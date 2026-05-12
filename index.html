@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="theme-color" content="" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>CAROUSEL</title>
+    <script>
+      (() => {
+        const BROWSER_THEME_COLORS = { light: "#bfd6f8", dark: "#0d1520" };
+        const STORAGE_KEY = "theme-mode";
+
+        try {
+          const mode = localStorage.getItem(STORAGE_KEY) || "auto";
+          let theme = mode;
+
+          if (mode === "auto") {
+            theme = window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+          }
+
+          document.documentElement.setAttribute("data-theme", theme);
+
+          const meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) {
+            meta.setAttribute("content", BROWSER_THEME_COLORS[theme]);
+          }
+        } catch {
+          const fallback = window.matchMedia("(prefers-color-scheme: dark)")
+            .matches
+            ? "dark"
+            : "light";
+          document.documentElement.setAttribute("data-theme", fallback);
+          document
+            .querySelector('meta[name="theme-color"]')
+            ?.setAttribute("content", BROWSER_THEME_COLORS[fallback]);
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/CarouselCC/assets/index-CgwnUDTN.js"></script>
+    <link rel="stylesheet" crossorigin href="/CarouselCC/assets/index-CAQGMbKk.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
