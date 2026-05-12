@@ -1,0 +1,128 @@
+@layer reset, baseStyles, components;
+
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+  }
+
+  body {
+    overflow-x: hidden;
+    background-color: var(--bg-global);
+    color: var(--color-global);
+    font-family: system-ui, Arial, sans-serif;
+  }
+
+  #root {
+    width: 100%;
+    min-height: 100vh;
+    box-sizing: border-box;
+  }
+
+  img,
+  picture,
+  video,
+  canvas,
+  svg {
+    display: block;
+    max-width: 100%;
+  }
+
+  input,
+  button,
+  textarea,
+  select {
+    background: none;
+    border: none;
+    outline: none;
+    color: inherit;
+    font: inherit;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  ul,
+  ol {
+    list-style: none;
+  }
+}
+
+:root {
+  --theme-marker: light;
+
+  --transition-color: 0.25s ease;
+  --transition-bg: 0.35s ease;
+  --transition-border: 0.3s ease;
+  --transition-opt: 0.35s ease;
+
+  --color-global: #1e2a3b;
+  --bg-global: #bfd6f8;
+  --border-global: #66686b;
+
+  --color-hover-global: #0b4882;
+  --bg-hover-global: #c7defa;
+  --border-hover-global: #4a749e;
+
+  --border-fv-global: #2f7bd3;
+  --shadow-fv-global: #1c3f6c4a;
+
+  --color-error-global: #c92c2c;
+  --bg-error-global: #f9f3f3;
+  --border-error-global: #d84949;
+
+  --color-disabled-global: #95908c;
+  --bg-disabled-global: #f0eeec;
+  --border-disabled-global: #b6b9bc;
+
+  --color-accent-global: #765af3;
+  --bg-accent-global: #bad0e5;
+  --border-accent-global: #1f6fb8;
+
+  --color-secondary-global: #596e89;
+  --bg-secondary-global: #f2f4f7;
+  --border-secondary-global: #9fb3c5;
+}
+
+[data-theme="dark"] {
+  --theme-marker: dark;
+
+  --color-global: #e5e9f0;
+  --bg-global: #0d1520;
+  --border-global: #91a6c1;
+
+  --color-hover-global: #84c5fb;
+  --bg-hover-global: #1d2f47;
+  --border-hover-global: #4082c3;
+
+  --border-fv-global: #d99821;
+  --shadow-fv-global: #b7cdeb60;
+
+  --color-error-global: #f3b1b1;
+  --bg-error-global: #2a0f13;
+  --border-error-global: #e96a6a;
+
+  --color-disabled-global: #a6a09a;
+  --bg-disabled-global: #1f2733;
+  --border-disabled-global: #4a535f;
+
+  --color-accent-global: #275df3;
+  --bg-accent-global: #204364;
+  --border-accent-global: #3a6a9c;
+
+  --color-secondary-global: #b0d1fc;
+  --bg-secondary-global: #1b2431;
+  --border-secondary-global: #4a607a;
+}

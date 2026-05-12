@@ -1,0 +1,103 @@
+.container_PW {
+  --dot-color: var(--color-secondary-global);
+  --dot-active-color: var(--color-global);
+  --dot-size: 24px;
+  --dots-gap: 30px;
+  --visible-dots-count: 5;
+  --widget-padding-inline: 28px;
+  --widget-padding-block: 12px;
+  --visible-dots-width: calc(var(--visible-dots-count) * var(--dot-size));
+  --visible-gaps-width: calc((var(--visible-dots-count) - 1) * var(--dots-gap));
+  --widget-width: calc(
+    var(--visible-dots-width) + var(--visible-gaps-width) +
+      (var(--widget-padding-inline) * 2)
+  );
+  --widget-height: calc(var(--dot-size) + (var(--widget-padding-block) * 2));
+
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--widget-width);
+  height: var(--widget-height);
+  border: 1px solid rgb(from var(--border-global) r g b / 40%);
+  border-radius: calc(var(--widget-height) / 2);
+  overflow: hidden;
+  transition: width 0.3s ease;
+  contain: layout paint;
+  box-sizing: border-box;
+}
+
+.dot_PW {
+  --dot-active-strength: 0;
+
+  position: absolute;
+  top: calc(50% - (var(--dot-size) / 2));
+  left: calc(50% - (var(--dot-size) / 2));
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: 50%;
+  background-color: var(--dot-color);
+  transform: translate3d(0, 0, 0) scale(1);
+  opacity: 1;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+.dot_PW::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-color: var(--dot-active-color);
+  box-shadow: 0 0 8px 1px var(--dot-active-color);
+  opacity: var(--dot-active-strength);
+  content: "";
+}
+
+.dotActive_PW {
+  z-index: 2;
+}
+
+.container_PW[data-motion-bound="true"] .dot_PW::after {
+  display: none;
+}
+
+.activeDot_PW {
+  position: absolute;
+  top: calc(50% - (var(--dot-size) / 2));
+  left: calc(50% - (var(--dot-size) / 2));
+  z-index: 3;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: 50%;
+  background-color: var(--dot-active-color);
+  box-shadow: 0 0 8px 1px var(--dot-active-color);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, 0, 0) scale(0);
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+@media (width <= 767px) {
+  .container_PW {
+    --widget-padding-inline: 20px;
+    --widget-padding-block: 10px;
+
+    max-width: calc(100vw - 24px);
+  }
+}
+
+@media (orientation: landscape) and (height <= 520px) {
+  .container_PW {
+    --widget-padding-inline: 14px;
+    --widget-padding-block: 7px;
+  }
+}
+
+@media (width <= 380px) {
+  .container_PW {
+    --widget-padding-inline: 12px;
+    --widget-padding-block: 8px;
+  }
+}

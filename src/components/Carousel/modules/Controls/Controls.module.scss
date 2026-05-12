@@ -1,0 +1,141 @@
+@layer components {
+  .navZone {
+    position: absolute;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 8%;
+    height: 100%;
+    border: none;
+    outline: none;
+    background-color: rgb(0 0 0 / 15%);
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    transform: none;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+    pointer-events: none;
+
+    &:focus-visible {
+      background-color: rgb(0 0 0 / 50%);
+    }
+  }
+
+  .navZoneL {
+    left: 0;
+  }
+
+  .navZoneR {
+    right: 0;
+  }
+
+  .navButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 45px;
+    height: 45px;
+    border: none;
+    border-radius: 50%;
+    color: rgb(245 245 245 / 80.7%);
+    background-color: rgb(0 0 0 / 45%);
+    user-select: none;
+    pointer-events: none;
+
+    svg {
+      opacity: 0.8;
+    }
+  }
+
+  [data-touch="true"] .navZone {
+    top: 50%;
+    width: 45px;
+    height: 45px;
+    background-color: transparent;
+    opacity: 1;
+    transform: translateY(-50%);
+    pointer-events: auto;
+  }
+
+  [data-touch="true"] .navZoneL {
+    left: 20px;
+  }
+
+  [data-touch="true"] .navZoneR {
+    right: 20px;
+  }
+
+  [data-touch="true"] .navButton {
+    background-color: rgb(0 0 0 / 20%);
+  }
+
+  [data-reduced-motion="true"] .navZone {
+    transition: none;
+  }
+
+  @media (width <= 1024px) {
+    .navZoneL {
+      left: 4px;
+    }
+
+    .navZoneR {
+      right: 4px;
+    }
+
+    .navButton {
+      width: 44px;
+      height: 88px;
+      border-radius: 8px;
+    }
+
+    [data-touch="true"] .navZone {
+      width: 44px;
+      height: 88px;
+    }
+
+    [data-touch="true"] .navZoneL {
+      left: 8px;
+    }
+
+    [data-touch="true"] .navZoneR {
+      right: 8px;
+    }
+  }
+
+  @media (width <= 767px) {
+    [data-touch="true"] .navZone {
+      width: 38px;
+      height: 72px;
+    }
+
+    [data-touch="true"] .navZoneL {
+      left: 6px;
+    }
+
+    [data-touch="true"] .navZoneR {
+      right: 6px;
+    }
+
+    .navButton {
+      width: 38px;
+      height: 72px;
+      border-radius: 8px;
+    }
+  }
+
+  @media (orientation: landscape) and (height <= 520px) {
+    [data-touch="true"] .navZone,
+    .navButton {
+      width: 34px;
+      height: 52px;
+    }
+  }
+
+  [data-touch="false"]:has(*:focus-visible) .navZone,
+  [data-touch="false"]:has([data-carousel-viewport]:hover) .navZone {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
