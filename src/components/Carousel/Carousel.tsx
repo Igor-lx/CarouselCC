@@ -63,10 +63,10 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
 
   // --- slots ----------------------------------------------------------------
   const slots = useMemo(() => resolveSlots(children, CAROUSEL_SLOTS), [children]);
+  const isDiagnosticActive = Boolean(slots.diagnostic);
 
-  // --- resolved runtime config ---------------------------------------------
-  const { config, notices } = useCarouselConfig({
-    diagnosticSlot: slots.diagnostic,
+  // --- resolved runtime config (no diagnostic dependency) ------------------
+  const config = useCarouselConfig({
     visibleSlidesNr,
     durationAutoplay,
     durationStep,
@@ -205,16 +205,32 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     visualPosition: isInstantMode ? null : visualPosition,
     isAtStart,
     isAtEnd,
+    isDiagnosticActive,
   });
 
+  // --- diagnostic context ---------------------------------------------------
+  // Carries raw props + observable layout/slot state. The carousel uses the
+  // resolved runtime config regardless of this context — diagnostics never
+  // feeds back into runtime.
   const diagnosticContextValue = useMemo(
     () => ({
-      notices,
-      perfectPageLayout: {
-        ...perfectPageLayoutInfo,
-        visibleSlidesCount: layout.visibleSlidesCount,
+      props: {
+        visibleSlidesNr,
+        durationAutoplay,
+        durationStep,
+        durationJump,
+        intervalAutoplay,
+        errAltPlaceholder,
       },
-      slotAttachment: {
+      layout: {
+        rawLength: perfectPageLayoutInfo.rawLength,
+        extendedLength: perfectPageLayoutInfo.extendedLength,
+        didExtendLayout: perfectPageLayoutInfo.didExtendLayout,
+        hasPerfectPageLayout: perfectPageLayoutInfo.hasPerfectPageLayout,
+        visibleSlidesCount: layout.visibleSlidesCount,
+        canSlide: layout.canSlide,
+      },
+      slots: {
         isControlsOn,
         hasControlsSlot: renderPolicy.hasControlsSlot,
         isPaginationOn,
@@ -222,13 +238,22 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
       },
     }),
     [
+      durationAutoplay,
+      durationJump,
+      durationStep,
+      errAltPlaceholder,
+      intervalAutoplay,
       isControlsOn,
       isPaginationOn,
+      layout.canSlide,
       layout.visibleSlidesCount,
-      notices,
-      perfectPageLayoutInfo,
+      perfectPageLayoutInfo.didExtendLayout,
+      perfectPageLayoutInfo.extendedLength,
+      perfectPageLayoutInfo.hasPerfectPageLayout,
+      perfectPageLayoutInfo.rawLength,
       renderPolicy.hasControlsSlot,
       renderPolicy.hasPaginationSlot,
+      visibleSlidesNr,
     ],
   );
 

@@ -16,10 +16,8 @@ export const applyResistance = (
   return sign * (abs / (1 + abs * Math.max(0, curvature) * stiffness));
 };
 
-export const clampMagnitude = (value: number, limit: number) => {
-  if (!Number.isFinite(value) || !(limit > 0)) return 0;
-  return Math.sign(value) * Math.min(Math.abs(value), limit);
-};
+export const clampMagnitude = (value: number, limit: number) =>
+  Math.sign(value) * Math.min(Math.abs(value), limit);
 
 export const calculateEma = (
   previous: number,

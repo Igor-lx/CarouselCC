@@ -9,6 +9,8 @@ import type { MotionPhase, MoveReason } from "../state";
 import type { CubicBezier } from "./types";
 
 const LINEAR: CubicBezier = { x1: 0, y1: 0, x2: 1, y2: 1 };
+const BEZIER_REGEX =
+  /cubic-bezier\(\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)/i;
 
 export const carouselEasingString = (
   motionPhase: MotionPhase,
@@ -27,31 +29,24 @@ export const carouselEasingString = (
   }
 };
 
+/**
+ * Parse a `cubic-bezier(...)` or `linear` string into a control-point record.
+ * No clamping, no fallback: the caller is responsible for syntactically valid
+ * input. A non-matching string yields a record of NaNs and downstream motion
+ * math will visibly fail — the diagnostic layer surfaces the same issue.
+ */
 const parseBezierString = (raw: string): CubicBezier => {
   if (raw.trim().toLowerCase() === "linear") return LINEAR;
-
-  const match =
-    /cubic-bezier\(\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)\s*,\s*([+-]?\d*\.?\d+)/i.exec(
-      raw,
-    );
-
-  if (!match) return LINEAR;
-
-  const x1 = Number.parseFloat(match[1] ?? "");
-  const y1 = Number.parseFloat(match[2] ?? "");
-  const x2 = Number.parseFloat(match[3] ?? "");
-  const y2 = Number.parseFloat(match[4] ?? "");
-
-  if (
-    !Number.isFinite(x1) ||
-    !Number.isFinite(y1) ||
-    !Number.isFinite(x2) ||
-    !Number.isFinite(y2)
-  ) {
-    return LINEAR;
+  const match = BEZIER_REGEX.exec(raw);
+  if (!match) {
+    return { x1: Number.NaN, y1: Number.NaN, x2: Number.NaN, y2: Number.NaN };
   }
-
-  return { x1: clamp(x1, 0, 1), y1, x2: clamp(x2, 0, 1), y2 };
+  return {
+    x1: Number.parseFloat(match[1] ?? ""),
+    y1: Number.parseFloat(match[2] ?? ""),
+    x2: Number.parseFloat(match[3] ?? ""),
+    y2: Number.parseFloat(match[4] ?? ""),
+  };
 };
 
 const cache = new Map<string, CubicBezier>();
@@ -63,6 +58,12 @@ export const parseBezier = (raw: string): CubicBezier => {
   cache.set(raw, parsed);
   return parsed;
 };
+
+export const isParsedBezierValid = (bezier: CubicBezier) =>
+  Number.isFinite(bezier.x1) &&
+  Number.isFinite(bezier.y1) &&
+  Number.isFinite(bezier.x2) &&
+  Number.isFinite(bezier.y2);
 
 const bezierValue = (t: number, p1: number, p2: number) => {
   const inverse = 1 - t;
@@ -120,6 +121,6 @@ export const sampleBezier = (bezier: CubicBezier, progress: number): BezierSampl
 
   return {
     progress: eased,
-    slope: Number.isFinite(slope) ? slope : 0,
+    slope,
   };
 };

@@ -24,12 +24,6 @@ export const REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE = 0.2;
 /** Fraction of the fast segment distance dedicated to ramp-down. */
 export const REPEATED_CLICK_DECELERATION_DISTANCE_SHARE = 0.7;
 
-/**
- * Hard cap for the deceleration share inside the segment factory — protects
- * against pathological values from external configuration.
- */
-export const REPEATED_CLICK_MAX_DECELERATION_DISTANCE_SHARE = 0.35;
-
 /** Cubic-bezier curves expressed as CSS strings. */
 export const JUMP_BEZIER = "cubic-bezier(0.16, 1, 0.3, 1)";
 export const MOVE_BEZIER = "cubic-bezier(0.24, 0.68, 0.42, 1)";

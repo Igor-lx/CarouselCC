@@ -24,6 +24,7 @@ interface UseModuleContextValueInput {
   visualPosition: VisualPositionSource | null;
   isAtStart: boolean;
   isAtEnd: boolean;
+  isDiagnosticActive: boolean;
 }
 
 export function useModuleContextValue({
@@ -38,6 +39,7 @@ export function useModuleContextValue({
   visualPosition,
   isAtStart,
   isAtEnd,
+  isDiagnosticActive,
 }: UseModuleContextValueInput): CarouselModuleContextValue {
   const statusView = useMemo<CarouselStatusView>(
     () => ({
@@ -66,10 +68,12 @@ export function useModuleContextValue({
       isAtEnd,
       isTouch,
       isReducedMotion,
+      isDiagnosticActive,
     }),
     [
       isAtEnd,
       isAtStart,
+      isDiagnosticActive,
       isReducedMotion,
       isTouch,
       state.layout.canSlide,

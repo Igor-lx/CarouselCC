@@ -139,11 +139,12 @@ horizontal translate transform.
   (`:has([data-carousel-viewport]:hover)`, `:has(*:focus-visible)`). On touch
   they are visible by default. `canMovePrev` / `canMoveNext` reflect the
   finite boundary state.
-- **Diagnostic**: an optional slot. When attached, its `resolveDiagnostic`
-  static parses props, normalises numeric inputs, and surfaces dev-only
-  warnings without changing runtime behaviour. The diagnostic resolver is the
-  source of truth for normalised values in DEV; otherwise the carousel falls
-  back to the raw resolved settings.
+- **Diagnostic**: an optional slot. When attached, it reads the carousel's
+  raw inputs and hand-written constants and emits dev-only warnings. It
+  never normalises, validates, repairs, or substitutes any runtime value;
+  the carousel uses identical runtime values with or without it. With the
+  slot attached, DEV consoles surface `[Carousel Diagnostic][CRITICAL|LOGICAL]`
+  lines describing each invariant violation and its consequence.
 
 ### 2.3 What is *not* part of the product contract
 
@@ -173,7 +174,7 @@ Every responsibility has exactly one owner. The orchestrator wires them.
 | Concern | Owner | Notes |
 | --- | --- | --- |
 | Public props | `Carousel.tsx` | Frozen contract, declared in `types.ts`. |
-| Resolved runtime config | `useCarouselConfig` | One memo. Reads props + diagnostic resolver. |
+| Resolved runtime config | `useCarouselConfig` | One memo. Substitutes defaults only for `undefined` props; never normalises explicit values. |
 | Slide records | `useCarouselSlideDeck` | Builds the slide records, optionally extends. |
 | Layout facts | `useCarouselSlideDeck` | `length`, `visibleSlidesCount`, `pageCount`, `virtualLength`, `canSlide`, `isFinite`, `dataKey`. |
 | Logical state | `useCarouselState` | Reducer-backed. Owns `activePageIndex`, `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`, `chain`, `gestureRelease`, `intent`. |
@@ -186,7 +187,7 @@ Every responsibility has exactly one owner. The orchestrator wires them.
 | Focus shift | `useFocusRecovery` | Triggers when the state settles. |
 | Module API | `useModuleContextValue` | Builds the value once, memoised. |
 | Module render policy | `useModuleRenderPolicy` | Decides whether controls / pagination render. |
-| Diagnostic resolver | `Diagnostic` module | The optional slot exposes `resolveDiagnostic`. |
+| Diagnostic warnings | `Diagnostic` module | Observe-only DEV warnings; never owns or replaces runtime values. |
 
 Each hook returns exactly the shape it owns. No hook reads another hook's
 internal state. Cross-layer values flow only through hook arguments and the
@@ -208,8 +209,10 @@ The system has four SSOTs, each owned by exactly one layer:
    layer. The track DOM and the PaginationWidget binding are its consumers.
 3. **Layout facts** — `useCarouselSlideDeck` returns a memoised `layout`
    object. Derived from props; recomputed only when the inputs change.
-4. **Runtime config** — `useCarouselConfig`. Coerces and normalises props
-   once, with diagnostic resolver overrides in DEV.
+4. **Runtime config** — `useCarouselConfig`. Substitutes defaults only for
+   `undefined` props. Never coerces, clamps, or repairs explicit values; the
+   diagnostic layer surfaces those issues without modifying the resolved
+   config.
 
 No layer mirrors another layer's value. The state machine never reads a
 sampled motion value; instead the gesture controller reads the visual
@@ -303,10 +306,15 @@ subscribe to `visualPosition` themselves and mutate their own DOM. Modules
 that only need the logical view (the pagination dots, controls availability)
 read from the context and re-render at the React tempo.
 
-The `Diagnostic` slot is the only module that can influence the resolved
-config — when attached, its static `resolveDiagnostic` is called by
-`useCarouselConfig`. The diagnostic module never reads runtime state and
-never decides runtime behaviour; it only inspects and warns.
+The `Diagnostic` slot is observe-only. When attached, its presence is
+surfaced as `layout.isDiagnosticActive` on the module context so modules
+with their own diagnostic checks (e.g. `PaginationWidget` via
+`useWidgetDiagnostic`) can run only when diagnostics are wired up. The
+slot itself reads `CarouselDiagnosticContext` (raw props + layout snapshot
++ slot attachment state) and runs the checks under
+`modules/Diagnostic/checks/`. Diagnostic never owns, normalises, replaces,
+or repairs any runtime value — the carousel uses identical runtime values
+regardless of whether the slot is attached.
 
 ---
 
@@ -388,7 +396,17 @@ src/components/Carousel/
     ├── Controls/...
     ├── Pagination/...
     ├── PaginationWidget/...
-    └── Diagnostic/...
+    └── Diagnostic/
+        ├── Diagnostic.tsx        observe-only orchestrator
+        ├── formatter.ts          unified warning line builder
+        ├── types.ts              Severity + Warning shape
+        ├── useGroupedWarnings.ts dev console emitter with dedupe
+        ├── useWidgetDiagnostic.ts  hook for PaginationWidget checks
+        └── checks/
+            ├── propChecks.ts     public input checks
+            ├── constantChecks.ts hand-written constant checks
+            ├── layoutChecks.ts   page layout + slot attachment
+            └── widgetChecks.ts   PaginationWidget prop checks
 ```
 
 This graph is intentionally different from the previous one. The old
@@ -525,11 +543,12 @@ The mapping below makes the differences explicit.
   window only shrinks back when motion settles. This avoids unmounting a
   slide mid-flight if the window edges shift; it costs at most one extra
   rendered slide pair during fast direction switches.
-- **Diagnostic resolver returns the runtime settings**: when the Diagnostic
-  slot is attached, its resolver is the source of normalised numeric
-  settings. This means a missing Diagnostic slot uses raw resolved settings
-  without normalisation. The trade-off is "more strictness in DEV, smaller
-  cost in production".
+- **Diagnostic is strictly observe-only**: the runtime values the carousel
+  uses do not depend on whether the Diagnostic slot is attached. Diagnostic
+  never normalises, validates, repairs, or substitutes any value; it reads
+  and warns. The trade-off is that the carousel will visibly misbehave when
+  fed invalid inputs (NaN propagation, impossible geometry, malformed
+  transforms) — which is the intended signal that the input must be fixed.
 
 ---
 
@@ -544,9 +563,11 @@ The mapping below makes the differences explicit.
 - **Strict Mode**: the motion controller cleanups handle remount; the
   visual position subscription returns a cleanup that disconnects from the
   controller.
-- **Runtime safety**: numeric inputs go through `coerceFiniteNumber` /
-  `coercePositiveNumber` helpers before they reach the reducer; layout
-  reconciliation tolerates page count changes and resets in dataKey changes.
+- **Runtime safety**: layout reconciliation tolerates page count changes
+  and resets on dataKey changes. Numeric inputs are *not* coerced or
+  repaired — invalid input is intentionally allowed to propagate so the
+  failure mode is visible. The diagnostic layer surfaces the violation
+  separately, without ever feeding back into runtime.
 - **Performance**: bezier and profile samplers cache their work where the
   inputs are known (parsed beziers, computed strips). The track binding
   short-circuits writes that would re-apply the same transform. The

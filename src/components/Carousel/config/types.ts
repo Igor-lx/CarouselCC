@@ -54,9 +54,3 @@ export interface RawConfigInput {
   intervalAutoplay?: unknown;
   errAltPlaceholder?: unknown;
 }
-
-/** A diagnostic slot may expose this resolver to take over config resolution. */
-export type CarouselDiagnosticResolver = (input: RawConfigInput) => {
-  config: CarouselRuntimeConfig;
-  notices: import("../../../shared").DevNoticeEntry[];
-};

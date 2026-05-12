@@ -160,10 +160,7 @@ export function useTrackBinding({
   );
 
   const readCurrentPosition = useCallback(() => {
-    const snapshot = visualPosition.getSnapshot();
-    const value = Number.isFinite(snapshot.position)
-      ? snapshot.position
-      : currentPositionRef.current;
+    const value = visualPosition.getSnapshot().position;
     writePosition(value);
     return value;
   }, [visualPosition, writePosition]);

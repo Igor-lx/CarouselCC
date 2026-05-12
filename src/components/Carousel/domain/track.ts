@@ -73,6 +73,6 @@ export const slideFlexStyle = (visibleSlidesCount: number): { flex: string } => 
  * index (the track shifts leftward in screen coordinates).
  */
 export const pointerVelocityToVirtual = (pointerVelocity: number, slotSize: number) => {
-  if (!Number.isFinite(pointerVelocity) || !(slotSize > 0)) return 0;
+  if (!(slotSize > 0)) return 0;
   return -(pointerVelocity / slotSize);
 };

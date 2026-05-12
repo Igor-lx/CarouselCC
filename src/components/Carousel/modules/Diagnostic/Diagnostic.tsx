@@ -1,43 +1,42 @@
-import { memo, useEffect } from "react";
+import { memo, useEffect, useMemo } from "react";
 
-import {
-  useGroupedDevNotice,
-} from "../../../../shared";
 import { useCarouselDiagnosticContext } from "../../context";
 import type { CarouselSlotComponent } from "../../slots";
-import { resolveCarouselDiagnostic } from "./resolveDiagnostic";
-import { usePerfectPageLayoutNotice, useSlotAttachmentNotice } from "./notices";
+import {
+  collectConstantWarnings,
+  collectLayoutWarnings,
+  collectPropWarnings,
+  collectSlotWarnings,
+} from "./checks";
+import type { CarouselDiagnosticWarning } from "./types";
+import { useGroupedWarnings } from "./useGroupedWarnings";
 
-const BANNER = "Carousel diagnostics enabled";
+const BANNER = "[Carousel Diagnostic] enabled. Observe-only — diagnostics never normalize or replace runtime values.";
 
 const DiagnosticBase = memo(function CarouselDiagnostic() {
-  const { notices, perfectPageLayout, slotAttachment } =
-    useCarouselDiagnosticContext();
+  const { props, layout, slots } = useCarouselDiagnosticContext();
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     console.info(BANNER);
   }, []);
 
-  useGroupedDevNotice({
-    scope: "Carousel diagnostic",
-    summary: "props were normalised",
-    entries: notices,
-  });
+  const warnings = useMemo<CarouselDiagnosticWarning[]>(
+    () => [
+      ...collectPropWarnings(props),
+      ...collectConstantWarnings(),
+      ...collectLayoutWarnings(layout),
+      ...collectSlotWarnings(slots),
+    ],
+    [layout, props, slots],
+  );
 
-  useSlotAttachmentNotice(slotAttachment);
-  usePerfectPageLayoutNotice(perfectPageLayout);
+  useGroupedWarnings(warnings);
 
   return null;
 });
 
-type DiagnosticSlot = CarouselSlotComponent<typeof DiagnosticBase, "diagnostic"> & {
-  resolveDiagnostic: typeof resolveCarouselDiagnostic;
-};
-
-export const Diagnostic: DiagnosticSlot = Object.assign(DiagnosticBase, {
-  slot: "diagnostic" as const,
-  resolveDiagnostic: resolveCarouselDiagnostic,
-});
+export const Diagnostic: CarouselSlotComponent<typeof DiagnosticBase, "diagnostic"> =
+  Object.assign(DiagnosticBase, { slot: "diagnostic" as const });
 
 export default Diagnostic;

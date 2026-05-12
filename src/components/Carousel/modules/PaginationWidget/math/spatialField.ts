@@ -48,7 +48,7 @@ export const buildPaginationWidgetGeometry = (
 };
 
 export const widgetProjectionSide = (visibleCount: number) =>
-  Math.max(1, Math.ceil(Math.max(1, visibleCount) / 2));
+  Math.ceil(visibleCount / 2);
 
 export const widgetProjectionSlotCount = (visibleCount: number) =>
   widgetProjectionSide(visibleCount) * 2 + 1;

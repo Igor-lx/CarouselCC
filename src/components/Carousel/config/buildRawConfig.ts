@@ -25,10 +25,10 @@ const useDefault = <T>(value: unknown, fallback: T): T =>
   typeof value === "undefined" ? fallback : (value as T);
 
 /**
- * Build the runtime config from raw prop input.
- * No coercion or validation is applied here — that is the diagnostic
- * resolver's job. This factory is the safe baseline used when no diagnostic
- * slot is attached.
+ * Assemble the runtime config. Defaults are applied only when a prop is
+ * `undefined`; any explicitly-provided value flows through unchanged. The
+ * carousel intentionally trusts its inputs — see the diagnostic layer for
+ * observability.
  */
 export const buildRawCarouselConfig = ({
   visibleSlidesNr,

@@ -1,10 +1,6 @@
 import { useCallback, useRef } from "react";
 
-import {
-  useIsomorphicLayoutEffect,
-  type DevNoticeEntry,
-} from "../../../../shared";
-import { useGroupedDevNotice } from "../../../../shared";
+import { useIsomorphicLayoutEffect } from "../../../../shared";
 import type { VisualPositionSource } from "../../position";
 import {
   widgetProjectionSide,
@@ -163,8 +159,7 @@ export function usePaginationWidgetBinding({
 
   const writeVisualOffset = useCallback(
     (visualOffset: number) => {
-      const safe = Number.isFinite(visualOffset) ? visualOffset : 0;
-      const firstId = Math.round(safe) - side;
+      const firstId = Math.round(visualOffset) - side;
       const cache = dotCacheRef.current;
 
       for (let index = 0; index < slotCount; index += 1) {
@@ -172,7 +167,7 @@ export function usePaginationWidgetBinding({
         if (!dot) continue;
 
         const id = firstId + index;
-        const state = writeDotProjection(projectionRef.current, id, safe, geometry);
+        const state = writeDotProjection(projectionRef.current, id, visualOffset, geometry);
         const transform = toTransform(state.x, state.scale);
         const last = cache[index];
 
@@ -190,7 +185,7 @@ export function usePaginationWidgetBinding({
         }
       }
 
-      writeActiveProjection(safe);
+      writeActiveProjection(visualOffset);
     },
     [geometry, side, slotCount, writeActiveProjection],
   );
@@ -209,33 +204,4 @@ export function usePaginationWidgetBinding({
     slotCount,
     activeDotCount: ACTIVE_DOT_COUNT,
   };
-}
-
-interface UseLayoutNoticeInput {
-  requestedVisibleDots: number | undefined;
-  normalizedVisibleDots: number;
-}
-
-export function usePaginationWidgetLayoutNotice({
-  requestedVisibleDots,
-  normalizedVisibleDots,
-}: UseLayoutNoticeInput) {
-  const entries: DevNoticeEntry[] =
-    typeof requestedVisibleDots === "number" &&
-    requestedVisibleDots !== normalizedVisibleDots
-      ? [
-          {
-            field: "visibleDots",
-            provided: requestedVisibleDots,
-            normalized: normalizedVisibleDots,
-            reason: "must be an odd integer in [3, 101]",
-          },
-        ]
-      : [];
-
-  useGroupedDevNotice({
-    scope: "PaginationWidget",
-    summary: "props were normalised",
-    entries,
-  });
 }

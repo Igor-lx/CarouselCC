@@ -2,9 +2,6 @@ import {
   resolveInertialRelease,
   type InertialReleaseConfig,
 } from "../../../shared";
-import {
-  REPEATED_CLICK_MAX_DECELERATION_DISTANCE_SHARE,
-} from "../config";
 import type {
   CarouselRuntimeConfig,
   RepeatedClickSettings,
@@ -21,12 +18,6 @@ import type {
   MotionStart,
   ProfileSegment,
 } from "./types";
-
-const clampDecelerationShare = (share: number) =>
-  Math.min(share, REPEATED_CLICK_MAX_DECELERATION_DISTANCE_SHARE);
-
-const normalSpeed = (stepSize: number, stepDuration: number) =>
-  stepSize > 0 && stepDuration > 0 ? averageSpeed(stepSize, stepDuration) : 0;
 
 const intentFromState = (state: CarouselState, isInstant: boolean): CarouselMotionIntent => {
   if (isInstant || state.motionPhase === "step-instant") return "instant";
@@ -109,7 +100,7 @@ const buildRepeatedProfile = (
       peakSpeed: Math.abs(peakVelocity),
       endSpeed: Math.abs(endVelocity),
       accelerationDistanceShare: repeated.accelerationDistanceShare,
-      decelerationDistanceShare: clampDecelerationShare(repeated.decelerationDistanceShare),
+      decelerationDistanceShare: repeated.decelerationDistanceShare,
       targetDuration: duration,
     }),
   };
@@ -138,7 +129,7 @@ const buildRepeatedFollowUpProfile = (
       peakSpeed: Math.abs(peakVelocity),
       endSpeed: 0,
       accelerationDistanceShare: 0,
-      decelerationDistanceShare: clampDecelerationShare(repeated.decelerationDistanceShare),
+      decelerationDistanceShare: repeated.decelerationDistanceShare,
     }),
   };
 };
@@ -234,7 +225,7 @@ export function buildCarouselSegment({
     gestureReleaseDuration: baseRelease.duration,
   });
 
-  const moveSpeed = normalSpeed(stepSize, config.stepDuration);
+  const moveSpeed = averageSpeed(stepSize, config.stepDuration);
   const fallbackMoveSpeed = moveSpeed || averageSpeed(state.virtualIndex - start.position, duration);
 
   if (intent === "repeated-click") {

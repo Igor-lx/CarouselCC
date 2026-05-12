@@ -22,34 +22,28 @@ export interface UseVisualPositionResult {
   controller: MotionController<CarouselMotionStrategy>;
 }
 
-const safeStepSize = (visibleSlidesCount: number) =>
-  visibleSlidesCount > 0 ? visibleSlidesCount : 1;
-
 const toFrame = (
   sample: MotionSample<CarouselMotionStrategy>,
   visibleSlidesCount: number,
-): VisualPositionFrame => {
-  const stepSize = safeStepSize(visibleSlidesCount);
-  return {
-    position: sample.value,
-    pageOffset: sample.value / stepSize,
-    velocity: sample.velocity,
-    target: sample.target,
-    targetPageOffset: sample.target / stepSize,
-    strategy: sample.strategy,
-    timestamp: sample.timestamp,
-    phase: sample.phase,
-    progress: sample.progress,
-  };
-};
+): VisualPositionFrame => ({
+  position: sample.value,
+  pageOffset: sample.value / visibleSlidesCount,
+  velocity: sample.velocity,
+  target: sample.target,
+  targetPageOffset: sample.target / visibleSlidesCount,
+  strategy: sample.strategy,
+  timestamp: sample.timestamp,
+  phase: sample.phase,
+  progress: sample.progress,
+});
 
 export function useVisualPosition({
   visibleSlidesCount,
 }: UseVisualPositionInput): UseVisualPositionResult {
   const controller = useMotionController<CarouselMotionStrategy>(0, "idle");
 
-  const stepSizeRef = useRef(safeStepSize(visibleSlidesCount));
-  stepSizeRef.current = safeStepSize(visibleSlidesCount);
+  const stepSizeRef = useRef(visibleSlidesCount);
+  stepSizeRef.current = visibleSlidesCount;
 
   const listenersRef = useRef<Set<VisualPositionListener>>(new Set());
   const lastFrameRef = useRef<VisualPositionFrame>(

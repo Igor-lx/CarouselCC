@@ -38,11 +38,17 @@ const buildStartFromSample = (
   strategy: sample.strategy,
 });
 
-const buildStartFromGesture = (
-  state: CarouselState,
-  currentPosition: number,
-): MotionStart => ({
-  position: currentPosition,
+/**
+ * Origin of a post-drag release segment. The state machine wrote
+ * `fromVirtualIndex` from the visually-sampled release position at END_DRAG,
+ * so we read it here directly. We deliberately do NOT use the motion
+ * controller's snapshot: drag bypasses the controller (immediate transform
+ * writes via `applyTrackPosition`), so the controller's `sample` is stale
+ * for the entire drag span and using it would jump the track back to the
+ * pre-drag logical origin before the release segment animates.
+ */
+const buildStartFromGesture = (state: CarouselState): MotionStart => ({
+  position: state.fromVirtualIndex,
   velocity: state.gesture.uiVelocity,
   strategy: "gesture",
 });
@@ -156,7 +162,7 @@ export function useMotionRunner({
       isRepeatedFollowUp = handoff.strategy === "repeated";
       consumedHandoff = true;
     } else if (state.moveReason === "gesture") {
-      start = buildStartFromGesture(state, currentSample.value);
+      start = buildStartFromGesture(state);
     } else {
       start = buildStartFromIdle(currentSample.value, currentSample.velocity);
     }

@@ -16,7 +16,6 @@ export {
   REPEATED_CLICK_SPEED_MULTIPLIER,
   REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
   REPEATED_CLICK_DECELERATION_DISTANCE_SHARE,
-  REPEATED_CLICK_MAX_DECELERATION_DISTANCE_SHARE,
 } from "./motion";
 export {
   AUTOPLAY_PAGINATION_FACTOR,
@@ -28,13 +27,9 @@ export {
   CAROUSEL_INERTIAL_RELEASE_CONFIG,
 } from "./gesture";
 export { buildRawCarouselConfig } from "./buildRawConfig";
-export {
-  useCarouselConfig,
-} from "./useCarouselConfig";
-export type { CarouselResolvedConfig } from "./useCarouselConfig";
+export { useCarouselConfig } from "./useCarouselConfig";
 export type {
   CarouselRuntimeConfig,
-  CarouselDiagnosticResolver,
   RawConfigInput,
   PropDerivedSettings,
   MotionSettings,

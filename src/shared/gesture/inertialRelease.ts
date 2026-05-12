@@ -19,19 +19,11 @@ export interface InertialReleaseResult {
   isInertialRelease: boolean;
 }
 
-const safeSpeed = (value: number) =>
-  Number.isFinite(value) ? Math.max(0, Math.abs(value)) : 0;
-
 const sameDirectionSpeed = (velocity: number, distance: number) => {
   const direction = Math.sign(distance);
-  if (direction === 0 || !Number.isFinite(velocity) || Math.sign(velocity) !== direction) {
-    return 0;
-  }
+  if (direction === 0 || Math.sign(velocity) !== direction) return 0;
   return Math.abs(velocity);
 };
-
-const clamp = (value: number, min: number, max: number) =>
-  Math.max(min, Math.min(max, value));
 
 interface ResolveReleaseInput {
   gestureReleaseVelocity: number;
@@ -40,41 +32,37 @@ interface ResolveReleaseInput {
   config: InertialReleaseConfig;
 }
 
+/**
+ * Resolve the speed/duration of an inertial release. Inputs are trusted —
+ * the caller is responsible for finite, in-range values. The function performs
+ * algorithmic math only.
+ */
 export function resolveInertialRelease({
   gestureReleaseVelocity,
   distanceToTarget,
   baseDuration,
   config,
 }: ResolveReleaseInput): InertialReleaseResult {
-  const distance = Number.isFinite(distanceToTarget) && distanceToTarget !== 0
-    ? distanceToTarget
-    : Math.sign(gestureReleaseVelocity) || 1;
-  const safeBaseDuration =
-    Number.isFinite(baseDuration) && baseDuration > 0 ? baseDuration : 0;
-  const minimumSpeed = safeBaseDuration > 0 ? Math.abs(distance) / safeBaseDuration : 0;
-  const releaseSpeed = sameDirectionSpeed(gestureReleaseVelocity, distance);
-  const safeReleaseSpeed = safeSpeed(releaseSpeed);
-  const safeMinimum = safeSpeed(minimumSpeed);
-  const fasterThanBase = safeReleaseSpeed > safeMinimum;
-  const boostedReleaseSpeed = safeReleaseSpeed * Math.max(0, config.inertiaBoost);
+  const minimumSpeed = baseDuration > 0 ? Math.abs(distanceToTarget) / baseDuration : 0;
+  const releaseSpeed = sameDirectionSpeed(gestureReleaseVelocity, distanceToTarget);
+  const fasterThanBase = releaseSpeed > minimumSpeed;
+  const boostedReleaseSpeed = releaseSpeed * config.inertiaBoost;
   const effectiveReleaseSpeed = !fasterThanBase
-    ? safeMinimum
-    : safeMinimum > 0
-      ? Math.max(boostedReleaseSpeed, safeMinimum)
+    ? minimumSpeed
+    : minimumSpeed > 0
+      ? Math.max(boostedReleaseSpeed, minimumSpeed)
       : boostedReleaseSpeed;
-  const decelerationShare = fasterThanBase
-    ? clamp(config.decelerationDistanceShare, 0, 1)
-    : 0;
+  const decelerationShare = fasterThanBase ? config.decelerationDistanceShare : 0;
 
-  let duration = safeBaseDuration;
-  const safeDistance = Math.abs(distance);
-  if (safeDistance > 0 && effectiveReleaseSpeed > 0) {
-    duration = (safeDistance / effectiveReleaseSpeed) * (1 + decelerationShare);
+  let duration = baseDuration;
+  const absDistance = Math.abs(distanceToTarget);
+  if (absDistance > 0 && effectiveReleaseSpeed > 0) {
+    duration = (absDistance / effectiveReleaseSpeed) * (1 + decelerationShare);
   }
 
   return {
     effectiveReleaseSpeed,
-    duration: Math.max(0, duration),
+    duration,
     isInertialRelease: fasterThanBase,
   };
 }

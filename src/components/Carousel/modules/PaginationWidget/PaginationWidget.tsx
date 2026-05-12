@@ -4,13 +4,10 @@ import { memo, useMemo } from "react";
 import { mergeStyleMaps } from "../../../../shared";
 import { useCarouselModuleContext } from "../../context";
 import type { CarouselSlotComponent } from "../../slots";
-import { normalizePaginationWidgetConfig } from "./config";
+import { useWidgetDiagnostic } from "../Diagnostic/useWidgetDiagnostic";
 import { buildPaginationWidgetGeometry } from "./math/spatialField";
 import { projectDot } from "./math/projection";
-import {
-  usePaginationWidgetBinding,
-  usePaginationWidgetLayoutNotice,
-} from "./usePaginationWidgetBinding";
+import { usePaginationWidgetBinding } from "./usePaginationWidgetBinding";
 import { PaginationWidgetDot } from "./PaginationWidgetDot";
 import { PAGINATION_WIDGET_DEFAULTS } from "./defaults";
 import styles from "./PaginationWidget.module.scss";
@@ -28,20 +25,18 @@ const PaginationWidgetBase = memo(function PaginationWidget({
 }: PaginationWidgetProps) {
   const { intent, layout, visualPosition } = useCarouselModuleContext();
 
-  // When reduced motion is on, the binding has nothing to subscribe to and
-  // we render a static snapshot. Otherwise we render the bound mode where
-  // dots are mutated frame-by-frame by the binding.
+  // When reduced motion is on, the binding has nothing to subscribe to and we
+  // render a static snapshot. Otherwise the binding mutates dots frame-by-frame.
   const isMotionBound = visualPosition !== null && !layout.isReducedMotion;
 
-  const { visibleDots: normalizedVisibleDots, spatial } = useMemo(
-    () =>
-      normalizePaginationWidgetConfig({ visibleDots, dotSize, dotGap, scaleFactor }),
-    [dotGap, dotSize, scaleFactor, visibleDots],
+  const spatial = useMemo(
+    () => ({ size: dotSize, gap: dotGap, scaleFactor }),
+    [dotGap, dotSize, scaleFactor],
   );
 
   const geometry = useMemo(
-    () => buildPaginationWidgetGeometry(normalizedVisibleDots, spatial),
-    [normalizedVisibleDots, spatial],
+    () => buildPaginationWidgetGeometry(visibleDots, spatial),
+    [spatial, visibleDots],
   );
 
   const classNames = useMemo(
@@ -66,10 +61,7 @@ const PaginationWidgetBase = memo(function PaginationWidget({
     [activeDotCount],
   );
 
-  usePaginationWidgetLayoutNotice({
-    requestedVisibleDots: visibleDots,
-    normalizedVisibleDots: geometry.visibleCount,
-  });
+  useWidgetDiagnostic({ visibleDots, dotSize, dotGap, scaleFactor });
 
   const containerStyle = useMemo<PaginationWidgetContainerCSSVars>(
     () => ({

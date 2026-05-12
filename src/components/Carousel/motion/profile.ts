@@ -24,6 +24,11 @@ export interface MotionProfileInput {
   targetDuration?: number;
 }
 
+/**
+ * Lower bound for the average speed used to compute zone duration. Avoids
+ * a 0-divide singularity in `distance / averageSpeed`; not a substitution
+ * for an invalid input.
+ */
 const MIN_PROFILE_SPEED = 1e-6;
 
 const smoothstep = (progress: number) => progress * progress * (3 - 2 * progress);
@@ -34,26 +39,9 @@ const smoothstepIntegral = (progress: number) =>
 const lerp = (from: number, to: number, progress: number) =>
   from + (to - from) * progress;
 
-const normalizeShare = (value: number) =>
-  Number.isFinite(value) ? clamp(value, 0, 1) : 0;
-
-const partitionShares = (acceleration: number, deceleration: number) => {
-  let accelerationShare = normalizeShare(acceleration);
-  let decelerationShare = normalizeShare(deceleration);
-  if (accelerationShare + decelerationShare > 1) {
-    accelerationShare = 0.5;
-    decelerationShare = 0.5;
-  }
-  return {
-    accelerationShare,
-    cruiseShare: Math.max(0, 1 - accelerationShare - decelerationShare),
-    decelerationShare,
-  };
-};
-
 const zoneDuration = (distance: number, startSpeed: number, endSpeed: number) => {
   if (!(distance > 0)) return 0;
-  const averageSpeed = Math.max(MIN_PROFILE_SPEED, (Math.max(0, startSpeed) + Math.max(0, endSpeed)) * 0.5);
+  const averageSpeed = Math.max(MIN_PROFILE_SPEED, (startSpeed + endSpeed) * 0.5);
   return distance / averageSpeed;
 };
 
@@ -138,30 +126,24 @@ export const createMotionProfile = ({
   decelerationDistanceShare,
   targetDuration,
 }: MotionProfileInput): MotionProfile => {
-  const safeDistance = Math.abs(distance);
-  const safeStart = Math.max(0, startSpeed);
-  const safePeak = Math.max(MIN_PROFILE_SPEED, peakSpeed);
-  const safeEnd = Math.max(0, endSpeed);
-  const { accelerationShare, cruiseShare, decelerationShare } = partitionShares(
-    accelerationDistanceShare,
-    decelerationDistanceShare,
-  );
+  const absDistance = Math.abs(distance);
+  const accelerationShare = accelerationDistanceShare;
+  const decelerationShare = decelerationDistanceShare;
+  const cruiseShare = 1 - accelerationShare - decelerationShare;
 
-  const durationBoundPeak =
+  const resolvedPeak =
     typeof targetDuration === "number" && targetDuration > 0
       ? solvePeakForDuration({
-          distance: safeDistance,
+          distance: absDistance,
           targetDuration,
-          startSpeed: safeStart,
-          peakSpeed: safePeak,
-          endSpeed: safeEnd,
+          startSpeed,
+          peakSpeed,
+          endSpeed,
           accelerationShare,
           cruiseShare,
           decelerationShare,
         })
-      : safePeak;
-
-  const resolvedPeak = Math.max(safePeak, safeStart, safeEnd, durationBoundPeak);
+      : peakSpeed;
 
   const zones: MotionProfileZone[] = [];
   let progress = 0;
@@ -169,23 +151,23 @@ export const createMotionProfile = ({
   progress = pushZone(zones, {
     distanceProgress: progress,
     share: accelerationShare,
-    startSpeed: safeStart,
+    startSpeed,
     endSpeed: resolvedPeak,
-    distance: safeDistance,
+    distance: absDistance,
   });
   progress = pushZone(zones, {
     distanceProgress: progress,
     share: cruiseShare,
     startSpeed: resolvedPeak,
     endSpeed: resolvedPeak,
-    distance: safeDistance,
+    distance: absDistance,
   });
   pushZone(zones, {
     distanceProgress: progress,
     share: decelerationShare,
     startSpeed: resolvedPeak,
-    endSpeed: safeEnd,
-    distance: safeDistance,
+    endSpeed,
+    distance: absDistance,
   });
 
   const duration =

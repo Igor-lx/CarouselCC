@@ -15,4 +15,3 @@ export { ChevronIcon } from "./icons/ChevronIcon";
 export type { ChevronDirection } from "./icons/ChevronIcon";
 
 export * from "./math/numeric";
-export * from "./dev-notice";

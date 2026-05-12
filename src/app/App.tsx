@@ -35,9 +35,7 @@ export default function App() {
   const device = useBreakpoint(VISIBLE_BY_BREAKPOINT);
 
   const visibleSlidesNr =
-    isTouch && isCompactLandscape
-      ? COMPACT_LANDSCAPE_VISIBLE_SLIDES
-      : device;
+    isTouch && isCompactLandscape ? COMPACT_LANDSCAPE_VISIBLE_SLIDES : device;
   const useMobileImages = device === 1 && !isCompactLandscape;
 
   const slidesData = useMemo(
@@ -81,9 +79,9 @@ export default function App() {
             isAuto={isAutoplay}
             isPaginationOn
             isInteractive={isInteractive}
-            durationAutoplay={7000}
+            durationAutoplay={5000}
             durationStep={7000}
-            durationJump={450}
+            durationJump={9450}
             intervalAutoplay={3000}
             isPagePaddingOn
             isTouchDevice={isTouch}
