@@ -1,196 +1,303 @@
-# Carousel — Architecture
+# Carousel
 
-This document is the source of truth for the Carousel component's internal design.
-It exists alongside the code and is updated whenever an architectural decision changes.
+A React 19 carousel deck with motion-controller-driven track movement, touch
+gesture, repeated-click chaining, autoplay, dot pagination, an alternative
+touch pagination widget, edge controls, and a dev-only diagnostic slot.
 
-The reader should be able to start here, then open `Carousel.tsx` and follow the
-composition top-down without surprises.
+The component is a single composition root (`Carousel.tsx`) plus four pluggable
+slot modules. The track owns a horizontal `transform` that is mutated outside
+React at RAF tempo by a single visual-position SSOT; React only re-renders on
+logical state transitions (click, gesture release, autoplay tick, settle).
 
----
-
-## 1. Why a rebuild instead of a refactor
-
-The previous implementation (located in the sibling `test-deploy` project) had
-many strong local pieces — a motion controller, a drag engine, a motion-profile
-solver, a virtual-windowing helper, a slot resolver — but the system as a whole
-suffered from:
-
-- ownership ambiguity: state machine, motion controller, projection source, and
-  DOM bridge each held overlapping snapshots of "where the carousel currently is";
-- accidental coupling: a `motion-projection-source` layer with priorities and
-  deferred frames sat between the controller and its consumers, but its priorities
-  were never genuinely required and its deferred-frame branching obscured the
-  data flow;
-- mixed responsibilities inside the orchestrator: `Carousel.tsx` declared an
-  18-hook pipeline that re-derived layout, reconciled state, planned motion, and
-  wired modules — all readable in isolation, but with no top-down narrative;
-- a special-cased `repeated-click` planner that lived half in the reducer and
-  half in the motion-plan resolver, with `followUpVirtualIndex` flowing through
-  three different layers before the runner consumed it.
-
-The product behaviour was good and worth preserving. The implementation skeleton
-was not.
-
-This rebuild keeps the product contract (public props, demo experience, visual
-states, gesture and click semantics, reduced-motion, autoplay, interruption
-handling, repeated-click chaining, pagination response) and replaces the
-skeleton with a layered design where each concern has exactly one owner.
-
-The rebuild also keeps individual pieces of self-contained domain math from the
-old code — a cubic-bezier sampler, a motion-profile solver, an EMA velocity
-filter, a render-window expander. They are atomic, well-tested by inspection,
-and ported into the new layout where appropriate. None of the old orchestration
-hooks, module-context shape, reducer transitions folder, or motion-projection
-layer survived as a structural element.
+This document is the source of truth for the component. It starts from the
+public contract — every prop, every dependency between props, every default —
+and then describes the internal architecture.
 
 ---
 
-## 2. Product contract restored from test-deploy
+## 1. Product contract
 
-These are user-facing facts the new implementation must keep. Sourced from
-props, defaults, constants, styles, demo usage, and module behaviour.
+### 1.1 Import
 
-### 2.1 Public API
+```tsx
+import Carousel, { type Slide, type CarouselProps } from "@/components/Carousel";
+import { Pagination } from "@/components/Carousel/modules/Pagination";
+import { PaginationWidget } from "@/components/Carousel/modules/PaginationWidget";
+import { Controls } from "@/components/Carousel/modules/Controls";
+import { Diagnostic } from "@/components/Carousel/modules/Diagnostic";
+```
 
-`Carousel` accepts:
+The default export is the deck. Modules are named exports from their own
+folders and attach via the `slot` static convention (see §3).
 
-- `slidesData: Slide[]` where `Slide = { id, content, alt? }` and `content` is a
-  trimmed-non-empty string, a number, or a React element;
-- `visibleSlidesNr?: number` (default 3) — how many slides share the viewport;
-- `isPagePaddingOn?: boolean` (default false) — when on, pads the deck with
-  cloned tail slides so the deck length is a multiple of `visibleSlidesNr`;
-- `durationAutoplay?: number` (default 3000), `intervalAutoplay?: number`
-  (default 3000), `durationStep?: number` (default 2000), `durationJump?: number`
-  (default 800) — timing inputs in milliseconds;
-- `isContentImg?: boolean` (default true), `errAltPlaceholder?: string`
-  (default `"Downloading Error"`);
-- `isAuto?: boolean` (default true), `isPaginationOn?: boolean` (default true),
-  `isControlsOn?: boolean` (default true), `isInteractive?: boolean`
-  (default true), `isFinite?: boolean` (default false);
-- `isInstantMotion?: boolean` — explicit override for prefers-reduced-motion;
-- `isTouchDevice?: boolean` — explicit override for detected touch device;
-- `className?: ClassNameMap` — partial map keyed by `outerContainer`,
-  `innerContainer`, `slideContainer`, `slide`, `slideInteractive`, `slideError`,
-  `slideText`;
-- `onSlideClick?: (slide: Slide) => void`;
-- `onMotionIdleStatusChange?: (isIdle: boolean) => void` - external lifecycle signal
-  for consumers that need to coordinate work around carousel motion. The
-  callback reports only the public idle/running boundary; it does not expose the
-  reducer state, visual position stream, or asset-loading responsibilities;
-- `children?` — slots: `Pagination | PaginationWidget`, `Controls`,
-  `Diagnostic`, attached by a `slot` static on the component.
+### 1.2 Minimal usage
 
-The component renders a region with `role="region"`,
-`aria-roledescription="carousel"`, exposes `data-touch` and `data-reduced-motion`
-on the outer container, and a `data-carousel-track` track that owns the
-horizontal translate transform.
+```tsx
+<Carousel slidesData={slides}>
+  <Pagination />
+  <Controls />
+</Carousel>
+```
 
-### 2.2 Functional semantics worth preserving
+With overrides:
 
-- **Slide layout**: `pageCount = ceil(length / visibleSlidesCount)`. When
-  `length <= visibleSlidesCount`, `canSlide` is false and the deck shows
-  statically. When `!isFinite && canSlide`, the track behaves cyclically.
-- **Step semantics**: `MOVE(+1)` advances by one page, `MOVE(-1)` retreats by
-  one page, `GO_TO(pageIndex)` jumps over a possibly larger distance. In the
-  infinite/cyclic mode `GO_TO` always travels the shortest cyclic distance.
-- **Repeated click**: a click in the same direction while the previous click's
-  motion is still running does not restart from scratch. Instead it plans a
-  fast in-flight advance to `(1 + destinationPosition) * stepSize` of the
-  current page (destination position 1 on desktop, 0.99 on touch), with a
+```tsx
+<Carousel
+  slidesData={slides}
+  visibleSlidesNr={3}
+  isAuto
+  isPagePaddingOn
+  durationStep={2000}
+  durationJump={800}
+  intervalAutoplay={3000}
+  onSlideClick={(slide) => openInNewTab(String(slide.content))}
+  onMotionIdleStatusChange={setIsIdle}
+>
+  {isTouch ? <PaginationWidget /> : <Pagination />}
+  <Controls />
+  <Diagnostic />
+</Carousel>
+```
+
+### 1.3 Public props
+
+All props are optional except `slidesData`. Defaults below are substituted only
+for `undefined` props. Other values pass through unchanged — invalid input
+(NaN, negative durations, mismatched slot counts) is surfaced by the
+`Diagnostic` slot but never repaired at runtime, so the failure mode is
+visible.
+
+#### Slides
+
+| Prop          | Type            | Default | Effect |
+| ------------- | --------------- | ------- | ------ |
+| `slidesData`  | `Slide[]`       | —       | Required. `Slide = { id: string \| number; content: string \| number \| ReactElement; alt?: string }`. `content` must be a trimmed-non-empty string, a number, or a React element. |
+| `visibleSlidesNr` | `number`     | `3`     | How many slides share the viewport. Drives layout flex-basis, slot-size measurement, page math (`pageCount = ceil(slidesData.length / visibleSlidesNr)`), and the PaginationWidget projection slot count. |
+| `isPagePaddingOn` | `boolean`    | `false` | When on, pads the deck with cloned tail slides so `length` becomes a multiple of `visibleSlidesNr`. Eliminates partial pages at the tail. |
+| `isContentImg` | `boolean`      | `true`  | When on, treats string `content` as an `<img src>`. When off, renders raw `content`. Image errors fall back to `slide.alt` or `errAltPlaceholder`. |
+| `errAltPlaceholder` | `string`  | `"Downloading Error"` | Used when an image fails to load and the slide has no `alt`. |
+
+#### Layout / motion mode
+
+| Prop            | Type      | Default | Effect |
+| --------------- | --------- | ------- | ------ |
+| `isFinite`      | `boolean` | `false` | When on, the track stops at the boundaries (no wrap, `isAtStart`/`isAtEnd` flag the edges). When off, the track loops cyclically and `GO_TO` always travels the shortest cyclic distance. |
+| `isInstantMotion` | `boolean` | — *(reads `prefers-reduced-motion`)* | Explicit override for the OS-level reduced-motion preference. When set or detected: every transition snaps instantly, gesture is disabled, the PaginationWidget runs in static (non-motion-bound) mode. |
+| `isTouchDevice` | `boolean` | — *(detects via `(pointer:coarse)`)* | Explicit override for touch detection. Controls: gesture eligibility, `data-touch` outer attribute, hover-pause exemption for autoplay, the touch variant of `REPEATED_CLICK_DESTINATION_POSITION` (0.99 instead of 1). |
+
+#### Timings (milliseconds)
+
+| Prop              | Default | Effect |
+| ----------------- | ------- | ------ |
+| `durationAutoplay` | `3000` | Duration of an autoplay-driven page step. |
+| `intervalAutoplay` | `3000` | Idle interval between two autoplay steps. |
+| `durationStep`    | `2000`  | Base duration of one click / gesture-driven step. Repeated-click fast segment duration is `durationStep ÷ REPEATED_CLICK_SPEED_MULTIPLIER` (≈ `durationStep / 4.5`). Multi-page click distances scale linearly. |
+| `durationJump`    | `800`   | Duration of `GO_TO` jumps (e.g. pagination click to a far page, autoplay loop-back). Also used as the fallback duration when reduced-motion mode requires a hard jump. |
+
+#### Module gates
+
+| Prop             | Default | Effect |
+| ---------------- | ------- | ------ |
+| `isAuto`         | `true`  | Master autoplay switch. When `false`, the `setTimeout` loop never runs. Autoplay also auto-pauses when (a) the viewport is <`VISIBILITY_THRESHOLD` (20 %) on screen, (b) the user is dragging or motion is in progress, (c) on desktop only, the pointer hovers the viewport (`HOVER_PAUSE_DELAY` 150 ms debounce). On the final page in finite mode it loops back to page 0 via `GO_TO`. |
+| `isPaginationOn` | `true`  | Gates the rendering of the attached `Pagination`/`PaginationWidget` slot. If the prop is `true` but no pagination slot is attached, nothing renders; the slot must opt in by being placed in `children`. |
+| `isControlsOn`   | `true`  | Same contract as `isPaginationOn`, for the `Controls` slot. |
+| `isInteractive`  | `true`  | When on, a slide whose image has loaded successfully and that has an `onSlideClick` handler renders as a `<button>`. When off, slides are never interactive even with a handler. |
+
+#### Callbacks
+
+| Prop                       | Type | Effect |
+| -------------------------- | ---- | ------ |
+| `onSlideClick`             | `(slide: Slide) => void` | Fires when an interactive slide is clicked. The slide is interactive only when `isInteractive`, the image (if any) loaded successfully, and this handler is provided. |
+| `onMotionIdleStatusChange` | `(isIdle: boolean) => void` | Fires when the carousel crosses the idle ↔ running boundary. **Observation-only**: it never drives carousel semantics. Intended for consumers that need to coordinate work around motion (e.g. defer image preload/decode until idle so the decoder does not compete with the motion RAF). The callback never receives the reducer state, the visual position stream, or any internal detail. |
+
+#### Styling
+
+| Prop        | Type           | Effect |
+| ----------- | -------------- | ------ |
+| `className` | `ClassNameMap` | Partial map keyed by `outerContainer`, `innerContainer`, `slideContainer`, `slide`, `slideInteractive`, `slideError`, `slideText`. Merged into the deck SCSS via `mergeStyleMaps`. Keys not provided fall back to the built-in styles. |
+
+### 1.4 Slot children
+
+`children` accepts module elements identified by a `slot` static:
+
+| Slot          | Component                       | Notes |
+| ------------- | ------------------------------- | ----- |
+| `pagination`  | `<Pagination />` or `<PaginationWidget />` | Exactly one may be attached. Renders only when `isPaginationOn` is `true`. |
+| `controls`    | `<Controls />`                  | Renders only when `isControlsOn` is `true`. |
+| `diagnostic`  | `<Diagnostic />`                | Always renders if attached. Dev-only; in prod console output is suppressed by the env guard. |
+
+Slot resolution is done by the shared `resolveSlots` against `CAROUSEL_SLOTS`.
+Children that are not slot-tagged are dropped (with a dev warning if a
+Diagnostic slot is present).
+
+### 1.5 DOM contract
+
+The deck renders this skeleton (class names are SCSS-module hashed):
+
+```html
+<div role="region" aria-roledescription="carousel"
+     data-carousel-root data-touch data-reduced-motion>
+  <div data-carousel-viewport tabindex="-1">
+    <div data-carousel-track>
+      <!-- one element per virtual slide in the render window -->
+    </div>
+    <!-- controls slot (if mounted) -->
+  </div>
+  <!-- pagination slot (if mounted) -->
+  <!-- diagnostic slot (if mounted) -->
+</div>
+```
+
+Stable hooks for external code:
+- `[data-carousel-root]` — the outermost region.
+- `[data-carousel-viewport]` — the clipping container.
+- `[data-carousel-track]` — the element whose `transform` is animated.
+- `data-touch="true|false"` — touch override / detection result.
+- `data-reduced-motion="true|false"` — reduced-motion override / detection.
+- `[inert]` on slides outside the active visual band.
+
+### 1.6 Functional semantics
+
+These are the user-facing behaviours the implementation guarantees.
+
+- **Slide layout.** `pageCount = ceil(length / visibleSlidesCount)`. When
+  `length ≤ visibleSlidesCount`, `layout.canSlide` is false and the deck shows
+  statically (no gesture, no click navigation, no autoplay). When
+  `!isFinite && canSlide`, the track behaves cyclically.
+- **Step semantics.** `MOVE(+1)` advances one page, `MOVE(-1)` retreats one
+  page, `GO_TO(pageIndex)` jumps over a possibly larger distance. In cyclic
+  mode, `GO_TO` always travels the shortest cyclic distance.
+- **Click during motion (opposite direction).** Re-targets without
+  restarting from the logical origin: the new segment continues from the
+  *current sampled visual position*, not from where the previous segment
+  was supposed to start.
+- **Repeated click (same direction during motion).** Does not restart from
+  scratch. The reducer plans a fast in-flight advance to
+  `(1 + destinationPosition) · stepSize` of the current page
+  (`destinationPosition` is `1` on desktop, `0.99` on touch), with a
   follow-up segment that normalises to a clean page boundary one full page
-  further. The animation speed of that fast segment is roughly
-  `REPEATED_CLICK_SPEED_MULTIPLIER` (4.5×) of a normal MOVE.
-- **Opposite-direction click**: re-targets the motion without restarting from
-  the current logical origin — the state machine reads the current sampled
-  visual position as the new "from", so the new segment continues from where
-  the user actually sees the track.
-- **Drag / swipe**: pointer-driven, touch only. EMA-smoothed velocity, edge
-  resistance with a configurable curvature. Release resolves to a swipe
-  direction by either a quick-flick (raw velocity + raw offset) or a
-  distance-based threshold (`SWIPE_THRESHOLD_RATIO` of the viewport width with
-  a hard min). When intent is "NONE" the track snaps back to its origin via a
-  snap-back curve.
-- **Gesture interrupting motion**: starting a drag while the carousel is
-  animating cancels the active motion. The drag starts from the visually
-  sampled position, not the logical target.
-- **Autoplay**: a `setTimeout(intervalAutoplay)` schedules the next step. It
-  pauses when (a) the carousel is off-screen by less than the visibility
-  threshold, (b) the user is dragging, (c) motion is in progress, (d) on
-  desktop only, the pointer hovers the viewport (with a 150 ms debounce). On
-  the final page in finite mode it loops back to page 0 via a GO_TO jump.
-- **External motion idle signal**: `onMotionIdleStatusChange` fires when the carousel
-  crosses the idle/running boundary. It is an observation contract for outer
-  application code (for example, deferring image preload/decode until the
-  carousel is idle). It never drives carousel semantics and never moves asset
-  preparation into the component.
-- **Reduced motion**: when prefers-reduced-motion or `isInstantMotion` is set,
-  every transition snaps instantly. Gesture is disabled.
-- **Pagination (dots)**: one dot per page. The active dot reflects the
-  `targetPageIndex` immediately on click and gesture. During autoplay there is
-  a deliberate delay (`AUTOPLAY_PAGINATION_FACTOR` × duration, default 20% of
-  the animation) before the dot switches — this matches the test-deploy
-  behaviour where autoplay rolls the pagination later than the visual.
-- **PaginationWidget (touch)**: a fixed-width odd-count widget of dots with a
-  spatial field (centre is largest, sides shrink exponentially). When
-  reduced-motion is off, the widget binds to the visual position source and
-  mutates its dots' transform/opacity per frame without re-rendering React.
-  Two `activeDot` overlays interpolate between adjacent page indexes so the
-  active highlight tracks the visual progress, not the logical target.
-- **Slide click**: a slide is interactive when `isInteractive` is true, the
-  image loaded successfully, and an `onSlideClick` handler was provided. The
-  slide is rendered as a `<button type="button">` in that case, otherwise as
-  a `<div>`. Slides outside the active visual band are `inert`.
-- **Focus management**: when the carousel settles after a step, focus inside
-  an out-of-band slide is moved to the focusable target of the active band
-  via `manageFocusShift` (a shared helper).
-- **Controls**: appear at the left and right edges of the viewport. On desktop
-  they are hidden by default and revealed on hover or focus
-  (`:has([data-carousel-viewport]:hover)`, `:has(*:focus-visible)`). On touch
-  they are visible by default. `canMovePrev` / `canMoveNext` reflect the
-  finite boundary state.
-- **Diagnostic**: an optional slot. When attached, it reads the carousel's
-  raw inputs and hand-written constants and emits dev-only warnings. It
-  never normalises, validates, repairs, or substitutes any runtime value;
-  the carousel uses identical runtime values with or without it. With the
-  slot attached, DEV consoles surface `[Carousel Diagnostic][CRITICAL|LOGICAL]`
-  lines describing each invariant violation and its consequence.
+  further. The fast segment's peak speed is `REPEATED_CLICK_SPEED_MULTIPLIER`
+  (4.5×) of a normal MOVE.
+- **Drag / swipe.** Touch only (pointer events with `pointerType === "touch"`).
+  EMA-smoothed velocity, edge resistance with a configurable curvature.
+  Release resolves to a swipe direction via either a quick-flick (raw
+  velocity + raw offset) or a distance-based threshold
+  (`swipeThresholdRatio` of the viewport width with a hard min). When the
+  intent is `NONE`, the track snaps back via the snap-back curve over
+  `SNAP_BACK_DURATION` (1300 ms).
+- **Gesture interrupts motion.** Starting a drag while the carousel is
+  animating cancels the active motion *immediately* at press-down; the
+  drag starts from the visually sampled position. The cancel is published
+  through the visual-position SSOT, so the pagination widget, the track,
+  and the motion runner all observe one consistent state during the
+  gesture.
+- **Autoplay.** A `setTimeout(intervalAutoplay)` schedules the next step
+  whenever the carousel is in the eligible state described under
+  `isAuto`. On the final page in finite mode, the next step loops back to
+  page 0 via `GO_TO` (using `durationJump`).
+- **External motion-idle signal.** `onMotionIdleStatusChange` fires once on
+  each idle↔running crossing. Asset preloaders should pause decoding while
+  `isIdle === false` so the image decoder does not compete with the motion
+  RAF and the React commit phase of state transitions.
+- **Reduced motion.** When `isInstantMotion` is set or
+  `prefers-reduced-motion` is detected, every transition snaps instantly,
+  the gesture adapter is disabled, and pagination dot transitions are
+  killed (`[data-reduced-motion="true"] .dot { transition: none }`).
+- **Pagination (`Pagination`).** One dot per page. The active dot reflects
+  the `targetPageIndex` immediately on click and gesture. During
+  *autoplay*, the dot switch is delayed by
+  `motionDuration · AUTOPLAY_PAGINATION_FACTOR` (default 20 % of the
+  animation) — this matches the historical product behaviour where
+  autoplay rolls the dot later than the visual.
+- **PaginationWidget (touch).** A fixed-width odd-count widget (default
+  5 dots, configurable via internal `PAGINATION_WIDGET_DEFAULTS`). Centre
+  dot is largest; sides shrink exponentially by `scaleFactor` (0.585).
+  When reduced motion is *off*, the widget subscribes to the visual
+  position source and mutates its dots' `transform` and `opacity` per RAF
+  frame without re-rendering React. Two `activeDot` overlays interpolate
+  between adjacent page indexes so the active highlight tracks the visual
+  progress, not the logical target.
+- **Slide click.** A slide is interactive (rendered as `<button>`) when
+  `isInteractive` is true, the image loaded successfully, and an
+  `onSlideClick` handler was provided. Otherwise rendered as `<div>`.
+  Slides outside the active visual band are `inert`.
+- **Focus management.** When the carousel settles after a step, if focus
+  is currently inside an out-of-band (now `inert`) slide, focus is moved
+  to the first focusable target inside the new active band via
+  `manageFocusShift`. No-op when nothing is focused inside the deck.
+- **Controls.** `<Controls />` renders one zone on each edge of the
+  viewport. On desktop they are hidden by default and revealed on viewport
+  hover or focus (`:has([data-carousel-viewport]:hover)`,
+  `:has(*:focus-visible)`). On touch they are visible by default.
+  `canMovePrev` / `canMoveNext` reflect the finite-boundary state, so the
+  edge zones are not rendered when there is no destination.
+- **Diagnostic.** Observation-only. When attached, raw inputs and
+  hand-written constants are checked. Violations surface as DEV-only
+  `[Carousel Diagnostic][CRITICAL|LOGICAL]` console lines, deduplicated
+  via the formatter. The runtime values the carousel uses are *identical*
+  whether the slot is attached or not. The slot's presence is exposed on
+  the module context as `layout.isDiagnosticActive` so module-level checks
+  (e.g. `PaginationWidget`'s `useWidgetDiagnostic`) skip their work when
+  no diagnostic is wired up.
 
-### 2.3 What is *not* part of the product contract
+### 1.7 Default values reference
 
-These are old implementation details that the new design does not preserve:
+For copy-paste / quick lookup. Source: `config/defaults.ts`,
+`config/interaction.ts`, `config/motion.ts`, `config/gesture.ts`,
+`config/constants.ts`.
 
-- the specific layer ordering inside the orchestrator (configuration → reducer →
-  motion controller → projection source → DOM bridge → modules);
-- the `CarouselMotionProjectionSource` priority-queue API with deferred-frame
-  publishing for idle samples;
-- the `motion-plan / motion-execution / motion-projection / motion-duration /
-  motion-speed / motion-profile` separation into six sibling folders;
-- the reducer-transition folder mirror (drag-transition, repeated-click-transition,
-  step-transition, layout-reconciliation) — these are joined or restructured;
-- the specific shape of `CarouselModuleContextValue` (the new module API is
-  smaller and clearly partitioned into status, navigation, projection);
-- two separate render modes inside `PaginationWidget` with two parallel ref
-  arrays and two write caches;
-- the `useCarouselEngine` indirection layer that re-wraps every dispatch with
-  layout/instant/epsilon context.
+| Constant | Value | Where it shows |
+| --- | --- | --- |
+| `visibleSlidesNr` (default) | `3` | slot count, flex basis |
+| `durationAutoplay` (default) | `3000` ms | autoplay step duration |
+| `intervalAutoplay` (default) | `3000` ms | autoplay idle interval |
+| `durationStep` (default) | `2000` ms | click/gesture-driven step |
+| `durationJump` (default) | `800` ms | `GO_TO` jumps |
+| `errAltPlaceholder` (default) | `"Downloading Error"` | image error text |
+| `HOVER_PAUSE_DELAY` | `150` ms | hover-pause debounce |
+| `VISIBILITY_THRESHOLD` | `0.2` | viewport visibility fraction |
+| `AUTOPLAY_PAGINATION_FACTOR` | `0.2` | autoplay dot switch delay |
+| `SNAP_BACK_DURATION` | `1300` ms | drag snap-back |
+| `REPEATED_CLICK_DESTINATION_POSITION` | `1` (desktop) / `0.99` (touch) | repeated-click landing fraction |
+| `REPEATED_CLICK_SPEED_MULTIPLIER` | `4.5` | fast-segment peak vs. normal |
+| `REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE` | `0.2` | profile ramp-up |
+| `REPEATED_CLICK_DECELERATION_DISTANCE_SHARE` | `0.7` | profile ramp-down |
+| `JUMP_BEZIER` | `cubic-bezier(0.16, 1, 0.3, 1)` | far jumps |
+| `MOVE_BEZIER` | `cubic-bezier(0.24, 0.68, 0.42, 1)` | normal step |
+| `AUTO_BEZIER` | `cubic-bezier(0.28, 0.72, 0.38, 1)` | autoplay step |
+| `SNAP_BACK_BEZIER` | `cubic-bezier(0.18, 0.82, 0.28, 1)` | drag snap-back |
+| `CAROUSEL_SWIPE_CONFIG.resistance` | `0.53` | drag edge resistance |
+| `CAROUSEL_SWIPE_CONFIG.emaAlpha` | `0.85` | velocity smoothing |
+| `CAROUSEL_SWIPE_CONFIG.swipeThresholdRatio` | `0.23` | distance threshold |
+| `CAROUSEL_SWIPE_CONFIG.minSwipeDistance` | `20` px | hard min for distance threshold |
+| `CAROUSEL_INERTIAL_RELEASE_CONFIG.inertiaBoost` | `2.15` | post-release acceleration |
+| `CAROUSEL_INERTIAL_RELEASE_CONFIG.decelerationDistanceShare` | `0.25` | post-release tail share |
+| `MOTION_EPSILON` | `0.0001` | sample comparison tolerance |
+| `DRAG_RELEASE_EPSILON` | `0.001` | drag "on target" tolerance |
+| `REPEATED_CLICK_EPSILON` | `0.0001` | repeated-click target tolerance |
+| `RENDER_WINDOW_BUFFER_MULTIPLIER` | `1` | mounted-slide neighbour count |
+
+These are part of the visual contract. Changing them changes how the
+component *feels* — they are not safe to tune without a UX review.
 
 ---
 
-## 3. Ownership model
+## 2. Ownership model
 
-Every responsibility has exactly one owner. The orchestrator wires them.
+Every responsibility has exactly one owner. The orchestrator
+(`Carousel.tsx`) wires them.
 
 | Concern | Owner | Notes |
 | --- | --- | --- |
 | Public props | `Carousel.tsx` | Frozen contract, declared in `types.ts`. |
 | Resolved runtime config | `useCarouselConfig` | One memo. Substitutes defaults only for `undefined` props; never normalises explicit values. |
-| Slide records | `useCarouselSlideDeck` | Builds the slide records, optionally extends. |
+| Slide records | `useCarouselSlideDeck` | Builds slide records, optionally extends to fill perfect pages. |
 | Layout facts | `useCarouselSlideDeck` | `length`, `visibleSlidesCount`, `pageCount`, `virtualLength`, `canSlide`, `isFinite`, `dataKey`. |
-| Logical state | `useCarouselState` | Reducer-backed. Owns `activePageIndex`, `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`, `chain`, `gestureRelease`, `intent`. |
+| Logical state | `useCarouselState` | Reducer-backed. Owns `activePageIndex`, `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`, `followUpVirtualIndex`, `gesture`, `isRepeatedClickAdvance`, `moveReason`. |
 | Visual sampled position | `useVisualPosition` | Wraps a single `MotionController`. Sole SSOT for the visible track offset. |
 | Motion execution | `useMotionRunner` | Reads logical state, builds a segment, calls into the controller. |
 | Track DOM | `useTrackBinding` | Measures slot size and subscribes to visual position; writes `transform`. |
-| Render window | `useCarouselSlideDeck` | Memoised; expands during motion, snaps on idle. |
+| Render window | `useSlideRenderModel` | Memoised; expands during motion, snaps on idle. |
 | Gesture lifecycle | `useCarouselGesture` | Wraps the shared `usePointerSwipe`. Converts pointer events into dispatches and direct position writes. |
 | Autoplay lifecycle | `useAutoplay` | Owns the interval timer, hover/visibility/dragging pause. |
 | Focus shift | `useFocusRecovery` | Triggers when the state settles. |
@@ -204,412 +311,404 @@ context provider.
 
 ---
 
-## 4. Single source of truth (SSOT)
+## 3. Single source of truth (SSOT)
 
-The system has four SSOTs, each owned by exactly one layer:
+The system has four SSOTs, each owned by exactly one layer.
 
 1. **Logical state** — `useCarouselState`. Holds `activePageIndex`,
    `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`,
-   `chain` (the optional follow-up virtual index for repeated-click), and
-   `gestureRelease` (the velocity payload of the latest END_DRAG). No timing.
-2. **Visual sampled position** — `useVisualPosition`. The controller's
-   `value`/`velocity`/`target` are the only authority on "where the track is
-   right now". Everything that needs a per-frame number subscribes to this
-   layer. The track DOM and the PaginationWidget binding are its consumers.
+   `followUpVirtualIndex` (the optional follow-up for repeated-click),
+   `gesture` (the velocity payload of the latest END_DRAG), and
+   `isRepeatedClickAdvance`. No timing. Reducer-pure: every transition is
+   a pure function of `(state, command, context)`.
+2. **Visual sampled position** — `useVisualPosition`. The motion
+   controller's `value`/`velocity`/`target` are the only authority on
+   "where the track is right now". Everything that needs a per-frame
+   number subscribes here. The track DOM and the PaginationWidget binding
+   are its consumers.
 3. **Layout facts** — `useCarouselSlideDeck` returns a memoised `layout`
    object. Derived from props; recomputed only when the inputs change.
 4. **Runtime config** — `useCarouselConfig`. Substitutes defaults only for
-   `undefined` props. Never coerces, clamps, or repairs explicit values; the
-   diagnostic layer surfaces those issues without modifying the resolved
-   config.
+   `undefined` props. Never coerces, clamps, or repairs explicit values;
+   the diagnostic layer surfaces violations without modifying the
+   resolved config.
 
 No layer mirrors another layer's value. The state machine never reads a
-sampled motion value; instead the gesture controller reads the visual
-position and passes it into the dispatch as a value. The visual position
-never reads the logical state; the runner is the only bridge.
+sampled motion value: the gesture controller reads the visual position and
+passes it *into* the dispatch payload. The visual position never reads
+the logical state; the motion runner is the only bridge.
 
 ---
 
-## 5. Motion model
+## 4. Motion model
 
-There is exactly one `MotionController` (a numeric scalar that produces
-RAF-driven samples). It samples its current segment and publishes
-`{ progress, value, velocity, target, strategy, timestamp, phase }`.
+There is exactly one `MotionController` per Carousel instance (a numeric
+scalar that produces RAF-driven samples). It samples its current segment
+and publishes `{ progress, value, velocity, target, strategy, timestamp,
+phase }`.
 
-`useVisualPosition` wraps it and provides:
+`useVisualPosition` wraps it and exposes:
 
-- `subscribe(listener)` — called per frame while a segment is active.
+- `subscribe(listener)` — per-frame stream while a segment is active.
   Subscribers (track binding, pagination widget binding) mutate their own
-  DOM inside the callback; React is never involved at this tempo.
-- `getSnapshot()` — a *fresh* re-sample of the controller at `now()`.
+  DOM inside the callback; React is not involved at this tempo.
+- `getSnapshot()` — a **fresh** re-sample of the controller at `now()`.
   Cold reads on user events (gesture press start, navigation click) read
   through this so the captured origin matches what the user actually sees
   on the present frame — not the value emitted on the previous RAF tick.
 - `applyImmediatePosition(position)` — publish a position into the stream
-  during drag. Internally calls `controller.set`, which cancels any active
-  motion and emits, so the track, the widget, and the motion-runner
-  handoff observe one consistent source of truth throughout the gesture.
+  during drag. Internally calls `controller.set`, which cancels any
+  active motion and emits, so the track, the widget, and the motion
+  runner all observe one consistent source of truth throughout the
+  gesture.
+
+### 4.1 Segments
 
 A `Segment` is one of:
 
-- **Bezier segment** — a cubic-bezier eased move with a known duration; used
-  for autoplay/jump/click/snap-back/gesture-easing intents.
+- **Bezier segment** — a cubic-bezier eased move with a known duration.
+  Used for autoplay (`AUTO_BEZIER`), jump (`JUMP_BEZIER`),
+  click step / non-inertial gesture release (`MOVE_BEZIER`), and
+  snap-back (`SNAP_BACK_BEZIER`).
 - **Profile segment** — a smoothstep-driven acceleration / cruise /
-  deceleration profile; used for repeated-click bursts, gesture inertial
-  release, and click handoffs (when the current velocity is non-zero in the
-  same direction as the new target).
+  deceleration profile with a per-zone speed solve. Used for:
+  - **repeated-click fast advance** (peak speed
+    `REPEATED_CLICK_SPEED_MULTIPLIER × normalMoveSpeed`),
+  - **repeated-click follow-up** (peak speed = normal),
+  - **inertial gesture release** (peak speed derived from EMA-smoothed
+    release velocity × `inertiaBoost`),
+  - **click handoff** (when a click arrives during motion and the
+    current velocity is non-zero in the same direction as the new
+    target).
+
+### 4.2 Handoff invariant
 
 `useMotionRunner` is the only place the controller is started. It runs on
 state changes: when `motionPhase` becomes a non-idle value, it picks a
-fresh segment origin and builds the segment. When a previous segment is
-still running (repeated click, opposite-direction click, any interruption)
-the origin's position **and** time are both taken from the same `now()` —
-the position via `controller.read()` (re-samples the active curve at that
-instant), the segment's `startedAt` via `performance.now()` — so the new
-curve at `t = now()` evaluates to exactly the position the user is looking
-at on the current frame. This is the single invariant that keeps mid-flight
-handoffs free of back-step / skip-ahead artefacts.
+fresh segment origin and builds the segment.
+
+When a previous segment is still running (repeated click,
+opposite-direction click, any interruption), the origin's position **and**
+time are both taken from the same `now()`:
+
+- position via `controller.read()` (re-samples the active curve at that
+  instant);
+- segment `startedAt` via `performance.now()`.
+
+So the new curve at `t = now()` evaluates to *exactly* the position the
+user is looking at on the current frame. This is the invariant that keeps
+mid-flight handoffs free of back-step / skip-ahead artefacts. Any future
+change must preserve "time-origin == position-origin == one `now()`".
+
+For the repeated-click follow-up (a separate handoff from a settled
+segment to its chain successor), the new segment's `startedAt` is anchored
+at the previous segment's settle timestamp so the two are contiguous in
+time as well as in space.
 
 When the controller completes, the runner dispatches `MOTION_SETTLED`,
-which advances the state machine into either the chain follow-up (anchored
-in time at the previous segment's settle timestamp, so the two segments
-are contiguous in both space and time) or the idle state.
+which advances the state machine into either the chain follow-up or the
+idle state.
 
-There is no projection-source layer between the controller and its
-consumers. The track binding subscribes to the visual position directly.
-The PaginationWidget binding subscribes at the same level. The two
-subscriptions are independent listeners on the same RAF tick — there is no
-priority queue; both run in the same frame. If a future module ever needs
-to read the sample after the track has written, it can use the visual
-position's `getSnapshot()` from within its own listener.
+### 4.3 No projection-source layer
+
+There is no priority queue, no deferred-frame publisher between the
+controller and its consumers. The track binding subscribes to the visual
+position directly. The PaginationWidget binding subscribes at the same
+level. The two subscriptions are independent listeners on the same RAF
+tick — both run in the same frame. If a future module needs to read the
+sample *after* the track has written, it can call `getSnapshot()` from
+inside its own listener.
 
 ---
 
-## 6. Gesture model
+## 5. Gesture model
 
 The shared `usePointerSwipe` hook is a generic horizontal pointer-swipe
 primitive (touch-only, configurable, EMA-smoothed velocity with edge
-resistance). It is not carousel-specific and is intended to be reusable by
-future components.
+resistance, intent threshold, quick-flick detection, capture / cooldown).
+It is not carousel-specific and is reusable.
 
-`useCarouselGesture` is the carousel-specific adapter on top. It:
+`useCarouselGesture` is the carousel-specific adapter. It:
 
-1. records the visually-sampled origin position and the slot size at
-   press-start, via the visual position;
-2. on every move payload, translates `uiOffset` into a virtual index using
-   the recorded slot size and writes that directly into the visual position
-   (no React state per move);
-3. on release, computes the swipe target via `resolveDragRelease` (a pure
+1. on press-start: records the visually sampled origin position and the
+   slot size (`getSlotSize()`), then publishes the origin into the visual
+   position stream via `applyTrackPosition`. This cancels any active
+   motion *at the moment the user touches the screen*, not on the next
+   React render — eliminating the small lag between press-down and the
+   carousel actually stopping;
+2. on every move payload: translates `uiOffset` into a virtual-index
+   delta using the recorded slot size and writes that into the visual
+   position via `applyTrackPosition`. No React state per move;
+3. on release: computes the swipe target via `resolveDragRelease` (pure
    helper in `domain/dragRelease.ts`) and dispatches `END_DRAG` with the
-   resolved target plus the pointer/UI velocities.
+   resolved target plus the pointer/UI release velocities.
 
-The dispatch carries the velocities into the state machine, where they are
-preserved on the snapshot and read by `useMotionRunner` when it builds the
+The dispatch carries the velocities into the state machine. They are
+stored on the snapshot and read by `useMotionRunner` when it builds the
 release segment.
+
+---
+
+## 6. State machine
+
+A reducer-backed state machine in `state/`. Discriminated `CarouselCommand`
+union:
+
+- `START_DRAG { fromVirtualIndex, targetPageIndex }` — fires at gesture
+  press-start.
+- `END_DRAG { targetPageIndex, targetVirtualIndex, isSnap, isInstant,
+  pointerReleaseVelocity, uiReleaseVelocity }` — fires at gesture release.
+- `MOVE { step, moveReason, fromVirtualIndex, isInstant? }` — click /
+  controls / autoplay step.
+- `GO_TO { targetPageIndex, moveReason, fromVirtualIndex, isInstant? }`
+  — pagination click / autoplay loop-back / external jump.
+- `MOTION_SETTLED` — fired by the motion runner when the controller
+  completes.
+
+`motionPhase` is a discriminated union:
+`"idle" | "step-normal" | "step-jump" | "step-snap" | "step-instant" | "dragging"`.
+
+`moveReason` is `"click" | "gesture" | "autoplay" | "unknown"`.
+
+The reducer is pure. Layout / config / instant-mode flow in as a
+`context` envelope on every dispatch. Layout reconciliation runs at the
+top of every transition so a layout change (resize, slidesData replace)
+collapses cleanly to an instant snap.
 
 ---
 
 ## 7. Module synchronisation
 
-Modules attach via the `slot` static convention (resolved by `useCarouselSlots`,
-which is built on the shared `resolveSlots`). The `CarouselModuleContext`
-value exposes:
+Modules attach via the `slot` static convention, resolved by
+`resolveSlots` against `CAROUSEL_SLOTS = ["pagination", "controls", "diagnostic"]`.
 
-- `status: { isMoving, isJumping, isIdle, motionPhase }`,
-- `layout: { pageCount, canSlide, isAtStart, isAtEnd, isTouch, isReducedMotion }`,
-- `intent: { activePageIndex, targetPageIndex, moveReason, motionDuration }`,
-- `navigation: { handlePrev, handleNext, handlePageSelect }`,
-- `autoplayPaginationFactor`,
-- `visualPosition: VisualPositionSource | null` — `null` only when reduced motion
-  is active and live binding makes no sense.
+The `CarouselModuleContext` exposes a partitioned value:
 
-The context is rebuilt only on input changes (memoised). Modules that need
-live frame updates do not depend on context for the frame value; they
-subscribe to `visualPosition` themselves and mutate their own DOM. Modules
-that only need the logical view (the pagination dots, controls availability)
-read from the context and re-render at the React tempo.
+```ts
+{
+  status: { isIdle, isMoving, isJumping, isDragging, isInteracting, motionPhase },
+  layout: { pageCount, canSlide, isAtStart, isAtEnd, isTouch,
+            isReducedMotion, isDiagnosticActive },
+  intent: { activePageIndex, targetPageIndex, moveReason,
+            motionDuration, autoplayPaginationFactor },
+  navigation: { handlePrev, handleNext, handlePageSelect },
+  visualPosition: VisualPositionSource | null,  // null when reduced motion
+}
+```
 
-The `Diagnostic` slot is observe-only. When attached, its presence is
-surfaced as `layout.isDiagnosticActive` on the module context so modules
-with their own diagnostic checks (e.g. `PaginationWidget` via
-`useWidgetDiagnostic`) can run only when diagnostics are wired up. The
-slot itself reads `CarouselDiagnosticContext` (raw props + layout snapshot
-+ slot attachment state) and runs the checks under
-`modules/Diagnostic/checks/`. Diagnostic never owns, normalises, replaces,
-or repairs any runtime value — the carousel uses identical runtime values
-regardless of whether the slot is attached.
+The context is rebuilt only on input changes (each sub-view is memoised
+independently). Modules that need live per-frame updates do **not**
+depend on context for the frame value — they subscribe to
+`visualPosition` themselves and mutate their own DOM. Modules that only
+need the logical view (pagination dots, control availability) read from
+the context and re-render at the React tempo.
+
+`Diagnostic`'s presence is surfaced as `layout.isDiagnosticActive` so
+modules with their own checks (`PaginationWidget` via
+`useWidgetDiagnostic`) run only when diagnostics are wired up.
 
 ---
 
-## 8. Folder graph
+## 8. Slot module reference
+
+### 8.1 `<Pagination />`
+
+Desktop dot pagination. One `PaginationDot` per page. Reads
+`intent.activePageIndex`, `intent.motionDuration`,
+`intent.autoplayPaginationFactor`, and `layout.pageCount` from the
+context. During autoplay, dot switching is delayed by
+`motionDuration · autoplayPaginationFactor` via `usePaginationSync`. On
+click, `navigation.handlePageSelect(pageIndex)` is dispatched as `GO_TO`.
+
+### 8.2 `<PaginationWidget />`
+
+Touch dot pagination. A fixed-width odd-count strip (5 dots default) with
+exponentially shrinking side dots. Two `activeDot` overlays interpolate
+across adjacent page indexes to track the visual progress, not the
+logical target. Subscribes to `visualPosition` and mutates dot
+`transform` / `opacity` per RAF tick. When reduced motion is on, the
+widget falls back to a single static dot reflecting the logical target.
+
+### 8.3 `<Controls />`
+
+Edge navigation zones. Hidden by default on desktop, shown on
+viewport-hover or `:focus-visible`. Always visible on touch. The
+left/right zones are not rendered when `layout.isAtStart`/`isAtEnd` is
+true (finite mode), so there is no destination to navigate to.
+
+### 8.4 `<Diagnostic />`
+
+DEV-only console emitter. Reads
+`CarouselDiagnosticContext` (raw props + observable layout/slot state)
+and runs check sets under `modules/Diagnostic/checks/`:
+
+- `propChecks` — public input validity.
+- `constantChecks` — internal constants ranges.
+- `layoutChecks` — page layout consistency (perfect-page coverage,
+  `canSlide`/`pageCount` invariants).
+- `widgetChecks` — PaginationWidget prop sanity.
+
+Output format: `[Carousel Diagnostic][CRITICAL|LOGICAL] <description> — <consequence>`.
+
+---
+
+## 9. Folder graph
 
 ```
 src/components/Carousel/
-├── ARCHITECTURE.md
-├── Carousel.tsx               composition root, no business logic
+├── ARCHITECTURE.md                this document
+├── Carousel.tsx                   composition root, no business logic
 ├── Carousel.module.scss
-├── index.ts                   public re-exports
-├── types.ts                   public CarouselProps, Slide, ClassNameMap
-├── config/                    config resolution
-│   ├── defaults.ts
-│   ├── constants.ts           tunable runtime constants (timings, factors)
-│   ├── motion.ts              bezier strings, repeated-click factors
-│   ├── gesture.ts             drag config + release motion config
-│   ├── interaction.ts         hover/visibility/autoplay-pagination factor
+├── index.ts                       public re-exports
+├── types.ts                       public CarouselProps, Slide, ClassNameMap
+├── config/                        config resolution
+│   ├── defaults.ts                public-prop defaults
+│   ├── constants.ts               tunable runtime constants (epsilons, buffers)
+│   ├── motion.ts                  bezier strings, repeated-click factors
+│   ├── gesture.ts                 drag config + inertial release config
+│   ├── interaction.ts             hover delay, visibility threshold, autoplay pagination factor
+│   ├── buildRawConfig.ts          merges raw input with defaults
+│   ├── types.ts                   CarouselRuntimeConfig + sub-shapes
 │   └── useCarouselConfig.ts
 ├── context/
-│   ├── CarouselModuleContext.ts
-│   ├── CarouselDiagnosticContext.ts
-│   └── index.ts
-├── domain/                    pure functions, no React
-│   ├── index.ts
-│   ├── math.ts                clamp, mod, normalizePageIndex, getShortestCyclicDistance
-│   ├── slides.ts              record building, partial-page detection, extension
-│   ├── layout.ts              CarouselLayout factory, page/virtual conversions
-│   ├── renderWindow.ts        windowing math
-│   ├── visibility.ts          slide active/actual decision
-│   ├── a11y.ts                ARIA props builder
-│   ├── track.ts               transform string builders
-│   └── dragRelease.ts         release-target resolver
+│   ├── CarouselModuleContext.ts   module-facing value
+│   ├── CarouselDiagnosticContext.ts  raw props/layout/slots for Diagnostic
+│   ├── useModuleContextValue.ts
+│   └── types.ts
+├── domain/                        pure functions, no React
+│   ├── math.ts                    clamp, mod, normalizePageIndex, shortestCyclicDistance
+│   ├── slides.ts                  record building, partial-page detection, extension
+│   ├── layout.ts                  CarouselLayout factory, page/virtual conversions
+│   ├── renderWindow.ts            windowing math
+│   ├── visibility.ts              slide active/actual decision
+│   ├── track.ts                   transform string builders, slot-size measurer
+│   └── dragRelease.ts             release-target resolver
 ├── state/
-│   ├── types.ts               State, Command, MotionPhase, MoveReason
-│   ├── initial.ts             initial state factory
-│   ├── reconcile.ts           layout reconciliation
-│   ├── transitions.ts         pure step / repeated-click / drag transitions
-│   ├── reducer.ts             single switch over Commands
-│   ├── useCarouselState.ts    binds the reducer to React
-│   └── index.ts
+│   ├── types.ts                   CarouselState, Command, MotionPhase, MoveReason
+│   ├── initial.ts                 initial state factory + motionStatus
+│   ├── reconcile.ts               layout reconciliation
+│   ├── transitions.ts             pure step / repeated-click / drag transitions
+│   ├── reducer.ts                 single switch over Commands
+│   └── useCarouselState.ts        binds the reducer to React
 ├── motion/
-│   ├── types.ts               Segment, MotionIntent
-│   ├── bezier.ts              cubic-bezier sampler + cache + carousel curves
-│   ├── profile.ts             smoothstep profile (accel/cruise/decel)
-│   ├── release.ts             inertial release plan helper
-│   ├── segmentFactory.ts      builds the Segment for the next motion step
-│   ├── duration.ts            duration math per intent
-│   ├── useMotionRunner.ts     state → segment → controller
-│   └── index.ts
+│   ├── types.ts                   Segment, MotionIntent, MotionStart
+│   ├── bezier.ts                  cubic-bezier sampler + cache + carousel curves
+│   ├── profile.ts                 smoothstep profile (accel/cruise/decel)
+│   ├── speed.ts                   averageSpeed, sameDirectionSpeed, signedVelocity
+│   ├── duration.ts                duration math per intent
+│   ├── segmentFactory.ts          builds the Segment for the next motion step
+│   ├── sampler.ts                 segment → MotionSampleData at timestamp
+│   └── useMotionRunner.ts         state → segment → controller
 ├── position/
-│   ├── types.ts
-│   ├── createMotionController.ts   shared primitive — moved into shared/ for reuse
-│   ├── useVisualPosition.ts        VisualPositionSource owner
-│   └── index.ts
+│   ├── types.ts                   VisualPositionFrame, VisualPositionSource
+│   └── useVisualPosition.ts       VisualPositionSource owner
 ├── geometry/
-│   ├── useTrackBinding.ts     ResizeObserver + slot measure + transform writer
-│   └── index.ts
+│   └── useTrackBinding.ts         ResizeObserver + slot measure + transform writer
 ├── gesture/
-│   ├── useCarouselGesture.ts  pointer-swipe → dispatch + visual position writes
-│   └── index.ts
+│   └── useCarouselGesture.ts      pointer-swipe → dispatch + visual position writes
 ├── autoplay/
 │   └── useAutoplay.ts
 ├── focus/
 │   └── useFocusRecovery.ts
+├── navigation/
+│   └── useCarouselNavigation.ts   public click handlers
 ├── slides/
 │   ├── SlideItem.tsx
-│   ├── SlideItem.module.scss  (only if slide owns local styles; here it shares
-│                                the deck SCSS)
-│   ├── types.ts
-│   └── useSlideRenderModel.ts virtual slides + render window owner
+│   ├── SlideItem.types.ts
+│   ├── useCarouselSlideDeck.ts    layout, records, perfect-page info
+│   └── useSlideRenderModel.ts     virtual slides + render window
 ├── slots/
-│   ├── slotNames.ts
-│   ├── useCarouselSlots.ts
-│   └── index.ts
+│   └── slotNames.ts               CAROUSEL_SLOTS + CarouselSlotComponent
 ├── render-policy/
 │   └── useModuleRenderPolicy.ts
 └── modules/
-    ├── Controls/...
-    ├── Pagination/...
-    ├── PaginationWidget/...
+    ├── Controls/
+    ├── Pagination/
+    ├── PaginationWidget/
     └── Diagnostic/
-        ├── Diagnostic.tsx        observe-only orchestrator
-        ├── formatter.ts          unified warning line builder
-        ├── types.ts              Severity + Warning shape
-        ├── useGroupedWarnings.ts dev console emitter with dedupe
-        ├── useWidgetDiagnostic.ts  hook for PaginationWidget checks
-        └── checks/
-            ├── propChecks.ts     public input checks
-            ├── constantChecks.ts hand-written constant checks
-            ├── layoutChecks.ts   page layout + slot attachment
-            └── widgetChecks.ts   PaginationWidget prop checks
 ```
 
-This graph is intentionally different from the previous one. The old
-`core/model/{motion-plan,motion-execution,motion-projection,motion-duration,
-motion-speed,motion-profile}` cluster is replaced by a single `motion/`
-folder. The old `core/hooks/{control,modules,motion,setup}` cluster is
-replaced by domain-named folders (`state`, `position`, `geometry`, `gesture`,
-`autoplay`, `slides`, `slots`, `render-policy`). The old `core/components`
-folder becomes the `slides/` folder, since the slide is the only component
-the deck renders directly. Modules are siblings of the deck, not under
-`core/`, because the deck is *the* component and modules attach to it.
+Reading order for someone new:
+
+1. `types.ts` — public surface.
+2. `Carousel.tsx` — top-down composition.
+3. `state/types.ts` and `state/reducer.ts` — what the carousel knows
+   about itself.
+4. `motion/types.ts` and `motion/segmentFactory.ts` — how a logical step
+   becomes a visual segment.
+5. `position/useVisualPosition.ts` — how the visible position is sampled
+   and exposed.
+6. `motion/useMotionRunner.ts` — how a state change becomes a controller
+   start; the handoff invariant (§4.2).
+7. `geometry/useTrackBinding.ts` — how the track DOM is written.
+8. `gesture/useCarouselGesture.ts` — how a touch swipe ends up as a
+   dispatch.
+9. The modules.
+
+If a future reader can follow that order without bouncing for inverse
+dependencies, the architecture has held.
 
 ---
 
-## 9. Why the new structure is not a copy of the old
+## 10. Trade-offs
 
-The mapping below makes the differences explicit.
-
-| Old | New | Difference |
-| --- | --- | --- |
-| `core/Carousel.tsx` (18 hooks, inline logic) | `Carousel.tsx` (composition root, no business logic) | New file written from scratch around the new ownership model; no piece of inline math, motion wiring, or context construction was copied. |
-| `core/model/reducer/{reducer, state, transitions/*}` | `state/{reducer, transitions, reconcile, initial}` | Same reducer pattern; rewritten with a smaller command set (`MOTION_SETTLED` replaces `END_STEP`, drag and step transitions consolidated). |
-| `core/model/motion-plan` | folded into `motion/segmentFactory.ts` + `motion/duration.ts` | Motion intent + plan + duration now live next to the segment factory that consumes them. The state machine no longer owns plan resolution. |
-| `core/model/motion-projection` | removed | No priority queue, no deferred-frame layer. Track and module bindings subscribe to `useVisualPosition` directly. |
-| `core/hooks/control/useCarouselTrackPositionBridge` | `geometry/useTrackBinding` + `position/useVisualPosition` | The bridge had two roles (DOM writer + "current position" reader). They are separated: visual position owns the read API, track binding only writes. |
-| `core/hooks/control/useCarouselEngine` | removed | No more dispatch-wrapper layer. The state hook returns a typed `dispatch` directly; layout / instant / drag-epsilon context is folded into the reducer signature. |
-| `core/hooks/control/useCarouselGesture` + `useCarouselDragController` | `gesture/useCarouselGesture` | The two old hooks collapse into one (the gesture is the controller — there is no separate "gesture phase" vs "drag controller" distinction). |
-| `core/hooks/control/useCarouselNavigationController` + `useCarouselClickHandlers` | `state/useCarouselNavigation` (inside `useCarouselState`) | Click handlers become trivial wrappers built once from the dispatch and exposed via the module context. |
-| `core/hooks/modules/useCarouselModuleContextValue` | `context/useModuleContextValue` | Same idea; shape redefined to split status / layout / intent / navigation / projection cleanly. |
-| `core/utilities/{drag-release, layout, math, slide-records, slide-rendering, slide-styles, track-geometry, track-styles, visible-slides}` | `domain/{math, slides, layout, renderWindow, visibility, a11y, track, dragRelease}` | Same domain, cleaner partition: layout and page math separated from render-window math, slide styles inlined into the slides folder. |
-| `shared/motion/{motionEngine, createMappedNumericMotionValueSource, ...}` | `shared/motion/createMotionController.ts` + `position/useVisualPosition.ts` | The shared layer keeps the generic numeric motion controller. The carousel-specific projection wrapper now lives next to the carousel. |
-| `shared/touch-input/drag-engine/useDragEngine` | `shared/gesture/usePointerSwipe` | Same idea, smaller surface, renamed to reflect that it is pointer-driven swipe (not arbitrary drag). The interactive-target detection is preserved as a pure helper, the resistance / EMA / release intent helpers are reused. |
-| `shared/touch-input/velocity-engine/*` | `shared/gesture/inertialRelease.ts` (only the public helper) | The "velocity-engine" name is replaced by a clearer "inertial release" helper that takes a release velocity and produces a release plan. |
-
----
-
-## 10. Old code: what is reused, what is rewritten, what is rejected
-
-### Copied as a generic primitive
-
-- `clamp`, `mod`, `normalizePageIndex`, `getShortestCyclicDistance` — pure math.
-- `cubicBezierValue`, `cubicBezierDerivative`, the bisection solver for `t` —
-  pure math, well-tested by inspection.
-- The smoothstep / smoothstepIntegral pair used inside the profile solver.
-- `INTERACTIVE_TARGET_SELECTOR` — DOM selector list for interactive descendants
-  of slides (so a button inside a slide content keeps its click on touch).
-- `manageFocusShift` — a generic helper, lives in `shared/focus/`.
-- `useIsTouchDevice`, `useIsReducedMotion`, `useMatchMedia`,
-  `useIsomorphicLayoutEffect` — generic hooks.
-- The cubic-bezier strings (`MOVE_BEZIER`, `JUMP_BEZIER`, `SNAP_BACK_BEZIER`,
-  `AUTO_BEZIER`) — these are the *visual contract* (the easing the user sees),
-  so they are preserved verbatim.
-- The numeric constants that express product intent: `REPEATED_CLICK_SPEED_MULTIPLIER`,
-  `REPEATED_CLICK_DESTINATION_POSITION` (and its touch variant),
-  acceleration / deceleration distance shares, `HOVER_PAUSE_DELAY`,
-  `VISIBILITY_THRESHOLD`, `AUTOPLAY_PAGINATION_FACTOR`, `SNAP_BACK_DURATION`,
-  the drag engine config (`INTENT_THRESHOLD`, `RESISTANCE`, `EMA_ALPHA`, etc.).
-  These define how the component *feels*. Changing them would change the product.
-
-### Adapted into the new architecture
-
-- The state-machine actions (MOVE / GO_TO / drag / settle) — same intent,
-  redefined with smaller TypeScript surface and a single `Command` discriminated
-  union. No reducer transition file is copied; transitions are rewritten to
-  match the new state shape.
-- The render-window expander (`containsRenderWindow`, `expandRenderWindow`,
-  `getRenderMovementSegment`) — adapted into the `domain/renderWindow.ts`
-  module. Same algorithm, simpler call sites.
-- The motion profile solver (smoothstep accel/cruise/decel) — adapted into
-  `motion/profile.ts`. The peak-speed-for-duration bisection is kept; the
-  zone iteration is the same.
-- The PaginationWidget spatial-field math (scales, strip, edge drift) — kept
-  inside `modules/PaginationWidget/math/`. The widget itself is rewritten as
-  a single-mode binding (no dual static / motion-bound rendering).
-
-### Rewritten from the old idea
-
-- The orchestrator (`Carousel.tsx`) — written from scratch around the new
-  layers.
-- The state hook (`useCarouselState`) — written from scratch; the reducer
-  signature, transitions, and reconciliation are new. No file was copied
-  forward.
-- The motion runner (`useMotionRunner`) — written from scratch. The old
-  `useCarouselMotion` hook is not used as a template; its handoff snapshot
-  pattern is rewritten directly inside the runner using the controller's
-  own `isActive() + read()` reads.
-- The track DOM bridge — rewritten as `useTrackBinding`. ResizeObserver and
-  slot measurement are the same idea; the integration with visual position
-  and the way layout writes happen is new.
-- The gesture adapter — rewritten as one hook on top of the shared swipe
-  primitive. The old two-hook split (gesture + drag controller) is gone.
-- The module context value — redefined. The new shape is partitioned into
-  status / layout / intent / navigation / visualPosition rather than a flat
-  bag of fields.
-- The PaginationWidget binding — rewritten with a single ref array and a
-  single write path. The old dual-mode logic with two ref arrays and two
-  write caches is removed.
-
-### Rejected
-
-- `motion-projection-source` with priorities and deferred frame publishing —
-  the priority abstraction was never genuinely required; deferred-frame
-  publishing was an artefact of the projection layer's own architecture.
-- The `useCarouselEngine` indirection — every dispatch now flows directly
-  through the typed reducer; layout context is part of the reducer signature.
-- The `useResponsiveRepeatedClickSettings` separate hook — merged into the
-  config resolution as a single touch-aware destination-position value.
-- The `motion-plan` / `motion-execution` six-folder split — merged into a
-  cohesive `motion/` folder.
-- The `useCarouselSlots` separate hook returning `{ slots }` (over-wrapped
-  shared `resolveSlots`) — folded into the orchestrator inline since it is a
-  one-liner.
+- **Per-frame mutation in track binding and PaginationWidget.**
+  Deliberately bypasses React rendering. The trade-off is that DOM
+  manipulation lives outside React's reconciler; the alternative (state
+  per frame, context per frame) would re-render every consumer at 60 Hz
+  for purely visual data. The pattern is contained — both hooks own
+  their own DOM refs and subscribe through the same single API.
+- **Visual position is global per-instance, not via context.** Every
+  consumer takes it as an explicit dependency through props (Carousel
+  internals) or through the module context value (modules). This makes
+  the data flow visible in source rather than relying on hidden context
+  provider scope.
+- **State machine reads `fromVirtualIndex` from the gesture/click site,
+  not internally.** Callers pass the visually-sampled origin as part of
+  the dispatch payload. The state machine never reaches into the motion
+  controller. This keeps the state machine pure (testable without any
+  DOM / RAF context).
+- **Render-window keeps its expanded shape during a motion segment.**
+  The window only shrinks back when motion settles. This avoids
+  unmounting a slide mid-flight if the window edges shift; it costs at
+  most one extra rendered slide pair during fast direction switches.
+- **Diagnostic is strictly observe-only.** The runtime values the
+  carousel uses do not depend on whether the Diagnostic slot is attached.
+  Diagnostic never normalises, validates, repairs, or substitutes any
+  value; it reads and warns. The trade-off is that the carousel will
+  visibly misbehave when fed invalid inputs (NaN propagation, impossible
+  geometry, malformed transforms) — which is the intended signal that
+  the input must be fixed.
+- **`onMotionIdleStatusChange` is observation-only.** It never drives
+  carousel semantics, never receives reducer state, and never moves
+  asset-loading responsibility into the component. The carousel's
+  contract is the deck itself; preload coordination is an application
+  concern.
 
 ---
 
-## 11. Trade-offs
+## 11. Quality protections
 
-- **Per-frame mutation in track binding and PaginationWidget**: deliberately
-  bypasses React rendering. The trade-off is that DOM manipulation lives
-  outside React's reconciler, but the alternative (state per frame, context
-  per frame) would re-render every consumer at 60 Hz for purely visual data.
-  The pattern is contained — both hooks own their own DOM refs and subscribe
-  through the same single API.
-- **Visual position is global per-instance, not via context**: every consumer
-  takes it as an explicit dependency through props (Carousel internals) or
-  through the module context value (modules). This makes the data flow
-  visible in source rather than relying on hidden context provider scope.
-- **State machine reads `fromVirtualIndex` from the gesture/click site, not
-  internally**: callers pass the visually-sampled origin as part of the
-  dispatch payload. The state machine never reaches into the motion
-  controller. This keeps the state machine pure (testable without any DOM /
-  RAF context).
-- **Render-window keeps its expanded shape during a motion segment**: the
-  window only shrinks back when motion settles. This avoids unmounting a
-  slide mid-flight if the window edges shift; it costs at most one extra
-  rendered slide pair during fast direction switches.
-- **Diagnostic is strictly observe-only**: the runtime values the carousel
-  uses do not depend on whether the Diagnostic slot is attached. Diagnostic
-  never normalises, validates, repairs, or substitutes any value; it reads
-  and warns. The trade-off is that the carousel will visibly misbehave when
-  fed invalid inputs (NaN propagation, impossible geometry, malformed
-  transforms) — which is the intended signal that the input must be fixed.
-
----
-
-## 12. Quality protections
-
-- **TypeScript**: discriminated unions for `Command`, `MotionPhase`, `MoveReason`,
-  `Segment`, `MotionIntent`. No `any`.
-- **React safety**: per-frame work never touches React state. State machine
-  dispatches are batched by React. Effects are pure; cleanup is explicit.
-  `useIsomorphicLayoutEffect` is used only for DOM measurement and
-  subscription wiring.
-- **Strict Mode**: the motion controller cleanups handle remount; the
-  visual position subscription returns a cleanup that disconnects from the
-  controller.
-- **Runtime safety**: layout reconciliation tolerates page count changes
-  and resets on dataKey changes. Numeric inputs are *not* coerced or
+- **TypeScript.** Discriminated unions for `CarouselCommand`,
+  `MotionPhase`, `MoveReason`, `CarouselSegment`, `CarouselMotionIntent`.
+  No `any`. Public props validated via Zod at module load (`zod.function`
+  signatures for callbacks).
+- **React safety.** Per-frame work never touches React state. State
+  machine dispatches are batched by React. Effects are pure; cleanup is
+  explicit. `useIsomorphicLayoutEffect` is used only for DOM measurement
+  and subscription wiring.
+- **Strict Mode.** The motion controller cleanups handle remount; the
+  visual position subscription returns a cleanup that disconnects from
+  the controller.
+- **Runtime safety.** Layout reconciliation tolerates page-count changes
+  and resets on `dataKey` changes. Numeric inputs are *not* coerced or
   repaired — invalid input is intentionally allowed to propagate so the
-  failure mode is visible. The diagnostic layer surfaces the violation
+  failure mode is visible. The diagnostic layer surfaces violations
   separately, without ever feeding back into runtime.
-- **Performance**: bezier and profile samplers cache their work where the
-  inputs are known (parsed beziers, computed strips). The track binding
-  short-circuits writes that would re-apply the same transform. The
-  PaginationWidget binding short-circuits writes per dot.
-
----
-
-## 13. Reading guide
-
-The intended reading order for someone new to the component is:
-
-1. `types.ts` — public surface;
-2. `Carousel.tsx` — top-down composition;
-3. `state/types.ts` and `state/reducer.ts` — what the carousel knows about itself;
-4. `motion/types.ts` and `motion/segmentFactory.ts` — how a logical step becomes a visual segment;
-5. `position/useVisualPosition.ts` — how the visible position is sampled and exposed;
-6. `geometry/useTrackBinding.ts` — how the track DOM is written;
-7. `gesture/useCarouselGesture.ts` — how a touch swipe ends up as a dispatch;
-8. the modules.
-
-If a future reader can follow that order without needing to bounce between
-files for inverse dependencies, the architecture has held.
+- **Performance.** Bezier and profile samplers cache their work where
+  the inputs are known (parsed beziers, computed strips). The track
+  binding short-circuits writes that would re-apply the same transform.
+  The PaginationWidget binding short-circuits writes per dot. The motion
+  controller emits only on actual sample change (per RAF tick of an
+  active segment; one synchronous emit on segment start; no emits while
+  idle).
