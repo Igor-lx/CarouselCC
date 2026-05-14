@@ -259,11 +259,11 @@ For copy-paste / quick lookup. Source: `config/defaults.ts`,
 | `AUTOPLAY_PAGINATION_FACTOR` | `0.2` | autoplay dot switch delay |
 | `SNAP_BACK_DURATION` | `1300` ms | drag snap-back |
 | `REPEATED_CLICK_DESTINATION_POSITION` | `1` (desktop) / `0.99` (touch) | repeated-click landing fraction |
-| `REPEATED_CLICK_SPEED_MULTIPLIER` | `4.5` | fast-segment peak vs. normal |
-| `REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE` | `0.2` | profile ramp-up |
-| `REPEATED_CLICK_DECELERATION_DISTANCE_SHARE` | `0.7` | profile ramp-down |
+| `REPEATED_CLICK_SPEED_MULTIPLIER` | `5` | fast-segment peak vs. normal |
+| `REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE` | `0.35` | profile ramp-up |
+| `REPEATED_CLICK_DECELERATION_DISTANCE_SHARE` | `0.35` | profile ramp-down |
 | `JUMP_BEZIER` | `cubic-bezier(0.16, 1, 0.3, 1)` | far jumps |
-| `MOVE_BEZIER` | `cubic-bezier(0.24, 0.68, 0.42, 1)` | normal step |
+| `MOVE_BEZIER` | `cubic-bezier(0.32, 0.2, 0.28, 1)` | normal step |
 | `AUTO_BEZIER` | `cubic-bezier(0.28, 0.72, 0.38, 1)` | autoplay step |
 | `SNAP_BACK_BEZIER` | `cubic-bezier(0.18, 0.82, 0.28, 1)` | drag snap-back |
 | `CAROUSEL_SWIPE_CONFIG.resistance` | `0.53` | drag edge resistance |
@@ -352,10 +352,13 @@ phase }`.
 - `subscribe(listener)` — per-frame stream while a segment is active.
   Subscribers (track binding, pagination widget binding) mutate their own
   DOM inside the callback; React is not involved at this tempo.
-- `getSnapshot()` — a **fresh** re-sample of the controller at `now()`.
-  Cold reads on user events (gesture press start, navigation click) read
-  through this so the captured origin matches what the user actually sees
-  on the present frame — not the value emitted on the previous RAF tick.
+- `getSnapshot()` returns the last **emitted** visual frame (cached). Cold
+  reads on user events (gesture press start, navigation click) read
+  through this so the captured origin matches what DOM subscribers have
+  *already painted* rather than a freshly re-sampled but unpainted
+  controller value. A freshly re-sampled `now`-value would force the
+  track to "catch up" in a single composite frame, which the eye reads as
+  a forward jerk on click.
 - `applyImmediatePosition(position)` — publish a position into the stream
   during drag. Internally calls `controller.set`, which cancels any
   active motion and emits, so the track, the widget, and the motion
@@ -371,7 +374,10 @@ A `Segment` is one of:
   click step / non-inertial gesture release (`MOVE_BEZIER`), and
   snap-back (`SNAP_BACK_BEZIER`).
 - **Profile segment** — a smoothstep-driven acceleration / cruise /
-  deceleration profile with a per-zone speed solve. Used for:
+  deceleration profile with a per-zone speed solve. If acceleration and
+  deceleration shares sum above `1`, runtime normalises the profile to
+  `0.5 / 0.5` with no cruise zone (and Diagnostic surfaces the
+  normalisation as a LOGICAL warning). Used for:
   - **repeated-click fast advance** (peak speed
     `REPEATED_CLICK_SPEED_MULTIPLIER × normalMoveSpeed`),
   - **repeated-click follow-up** (peak speed = normal),
@@ -384,30 +390,49 @@ A `Segment` is one of:
 ### 4.2 Handoff invariant
 
 `useMotionRunner` is the only place the controller is started. It runs on
-state changes: when `motionPhase` becomes a non-idle value, it picks a
-fresh segment origin and builds the segment.
+state changes: when `motionPhase` becomes a non-idle value, it records the
+new intent immediately, but the **controller retarget is deferred by a tiny
+frame-boundary window** (`RETARGET_FRAME_DELAY`, currently two RAF ticks).
+The old segment keeps publishing during that window. At the deferred
+boundary the new segment is built from the live stream:
 
-When a previous segment is still running (repeated click,
-opposite-direction click, any interruption), the origin's position **and**
-time are both taken from the same `now()`:
+- **position** comes from `controller.getSnapshot()` after the previous
+  segment has had time to publish additional frames — i.e. the position
+  DOM subscribers have already painted;
+- **velocity** comes from `controller.read(retargetTimestamp)` — the
+  instantaneous derivative of the *old* curve at that moment;
+- `segment.startedAt = retargetTimestamp`;
+- the controller emits the initial sample synchronously at that timestamp,
+  which by construction equals the already-painted position — a DOM
+  no-op.
 
-- position via `controller.read()` (re-samples the active curve at that
-  instant);
-- segment `startedAt` via `performance.now()`.
+This keeps the first handoff emit equal to the painted track position
+(retargeting is visually free), while the velocity is sampled close to the
+actual transition frame so the profile's `startSpeed` matches the eye's
+expectation. The two-source split is deliberate: a freshly re-sampled
+*position* would publish a value the user has not painted yet (forward
+jump on click); a *stale* velocity (last emit, up to 16 ms old) would make
+the profile decelerate momentarily (visible hiccup).
 
-So the new curve at `t = now()` evaluates to *exactly* the position the
-user is looking at on the current frame. This is the invariant that keeps
-mid-flight handoffs free of back-step / skip-ahead artefacts. Any future
-change must preserve "time-origin == position-origin == one `now()`".
-
-For the repeated-click follow-up (a separate handoff from a settled
+For the repeated-click follow-up (a separate handoff from a *settled*
 segment to its chain successor), the new segment's `startedAt` is anchored
 at the previous segment's settle timestamp so the two are contiguous in
 time as well as in space.
 
-When the controller completes, the runner dispatches `MOTION_SETTLED`,
-which advances the state machine into either the chain follow-up or the
-idle state.
+When the controller completes a segment, the runner dispatches
+`MOTION_SETTLED` **with the exact visual position at settle**. The reducer
+compares that `settledPosition` against `state.virtualIndex`:
+
+- If they match within `MOTION_EPSILON`, the segment completed as
+  intended: the reducer advances to the chain follow-up or to idle (using
+  `settledPosition` as the new `fromVirtualIndex`).
+- If they differ — a click landed during the settle frame and rewrote
+  `state.virtualIndex` to a new target — the reducer re-anchors
+  `fromVirtualIndex` to `settledPosition` and leaves `motionPhase`
+  non-idle. The next runner pass animates from the real settled point to
+  the still-pending target. This eliminates the "land short, freeze,
+  jump" artefact that occurs when the reducer would otherwise snap to the
+  post-click target.
 
 ### 4.3 No projection-source layer
 
@@ -535,6 +560,16 @@ Edge navigation zones. Hidden by default on desktop, shown on
 viewport-hover or `:focus-visible`. Always visible on touch. The
 left/right zones are not rendered when `layout.isAtStart`/`isAtEnd` is
 true (finite mode), so there is no destination to navigate to.
+
+**Sizing system.** All breakpoint-dependent dimensions are expressed as
+four CSS custom properties on `.navZone` — `--nav-button-w`,
+`--nav-button-h`, `--nav-button-radius`, `--nav-edge-inset`. Both the
+touch zone (which *is* the button) and the non-touch button (centred
+inside an 8 %-wide hover strip) read the same tokens. Each media query
+overrides just the four tokens; the rules that consume them never change.
+The four breakpoint blocks are: default desktop (45 px circle), tablet
+and small desktop ≤ 1024 px (48 × 96 px pill), mobile portrait ≤ 767 px
+(40 × 80 px pill), compact landscape ≤ 520 px height (36 × 56 px pill).
 
 ### 8.4 `<Diagnostic />`
 

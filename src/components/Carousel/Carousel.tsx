@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "./Carousel.module.scss";
 import {
@@ -133,7 +133,57 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   });
 
   // --- motion runner: state ↔ controller -----------------------------------
+  // `motionDuration` is consumed only by `usePaginationSync` (autoplay dot
+  // delay). It changes on every motion start, so a naive `setMotionDuration`
+  // forces an extra React commit on top of the dispatch-driven one. We defer
+  // the publish to the next idle moment after layout — RAF + a 0-ms task —
+  // so the duration update batches with whatever React work would have run
+  // anyway and never lands inside the synchronous click-handler path that
+  // schedules the new segment.
   const [motionDuration, setMotionDuration] = useState(0);
+  const motionDurationFrameRef = useRef<number | null>(null);
+  const motionDurationTimeoutRef = useRef<number | null>(null);
+
+  const cancelMotionDurationPublish = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (motionDurationFrameRef.current !== null) {
+      window.cancelAnimationFrame(motionDurationFrameRef.current);
+      motionDurationFrameRef.current = null;
+    }
+    if (motionDurationTimeoutRef.current !== null) {
+      window.clearTimeout(motionDurationTimeoutRef.current);
+      motionDurationTimeoutRef.current = null;
+    }
+  }, []);
+
+  const publishMotionDuration = useCallback(
+    (duration: number) => {
+      if (typeof window === "undefined") {
+        setMotionDuration(duration);
+        return;
+      }
+      cancelMotionDurationPublish();
+      motionDurationFrameRef.current = window.requestAnimationFrame(() => {
+        motionDurationFrameRef.current = null;
+        motionDurationTimeoutRef.current = window.setTimeout(() => {
+          motionDurationTimeoutRef.current = null;
+          setMotionDuration((current) =>
+            current === duration ? current : duration,
+          );
+        }, 0);
+      });
+    },
+    [cancelMotionDurationPublish],
+  );
+
+  useEffect(() => cancelMotionDurationPublish, [cancelMotionDurationPublish]);
+
+  const handleMotionSettled = useCallback(
+    (settledPosition: number) =>
+      dispatch({ type: "MOTION_SETTLED", settledPosition }),
+    [dispatch],
+  );
+
   useMotionRunner({
     state,
     config,
@@ -141,8 +191,8 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     isInstantMode,
     isDragging: status.isDragging,
     enabled: layout.canSlide,
-    onSettle: () => dispatch({ type: "MOTION_SETTLED" }),
-    onDurationChange: setMotionDuration,
+    onSettle: handleMotionSettled,
+    onDurationChange: publishMotionDuration,
   });
 
   // --- navigation -----------------------------------------------------------

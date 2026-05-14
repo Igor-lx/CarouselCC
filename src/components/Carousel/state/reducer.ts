@@ -172,10 +172,35 @@ export function carouselReducer(
         return synced;
       }
 
+      const settledPosition = envelope.settledPosition;
+      const targetChanged =
+        Math.abs(settledPosition - synced.virtualIndex) >
+        context.config.motion.epsilon;
+
+      // The carousel stopped where the *active* segment was aimed
+      // (`settledPosition`), but the latest `state.virtualIndex` is a
+      // different target — meaning a click landed after the segment had
+      // started settling but before this MOTION_SETTLED dispatch reached the
+      // reducer. We don't snap to the new target (that's what produces the
+      // "land short, freeze, jump" artefact); we re-anchor `fromVirtualIndex`
+      // to the actual settled position and let the next motion-runner pass
+      // animate from there to the still-pending `virtualIndex`. The chain
+      // follow-up (`followUpVirtualIndex`) stays untouched for the same
+      // reason — it must fire only after we've actually reached the
+      // (now-redirected) advance target.
+      if (targetChanged) {
+        return {
+          ...synced,
+          fromVirtualIndex: settledPosition,
+          isRepeatedClickAdvance: false,
+          gesture: ZERO_GESTURE_RELEASE,
+        };
+      }
+
       if (synced.followUpVirtualIndex !== null) {
         return {
           ...synced,
-          fromVirtualIndex: synced.virtualIndex,
+          fromVirtualIndex: settledPosition,
           virtualIndex: synced.followUpVirtualIndex,
           followUpVirtualIndex: null,
           isRepeatedClickAdvance: false,
@@ -188,7 +213,7 @@ export function carouselReducer(
       return {
         ...synced,
         activePageIndex: synced.targetPageIndex,
-        fromVirtualIndex: synced.virtualIndex,
+        fromVirtualIndex: settledPosition,
         followUpVirtualIndex: null,
         isRepeatedClickAdvance: false,
         motionPhase: "idle",

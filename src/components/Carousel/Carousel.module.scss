@@ -67,6 +67,7 @@
     transition: border-color 0.5s ease;
     overflow: hidden;
     box-sizing: border-box;
+    contain: paint;
     cursor: default;
 
     &:focus-visible {

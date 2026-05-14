@@ -14,19 +14,19 @@ export const REPEATED_CLICK_TOUCH_DESTINATION_POSITION = 0.99;
 
 /**
  * Peak speed of the repeated-click fast segment relative to a normal MOVE.
- * 4.5x produces the feel of "a click during motion accelerates the carousel".
+ * Controls how strongly a click during motion accelerates the carousel.
  */
-export const REPEATED_CLICK_SPEED_MULTIPLIER = 4.5;
+export const REPEATED_CLICK_SPEED_MULTIPLIER = 5;
 
 /** Fraction of the fast segment distance dedicated to ramp-up. */
-export const REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE = 0.2;
+export const REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE = 0.35;
 
 /** Fraction of the fast segment distance dedicated to ramp-down. */
-export const REPEATED_CLICK_DECELERATION_DISTANCE_SHARE = 0.7;
+export const REPEATED_CLICK_DECELERATION_DISTANCE_SHARE = 0.35;
 
 /** Cubic-bezier curves expressed as CSS strings. */
 export const JUMP_BEZIER = "cubic-bezier(0.16, 1, 0.3, 1)";
-export const MOVE_BEZIER = "cubic-bezier(0.24, 0.68, 0.42, 1)";
+export const MOVE_BEZIER = "cubic-bezier(0.32, 0.2, 0.28, 1)";
 export const AUTO_BEZIER = "cubic-bezier(0.28, 0.72, 0.38, 1)";
 export const SNAP_BACK_BEZIER = "cubic-bezier(0.18, 0.82, 0.28, 1)";
 

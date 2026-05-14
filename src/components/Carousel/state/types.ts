@@ -70,6 +70,17 @@ export interface EndDragCommand extends VirtualIndexSource {
 
 export interface MotionSettledCommand {
   type: "MOTION_SETTLED";
+  /**
+   * The visual position at which the motion controller actually settled.
+   * Required because, between the moment a segment naturally settles in the
+   * RAF tick and the moment the React reducer runs MOTION_SETTLED, the user
+   * may have dispatched a click that overwrote `state.virtualIndex` with a
+   * new target. The reducer must use this canonical "where the track really
+   * stopped" value as the chain / idle origin — using `state.virtualIndex`
+   * would race with that overwrite and snap the track to the post-click
+   * target instead of continuing to animate to it.
+   */
+  settledPosition: number;
 }
 
 export type CarouselCommand =

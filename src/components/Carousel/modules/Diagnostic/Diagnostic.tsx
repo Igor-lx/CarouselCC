@@ -11,7 +11,8 @@ import {
 import type { CarouselDiagnosticWarning } from "./types";
 import { useGroupedWarnings } from "./useGroupedWarnings";
 
-const BANNER = "[Carousel Diagnostic] enabled. Observe-only — diagnostics never normalize or replace runtime values.";
+const BANNER =
+  "[Carousel Diagnostic] enabled. Observe-only: diagnostics reports runtime values and any explicit runtime normalizations.";
 
 const DiagnosticBase = memo(function CarouselDiagnostic() {
   const { props, layout, slots } = useCarouselDiagnosticContext();

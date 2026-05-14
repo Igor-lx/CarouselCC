@@ -47,6 +47,7 @@ export function createMotionController<Strategy extends string = string>(
   initialStrategy: Strategy = "idle" as Strategy,
 ): MotionController<Strategy> {
   let sample = createIdleSample(initialValue, initialStrategy);
+  let emittedSample = sample;
   let frameId: number | null = null;
   let completionFrameId: number | null = null;
   let active: ActiveSegment<Strategy> | null = null;
@@ -64,6 +65,7 @@ export function createMotionController<Strategy extends string = string>(
 
   const emit = (next: MotionSample<Strategy>) => {
     sample = next;
+    emittedSample = next;
     subscribers.forEach((listener) => listener(next));
   };
 
@@ -136,11 +138,15 @@ export function createMotionController<Strategy extends string = string>(
   };
 
   return {
-    read() {
+    read(timestamp = now()) {
       if (!active) return sample;
-      const next = sampleActive(now());
+      const next = sampleActive(timestamp);
       sample = next;
       return next;
+    },
+
+    getSnapshot() {
+      return emittedSample;
     },
 
     isActive() {
@@ -149,7 +155,7 @@ export function createMotionController<Strategy extends string = string>(
 
     subscribe(listener, options) {
       subscribers.add(listener);
-      if (options?.emitCurrent ?? true) listener(sample);
+      if (options?.emitCurrent ?? true) listener(emittedSample);
       return () => {
         subscribers.delete(listener);
       };
@@ -172,7 +178,13 @@ export function createMotionController<Strategy extends string = string>(
         completion,
       };
 
-      const initial = sampleActive(now());
+      // Initial emit aligned with the segment's *declared* start time, not
+      // `now()`. The motion runner sets `segment.startedAt` together with the
+      // segment's `from` position so the curve at `startedAt` evaluates to
+      // `from` — emitting at this exact point gives subscribers a no-op DOM
+      // write (the same value they've already painted) instead of a
+      // catch-up jump.
+      const initial = sampleActive(segment.startedAt);
       emit(initial);
 
       if (initial.progress >= 1) {

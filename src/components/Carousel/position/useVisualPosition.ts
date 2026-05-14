@@ -43,16 +43,19 @@ const toFrame = (
  * and exposes:
  *
  * - `subscribe(listener)` — per-frame stream while a segment is active.
- *   Subscribers (track binding, pagination widget binding) mutate their
- *   own DOM directly inside the callback; they never go through React.
- * - `getSnapshot()` — a *fresh* re-sample of the controller at `now()`.
- *   Used for cold reads on user events (gesture press start, click).
- *   Re-sampling is required so the gesture/click origin matches what the
- *   user actually sees, not the value from the previous RAF tick.
- * - `applyImmediatePosition(position)` — writes the position into the
- *   controller during a drag. Cancels any active motion and emits, so the
- *   track, the widget, and any other subscriber all stay synchronised on a
- *   single per-frame stream throughout the drag.
+ *   Subscribers (track binding, pagination widget binding) mutate their own
+ *   DOM inside the callback; React is not involved at this tempo.
+ * - `getSnapshot()` returns the last *emitted* visual frame. Cold reads on
+ *   user events (gesture press start, navigation click) read through this
+ *   so the captured origin matches what DOM subscribers have already
+ *   received, not a freshly re-sampled but unpainted controller value. A
+ *   re-sampled now-value would force the track to "catch up" in a single
+ *   composite frame, which the eye perceives as a forward jerk on click /
+ *   press.
+ * - `applyImmediatePosition(position)` — publish a position into the stream
+ *   during drag. Internally calls `controller.set`, which cancels any active
+ *   motion and emits, so the track, the widget, and the motion runner all
+ *   observe one consistent source of truth throughout the gesture.
  */
 export function useVisualPosition({
   visibleSlidesCount,
@@ -63,8 +66,12 @@ export function useVisualPosition({
   stepSizeRef.current = visibleSlidesCount;
 
   const listenersRef = useRef<Set<VisualPositionListener>>(new Set());
+  const lastFrameRef = useRef<VisualPositionFrame>(
+    toFrame(controller.getSnapshot(), visibleSlidesCount),
+  );
 
   const emit = useCallback((frame: VisualPositionFrame) => {
+    lastFrameRef.current = frame;
     listenersRef.current.forEach((listener) => listener(frame));
   }, []);
 
@@ -77,13 +84,13 @@ export function useVisualPosition({
   }, [controller, emit]);
 
   const getSnapshot = useCallback<VisualPositionSource["getSnapshot"]>(
-    () => toFrame(controller.read(), stepSizeRef.current),
-    [controller],
+    () => lastFrameRef.current,
+    [],
   );
 
   useIsomorphicLayoutEffect(() => {
-    emit(getSnapshot());
-  }, [emit, getSnapshot, visibleSlidesCount]);
+    emit(toFrame(controller.getSnapshot(), stepSizeRef.current));
+  }, [controller, emit, visibleSlidesCount]);
 
   const subscribe = useCallback<VisualPositionSource["subscribe"]>(
     (listener, options) => {

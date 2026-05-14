@@ -30,6 +30,52 @@ export interface MotionProfileInput {
  * for an invalid input.
  */
 const MIN_PROFILE_SPEED = 1e-6;
+/**
+ * Fallback share applied to each end of the profile when the configured
+ * acceleration + deceleration shares sum above 1 (no room for a cruise
+ * zone). Splitting the profile evenly between accel and decel produces a
+ * well-behaved "no cruise" curve; the Diagnostic surfaces the normalisation
+ * as a LOGICAL warning so the developer can see runtime is repairing the
+ * input.
+ */
+const OVERALLOCATED_PROFILE_SHARE = 0.5;
+
+export interface MotionProfileShares {
+  accelerationShare: number;
+  decelerationShare: number;
+  cruiseShare: number;
+  wasNormalized: boolean;
+}
+
+/**
+ * Resolve the three profile zone shares from a (possibly invalid) input
+ * pair. The runtime normalisation has exactly one trigger — accel + decel
+ * sum above 1 — and exactly one outcome (`OVERALLOCATED_PROFILE_SHARE` on
+ * each end, no cruise). Diagnostic uses the same helper to know whether to
+ * report the normalisation.
+ */
+export const normalizeMotionProfileShares = (
+  accelerationDistanceShare: number,
+  decelerationDistanceShare: number,
+): MotionProfileShares => {
+  const sum = accelerationDistanceShare + decelerationDistanceShare;
+
+  if (Number.isFinite(sum) && sum > 1) {
+    return {
+      accelerationShare: OVERALLOCATED_PROFILE_SHARE,
+      decelerationShare: OVERALLOCATED_PROFILE_SHARE,
+      cruiseShare: 0,
+      wasNormalized: true,
+    };
+  }
+
+  return {
+    accelerationShare: accelerationDistanceShare,
+    decelerationShare: decelerationDistanceShare,
+    cruiseShare: 1 - sum,
+    wasNormalized: false,
+  };
+};
 
 const smoothstep = (progress: number) => progress * progress * (3 - 2 * progress);
 
@@ -127,9 +173,11 @@ export const createMotionProfile = ({
   targetDuration,
 }: MotionProfileInput): MotionProfile => {
   const absDistance = Math.abs(distance);
-  const accelerationShare = accelerationDistanceShare;
-  const decelerationShare = decelerationDistanceShare;
-  const cruiseShare = 1 - accelerationShare - decelerationShare;
+  const { accelerationShare, decelerationShare, cruiseShare } =
+    normalizeMotionProfileShares(
+      accelerationDistanceShare,
+      decelerationDistanceShare,
+    );
 
   const resolvedPeak =
     typeof targetDuration === "number" && targetDuration > 0
