@@ -20,6 +20,7 @@ interface UseVisualPositionInput {
 export interface UseVisualPositionResult {
   source: VisualPositionSource;
   controller: MotionController<CarouselMotionStrategy>;
+  applyImmediatePosition: (position: number) => void;
 }
 
 const toFrame = (
@@ -91,5 +92,16 @@ export function useVisualPosition({
     [getSnapshot, subscribe],
   );
 
-  return { source, controller };
+  const applyImmediatePosition = useCallback(
+    (position: number) => {
+      controller.set(position, {
+        target: position,
+        velocity: 0,
+        strategy: "handoff",
+      });
+    },
+    [controller],
+  );
+
+  return { source, controller, applyImmediatePosition };
 }

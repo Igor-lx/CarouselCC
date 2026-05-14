@@ -15,6 +15,7 @@ interface UseTrackBindingInput {
   renderWindowStart: number;
   visibleSlidesCount: number;
   visualPosition: VisualPositionSource;
+  applyVisualPosition: (position: number) => void;
 }
 
 export interface TrackBindingApi {
@@ -28,13 +29,16 @@ export interface TrackBindingApi {
  * measurement (ResizeObserver + window resize) and the transform write
  * (subscribes to the visual position and mutates `transform` directly).
  * Returns a small imperative API used by the gesture adapter and the
- * navigation controller.
+ * navigation controller. Imperative gesture writes are published back into
+ * the visual position stream so track, widgets, and motion handoff share one
+ * source of truth.
  */
 export function useTrackBinding({
   trackRef,
   renderWindowStart,
   visibleSlidesCount,
   visualPosition,
+  applyVisualPosition,
 }: UseTrackBindingInput): TrackBindingApi {
   const renderWindowStartRef = useRef(renderWindowStart);
   const visibleSlidesCountRef = useRef(visibleSlidesCount);
@@ -153,10 +157,9 @@ export function useTrackBinding({
 
   const applyTrackPosition = useCallback(
     (position: number) => {
-      // Drag writes are immediate: bypass the controller's RAF loop.
-      writePosition(position);
+      applyVisualPosition(position);
     },
-    [writePosition],
+    [applyVisualPosition],
   );
 
   const readCurrentPosition = useCallback(() => {

@@ -39,13 +39,10 @@ const buildStartFromSample = (
 });
 
 /**
- * Origin of a post-drag release segment. The state machine wrote
- * `fromVirtualIndex` from the visually-sampled release position at END_DRAG,
- * so we read it here directly. We deliberately do NOT use the motion
- * controller's snapshot: drag bypasses the controller (immediate transform
- * writes via `applyTrackPosition`), so the controller's `sample` is stale
- * for the entire drag span and using it would jump the track back to the
- * pre-drag logical origin before the release segment animates.
+ * Origin of a post-drag release segment. Drag writes are published into the
+ * visual position stream, while END_DRAG records the release position and
+ * release velocity in state. The reducer payload stays canonical here because
+ * it binds the sampled position and the release velocity to the same event.
  */
 const buildStartFromGesture = (state: CarouselState): MotionStart => ({
   position: state.fromVirtualIndex,
@@ -53,11 +50,11 @@ const buildStartFromGesture = (state: CarouselState): MotionStart => ({
   strategy: "gesture",
 });
 
-const buildStartFromIdle = (
-  currentPosition: number,
+const buildStartFromState = (
+  state: CarouselState,
   fallbackVelocity: number,
 ): MotionStart => ({
-  position: currentPosition,
+  position: state.fromVirtualIndex,
   velocity: fallbackVelocity,
   strategy: "easing",
 });
@@ -118,12 +115,16 @@ export function useMotionRunner({
       return;
     }
 
-    if (state.motionPhase === "idle" || state.motionPhase === "dragging") {
-      if (state.motionPhase === "idle") {
-        controller.snap(state.virtualIndex, { strategy: "idle" });
-        handoffSnapshotRef.current = null;
-        onDurationChange?.(0);
-      }
+    if (state.motionPhase === "idle") {
+      controller.snap(state.virtualIndex, { strategy: "idle" });
+      handoffSnapshotRef.current = null;
+      onDurationChange?.(0);
+      return;
+    }
+
+    if (state.motionPhase === "dragging") {
+      handoffSnapshotRef.current = null;
+      onDurationChange?.(0);
       return;
     }
 
@@ -149,6 +150,8 @@ export function useMotionRunner({
 
     if (isActive) {
       start = buildStartFromSample(currentSample);
+    } else if (state.moveReason === "gesture") {
+      start = buildStartFromGesture(state);
     } else if (
       handoff &&
       Math.abs(handoff.position - state.fromVirtualIndex) < config.motion.epsilon
@@ -161,10 +164,8 @@ export function useMotionRunner({
       startedAt = handoff.timestamp;
       isRepeatedFollowUp = handoff.strategy === "repeated";
       consumedHandoff = true;
-    } else if (state.moveReason === "gesture") {
-      start = buildStartFromGesture(state);
     } else {
-      start = buildStartFromIdle(currentSample.value, currentSample.velocity);
+      start = buildStartFromState(state, currentSample.velocity);
     }
 
     const distance = state.virtualIndex - start.position;

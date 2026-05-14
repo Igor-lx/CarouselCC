@@ -58,6 +58,7 @@ export function useCarouselGesture({
   const handlePressStart = useCallback(() => {
     slotSizeRef.current = getSlotSize();
     const origin = readCurrentPosition();
+    applyTrackPosition(origin);
     const pageIndex = nearestPageIndex(origin, layout);
 
     originPositionRef.current = origin;
@@ -68,7 +69,7 @@ export function useCarouselGesture({
       fromVirtualIndex: origin,
       targetPageIndex: pageIndex,
     });
-  }, [dispatch, getSlotSize, layout, readCurrentPosition]);
+  }, [applyTrackPosition, dispatch, getSlotSize, layout, readCurrentPosition]);
 
   const handleDragMove = useCallback(
     (payload: PointerSwipeMovePayload) => {

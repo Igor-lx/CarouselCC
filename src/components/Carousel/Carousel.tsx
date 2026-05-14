@@ -92,7 +92,11 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   });
 
   // --- visual position SSOT -------------------------------------------------
-  const { source: visualPosition, controller } = useVisualPosition({
+  const {
+    source: visualPosition,
+    controller,
+    applyImmediatePosition,
+  } = useVisualPosition({
     visibleSlidesCount: layout.visibleSlidesCount,
   });
 
@@ -116,6 +120,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     renderWindowStart,
     visibleSlidesCount: layout.visibleSlidesCount,
     visualPosition,
+    applyVisualPosition: applyImmediatePosition,
   });
 
   // --- motion runner: state ↔ controller -----------------------------------
@@ -167,7 +172,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // --- autoplay -------------------------------------------------------------
   const autoplayPaused = !visible || isInteracting || status.isMoving;
   const { handleHoverChange } = useAutoplay({
-    enabled: isAuto && layout.canSlide && !isInstantMode,
+    enabled: isAuto && layout.canSlide,
     isPaused: autoplayPaused,
     isAtEnd,
     intervalMs: config.autoplayInterval,
