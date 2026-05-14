@@ -47,6 +47,7 @@ export function createMotionController<Strategy extends string = string>(
   initialStrategy: Strategy = "idle" as Strategy,
 ): MotionController<Strategy> {
   let sample = createIdleSample(initialValue, initialStrategy);
+  let emittedSample = sample;
   let frameId: number | null = null;
   let completionFrameId: number | null = null;
   let active: ActiveSegment<Strategy> | null = null;
@@ -64,6 +65,7 @@ export function createMotionController<Strategy extends string = string>(
 
   const emit = (next: MotionSample<Strategy>) => {
     sample = next;
+    emittedSample = next;
     subscribers.forEach((listener) => listener(next));
   };
 
@@ -143,6 +145,10 @@ export function createMotionController<Strategy extends string = string>(
       return next;
     },
 
+    getSnapshot() {
+      return emittedSample;
+    },
+
     isActive() {
       return active !== null;
     },
@@ -160,7 +166,13 @@ export function createMotionController<Strategy extends string = string>(
     ) {
       cancelTick();
       cancelCompletion();
-      const { segment, sampler, onComplete, completion = "next-frame" } = options;
+      const {
+        segment,
+        sampler,
+        onComplete,
+        completion = "next-frame",
+        initialEmission = "sync",
+      } = options;
 
       active = {
         segment,
@@ -173,7 +185,11 @@ export function createMotionController<Strategy extends string = string>(
       };
 
       const initial = sampleActive(now());
-      emit(initial);
+      if (initialEmission === "sync") {
+        emit(initial);
+      } else {
+        sample = initial;
+      }
 
       if (initial.progress >= 1) {
         finalize(initial);

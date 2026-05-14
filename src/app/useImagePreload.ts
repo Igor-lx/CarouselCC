@@ -1,16 +1,71 @@
 import { useEffect, useRef } from "react";
 
-const scheduleIdle = (callback: () => void) => {
-  if (typeof window.requestIdleCallback === "function") {
-    const handle = window.requestIdleCallback(callback, { timeout: 1000 });
-    return () => window.cancelIdleCallback(handle);
-  }
+const FALLBACK_IDLE_DELAY_MS = 250;
+const MIN_IDLE_BUDGET_MS = 12;
 
-  const handle = window.setTimeout(callback, 0);
-  return () => window.clearTimeout(handle);
+const scheduleIdle = (callback: () => void) => {
+  let disposed = false;
+  let idleHandle: number | null = null;
+  let timeoutHandle: number | null = null;
+
+  const clearScheduled = () => {
+    if (idleHandle !== null) {
+      window.cancelIdleCallback?.(idleHandle);
+      idleHandle = null;
+    }
+    if (timeoutHandle !== null) {
+      window.clearTimeout(timeoutHandle);
+      timeoutHandle = null;
+    }
+  };
+
+  const schedule = () => {
+    clearScheduled();
+
+    if (typeof window.requestIdleCallback === "function") {
+      idleHandle = window.requestIdleCallback((deadline) => {
+        idleHandle = null;
+        if (disposed) return;
+        if (deadline.timeRemaining() < MIN_IDLE_BUDGET_MS) {
+          schedule();
+          return;
+        }
+        callback();
+      });
+      return;
+    }
+
+    timeoutHandle = window.setTimeout(() => {
+      timeoutHandle = null;
+      if (!disposed) callback();
+    }, FALLBACK_IDLE_DELAY_MS);
+  };
+
+  schedule();
+
+  return () => {
+    disposed = true;
+    clearScheduled();
+  };
 };
 
-const decodeImage = (src: string): Promise<HTMLImageElement> =>
+const canDecodeDuringIdle = () =>
+  typeof window.requestIdleCallback === "function";
+
+const waitForIdle = (pendingCancels: Set<() => void>) =>
+  new Promise<void>((resolve) => {
+    let cancel: () => void = () => undefined;
+    cancel = scheduleIdle(() => {
+      pendingCancels.delete(cancel);
+      resolve();
+    });
+    pendingCancels.add(cancel);
+  });
+
+const loadImage = (
+  src: string,
+  pendingCancels: Set<() => void>,
+): Promise<HTMLImageElement> =>
   new Promise((resolve) => {
     const image = new Image();
     let settled = false;
@@ -20,32 +75,46 @@ const decodeImage = (src: string): Promise<HTMLImageElement> =>
       settled = true;
       image.onload = null;
       image.onerror = null;
+      pendingCancels.delete(cancel);
       resolve(image);
     };
 
-    image.decoding = "async";
-    const decode = () => {
-      if (typeof image.decode !== "function") {
-        finish();
-        return;
-      }
-      image.decode().then(finish, finish);
+    const cancel = () => {
+      if (settled) return;
+      settled = true;
+      image.onload = null;
+      image.onerror = null;
+      image.removeAttribute("src");
+      pendingCancels.delete(cancel);
+      resolve(image);
     };
 
-    image.onload = decode;
+    pendingCancels.add(cancel);
+    image.decoding = "async";
+    image.fetchPriority = "low";
+
+    image.onload = finish;
     image.onerror = finish;
     image.src = src;
 
     if (image.complete) {
-      decode();
+      finish();
     }
   });
 
-export function useImagePreload(urls: readonly string[]): void {
+const decodeLoadedImage = (image: HTMLImageElement): Promise<void> => {
+  if (typeof image.decode !== "function") return Promise.resolve();
+  return image.decode().then(
+    () => undefined,
+    () => undefined,
+  );
+};
+
+export function useImagePreload(urls: readonly string[], enabled = true): void {
   const cacheRef = useRef(new Map<string, HTMLImageElement>());
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !enabled) return;
 
     let cancelled = false;
     const pendingCancels = new Set<() => void>();
@@ -62,17 +131,18 @@ export function useImagePreload(urls: readonly string[]): void {
       for (const src of uniqueUrls) {
         if (cancelled || cacheRef.current.has(src)) continue;
 
-        await new Promise<void>((resolve) => {
-          let cancel: () => void = () => undefined;
-          cancel = scheduleIdle(() => {
-            pendingCancels.delete(cancel);
-            resolve();
-          });
-          pendingCancels.add(cancel);
-        });
-
+        await waitForIdle(pendingCancels);
         if (cancelled) break;
-        const image = await decodeImage(src);
+
+        const image = await loadImage(src, pendingCancels);
+        if (cancelled) break;
+
+        if (canDecodeDuringIdle()) {
+          await waitForIdle(pendingCancels);
+          if (cancelled) break;
+          await decodeLoadedImage(image);
+        }
+
         if (!cancelled) {
           cacheRef.current.set(src, image);
         }
@@ -86,5 +156,5 @@ export function useImagePreload(urls: readonly string[]): void {
       pendingCancels.forEach((cancel) => cancel());
       pendingCancels.clear();
     };
-  }, [urls]);
+  }, [enabled, urls]);
 }

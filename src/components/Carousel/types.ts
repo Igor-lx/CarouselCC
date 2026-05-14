@@ -54,6 +54,11 @@ const OnSlideClickSchema = z.function({
   output: z.void(),
 });
 
+const OnMotionIdleStatusChangeSchema = z.function({
+  input: [z.boolean()],
+  output: z.void(),
+});
+
 export const CarouselPropsSchema = z.object({
   slidesData: z.array(SlideSchema),
   visibleSlidesNr: z.number().optional(),
@@ -73,6 +78,7 @@ export const CarouselPropsSchema = z.object({
   isInstantMotion: z.boolean().optional(),
   isTouchDevice: z.boolean().optional(),
   onSlideClick: OnSlideClickSchema.optional(),
+  onMotionIdleStatusChange: OnMotionIdleStatusChangeSchema.optional(),
 });
 
 export interface CarouselProps extends z.infer<typeof CarouselPropsSchema> {

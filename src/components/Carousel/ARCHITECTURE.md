@@ -73,6 +73,10 @@ props, defaults, constants, styles, demo usage, and module behaviour.
   `innerContainer`, `slideContainer`, `slide`, `slideInteractive`, `slideError`,
   `slideText`;
 - `onSlideClick?: (slide: Slide) => void`;
+- `onMotionIdleStatusChange?: (isIdle: boolean) => void` - external lifecycle signal
+  for consumers that need to coordinate work around carousel motion. The
+  callback reports only the public idle/running boundary; it does not expose the
+  reducer state, visual position stream, or asset-loading responsibilities;
 - `children?` — slots: `Pagination | PaginationWidget`, `Controls`,
   `Diagnostic`, attached by a `slot` static on the component.
 
@@ -114,6 +118,11 @@ horizontal translate transform.
   threshold, (b) the user is dragging, (c) motion is in progress, (d) on
   desktop only, the pointer hovers the viewport (with a 150 ms debounce). On
   the final page in finite mode it loops back to page 0 via a GO_TO jump.
+- **External motion idle signal**: `onMotionIdleStatusChange` fires when the carousel
+  crosses the idle/running boundary. It is an observation contract for outer
+  application code (for example, deferring image preload/decode until the
+  carousel is idle). It never drives carousel semantics and never moves asset
+  preparation into the component.
 - **Reduced motion**: when prefers-reduced-motion or `isInstantMotion` is set,
   every transition snaps instantly. Gesture is disabled.
 - **Pagination (dots)**: one dot per page. The active dot reflects the

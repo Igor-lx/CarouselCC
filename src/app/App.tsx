@@ -39,6 +39,7 @@ export default function App() {
 
   const [isAutoplay, setIsAutoplay] = useState(false);
   const [isInteractive, setIsInteractive] = useState(true);
+  const [isCarouselIdle, setIsCarouselIdle] = useState(true);
 
   const device = useBreakpoint(VISIBLE_BY_BREAKPOINT);
 
@@ -54,7 +55,7 @@ export default function App() {
     [useMobileImages],
   );
 
-  useImagePreload(slideImageUrls);
+  useImagePreload(slideImageUrls, isCarouselIdle);
 
   const slidesData = useMemo(
     () =>
@@ -104,6 +105,7 @@ export default function App() {
             isPagePaddingOn
             isTouchDevice={isTouch}
             onSlideClick={openSlide}
+            onMotionIdleStatusChange={setIsCarouselIdle}
           >
             {isTouch ? <PaginationWidget /> : <Pagination />}
             <Controls />

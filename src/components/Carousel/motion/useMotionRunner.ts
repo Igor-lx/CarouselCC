@@ -139,17 +139,19 @@ export function useMotionRunner({
     }
 
     const isActive = controller.isActive();
-    const now = performance.now();
-    const currentSample = controller.read();
+    const currentSample = isActive ? controller.getSnapshot() : controller.read();
     const handoff = handoffSnapshotRef.current;
 
     let start: MotionStart;
-    let startedAt = now;
+    let startedAt = performance.now();
+    let initialEmission: "sync" | "next-frame" = "sync";
     let isRepeatedFollowUp = false;
     let consumedHandoff = false;
 
     if (isActive) {
       start = buildStartFromSample(currentSample);
+      startedAt = currentSample.timestamp;
+      initialEmission = "next-frame";
     } else if (state.moveReason === "gesture") {
       start = buildStartFromGesture(state);
     } else if (
@@ -202,6 +204,7 @@ export function useMotionRunner({
       sampler: sampleCarouselSegment,
       onComplete: settle,
       completion: state.followUpVirtualIndex !== null ? "immediate" : "next-frame",
+      initialEmission,
     });
   }, [
     config,

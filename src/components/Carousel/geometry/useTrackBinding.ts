@@ -104,9 +104,9 @@ export function useTrackBinding({
   const syncGeometry = useCallback(
     (width?: number) => {
       measure(width);
-      writePosition(currentPositionRef.current);
+      writePosition(visualPosition.getSnapshot().position);
     },
-    [measure, writePosition],
+    [measure, visualPosition, writePosition],
   );
 
   useIsomorphicLayoutEffect(() => {
@@ -164,9 +164,9 @@ export function useTrackBinding({
 
   const readCurrentPosition = useCallback(() => {
     const value = visualPosition.getSnapshot().position;
-    writePosition(value);
+    currentPositionRef.current = value;
     return value;
-  }, [visualPosition, writePosition]);
+  }, [visualPosition]);
 
   const getSlotSize = useCallback(() => slotSizeRef.current ?? 0, []);
 

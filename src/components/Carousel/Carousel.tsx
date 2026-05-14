@@ -1,4 +1,4 @@
-import { memo, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "./Carousel.module.scss";
 import {
@@ -52,6 +52,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     isInstantMotion,
     isTouchDevice,
     onSlideClick,
+    onMotionIdleStatusChange,
     children,
   } = props;
 
@@ -90,6 +91,14 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     config,
     isInstantMode,
   });
+  const lastReportedMotionIdleRef = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    if (!onMotionIdleStatusChange) return;
+    if (lastReportedMotionIdleRef.current === status.isIdle) return;
+    lastReportedMotionIdleRef.current = status.isIdle;
+    onMotionIdleStatusChange(status.isIdle);
+  }, [onMotionIdleStatusChange, status.isIdle]);
 
   // --- visual position SSOT -------------------------------------------------
   const {

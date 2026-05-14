@@ -201,12 +201,20 @@ export function buildCarouselSegment({
 }: BuildSegmentInput): BuildSegmentResult {
   const intent = intentFromState(state, isInstantMode);
   const stepSize = state.layout.visibleSlidesCount;
-  const baseRelease = resolveInertialRelease({
-    gestureReleaseVelocity: state.gesture.pointerVelocity,
-    distanceToTarget: state.virtualIndex - state.fromVirtualIndex,
-    baseDuration: stepSize > 0 ? config.stepDuration * Math.abs(state.virtualIndex - state.fromVirtualIndex) / stepSize : config.stepDuration,
-    config: config.releaseConfig,
-  });
+  const baseRelease =
+    intent === "gesture-release"
+      ? resolveInertialRelease({
+          gestureReleaseVelocity: state.gesture.pointerVelocity,
+          distanceToTarget: state.virtualIndex - state.fromVirtualIndex,
+          baseDuration:
+            stepSize > 0
+              ? config.stepDuration *
+                Math.abs(state.virtualIndex - state.fromVirtualIndex) /
+                stepSize
+              : config.stepDuration,
+          config: config.releaseConfig,
+        })
+      : null;
 
   const duration = resolveCarouselDuration({
     motionPhase: state.motionPhase,
@@ -222,7 +230,7 @@ export function buildCarouselSegment({
     autoplayDuration: config.autoplayDuration,
     stepDuration: config.stepDuration,
     jumpDuration: config.jumpDuration,
-    gestureReleaseDuration: baseRelease.duration,
+    gestureReleaseDuration: baseRelease?.duration ?? config.stepDuration,
   });
 
   const moveSpeed = averageSpeed(stepSize, config.stepDuration);
@@ -245,7 +253,7 @@ export function buildCarouselSegment({
     };
   }
 
-  if (intent === "gesture-release" && baseRelease.isInertialRelease) {
+  if (intent === "gesture-release" && baseRelease?.isInertialRelease) {
     return {
       intent,
       duration,
