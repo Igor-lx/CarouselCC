@@ -238,11 +238,17 @@ RAF-driven samples). It samples its current segment and publishes
 
 `useVisualPosition` wraps it and provides:
 
-- `subscribe(listener)` — called per frame while a segment is active;
-- `getSnapshot()` — pull the current sample (used by gesture origin and the
-  controls for cold reads);
-- `applyImmediate(position)` — set the value during drag (no animation);
-- `snapTo(position)` — finalise without animation.
+- `subscribe(listener)` — called per frame while a segment is active.
+  Subscribers (track binding, pagination widget binding) mutate their own
+  DOM inside the callback; React is never involved at this tempo.
+- `getSnapshot()` — a *fresh* re-sample of the controller at `now()`.
+  Cold reads on user events (gesture press start, navigation click) read
+  through this so the captured origin matches what the user actually sees
+  on the present frame — not the value emitted on the previous RAF tick.
+- `applyImmediatePosition(position)` — publish a position into the stream
+  during drag. Internally calls `controller.set`, which cancels any active
+  motion and emits, so the track, the widget, and the motion-runner
+  handoff observe one consistent source of truth throughout the gesture.
 
 A `Segment` is one of:
 
@@ -254,12 +260,20 @@ A `Segment` is one of:
   same direction as the new target).
 
 `useMotionRunner` is the only place the controller is started. It runs on
-state changes: when `motionPhase` becomes a non-idle value, it picks a fresh
-sample as the segment origin (using the controller's own snapshot if a
-segment was already running — that is the gesture/click handoff entry
-point), builds the segment, and starts the controller. When the controller
-completes, the runner dispatches `MOTION_SETTLED`, which advances the state
-machine into either the chain follow-up or the idle state.
+state changes: when `motionPhase` becomes a non-idle value, it picks a
+fresh segment origin and builds the segment. When a previous segment is
+still running (repeated click, opposite-direction click, any interruption)
+the origin's position **and** time are both taken from the same `now()` —
+the position via `controller.read()` (re-samples the active curve at that
+instant), the segment's `startedAt` via `performance.now()` — so the new
+curve at `t = now()` evaluates to exactly the position the user is looking
+at on the current frame. This is the single invariant that keeps mid-flight
+handoffs free of back-step / skip-ahead artefacts.
+
+When the controller completes, the runner dispatches `MOTION_SETTLED`,
+which advances the state machine into either the chain follow-up (anchored
+in time at the previous segment's settle timestamp, so the two segments
+are contiguous in both space and time) or the idle state.
 
 There is no projection-source layer between the controller and its
 consumers. The track binding subscribes to the visual position directly.

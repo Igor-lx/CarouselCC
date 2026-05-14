@@ -25,13 +25,15 @@ export interface TrackBindingApi {
 }
 
 /**
- * Wires the track DOM to the visual position source. Owns the slot-size
- * measurement (ResizeObserver + window resize) and the transform write
- * (subscribes to the visual position and mutates `transform` directly).
- * Returns a small imperative API used by the gesture adapter and the
- * navigation controller. Imperative gesture writes are published back into
- * the visual position stream so track, widgets, and motion handoff share one
- * source of truth.
+ * Wires the track DOM to the visual position source. Owns slot-size
+ * measurement (ResizeObserver + window resize) and the per-frame transform
+ * write (subscribes to the visual position and mutates `transform` directly,
+ * outside React).
+ *
+ * The imperative `applyTrackPosition` is the drag entry point: it publishes
+ * the new position back into the visual position stream so the track, the
+ * pagination widget binding, and the motion runner all observe one source
+ * of truth throughout a gesture.
  */
 export function useTrackBinding({
   trackRef,
@@ -46,7 +48,6 @@ export function useTrackBinding({
   const lastTransformRef = useRef<string | null>(null);
   const lastTransitionRef = useRef<string | null>(null);
   const lastMeasuredWidthRef = useRef<number | null>(null);
-  const currentPositionRef = useRef(0);
 
   renderWindowStartRef.current = renderWindowStart;
   visibleSlidesCountRef.current = visibleSlidesCount;
@@ -83,7 +84,6 @@ export function useTrackBinding({
 
   const writePosition = useCallback(
     (position: number) => {
-      currentPositionRef.current = position;
       const track = trackRef.current;
       if (!track) return;
       const transform = resolveTransform(position);
@@ -162,11 +162,10 @@ export function useTrackBinding({
     [applyVisualPosition],
   );
 
-  const readCurrentPosition = useCallback(() => {
-    const value = visualPosition.getSnapshot().position;
-    currentPositionRef.current = value;
-    return value;
-  }, [visualPosition]);
+  const readCurrentPosition = useCallback(
+    () => visualPosition.getSnapshot().position,
+    [visualPosition],
+  );
 
   const getSlotSize = useCallback(() => slotSizeRef.current ?? 0, []);
 

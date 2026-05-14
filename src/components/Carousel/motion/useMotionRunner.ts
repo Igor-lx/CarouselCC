@@ -123,6 +123,8 @@ export function useMotionRunner({
     }
 
     if (state.motionPhase === "dragging") {
+      // Drag has already cancelled motion via applyImmediatePosition →
+      // controller.set(). No further controller work here.
       handoffSnapshotRef.current = null;
       onDurationChange?.(0);
       return;
@@ -138,26 +140,40 @@ export function useMotionRunner({
       return;
     }
 
+    // From here on we are starting a real animation segment. The single
+    // critical correctness rule is: the segment's time origin and the
+    // segment's position origin must come from the *same instant*. We use
+    // `now()` for both — `controller.read()` re-samples the active segment
+    // at this same `now()`, so the new segment's curve at `t = now()`
+    // starts at exactly where the user is looking right now. No back-step,
+    // no skip-ahead, no micro-freeze at handoff.
+    const startedNow = performance.now();
     const isActive = controller.isActive();
-    const currentSample = isActive ? controller.getSnapshot() : controller.read();
+    const currentSample = controller.read();
     const handoff = handoffSnapshotRef.current;
 
     let start: MotionStart;
-    let startedAt = performance.now();
-    let initialEmission: "sync" | "next-frame" = "sync";
+    let startedAt = startedNow;
     let isRepeatedFollowUp = false;
     let consumedHandoff = false;
 
     if (isActive) {
+      // Mid-flight handoff (repeated click, opposite-direction click,
+      // anything that interrupts a running segment). Start from the
+      // *fresh* sample at `startedNow`.
       start = buildStartFromSample(currentSample);
-      startedAt = currentSample.timestamp;
-      initialEmission = "next-frame";
     } else if (state.moveReason === "gesture") {
+      // Post-release segment. Origin and release velocity come from the
+      // END_DRAG payload (canonical), not the controller — drag emissions
+      // carry no velocity by design.
       start = buildStartFromGesture(state);
     } else if (
       handoff &&
       Math.abs(handoff.position - state.fromVirtualIndex) < config.motion.epsilon
     ) {
+      // Follow-up of a settled repeated-click advance. Anchor the new
+      // segment's time origin to the moment the previous one ended so the
+      // two are contiguous in time as well as in space.
       start = {
         position: handoff.position,
         velocity: handoff.velocity,
@@ -167,6 +183,9 @@ export function useMotionRunner({
       isRepeatedFollowUp = handoff.strategy === "repeated";
       consumedHandoff = true;
     } else {
+      // Idle → moving. The reducer wrote fromVirtualIndex from the cold
+      // visual read at dispatch time, which equals the controller's
+      // current value, so either source is fine; state is canonical.
       start = buildStartFromState(state, currentSample.velocity);
     }
 
@@ -204,7 +223,6 @@ export function useMotionRunner({
       sampler: sampleCarouselSegment,
       onComplete: settle,
       completion: state.followUpVirtualIndex !== null ? "immediate" : "next-frame",
-      initialEmission,
     });
   }, [
     config,

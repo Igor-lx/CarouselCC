@@ -32,7 +32,6 @@ export type MotionSegmentSampler<
 > = (segment: Segment, timestamp: number) => MotionSampleData<Strategy>;
 
 export type MotionCompletionMode = "immediate" | "next-frame";
-export type MotionInitialEmissionMode = "sync" | "next-frame";
 
 export interface MotionStartOptions<
   Segment extends MotionSegmentBase<Strategy>,
@@ -42,7 +41,6 @@ export interface MotionStartOptions<
   sampler: MotionSegmentSampler<Segment, Strategy>;
   onComplete?: (sample: MotionSample<Strategy>) => void;
   completion?: MotionCompletionMode;
-  initialEmission?: MotionInitialEmissionMode;
 }
 
 export interface MotionSetOptions<Strategy extends string = string> {
@@ -65,7 +63,6 @@ export type MotionSubscriber<Strategy extends string = string> = (
 
 export interface MotionController<Strategy extends string = string> {
   read: () => MotionSample<Strategy>;
-  getSnapshot: () => MotionSample<Strategy>;
   isActive: () => boolean;
   subscribe: (
     listener: MotionSubscriber<Strategy>,
