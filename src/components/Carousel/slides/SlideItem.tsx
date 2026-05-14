@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { SlideItemProps } from "./SlideItem.types";
 
 /**
@@ -23,7 +23,14 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
   } = props;
 
   const [hasImageError, setHasImageError] = useState(false);
+  const hasImageErrorRef = useRef(false);
   const wasActualRef = useRef(Boolean(isActual));
+
+  const updateImageError = useCallback((next: boolean) => {
+    if (hasImageErrorRef.current === next) return;
+    hasImageErrorRef.current = next;
+    setHasImageError(next);
+  }, []);
 
   const imageSource =
     isContentImg && typeof slideData?.content === "string"
@@ -31,8 +38,8 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
       : null;
 
   useEffect(() => {
-    setHasImageError(false);
-  }, [imageSource]);
+    updateImageError(false);
+  }, [imageSource, updateImageError]);
 
   useEffect(() => {
     const becameActual = Boolean(isActual) && !wasActualRef.current;
@@ -44,10 +51,10 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
     const probe = new Image();
 
     probe.onload = () => {
-      if (!disposed) setHasImageError(false);
+      if (!disposed) updateImageError(false);
     };
     probe.onerror = () => {
-      if (!disposed) setHasImageError(true);
+      if (!disposed) updateImageError(true);
     };
     probe.src = imageSource;
 
@@ -56,7 +63,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
       probe.onload = null;
       probe.onerror = null;
     };
-  }, [hasImageError, imageSource, isActual]);
+  }, [hasImageError, imageSource, isActual, updateImageError]);
 
   if (!slideData) return null;
 
@@ -83,9 +90,11 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
           <img
             src={slideData.content}
             alt={slideData.alt || ""}
+            decoding="async"
+            fetchPriority={isActive ? "high" : "low"}
             draggable={false}
-            onLoad={() => setHasImageError(false)}
-            onError={() => setHasImageError(true)}
+            onLoad={() => updateImageError(false)}
+            onError={() => updateImageError(true)}
           />
         ) : (
           slideData.alt || errAltPlaceholder

@@ -21,6 +21,7 @@ import {
   VISIBILITY_THRESHOLD,
 } from "../../../config";
 import { isParsedBezierValid, parseBezier } from "../../../motion/bezier";
+import { normalizeMotionProfileShares } from "../../../motion/profile";
 import type { CarouselDiagnosticWarning } from "../types";
 
 interface NumericRule {
@@ -97,18 +98,18 @@ const numericRules: NumericRule[] = [
     field: "REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE",
     value: REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
     severity: "CRITICAL",
-    expected: "Expected a finite number in the range [0, 1)",
-    consequence: "Acceleration zone share outside [0,1) leads to malformed motion profile zones",
-    predicate: inRangeExclusiveUpper(0, 1),
+    expected: "Expected a finite number in the range [0, 1]",
+    consequence: "Acceleration zone share outside [0,1] leads to malformed motion profile zones",
+    predicate: inRangeInclusive(0, 1),
   },
   {
     layer: "Motion",
     field: "REPEATED_CLICK_DECELERATION_DISTANCE_SHARE",
     value: REPEATED_CLICK_DECELERATION_DISTANCE_SHARE,
     severity: "CRITICAL",
-    expected: "Expected a finite number in the range [0, 1)",
-    consequence: "Deceleration zone share outside [0,1) leads to malformed motion profile zones",
-    predicate: inRangeExclusiveUpper(0, 1),
+    expected: "Expected a finite number in the range [0, 1]",
+    consequence: "Deceleration zone share outside [0,1] leads to malformed motion profile zones",
+    predicate: inRangeInclusive(0, 1),
   },
 
   // Epsilons (must be small positive)
@@ -318,18 +319,33 @@ const collectBezierWarnings = (): CarouselDiagnosticWarning[] => {
 };
 
 const collectRepeatedShareRelation = (): CarouselDiagnosticWarning | null => {
+  const accelerationDistanceShare = REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE;
+  const decelerationDistanceShare = REPEATED_CLICK_DECELERATION_DISTANCE_SHARE;
+  const normalized = normalizeMotionProfileShares(
+    accelerationDistanceShare,
+    decelerationDistanceShare,
+  );
   const sum =
     REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE +
     REPEATED_CLICK_DECELERATION_DISTANCE_SHARE;
-  if (sum <= 1) return null;
+  if (!normalized.wasNormalized) return null;
   return {
-    severity: "CRITICAL",
+    severity: "LOGICAL",
     layer: "Motion",
     field: "REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE + REPEATED_CLICK_DECELERATION_DISTANCE_SHARE",
-    actual: sum,
-    expected: "Expected accelerationShare + decelerationShare <= 1",
+    actual: {
+      accelerationDistanceShare,
+      decelerationDistanceShare,
+      sum,
+    },
+    normalizedTo: {
+      accelerationDistanceShare: normalized.accelerationShare,
+      decelerationDistanceShare: normalized.decelerationShare,
+      cruiseDistanceShare: normalized.cruiseShare,
+    },
+    expected: "Expected accelerationShare + decelerationShare <= 1 for an explicit cruise zone",
     consequence:
-      "Cruise zone becomes negative and the repeated-click profile allocates more than 100% of the segment",
+      "Motion profile runtime normalizes overallocated shares to 50% acceleration and 50% deceleration",
   };
 };
 

@@ -138,9 +138,9 @@ export function createMotionController<Strategy extends string = string>(
   };
 
   return {
-    read() {
+    read(timestamp = now()) {
       if (!active) return sample;
-      const next = sampleActive(now());
+      const next = sampleActive(timestamp);
       sample = next;
       return next;
     },
@@ -155,7 +155,7 @@ export function createMotionController<Strategy extends string = string>(
 
     subscribe(listener, options) {
       subscribers.add(listener);
-      if (options?.emitCurrent ?? true) listener(sample);
+      if (options?.emitCurrent ?? true) listener(emittedSample);
       return () => {
         subscribers.delete(listener);
       };
@@ -166,13 +166,7 @@ export function createMotionController<Strategy extends string = string>(
     ) {
       cancelTick();
       cancelCompletion();
-      const {
-        segment,
-        sampler,
-        onComplete,
-        completion = "next-frame",
-        initialEmission = "sync",
-      } = options;
+      const { segment, sampler, onComplete, completion = "next-frame" } = options;
 
       active = {
         segment,
@@ -184,12 +178,8 @@ export function createMotionController<Strategy extends string = string>(
         completion,
       };
 
-      const initial = sampleActive(now());
-      if (initialEmission === "sync") {
-        emit(initial);
-      } else {
-        sample = initial;
-      }
+      const initial = sampleActive(segment.startedAt);
+      emit(initial);
 
       if (initial.progress >= 1) {
         finalize(initial);

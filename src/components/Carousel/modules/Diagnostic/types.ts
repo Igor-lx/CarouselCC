@@ -1,7 +1,6 @@
 /**
- * Severity of a diagnostic warning. Diagnostics never repair runtime values;
- * the severity describes *how badly* the runtime is expected to misbehave
- * when the developer ships the offending input.
+ * Severity of a diagnostic warning. Diagnostics observe runtime values and
+ * report expected runtime behaviour. They do not repair values themselves.
  */
 export type DiagnosticSeverity = "CRITICAL" | "LOGICAL";
 
@@ -10,14 +9,16 @@ export type DiagnosticSeverity = "CRITICAL" | "LOGICAL";
  * identify the source; `actual`, `expected`, `consequence` describe what is
  * wrong and what will happen at runtime.
  *
- * Diagnostics is observe/report only — emitting a warning never changes the
- * runtime value the carousel uses.
+ * Diagnostics is observe/report only. Emitting a warning never changes the
+ * runtime value the carousel uses; when runtime has an explicit normalization
+ * rule, `normalizedTo` reports the value runtime will use.
  */
 export interface CarouselDiagnosticWarning {
   severity: DiagnosticSeverity;
   layer: string;
   field: string;
   actual: unknown;
+  normalizedTo?: unknown;
   expected: string;
   consequence: string;
 }

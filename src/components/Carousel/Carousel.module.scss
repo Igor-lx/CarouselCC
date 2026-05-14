@@ -67,6 +67,7 @@
     transition: border-color 0.5s ease;
     overflow: hidden;
     box-sizing: border-box;
+    contain: paint;
     cursor: default;
 
     &:focus-visible {
@@ -92,7 +93,7 @@
 
   .outerContainer[data-touch="false"] {
     .slideInteractive:hover {
-      border-color: rgb(29, 224, 22);
+      border-color: rgb(18, 237, 54);
     }
   }
 

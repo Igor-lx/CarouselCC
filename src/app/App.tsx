@@ -38,8 +38,7 @@ export default function App() {
   const isCompactLandscape = useCompactLandscape();
 
   const [isAutoplay, setIsAutoplay] = useState(false);
-  const [isInteractive, setIsInteractive] = useState(true);
-  const [isCarouselIdle, setIsCarouselIdle] = useState(true);
+  const [isInteractive, setIsInteractive] = useState(false);
 
   const device = useBreakpoint(VISIBLE_BY_BREAKPOINT);
 
@@ -50,12 +49,12 @@ export default function App() {
   const slideImageUrls = useMemo(
     () =>
       ACTIVE_CAROUSEL_SOURCES.map((entry) =>
-        useMobileImages ? entry.mobile : entry.desktop,
+        useMobileImages ? entry.mobile : entry.mobile,
       ),
     [useMobileImages],
   );
 
-  useImagePreload(slideImageUrls, isCarouselIdle);
+  useImagePreload(slideImageUrls);
 
   const slidesData = useMemo(
     () =>
@@ -99,13 +98,12 @@ export default function App() {
             isPaginationOn
             isInteractive={isInteractive}
             durationAutoplay={5000}
-            durationStep={7000}
+            durationStep={6000}
             durationJump={450}
             intervalAutoplay={3000}
             isPagePaddingOn
             isTouchDevice={isTouch}
             onSlideClick={openSlide}
-            onMotionIdleStatusChange={setIsCarouselIdle}
           >
             {isTouch ? <PaginationWidget /> : <Pagination />}
             <Controls />

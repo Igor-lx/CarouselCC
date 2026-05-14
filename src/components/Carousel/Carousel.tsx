@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "./Carousel.module.scss";
 import {
@@ -134,6 +134,45 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
 
   // --- motion runner: state ↔ controller -----------------------------------
   const [motionDuration, setMotionDuration] = useState(0);
+  const motionDurationFrameRef = useRef<number | null>(null);
+  const motionDurationTimeoutRef = useRef<number | null>(null);
+
+  const cancelMotionDurationPublish = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    if (motionDurationFrameRef.current !== null) {
+      window.cancelAnimationFrame(motionDurationFrameRef.current);
+      motionDurationFrameRef.current = null;
+    }
+
+    if (motionDurationTimeoutRef.current !== null) {
+      window.clearTimeout(motionDurationTimeoutRef.current);
+      motionDurationTimeoutRef.current = null;
+    }
+  }, []);
+
+  const publishMotionDuration = useCallback((duration: number) => {
+    if (typeof window === "undefined") {
+      setMotionDuration(duration);
+      return;
+    }
+
+    cancelMotionDurationPublish();
+
+    motionDurationFrameRef.current = window.requestAnimationFrame(() => {
+      motionDurationFrameRef.current = null;
+      motionDurationTimeoutRef.current = window.setTimeout(() => {
+        motionDurationTimeoutRef.current = null;
+        setMotionDuration((current) => (current === duration ? current : duration));
+      }, 0);
+    });
+  }, [cancelMotionDurationPublish]);
+
+  useEffect(
+    () => cancelMotionDurationPublish,
+    [cancelMotionDurationPublish],
+  );
+
   useMotionRunner({
     state,
     config,
@@ -142,7 +181,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     isDragging: status.isDragging,
     enabled: layout.canSlide,
     onSettle: () => dispatch({ type: "MOTION_SETTLED" }),
-    onDurationChange: setMotionDuration,
+    onDurationChange: publishMotionDuration,
   });
 
   // --- navigation -----------------------------------------------------------

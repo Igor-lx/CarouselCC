@@ -91,7 +91,7 @@ visible.
 | ----------------- | ------- | ------ |
 | `durationAutoplay` | `3000` | Duration of an autoplay-driven page step. |
 | `intervalAutoplay` | `3000` | Idle interval between two autoplay steps. |
-| `durationStep`    | `2000`  | Base duration of one click / gesture-driven step. Repeated-click fast segment duration is `durationStep ÷ REPEATED_CLICK_SPEED_MULTIPLIER` (≈ `durationStep / 4.5`). Multi-page click distances scale linearly. |
+| `durationStep`    | `2000`  | Base duration of one click / gesture-driven step. Repeated-click fast segment duration is `durationStep ÷ REPEATED_CLICK_SPEED_MULTIPLIER`. Multi-page click distances scale linearly. |
 | `durationJump`    | `800`   | Duration of `GO_TO` jumps (e.g. pagination click to a far page, autoplay loop-back). Also used as the fallback duration when reduced-motion mode requires a hard jump. |
 
 #### Module gates
@@ -108,7 +108,7 @@ visible.
 | Prop                       | Type | Effect |
 | -------------------------- | ---- | ------ |
 | `onSlideClick`             | `(slide: Slide) => void` | Fires when an interactive slide is clicked. The slide is interactive only when `isInteractive`, the image (if any) loaded successfully, and this handler is provided. |
-| `onMotionIdleStatusChange` | `(isIdle: boolean) => void` | Fires when the carousel crosses the idle ↔ running boundary. **Observation-only**: it never drives carousel semantics. Intended for consumers that need to coordinate work around motion (e.g. defer image preload/decode until idle so the decoder does not compete with the motion RAF). The callback never receives the reducer state, the visual position stream, or any internal detail. |
+| `onMotionIdleStatusChange` | `(isIdle: boolean) => void` | Fires when the carousel crosses the idle ↔ running boundary. **Observation-only**: it never drives carousel semantics. Intended for consumers that need to coordinate non-critical work around motion. The callback never receives the reducer state, the visual position stream, or any internal detail. |
 
 #### Styling
 
@@ -169,7 +169,7 @@ These are the user-facing behaviours the implementation guarantees.
   mode, `GO_TO` always travels the shortest cyclic distance.
 - **Click during motion (opposite direction).** Re-targets without
   restarting from the logical origin: the new segment continues from the
-  last published visual frame, not from where the previous segment was
+  last emitted visual sample, not from where the previous segment was
   supposed to start.
 - **Repeated click (same direction during motion).** Does not restart from
   scratch. The reducer plans a fast in-flight advance to
@@ -177,7 +177,7 @@ These are the user-facing behaviours the implementation guarantees.
   (`destinationPosition` is `1` on desktop, `0.99` on touch), with a
   follow-up segment that normalises to a clean page boundary one full page
   further. The fast segment's peak speed is `REPEATED_CLICK_SPEED_MULTIPLIER`
-  (4.5×) of a normal MOVE.
+  of a normal MOVE.
 - **Drag / swipe.** Touch only (pointer events with `pointerType === "touch"`).
   EMA-smoothed velocity, edge resistance with a configurable curvature.
   Release resolves to a swipe direction via either a quick-flick (raw
@@ -196,9 +196,9 @@ These are the user-facing behaviours the implementation guarantees.
   `isAuto`. On the final page in finite mode, the next step loops back to
   page 0 via `GO_TO` (using `durationJump`).
 - **External motion-idle signal.** `onMotionIdleStatusChange` fires once on
-  each idle↔running crossing. Asset preloaders should pause decoding while
-  `isIdle === false` so the image decoder does not compete with the motion
-  RAF and the React commit phase of state transitions.
+  each idle↔running crossing. Consumers may use it to schedule non-critical
+  work around motion, but asset preparation remains application-owned and is
+  not part of carousel runtime semantics.
 - **Reduced motion.** When `isInstantMotion` is set or
   `prefers-reduced-motion` is detected, every transition snaps instantly,
   the gesture adapter is disabled, and pagination dot transitions are
@@ -259,11 +259,11 @@ For copy-paste / quick lookup. Source: `config/defaults.ts`,
 | `AUTOPLAY_PAGINATION_FACTOR` | `0.2` | autoplay dot switch delay |
 | `SNAP_BACK_DURATION` | `1300` ms | drag snap-back |
 | `REPEATED_CLICK_DESTINATION_POSITION` | `1` (desktop) / `0.99` (touch) | repeated-click landing fraction |
-| `REPEATED_CLICK_SPEED_MULTIPLIER` | `4.5` | fast-segment peak vs. normal |
-| `REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE` | `0.2` | profile ramp-up |
-| `REPEATED_CLICK_DECELERATION_DISTANCE_SHARE` | `0.7` | profile ramp-down |
+| `REPEATED_CLICK_SPEED_MULTIPLIER` | `7` | fast-segment peak vs. normal |
+| `REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE` | `0.3` | profile ramp-up |
+| `REPEATED_CLICK_DECELERATION_DISTANCE_SHARE` | `0.15` | profile ramp-down |
 | `JUMP_BEZIER` | `cubic-bezier(0.16, 1, 0.3, 1)` | far jumps |
-| `MOVE_BEZIER` | `cubic-bezier(0.24, 0.68, 0.42, 1)` | normal step |
+| `MOVE_BEZIER` | `cubic-bezier(0.32, 0.2, 0.28, 1)` | normal step |
 | `AUTO_BEZIER` | `cubic-bezier(0.28, 0.72, 0.38, 1)` | autoplay step |
 | `SNAP_BACK_BEZIER` | `cubic-bezier(0.18, 0.82, 0.28, 1)` | drag snap-back |
 | `CAROUSEL_SWIPE_CONFIG.resistance` | `0.53` | drag edge resistance |
@@ -352,10 +352,10 @@ phase }`.
 - `subscribe(listener)` — per-frame stream while a segment is active.
   Subscribers (track binding, pagination widget binding) mutate their own
   DOM inside the callback; React is not involved at this tempo.
-- `getSnapshot()` — the last published visual frame. Cold reads on user
+- `getSnapshot()` returns the last emitted visual frame. Cold reads on user
   events (gesture press start, navigation click) use this so the captured
-  origin matches the frame already emitted to DOM subscribers, not an
-  internal controller sample that has not yet been painted.
+  origin matches what DOM subscribers have already received, not a
+  mathematically fresh but unpainted controller sample.
 - `applyImmediatePosition(position)` — publish a position into the stream
   during drag. Internally calls `controller.set`, which cancels any
   active motion and emits, so the track, the widget, and the motion
@@ -370,10 +370,12 @@ A `Segment` is one of:
   Used for autoplay (`AUTO_BEZIER`), jump (`JUMP_BEZIER`),
   click step / non-inertial gesture release (`MOVE_BEZIER`), and
   snap-back (`SNAP_BACK_BEZIER`).
-- **Profile segment** — a smoothstep-driven acceleration / cruise /
-  deceleration profile with a per-zone speed solve. Used for:
+- **Profile segment** - a smoothstep-driven acceleration / cruise /
+  deceleration profile with a per-zone speed solve. If acceleration and
+  deceleration shares sum above `1`, runtime normalizes the profile to
+  `0.5 / 0.5` with no cruise zone. Used for:
   - **repeated-click fast advance** (peak speed
-    `REPEATED_CLICK_SPEED_MULTIPLIER × normalMoveSpeed`),
+    `REPEATED_CLICK_SPEED_MULTIPLIER x normalMoveSpeed`),
   - **repeated-click follow-up** (peak speed = normal),
   - **inertial gesture release** (peak speed derived from EMA-smoothed
     release velocity × `inertiaBoost`),
@@ -384,24 +386,30 @@ A `Segment` is one of:
 ### 4.2 Handoff invariant
 
 `useMotionRunner` is the only place the controller is started. It runs on
-state changes: when `motionPhase` becomes a non-idle value, it picks a
-published visual segment origin and builds the segment.
+state changes: when `motionPhase` becomes a non-idle value, it samples the
+motion origin and builds the segment.
 
 When a previous segment is still running (repeated click,
-opposite-direction click, any interruption), the new segment starts from
-the last published visual sample:
+opposite-direction click, any interruption), the state change records the
+new intent immediately, but the controller retarget is deferred by a tiny
+frame-boundary window (`RETARGET_FRAME_DELAY`, currently two RAF ticks). The
+old segment keeps publishing during that window. At the deferred boundary the
+new segment starts from the live stream:
 
-- position and velocity come from `controller.getSnapshot()`;
-- `startedAt` is anchored to that sample's `timestamp`;
-- the controller's first emission for this retarget is deferred to the
-  next RAF.
+- position comes from `controller.getSnapshot()` after the previous segment
+  has had time to publish additional frames;
+- velocity comes from `controller.read(retargetTimestamp)`;
+- `startedAt = retargetTimestamp`;
+- the controller publishes the initial sample synchronously.
 
-This keeps the handoff aligned with the frame that was already emitted to
-the track and module subscribers. The controller may be able to compute a
-fresher mathematical sample via `read()`, but using that unpainted value as
-the public handoff origin can produce visible back-step / skip-ahead
-artefacts on repeated clicks. Any future change must preserve the
-"handoff from published visual frame" invariant.
+This keeps the first handoff emit equal to the already-published track
+position, so retargeting is a DOM no-op, while the velocity is sampled close
+to the actual transition frame. Using a fresh unemitted position can make the
+carousel jump to a position the user never saw; retargeting synchronously in
+the input/layout-effect turn can feel like a micro-stop. Any future change
+must preserve the invariant: "intent immediately, controller retarget on a
+frame boundary, position from emitted visual frame, velocity from current
+segment sample, time from new segment start".
 
 For the repeated-click follow-up (a separate handoff from a settled
 segment to its chain successor), the new segment's `startedAt` is anchored
@@ -418,9 +426,9 @@ There is no priority queue, no deferred-frame publisher between the
 controller and its consumers. The track binding subscribes to the visual
 position directly. The PaginationWidget binding subscribes at the same
 level. The two subscriptions are independent listeners on the same RAF
-tick — both run in the same frame. `getSnapshot()` returns the latest
-published frame from that stream; it is an observation API, not a way to
-pull motion forward outside RAF.
+tick - both run in the same frame. `getSnapshot()` is reserved for cold
+imperative reads; it returns the emitted visual frame and should not be used
+inside per-frame subscribers.
 
 ---
 
@@ -714,5 +722,5 @@ dependencies, the architecture has held.
   The PaginationWidget binding short-circuits writes per dot. The motion
   controller emits only on actual sample change (per RAF tick of an
   active segment; one synchronous emit on cold segment start; active
-  retargets publish their first sample on the next RAF; no emits while
-  idle).
+  retargets publish their first successor sample after the deferred
+  frame-boundary handoff; no emits while idle).

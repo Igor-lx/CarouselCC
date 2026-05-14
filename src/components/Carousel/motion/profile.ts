@@ -30,6 +30,7 @@ export interface MotionProfileInput {
  * for an invalid input.
  */
 const MIN_PROFILE_SPEED = 1e-6;
+const OVERALLOCATED_PROFILE_SHARE = 0.5;
 
 const smoothstep = (progress: number) => progress * progress * (3 - 2 * progress);
 
@@ -38,6 +39,36 @@ const smoothstepIntegral = (progress: number) =>
 
 const lerp = (from: number, to: number, progress: number) =>
   from + (to - from) * progress;
+
+export interface MotionProfileShares {
+  accelerationShare: number;
+  decelerationShare: number;
+  cruiseShare: number;
+  wasNormalized: boolean;
+}
+
+export const normalizeMotionProfileShares = (
+  accelerationDistanceShare: number,
+  decelerationDistanceShare: number,
+): MotionProfileShares => {
+  const sum = accelerationDistanceShare + decelerationDistanceShare;
+
+  if (Number.isFinite(sum) && sum > 1) {
+    return {
+      accelerationShare: OVERALLOCATED_PROFILE_SHARE,
+      decelerationShare: OVERALLOCATED_PROFILE_SHARE,
+      cruiseShare: 0,
+      wasNormalized: true,
+    };
+  }
+
+  return {
+    accelerationShare: accelerationDistanceShare,
+    decelerationShare: decelerationDistanceShare,
+    cruiseShare: 1 - sum,
+    wasNormalized: false,
+  };
+};
 
 const zoneDuration = (distance: number, startSpeed: number, endSpeed: number) => {
   if (!(distance > 0)) return 0;
@@ -127,9 +158,11 @@ export const createMotionProfile = ({
   targetDuration,
 }: MotionProfileInput): MotionProfile => {
   const absDistance = Math.abs(distance);
-  const accelerationShare = accelerationDistanceShare;
-  const decelerationShare = decelerationDistanceShare;
-  const cruiseShare = 1 - accelerationShare - decelerationShare;
+  const { accelerationShare, decelerationShare, cruiseShare } =
+    normalizeMotionProfileShares(
+      accelerationDistanceShare,
+      decelerationDistanceShare,
+    );
 
   const resolvedPeak =
     typeof targetDuration === "number" && targetDuration > 0

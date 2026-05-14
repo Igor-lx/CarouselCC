@@ -60,11 +60,11 @@
   }
 
   [data-touch="true"] .navZoneL {
-    left: 20px;
+    left: 10px;
   }
 
   [data-touch="true"] .navZoneR {
-    right: 20px;
+    right: 10px;
   }
 
   [data-touch="true"] .navButton {
@@ -85,13 +85,13 @@
     }
 
     .navButton {
-      width: 44px;
-      height: 88px;
+      width: 70px;
+      height: 200px;
       border-radius: 8px;
     }
 
     [data-touch="true"] .navZone {
-      width: 44px;
+      width: 144px;
       height: 88px;
     }
 

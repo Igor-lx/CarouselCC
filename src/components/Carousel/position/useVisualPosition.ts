@@ -64,13 +64,14 @@ export function useVisualPosition({
     return unsubscribe;
   }, [controller, emit]);
 
+  const getSnapshot = useCallback<VisualPositionSource["getSnapshot"]>(
+    () => lastFrameRef.current,
+    [],
+  );
+
   useIsomorphicLayoutEffect(() => {
     emit(toFrame(controller.getSnapshot(), stepSizeRef.current));
   }, [controller, emit, visibleSlidesCount]);
-
-  const getSnapshot = useCallback(() => {
-    return lastFrameRef.current;
-  }, []);
 
   const subscribe = useCallback<VisualPositionSource["subscribe"]>(
     (listener, options) => {

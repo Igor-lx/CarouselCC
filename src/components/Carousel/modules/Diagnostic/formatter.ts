@@ -2,7 +2,7 @@ import type { CarouselDiagnosticWarning } from "./types";
 
 const BANNER = "Carousel Diagnostic";
 const TRAILER =
-  "Diagnostics does not normalize or replace runtime values.";
+  "Diagnostics is observe-only and does not apply runtime changes.";
 
 const formatActual = (value: unknown): string => {
   if (typeof value === "string") return `"${value}"`;
@@ -32,17 +32,19 @@ const finishSentence = (message: string) => {
  * Build the canonical warning line shared by every diagnostic check.
  *
  *   [Carousel Diagnostic][SEVERITY] <Layer> -> <field> has value <actual>.
- *   <expected>. <consequence>. Diagnostics does not normalize or replace
- *   runtime values.
+ *   <expected>. <consequence>. Diagnostics is observe-only.
  */
 export const formatWarning = (warning: CarouselDiagnosticWarning): string =>
   [
     `[${BANNER}][${warning.severity}] ${warning.layer} -> ${warning.field}`,
     `has value ${formatActual(warning.actual)}.`,
+    typeof warning.normalizedTo === "undefined"
+      ? ""
+      : `Runtime normalizes it to ${formatActual(warning.normalizedTo)}.`,
     finishSentence(warning.expected),
     finishSentence(warning.consequence),
     TRAILER,
-  ].join(" ");
+  ].filter(Boolean).join(" ");
 
 /** Deterministic signature for dedupe / cache. */
 export const warningSignature = (warning: CarouselDiagnosticWarning): string =>
@@ -51,6 +53,7 @@ export const warningSignature = (warning: CarouselDiagnosticWarning): string =>
     warning.layer,
     warning.field,
     formatActual(warning.actual),
+    formatActual(warning.normalizedTo),
     warning.expected,
     warning.consequence,
   ].join("|");
