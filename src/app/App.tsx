@@ -26,7 +26,7 @@ const CAROUSEL_SOURCE_SETS = {
   CAROUSEL_SOURCES2,
 } as const;
 
-const ACTIVE_CAROUSEL_SOURCES = CAROUSEL_SOURCE_SETS.CAROUSEL_SOURCES2;
+const ACTIVE_CAROUSEL_SOURCES = CAROUSEL_SOURCE_SETS.CAROUSEL_SOURCES;
 
 const openSlide = (slide: Slide) => {
   window.open(String(slide.content), "_blank");

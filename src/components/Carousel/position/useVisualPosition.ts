@@ -95,7 +95,7 @@ export function useVisualPosition({
       controller.set(position, {
         target: position,
         velocity: 0,
-        strategy: "handoff",
+        strategy: "gesture",
       });
     },
     [controller],

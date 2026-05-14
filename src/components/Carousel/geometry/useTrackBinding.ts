@@ -46,7 +46,6 @@ export function useTrackBinding({
   const lastTransformRef = useRef<string | null>(null);
   const lastTransitionRef = useRef<string | null>(null);
   const lastMeasuredWidthRef = useRef<number | null>(null);
-  const currentPositionRef = useRef(0);
 
   renderWindowStartRef.current = renderWindowStart;
   visibleSlidesCountRef.current = visibleSlidesCount;
@@ -83,7 +82,6 @@ export function useTrackBinding({
 
   const writePosition = useCallback(
     (position: number) => {
-      currentPositionRef.current = position;
       const track = trackRef.current;
       if (!track) return;
       const transform = resolveTransform(position);
@@ -162,11 +160,10 @@ export function useTrackBinding({
     [applyVisualPosition],
   );
 
-  const readCurrentPosition = useCallback(() => {
-    const value = visualPosition.getSnapshot().position;
-    currentPositionRef.current = value;
-    return value;
-  }, [visualPosition]);
+  const readCurrentPosition = useCallback(
+    () => visualPosition.getSnapshot().position,
+    [visualPosition],
+  );
 
   const getSlotSize = useCallback(() => slotSizeRef.current ?? 0, []);
 
