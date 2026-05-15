@@ -27,7 +27,12 @@ export interface CarouselState {
   targetPageIndex: number;
   fromVirtualIndex: number;
   virtualIndex: number;
-  followUpVirtualIndex: number | null;
+  /**
+   * True when this segment was started by a click that arrived while the
+   * carousel was already moving in the same direction. It selects the fast
+   * acceleration profile instead of plain bezier easing — the segment still
+   * drives straight to the page boundary and decays to zero speed.
+   */
   isRepeatedClickAdvance: boolean;
   motionPhase: MotionPhase;
   moveReason: MoveReason;

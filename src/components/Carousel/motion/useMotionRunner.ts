@@ -11,14 +11,6 @@ import { buildCarouselSegment } from "./segmentFactory";
 import { sampleCarouselSegment } from "./sampler";
 import type { CarouselMotionStrategy, MotionStart } from "./types";
 
-interface HandoffSnapshot {
-  position: number;
-  velocity: number;
-  timestamp: number;
-  target: number;
-  strategy: CarouselMotionStrategy;
-}
-
 interface UseMotionRunnerInput {
   state: CarouselState;
   config: CarouselRuntimeConfig;
@@ -28,8 +20,8 @@ interface UseMotionRunnerInput {
   enabled: boolean;
   /** Called by the controller when a segment naturally settles. The argument
    *  is the visual position at which it settled — required by the reducer to
-   *  resolve the MOTION_SETTLED transition when the user has changed the
-   *  target during the motion. */
+   *  resolve the MOTION_SETTLED transition when the user changed the target
+   *  during the motion. */
   onSettle: (settledPosition: number) => void;
   onDurationChange?: (duration: number) => void;
 }
@@ -81,7 +73,8 @@ const buildStartFromState = (
  * controller. On every state transition that requires animation it:
  *
  * 1. records the new intent in state *immediately*;
- * 2. for mid-flight handoff (`isActive`), defers the controller retarget by
+ * 2. for a mid-flight handoff (`isActive` — repeated click, opposite-
+ *    direction click, any interruption), defers the controller retarget by
  *    `RETARGET_FRAME_DELAY` RAFs so the old segment keeps emitting and the
  *    DOM stream stays continuous;
  * 3. at the deferred boundary, samples *position from the last emitted
@@ -98,16 +91,15 @@ const buildStartFromState = (
  *   profile's `startSpeed` lag behind the real instantaneous derivative,
  *   producing a momentary deceleration the user reads as a hiccup.
  *
+ * Every segment — first click, repeated click, gesture release — drives
+ * straight to `state.virtualIndex` (the page boundary) and decays to zero
+ * speed. There is no intermediate target and no chained follow-up segment.
+ *
  * Other branches:
  *   - `gesture` (post-release): the position lives on the state from
  *     END_DRAG; the segment starts there.
- *   - `handoff` (repeated-click follow-up): the previous segment's settle
- *     stored its end state; the follow-up resumes from that point with
- *     `startedAt = handoff.timestamp` so the two segments are perfectly
- *     contiguous in time as well as in space.
- *   - default (cold idle → moving): start from the state-canonical
- *     `fromVirtualIndex` (set on dispatch from the visually-sampled
- *     current position).
+ *   - default (cold idle → moving, or post-MOTION_SETTLED re-target): start
+ *     from the state-canonical `fromVirtualIndex`.
  */
 export function useMotionRunner({
   state,
@@ -119,7 +111,6 @@ export function useMotionRunner({
   onSettle,
   onDurationChange,
 }: UseMotionRunnerInput): void {
-  const handoffSnapshotRef = useRef<HandoffSnapshot | null>(null);
   const lastKeyRef = useRef<string>("");
   const retargetFrameRef = useRef<number | null>(null);
   const retargetTokenRef = useRef(0);
@@ -164,20 +155,9 @@ export function useMotionRunner({
 
   const settle = useCallback(
     (sample: MotionSample<CarouselMotionStrategy>) => {
-      if (state.followUpVirtualIndex !== null) {
-        handoffSnapshotRef.current = {
-          position: sample.value,
-          velocity: sample.velocity,
-          timestamp: sample.timestamp,
-          target: sample.target,
-          strategy: sample.strategy,
-        };
-      } else {
-        handoffSnapshotRef.current = null;
-      }
       onSettle(sample.value);
     },
-    [onSettle, state.followUpVirtualIndex],
+    [onSettle],
   );
 
   useIsomorphicLayoutEffect(() => {
@@ -187,7 +167,6 @@ export function useMotionRunner({
       state.moveReason,
       state.virtualIndex,
       state.fromVirtualIndex,
-      state.followUpVirtualIndex,
       state.isRepeatedClickAdvance,
       state.gesture.pointerVelocity,
       state.gesture.uiVelocity,
@@ -201,7 +180,6 @@ export function useMotionRunner({
     if (!enabled) {
       cancelDeferredRetarget();
       controller.snap(state.virtualIndex, { strategy: "idle" });
-      handoffSnapshotRef.current = null;
       onDurationChange?.(0);
       return;
     }
@@ -209,7 +187,6 @@ export function useMotionRunner({
     if (state.motionPhase === "idle") {
       cancelDeferredRetarget();
       controller.snap(state.virtualIndex, { strategy: "idle" });
-      handoffSnapshotRef.current = null;
       onDurationChange?.(0);
       return;
     }
@@ -217,11 +194,9 @@ export function useMotionRunner({
     if (state.motionPhase === "dragging") {
       // Drag is owned by the gesture adapter, which writes through
       // `applyImmediatePosition`. That call already cancels any prior motion
-      // and emits the new value on the visual position stream, so the
-      // runner has nothing to do here besides clearing any leftover handoff
-      // and aborting any pending retarget.
+      // and emits the new value on the visual position stream, so the runner
+      // has nothing to do here besides aborting any pending retarget.
       cancelDeferredRetarget();
-      handoffSnapshotRef.current = null;
       onDurationChange?.(0);
       return;
     }
@@ -231,7 +206,6 @@ export function useMotionRunner({
       controller.snap(state.virtualIndex, {
         strategy: "idle",
         onComplete: settle,
-        completion: state.followUpVirtualIndex !== null ? "immediate" : "next-frame",
       });
       onDurationChange?.(0);
       return;
@@ -244,18 +218,10 @@ export function useMotionRunner({
     // `startedNow` is fine because the controller is settled — `read` just
     // returns the stored sample without doing any segment math.
     const currentSample = isActive ? null : controller.read(startedNow);
-    const handoff = handoffSnapshotRef.current;
-
-    let start: MotionStart;
-    let startedAt = startedNow;
-    let isRepeatedFollowUp = false;
-    let consumedHandoff = false;
 
     const startResolvedMotion = (
       resolvedStart: MotionStart,
       resolvedStartedAt: number,
-      resolvedIsRepeatedFollowUp: boolean,
-      shouldConsumeHandoff: boolean,
     ) => {
       const distance = state.virtualIndex - resolvedStart.position;
 
@@ -264,8 +230,6 @@ export function useMotionRunner({
           strategy: resolvedStart.strategy,
           velocity: resolvedStart.velocity,
           onComplete: settle,
-          completion:
-            state.followUpVirtualIndex !== null ? "immediate" : "next-frame",
         });
         onDurationChange?.(0);
         return;
@@ -276,14 +240,9 @@ export function useMotionRunner({
         config,
         isInstantMode,
         isDragging,
-        isRepeatedFollowUp: resolvedIsRepeatedFollowUp,
         start: resolvedStart,
         startedAt: resolvedStartedAt,
       });
-
-      if (shouldConsumeHandoff) {
-        handoffSnapshotRef.current = null;
-      }
 
       onDurationChange?.(duration);
 
@@ -291,8 +250,6 @@ export function useMotionRunner({
         segment,
         sampler: sampleCarouselSegment,
         onComplete: settle,
-        completion:
-          state.followUpVirtualIndex !== null ? "immediate" : "next-frame",
       });
     };
 
@@ -308,44 +265,32 @@ export function useMotionRunner({
           retargetVisualSample,
           retargetVelocitySample,
         );
-        startResolvedMotion(retargetStart, retargetTimestamp, false, false);
+        startResolvedMotion(retargetStart, retargetTimestamp);
       });
       return;
-    } else if (state.moveReason === "gesture") {
+    }
+
+    cancelDeferredRetarget();
+
+    if (state.moveReason === "gesture") {
       // Post-release segment. Origin and release velocity come from the
       // END_DRAG payload (canonical), not the controller — drag emissions
       // carry no velocity by design.
-      cancelDeferredRetarget();
-      start = buildStartFromGesture(state);
-    } else if (
-      handoff &&
-      Math.abs(handoff.position - state.fromVirtualIndex) < config.motion.epsilon
-    ) {
-      // Follow-up of a settled repeated-click advance. Anchor the new
-      // segment's time origin to the moment the previous one ended so the
-      // two are contiguous in time as well as in space.
-      cancelDeferredRetarget();
-      start = {
-        position: handoff.position,
-        velocity: handoff.velocity,
-        strategy: handoff.strategy,
-      };
-      startedAt = handoff.timestamp;
-      isRepeatedFollowUp = handoff.strategy === "repeated";
-      consumedHandoff = true;
-    } else {
-      // Either:
-      //  - idle → moving (state.fromVirtualIndex was written from the cold
-      //    visual read at dispatch time);
-      //  - post-MOTION_SETTLED re-targeting (reducer re-anchored
-      //    fromVirtualIndex to the actual settled position when the user
-      //    changed the target during motion).
-      // In both cases `state.fromVirtualIndex` is the canonical origin.
-      cancelDeferredRetarget();
-      start = buildStartFromState(state, currentSample?.velocity ?? 0);
+      startResolvedMotion(buildStartFromGesture(state), startedNow);
+      return;
     }
 
-    startResolvedMotion(start, startedAt, isRepeatedFollowUp, consumedHandoff);
+    // Either:
+    //  - idle → moving (state.fromVirtualIndex was written from the cold
+    //    visual read at dispatch time);
+    //  - post-MOTION_SETTLED re-targeting (reducer re-anchored
+    //    fromVirtualIndex to the actual settled position when the user
+    //    changed the target during motion).
+    // In both cases `state.fromVirtualIndex` is the canonical origin.
+    startResolvedMotion(
+      buildStartFromState(state, currentSample?.velocity ?? 0),
+      startedNow,
+    );
   }, [
     cancelDeferredRetarget,
     config,
@@ -356,7 +301,6 @@ export function useMotionRunner({
     onDurationChange,
     scheduleDeferredRetarget,
     settle,
-    state.followUpVirtualIndex,
     state.fromVirtualIndex,
     state.gesture.pointerVelocity,
     state.gesture.uiVelocity,

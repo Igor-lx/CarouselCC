@@ -1,8 +1,9 @@
 # Carousel
 
 A React 19 carousel deck with motion-controller-driven track movement, touch
-gesture, repeated-click chaining, autoplay, dot pagination, an alternative
-touch pagination widget, edge controls, and a dev-only diagnostic slot.
+gesture, fast repeated-click acceleration, autoplay, dot pagination, an
+alternative touch pagination widget, edge controls, and a dev-only
+diagnostic slot.
 
 The component is a single composition root (`Carousel.tsx`) plus four pluggable
 slot modules. The track owns a horizontal `transform` that is mutated outside
@@ -83,7 +84,7 @@ visible.
 | --------------- | --------- | ------- | ------ |
 | `isFinite`      | `boolean` | `false` | When on, the track stops at the boundaries (no wrap, `isAtStart`/`isAtEnd` flag the edges). When off, the track loops cyclically and `GO_TO` always travels the shortest cyclic distance. |
 | `isInstantMotion` | `boolean` | — *(reads `prefers-reduced-motion`)* | Explicit override for the OS-level reduced-motion preference. When set or detected: every transition snaps instantly, gesture is disabled, the PaginationWidget runs in static (non-motion-bound) mode. |
-| `isTouchDevice` | `boolean` | — *(detects via `(pointer:coarse)`)* | Explicit override for touch detection. Controls: gesture eligibility, `data-touch` outer attribute, hover-pause exemption for autoplay, the touch variant of `REPEATED_CLICK_DESTINATION_POSITION` (0.99 instead of 1). |
+| `isTouchDevice` | `boolean` | — *(detects via `(pointer:coarse)`)* | Explicit override for touch detection. Controls: gesture eligibility, `data-touch` outer attribute, hover-pause exemption for autoplay. |
 
 #### Timings (milliseconds)
 
@@ -172,12 +173,13 @@ These are the user-facing behaviours the implementation guarantees.
   *current sampled visual position*, not from where the previous segment
   was supposed to start.
 - **Repeated click (same direction during motion).** Does not restart from
-  scratch. The reducer plans a fast in-flight advance to
-  `(1 + destinationPosition) · stepSize` of the current page
-  (`destinationPosition` is `1` on desktop, `0.99` on touch), with a
-  follow-up segment that normalises to a clean page boundary one full page
-  further. The fast segment's peak speed is `REPEATED_CLICK_SPEED_MULTIPLIER`
-  (4.5×) of a normal MOVE.
+  scratch and does not get a special destination — it steps to the next
+  page boundary like any click. The reducer only flags the segment
+  (`isRepeatedClickAdvance`) so the motion layer drives it with a single
+  fast acceleration profile straight to `state.virtualIndex` (peak speed
+  `REPEATED_CLICK_SPEED_MULTIPLIER`, 4.5× a normal MOVE) instead of plain
+  bezier easing. There is no intermediate target and no chained follow-up
+  segment.
 - **Drag / swipe.** Touch only (pointer events with `pointerType === "touch"`).
   EMA-smoothed velocity, edge resistance with a configurable curvature.
   Release resolves to a swipe direction via either a quick-flick (raw
@@ -258,7 +260,6 @@ For copy-paste / quick lookup. Source: `config/defaults.ts`,
 | `VISIBILITY_THRESHOLD` | `0.2` | viewport visibility fraction |
 | `AUTOPLAY_PAGINATION_FACTOR` | `0.2` | autoplay dot switch delay |
 | `SNAP_BACK_DURATION` | `1300` ms | drag snap-back |
-| `REPEATED_CLICK_DESTINATION_POSITION` | `1` (desktop) / `0.99` (touch) | repeated-click landing fraction |
 | `REPEATED_CLICK_SPEED_MULTIPLIER` | `5` | fast-segment peak vs. normal |
 | `REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE` | `0.35` | profile ramp-up |
 | `REPEATED_CLICK_DECELERATION_DISTANCE_SHARE` | `0.35` | profile ramp-down |
@@ -274,7 +275,6 @@ For copy-paste / quick lookup. Source: `config/defaults.ts`,
 | `CAROUSEL_INERTIAL_RELEASE_CONFIG.decelerationDistanceShare` | `0.25` | post-release tail share |
 | `MOTION_EPSILON` | `0.0001` | sample comparison tolerance |
 | `DRAG_RELEASE_EPSILON` | `0.001` | drag "on target" tolerance |
-| `REPEATED_CLICK_EPSILON` | `0.0001` | repeated-click target tolerance |
 | `RENDER_WINDOW_BUFFER_MULTIPLIER` | `1` | mounted-slide neighbour count |
 
 These are part of the visual contract. Changing them changes how the
@@ -293,7 +293,7 @@ Every responsibility has exactly one owner. The orchestrator
 | Resolved runtime config | `useCarouselConfig` | One memo. Substitutes defaults only for `undefined` props; never normalises explicit values. |
 | Slide records | `useCarouselSlideDeck` | Builds slide records, optionally extends to fill perfect pages. |
 | Layout facts | `useCarouselSlideDeck` | `length`, `visibleSlidesCount`, `pageCount`, `virtualLength`, `canSlide`, `isFinite`, `dataKey`. |
-| Logical state | `useCarouselState` | Reducer-backed. Owns `activePageIndex`, `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`, `followUpVirtualIndex`, `gesture`, `isRepeatedClickAdvance`, `moveReason`. |
+| Logical state | `useCarouselState` | Reducer-backed. Owns `activePageIndex`, `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`, `gesture`, `isRepeatedClickAdvance`, `moveReason`. |
 | Visual sampled position | `useVisualPosition` | Wraps a single `MotionController`. Sole SSOT for the visible track offset. |
 | Motion execution | `useMotionRunner` | Reads logical state, builds a segment, calls into the controller. |
 | Track DOM | `useTrackBinding` | Measures slot size and subscribes to visual position; writes `transform`. |
@@ -317,10 +317,10 @@ The system has four SSOTs, each owned by exactly one layer.
 
 1. **Logical state** — `useCarouselState`. Holds `activePageIndex`,
    `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`,
-   `followUpVirtualIndex` (the optional follow-up for repeated-click),
    `gesture` (the velocity payload of the latest END_DRAG), and
-   `isRepeatedClickAdvance`. No timing. Reducer-pure: every transition is
-   a pure function of `(state, command, context)`.
+   `isRepeatedClickAdvance` (flags the fast-profile segment for a
+   same-direction repeated click). No timing. Reducer-pure: every
+   transition is a pure function of `(state, command, context)`.
 2. **Visual sampled position** — `useVisualPosition`. The motion
    controller's `value`/`velocity`/`target` are the only authority on
    "where the track is right now". Everything that needs a per-frame
@@ -378,14 +378,11 @@ A `Segment` is one of:
   deceleration shares sum above `1`, runtime normalises the profile to
   `0.5 / 0.5` with no cruise zone (and Diagnostic surfaces the
   normalisation as a LOGICAL warning). Used for:
-  - **repeated-click fast advance** (peak speed
-    `REPEATED_CLICK_SPEED_MULTIPLIER × normalMoveSpeed`),
-  - **repeated-click follow-up** (peak speed = normal),
+  - **repeated-click fast advance** — a single segment straight to the
+    next page boundary, peak speed
+    `REPEATED_CLICK_SPEED_MULTIPLIER × normalMoveSpeed`,
   - **inertial gesture release** (peak speed derived from EMA-smoothed
-    release velocity × `inertiaBoost`),
-  - **click handoff** (when a click arrives during motion and the
-    current velocity is non-zero in the same direction as the new
-    target).
+    release velocity × `inertiaBoost`).
 
 ### 4.2 Handoff invariant
 
@@ -414,18 +411,13 @@ expectation. The two-source split is deliberate: a freshly re-sampled
 jump on click); a *stale* velocity (last emit, up to 16 ms old) would make
 the profile decelerate momentarily (visible hiccup).
 
-For the repeated-click follow-up (a separate handoff from a *settled*
-segment to its chain successor), the new segment's `startedAt` is anchored
-at the previous segment's settle timestamp so the two are contiguous in
-time as well as in space.
-
 When the controller completes a segment, the runner dispatches
 `MOTION_SETTLED` **with the exact visual position at settle**. The reducer
 compares that `settledPosition` against `state.virtualIndex`:
 
 - If they match within `MOTION_EPSILON`, the segment completed as
-  intended: the reducer advances to the chain follow-up or to idle (using
-  `settledPosition` as the new `fromVirtualIndex`).
+  intended: the reducer advances to idle (using `settledPosition` as the
+  new `fromVirtualIndex`).
 - If they differ — a click landed during the settle frame and rewrote
   `state.virtualIndex` to a new target — the reducer re-anchors
   `fromVirtualIndex` to `settledPosition` and leaves `motionPhase`

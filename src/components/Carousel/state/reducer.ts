@@ -2,7 +2,7 @@ import { clamp, normalizePageIndex } from "../domain";
 import { reconcileStateToLayout } from "./reconcile";
 import {
   hasReachedDragTarget,
-  resolveRepeatedClickPlan,
+  isSameDirectionRepeat,
   resolveStepTransition,
 } from "./transitions";
 import {
@@ -38,7 +38,6 @@ export function carouselReducer(
         targetPageIndex: dragPageIndex,
         fromVirtualIndex: dragOrigin,
         virtualIndex: dragOrigin,
-        followUpVirtualIndex: null,
         isRepeatedClickAdvance: false,
         motionPhase: "dragging",
         moveReason: "gesture",
@@ -65,7 +64,6 @@ export function carouselReducer(
           targetPageIndex,
           fromVirtualIndex: envelope.targetVirtualIndex,
           virtualIndex: envelope.targetVirtualIndex,
-          followUpVirtualIndex: null,
           isRepeatedClickAdvance: false,
           motionPhase: "idle",
           moveReason: "gesture",
@@ -86,7 +84,6 @@ export function carouselReducer(
         targetPageIndex,
         fromVirtualIndex: dragOrigin,
         virtualIndex: envelope.targetVirtualIndex,
-        followUpVirtualIndex: null,
         isRepeatedClickAdvance: false,
         motionPhase: dragReleasePhase(envelope, context.isInstantMode),
         moveReason: "gesture",
@@ -105,37 +102,25 @@ export function carouselReducer(
         phase,
       } = resolveStepTransition(synced, command, context.isInstantMode);
 
-      const repeatedPlan =
+      // A repeated click (a same-direction MOVE click while motion is
+      // running) does not get a special destination — it steps to the next
+      // page boundary like any click. The flag only tells the motion layer
+      // to use the fast acceleration profile for this segment.
+      const isRepeatedClickAdvance =
         command.type === "MOVE" &&
         command.moveReason === "click" &&
         !isInstant &&
-        Math.abs(command.step) > 0
-          ? resolveRepeatedClickPlan({
-              state: synced,
-              fromVirtualIndex: nextFromVirtualIndex,
-              step: command.step,
-              repeated: context.config.repeatedClick,
-            })
-          : null;
-
-      const plannedTargetPageIndex =
-        repeatedPlan?.nextTargetPageIndex ?? nextTargetPageIndex;
-      const followUpVirtualIndex = repeatedPlan?.followUpVirtualIndex ?? null;
-      const plannedVirtualIndex =
-        repeatedPlan?.nextAdvanceVirtualIndex ?? nextVirtualIndex;
+        isSameDirectionRepeat(synced, command.step);
 
       const isNoop =
-        repeatedPlan === null &&
-        plannedTargetPageIndex === synced.targetPageIndex &&
-        plannedVirtualIndex === synced.virtualIndex &&
-        followUpVirtualIndex === null;
+        nextTargetPageIndex === synced.targetPageIndex &&
+        nextVirtualIndex === synced.virtualIndex;
 
       if (isNoop) {
         if (command.moveReason === "gesture") {
           return {
             ...synced,
             fromVirtualIndex: nextFromVirtualIndex,
-            followUpVirtualIndex: null,
             isRepeatedClickAdvance: false,
             motionPhase: "step-snap",
             moveReason: "gesture",
@@ -145,8 +130,7 @@ export function carouselReducer(
         return {
           ...synced,
           fromVirtualIndex: nextFromVirtualIndex,
-          virtualIndex: plannedVirtualIndex,
-          followUpVirtualIndex: null,
+          virtualIndex: nextVirtualIndex,
           isRepeatedClickAdvance: false,
           motionPhase: isInstant ? "step-instant" : synced.motionPhase,
           moveReason: command.moveReason,
@@ -156,11 +140,10 @@ export function carouselReducer(
 
       return {
         ...synced,
-        targetPageIndex: plannedTargetPageIndex,
+        targetPageIndex: nextTargetPageIndex,
         fromVirtualIndex: nextFromVirtualIndex,
-        virtualIndex: plannedVirtualIndex,
-        followUpVirtualIndex,
-        isRepeatedClickAdvance: repeatedPlan !== null,
+        virtualIndex: nextVirtualIndex,
+        isRepeatedClickAdvance,
         motionPhase: phase,
         moveReason: command.moveReason,
         gesture: ZERO_GESTURE_RELEASE,
@@ -179,15 +162,13 @@ export function carouselReducer(
 
       // The carousel stopped where the *active* segment was aimed
       // (`settledPosition`), but the latest `state.virtualIndex` is a
-      // different target — meaning a click landed after the segment had
-      // started settling but before this MOTION_SETTLED dispatch reached the
-      // reducer. We don't snap to the new target (that's what produces the
+      // different target — a click landed after the segment had started
+      // settling but before this MOTION_SETTLED dispatch reached the
+      // reducer. We do not snap to the new target (that is what produced the
       // "land short, freeze, jump" artefact); we re-anchor `fromVirtualIndex`
-      // to the actual settled position and let the next motion-runner pass
-      // animate from there to the still-pending `virtualIndex`. The chain
-      // follow-up (`followUpVirtualIndex`) stays untouched for the same
-      // reason — it must fire only after we've actually reached the
-      // (now-redirected) advance target.
+      // to the actual settled position and leave `motionPhase` non-idle so
+      // the next motion-runner pass animates from there to the still-pending
+      // `virtualIndex`.
       if (targetChanged) {
         return {
           ...synced,
@@ -197,24 +178,10 @@ export function carouselReducer(
         };
       }
 
-      if (synced.followUpVirtualIndex !== null) {
-        return {
-          ...synced,
-          fromVirtualIndex: settledPosition,
-          virtualIndex: synced.followUpVirtualIndex,
-          followUpVirtualIndex: null,
-          isRepeatedClickAdvance: false,
-          motionPhase: "step-normal",
-          moveReason: "click",
-          gesture: ZERO_GESTURE_RELEASE,
-        };
-      }
-
       return {
         ...synced,
         activePageIndex: synced.targetPageIndex,
         fromVirtualIndex: settledPosition,
-        followUpVirtualIndex: null,
         isRepeatedClickAdvance: false,
         motionPhase: "idle",
         gesture: ZERO_GESTURE_RELEASE,

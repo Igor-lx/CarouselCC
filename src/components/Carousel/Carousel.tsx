@@ -74,7 +74,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     durationJump,
     intervalAutoplay,
     errAltPlaceholder,
-    isTouch,
   });
 
   // --- slide deck + layout --------------------------------------------------
