@@ -42,7 +42,6 @@ interface BuildSegmentInput {
   config: CarouselRuntimeConfig;
   isInstantMode: boolean;
   isDragging: boolean;
-  isRepeatedFollowUp: boolean;
   start: MotionStart;
   startedAt: number;
 }
@@ -69,13 +68,18 @@ const buildEasing = (
   easing: parseBezier(carouselEasingString(state.motionPhase, state.moveReason)),
 });
 
+/**
+ * Fast acceleration profile for a repeated click - a same-direction click
+ * that arrives while the carousel is already moving. The segment drives
+ * straight to the page boundary (`state.virtualIndex`) and decays to zero
+ * speed; there is no intermediate target and no chained follow-up.
+ */
 const buildRepeatedProfile = (
   state: CarouselState,
   start: MotionStart,
   duration: number,
   startedAt: number,
   repeated: RepeatedClickSettings,
-  hasFollowUp: boolean,
   normalMoveSpeed: number,
 ): ProfileSegment => {
   const distance = state.virtualIndex - start.position;
@@ -83,9 +87,6 @@ const buildRepeatedProfile = (
     normalMoveSpeed * Math.max(1, repeated.speedMultiplier),
     distance,
   );
-  const endVelocity = hasFollowUp
-    ? signedVelocity(normalMoveSpeed, distance)
-    : 0;
 
   return {
     strategy: "repeated",
@@ -98,38 +99,10 @@ const buildRepeatedProfile = (
       to: state.virtualIndex,
       startSpeed: sameDirectionSpeed(start.velocity, distance),
       peakSpeed: Math.abs(peakVelocity),
-      endSpeed: Math.abs(endVelocity),
+      endSpeed: 0,
       accelerationDistanceShare: repeated.accelerationDistanceShare,
       decelerationDistanceShare: repeated.decelerationDistanceShare,
       targetDuration: duration,
-    }),
-  };
-};
-
-const buildRepeatedFollowUpProfile = (
-  state: CarouselState,
-  start: MotionStart,
-  duration: number,
-  startedAt: number,
-  repeated: RepeatedClickSettings,
-  normalMoveSpeed: number,
-): ProfileSegment => {
-  const distance = state.virtualIndex - start.position;
-  const peakVelocity = signedVelocity(normalMoveSpeed, distance);
-  return {
-    strategy: "repeated-follow-up",
-    from: start.position,
-    to: state.virtualIndex,
-    duration,
-    startedAt,
-    profile: buildProfile({
-      from: start.position,
-      to: state.virtualIndex,
-      startSpeed: sameDirectionSpeed(start.velocity, distance),
-      peakSpeed: Math.abs(peakVelocity),
-      endSpeed: 0,
-      accelerationDistanceShare: 0,
-      decelerationDistanceShare: repeated.decelerationDistanceShare,
     }),
   };
 };
@@ -162,40 +135,11 @@ const buildGestureProfile = (
   };
 };
 
-const buildHandoffProfile = (
-  state: CarouselState,
-  start: MotionStart,
-  duration: number,
-  startedAt: number,
-  normalMoveSpeed: number,
-): ProfileSegment => {
-  const distance = state.virtualIndex - start.position;
-  const peakVelocity = signedVelocity(normalMoveSpeed, distance);
-  return {
-    strategy: "handoff",
-    from: start.position,
-    to: state.virtualIndex,
-    duration,
-    startedAt,
-    profile: buildProfile({
-      from: start.position,
-      to: state.virtualIndex,
-      startSpeed: sameDirectionSpeed(start.velocity, distance),
-      peakSpeed: Math.abs(peakVelocity),
-      endSpeed: 0,
-      accelerationDistanceShare: 0,
-      decelerationDistanceShare: 1,
-      targetDuration: duration,
-    }),
-  };
-};
-
 export function buildCarouselSegment({
   state,
   config,
   isInstantMode,
   isDragging,
-  isRepeatedFollowUp,
   start,
   startedAt,
 }: BuildSegmentInput): BuildSegmentResult {
@@ -247,7 +191,6 @@ export function buildCarouselSegment({
         duration,
         startedAt,
         config.repeatedClick,
-        state.followUpVirtualIndex !== null,
         fallbackMoveSpeed,
       ),
     };
@@ -275,35 +218,6 @@ export function buildCarouselSegment({
       duration,
       isInertialRelease: false,
       segment: buildEasing(state, start, duration, startedAt, true),
-    };
-  }
-
-  if (isRepeatedFollowUp) {
-    return {
-      intent,
-      duration,
-      isInertialRelease: false,
-      segment: buildRepeatedFollowUpProfile(
-        state,
-        start,
-        duration,
-        startedAt,
-        config.repeatedClick,
-        fallbackMoveSpeed,
-      ),
-    };
-  }
-
-  if (
-    state.moveReason === "click" &&
-    state.motionPhase !== "step-jump" &&
-    sameDirectionSpeed(start.velocity, state.virtualIndex - start.position) > config.motion.epsilon
-  ) {
-    return {
-      intent,
-      duration,
-      isInertialRelease: false,
-      segment: buildHandoffProfile(state, start, duration, startedAt, fallbackMoveSpeed),
     };
   }
 

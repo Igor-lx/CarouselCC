@@ -4,9 +4,6 @@
  */
 export const RENDER_WINDOW_BUFFER_MULTIPLIER = 1;
 
-/** Tolerance for comparing repeated-click positions. */
-export const REPEATED_CLICK_EPSILON = 0.0001;
-
 /** Tolerance for motion sample position/velocity comparisons. */
 export const MOTION_EPSILON = 0.0001;
 

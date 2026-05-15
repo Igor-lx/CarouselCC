@@ -57,7 +57,6 @@ export const reconcileStateToLayout = (
     targetPageIndex,
     fromVirtualIndex: virtualIndex,
     virtualIndex,
-    followUpVirtualIndex: null,
     isRepeatedClickAdvance: false,
     motionPhase: "step-instant",
     gesture: ZERO_GESTURE_RELEASE,

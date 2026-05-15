@@ -5,8 +5,6 @@ export type CarouselMotionStrategy =
   | "gesture-easing"
   | "gesture"
   | "repeated"
-  | "repeated-follow-up"
-  | "handoff"
   | "idle";
 
 export type CarouselMotionIntent =
@@ -40,7 +38,7 @@ export interface EasingSegment extends SegmentBase {
 }
 
 export interface ProfileSegment extends SegmentBase {
-  strategy: "gesture" | "repeated" | "repeated-follow-up" | "handoff";
+  strategy: "gesture" | "repeated";
   profile: MotionProfile;
 }
 

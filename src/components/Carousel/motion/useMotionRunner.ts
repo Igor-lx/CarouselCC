@@ -11,14 +11,6 @@ import { buildCarouselSegment } from "./segmentFactory";
 import { sampleCarouselSegment } from "./sampler";
 import type { CarouselMotionStrategy, MotionStart } from "./types";
 
-interface HandoffSnapshot {
-  position: number;
-  velocity: number;
-  timestamp: number;
-  target: number;
-  strategy: CarouselMotionStrategy;
-}
-
 interface UseMotionRunnerInput {
   state: CarouselState;
   config: CarouselRuntimeConfig;
@@ -26,10 +18,23 @@ interface UseMotionRunnerInput {
   isInstantMode: boolean;
   isDragging: boolean;
   enabled: boolean;
-  onSettle: () => void;
+  /**
+   * Called by the controller when a segment naturally settles. The argument
+   * is the visual position where it settled, so the reducer can distinguish
+   * a finished current target from an older target that settled after a newer
+   * click had already been queued.
+   */
+  onSettle: (settledPosition: number) => void;
   onDurationChange?: (duration: number) => void;
 }
 
+/**
+ * Number of RAF ticks the runner waits before swapping the active segment for
+ * a click that lands during motion. The old segment keeps painting during the
+ * window. At the deferred boundary we read the last emitted visual position
+ * and the instantaneous velocity of the old curve, then start the successor
+ * from there.
+ */
 const RETARGET_FRAME_DELAY = 2;
 
 const buildStartFromVisualHandoff = (
@@ -62,6 +67,21 @@ const buildStartFromState = (
   strategy: "easing",
 });
 
+/**
+ * The motion runner is the only bridge between logical state and the motion
+ * controller.
+ *
+ * Mid-flight retargets keep the old segment painting for a tiny frame-boundary
+ * window. At the boundary, the successor segment uses:
+ * - position from the last emitted visual frame (`controller.getSnapshot()`),
+ * - velocity from a fresh sample of the active curve,
+ * - time from the successor segment's own start frame.
+ *
+ * That preserves the painted position while retaining the in-flight velocity.
+ * Every segment - first click, repeated click, gesture release - now drives
+ * directly to `state.virtualIndex`. There is no intermediate destination and
+ * no chained follow-up segment.
+ */
 export function useMotionRunner({
   state,
   config,
@@ -72,7 +92,6 @@ export function useMotionRunner({
   onSettle,
   onDurationChange,
 }: UseMotionRunnerInput): void {
-  const handoffSnapshotRef = useRef<HandoffSnapshot | null>(null);
   const lastKeyRef = useRef<string>("");
   const retargetFrameRef = useRef<number | null>(null);
   const retargetTokenRef = useRef(0);
@@ -117,20 +136,9 @@ export function useMotionRunner({
 
   const settle = useCallback(
     (sample: MotionSample<CarouselMotionStrategy>) => {
-      if (state.followUpVirtualIndex !== null) {
-        handoffSnapshotRef.current = {
-          position: sample.value,
-          velocity: sample.velocity,
-          timestamp: sample.timestamp,
-          target: sample.target,
-          strategy: sample.strategy,
-        };
-      } else {
-        handoffSnapshotRef.current = null;
-      }
-      onSettle();
+      onSettle(sample.value);
     },
-    [onSettle, state.followUpVirtualIndex],
+    [onSettle],
   );
 
   useIsomorphicLayoutEffect(() => {
@@ -140,7 +148,6 @@ export function useMotionRunner({
       state.moveReason,
       state.virtualIndex,
       state.fromVirtualIndex,
-      state.followUpVirtualIndex,
       state.isRepeatedClickAdvance,
       state.gesture.pointerVelocity,
       state.gesture.uiVelocity,
@@ -154,7 +161,6 @@ export function useMotionRunner({
     if (!enabled) {
       cancelDeferredRetarget();
       controller.snap(state.virtualIndex, { strategy: "idle" });
-      handoffSnapshotRef.current = null;
       onDurationChange?.(0);
       return;
     }
@@ -162,14 +168,12 @@ export function useMotionRunner({
     if (state.motionPhase === "idle") {
       cancelDeferredRetarget();
       controller.snap(state.virtualIndex, { strategy: "idle" });
-      handoffSnapshotRef.current = null;
       onDurationChange?.(0);
       return;
     }
 
     if (state.motionPhase === "dragging") {
       cancelDeferredRetarget();
-      handoffSnapshotRef.current = null;
       onDurationChange?.(0);
       return;
     }
@@ -179,31 +183,18 @@ export function useMotionRunner({
       controller.snap(state.virtualIndex, {
         strategy: "idle",
         onComplete: settle,
-        completion: state.followUpVirtualIndex !== null ? "immediate" : "next-frame",
       });
       onDurationChange?.(0);
       return;
     }
 
-    // User-input handoff invariant: position must come from the last emitted
-    // visual sample, because that is what DOM subscribers have already seen.
-    // Velocity is sampled at the deferred retarget boundary so the successor
-    // keeps the in-flight speed without jumping the track position.
     const startedNow = performance.now();
     const isActive = controller.isActive();
     const currentSample = isActive ? null : controller.read(startedNow);
-    const handoff = handoffSnapshotRef.current;
-
-    let start: MotionStart;
-    let startedAt = startedNow;
-    let isRepeatedFollowUp = false;
-    let consumedHandoff = false;
 
     const startResolvedMotion = (
       resolvedStart: MotionStart,
       resolvedStartedAt: number,
-      resolvedIsRepeatedFollowUp: boolean,
-      shouldConsumeHandoff: boolean,
     ) => {
       const distance = state.virtualIndex - resolvedStart.position;
 
@@ -212,9 +203,6 @@ export function useMotionRunner({
           strategy: resolvedStart.strategy,
           velocity: resolvedStart.velocity,
           onComplete: settle,
-          completion: state.followUpVirtualIndex !== null
-            ? "immediate"
-            : "next-frame",
         });
         onDurationChange?.(0);
         return;
@@ -225,14 +213,9 @@ export function useMotionRunner({
         config,
         isInstantMode,
         isDragging,
-        isRepeatedFollowUp: resolvedIsRepeatedFollowUp,
         start: resolvedStart,
         startedAt: resolvedStartedAt,
       });
-
-      if (shouldConsumeHandoff) {
-        handoffSnapshotRef.current = null;
-      }
 
       onDurationChange?.(duration);
 
@@ -240,9 +223,6 @@ export function useMotionRunner({
         segment,
         sampler: sampleCarouselSegment,
         onComplete: settle,
-        completion: state.followUpVirtualIndex !== null
-          ? "immediate"
-          : "next-frame",
       });
     };
 
@@ -254,31 +234,22 @@ export function useMotionRunner({
           retargetVisualSample,
           retargetVelocitySample,
         );
-        startResolvedMotion(retargetStart, retargetTimestamp, false, false);
+        startResolvedMotion(retargetStart, retargetTimestamp);
       });
       return;
-    } else if (state.moveReason === "gesture") {
-      cancelDeferredRetarget();
-      start = buildStartFromGesture(state);
-    } else if (
-      handoff &&
-      Math.abs(handoff.position - state.fromVirtualIndex) < config.motion.epsilon
-    ) {
-      cancelDeferredRetarget();
-      start = {
-        position: handoff.position,
-        velocity: handoff.velocity,
-        strategy: handoff.strategy,
-      };
-      startedAt = handoff.timestamp;
-      isRepeatedFollowUp = handoff.strategy === "repeated";
-      consumedHandoff = true;
-    } else {
-      cancelDeferredRetarget();
-      start = buildStartFromState(state, currentSample?.velocity ?? 0);
     }
 
-    startResolvedMotion(start, startedAt, isRepeatedFollowUp, consumedHandoff);
+    cancelDeferredRetarget();
+
+    if (state.moveReason === "gesture") {
+      startResolvedMotion(buildStartFromGesture(state), startedNow);
+      return;
+    }
+
+    startResolvedMotion(
+      buildStartFromState(state, currentSample?.velocity ?? 0),
+      startedNow,
+    );
   }, [
     cancelDeferredRetarget,
     config,
@@ -289,7 +260,6 @@ export function useMotionRunner({
     onDurationChange,
     scheduleDeferredRetarget,
     settle,
-    state.followUpVirtualIndex,
     state.fromVirtualIndex,
     state.gesture.pointerVelocity,
     state.gesture.uiVelocity,

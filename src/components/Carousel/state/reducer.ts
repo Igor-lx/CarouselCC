@@ -2,7 +2,7 @@ import { clamp, normalizePageIndex } from "../domain";
 import { reconcileStateToLayout } from "./reconcile";
 import {
   hasReachedDragTarget,
-  resolveRepeatedClickPlan,
+  isSameDirectionRepeat,
   resolveStepTransition,
 } from "./transitions";
 import {
@@ -38,7 +38,6 @@ export function carouselReducer(
         targetPageIndex: dragPageIndex,
         fromVirtualIndex: dragOrigin,
         virtualIndex: dragOrigin,
-        followUpVirtualIndex: null,
         isRepeatedClickAdvance: false,
         motionPhase: "dragging",
         moveReason: "gesture",
@@ -65,7 +64,6 @@ export function carouselReducer(
           targetPageIndex,
           fromVirtualIndex: envelope.targetVirtualIndex,
           virtualIndex: envelope.targetVirtualIndex,
-          followUpVirtualIndex: null,
           isRepeatedClickAdvance: false,
           motionPhase: "idle",
           moveReason: "gesture",
@@ -86,7 +84,6 @@ export function carouselReducer(
         targetPageIndex,
         fromVirtualIndex: dragOrigin,
         virtualIndex: envelope.targetVirtualIndex,
-        followUpVirtualIndex: null,
         isRepeatedClickAdvance: false,
         motionPhase: dragReleasePhase(envelope, context.isInstantMode),
         moveReason: "gesture",
@@ -105,37 +102,21 @@ export function carouselReducer(
         phase,
       } = resolveStepTransition(synced, command, context.isInstantMode);
 
-      const repeatedPlan =
+      const isRepeatedClickAdvance =
         command.type === "MOVE" &&
         command.moveReason === "click" &&
         !isInstant &&
-        Math.abs(command.step) > 0
-          ? resolveRepeatedClickPlan({
-              state: synced,
-              fromVirtualIndex: nextFromVirtualIndex,
-              step: command.step,
-              repeated: context.config.repeatedClick,
-            })
-          : null;
-
-      const plannedTargetPageIndex =
-        repeatedPlan?.nextTargetPageIndex ?? nextTargetPageIndex;
-      const followUpVirtualIndex = repeatedPlan?.followUpVirtualIndex ?? null;
-      const plannedVirtualIndex =
-        repeatedPlan?.nextAdvanceVirtualIndex ?? nextVirtualIndex;
+        isSameDirectionRepeat(synced, command.step);
 
       const isNoop =
-        repeatedPlan === null &&
-        plannedTargetPageIndex === synced.targetPageIndex &&
-        plannedVirtualIndex === synced.virtualIndex &&
-        followUpVirtualIndex === null;
+        nextTargetPageIndex === synced.targetPageIndex &&
+        nextVirtualIndex === synced.virtualIndex;
 
       if (isNoop) {
         if (command.moveReason === "gesture") {
           return {
             ...synced,
             fromVirtualIndex: nextFromVirtualIndex,
-            followUpVirtualIndex: null,
             isRepeatedClickAdvance: false,
             motionPhase: "step-snap",
             moveReason: "gesture",
@@ -145,8 +126,7 @@ export function carouselReducer(
         return {
           ...synced,
           fromVirtualIndex: nextFromVirtualIndex,
-          virtualIndex: plannedVirtualIndex,
-          followUpVirtualIndex: null,
+          virtualIndex: nextVirtualIndex,
           isRepeatedClickAdvance: false,
           motionPhase: isInstant ? "step-instant" : synced.motionPhase,
           moveReason: command.moveReason,
@@ -156,11 +136,10 @@ export function carouselReducer(
 
       return {
         ...synced,
-        targetPageIndex: plannedTargetPageIndex,
+        targetPageIndex: nextTargetPageIndex,
         fromVirtualIndex: nextFromVirtualIndex,
-        virtualIndex: plannedVirtualIndex,
-        followUpVirtualIndex,
-        isRepeatedClickAdvance: repeatedPlan !== null,
+        virtualIndex: nextVirtualIndex,
+        isRepeatedClickAdvance,
         motionPhase: phase,
         moveReason: command.moveReason,
         gesture: ZERO_GESTURE_RELEASE,
@@ -172,15 +151,16 @@ export function carouselReducer(
         return synced;
       }
 
-      if (synced.followUpVirtualIndex !== null) {
+      const settledPosition = envelope.settledPosition;
+      const targetChanged =
+        Math.abs(settledPosition - synced.virtualIndex) >
+        context.config.motion.epsilon;
+
+      if (targetChanged) {
         return {
           ...synced,
-          fromVirtualIndex: synced.virtualIndex,
-          virtualIndex: synced.followUpVirtualIndex,
-          followUpVirtualIndex: null,
+          fromVirtualIndex: settledPosition,
           isRepeatedClickAdvance: false,
-          motionPhase: "step-normal",
-          moveReason: "click",
           gesture: ZERO_GESTURE_RELEASE,
         };
       }
@@ -188,8 +168,7 @@ export function carouselReducer(
       return {
         ...synced,
         activePageIndex: synced.targetPageIndex,
-        fromVirtualIndex: synced.virtualIndex,
-        followUpVirtualIndex: null,
+        fromVirtualIndex: settledPosition,
         isRepeatedClickAdvance: false,
         motionPhase: "idle",
         gesture: ZERO_GESTURE_RELEASE,

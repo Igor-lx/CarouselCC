@@ -74,7 +74,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     durationJump,
     intervalAutoplay,
     errAltPlaceholder,
-    isTouch,
   });
 
   // --- slide deck + layout --------------------------------------------------
@@ -173,6 +172,12 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     [cancelMotionDurationPublish],
   );
 
+  const handleMotionSettled = useCallback(
+    (settledPosition: number) =>
+      dispatch({ type: "MOTION_SETTLED", settledPosition }),
+    [dispatch],
+  );
+
   useMotionRunner({
     state,
     config,
@@ -180,7 +185,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     isInstantMode,
     isDragging: status.isDragging,
     enabled: layout.canSlide,
-    onSettle: () => dispatch({ type: "MOTION_SETTLED" }),
+    onSettle: handleMotionSettled,
     onDurationChange: publishMotionDuration,
   });
 

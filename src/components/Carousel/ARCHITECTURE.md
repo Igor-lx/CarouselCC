@@ -1,7 +1,7 @@
 # Carousel
 
 A React 19 carousel deck with motion-controller-driven track movement, touch
-gesture, repeated-click chaining, autoplay, dot pagination, an alternative
+gesture, fast repeated-click acceleration, autoplay, dot pagination, an alternative
 touch pagination widget, edge controls, and a dev-only diagnostic slot.
 
 The component is a single composition root (`Carousel.tsx`) plus four pluggable
@@ -83,7 +83,7 @@ visible.
 | --------------- | --------- | ------- | ------ |
 | `isFinite`      | `boolean` | `false` | When on, the track stops at the boundaries (no wrap, `isAtStart`/`isAtEnd` flag the edges). When off, the track loops cyclically and `GO_TO` always travels the shortest cyclic distance. |
 | `isInstantMotion` | `boolean` | — *(reads `prefers-reduced-motion`)* | Explicit override for the OS-level reduced-motion preference. When set or detected: every transition snaps instantly, gesture is disabled, the PaginationWidget runs in static (non-motion-bound) mode. |
-| `isTouchDevice` | `boolean` | — *(detects via `(pointer:coarse)`)* | Explicit override for touch detection. Controls: gesture eligibility, `data-touch` outer attribute, hover-pause exemption for autoplay, the touch variant of `REPEATED_CLICK_DESTINATION_POSITION` (0.99 instead of 1). |
+| `isTouchDevice` | `boolean` | — *(detects via `(pointer:coarse)`)* | Explicit override for touch detection. Controls: gesture eligibility, `data-touch` outer attribute, hover-pause exemption for autoplay. |
 
 #### Timings (milliseconds)
 
@@ -172,12 +172,10 @@ These are the user-facing behaviours the implementation guarantees.
   last emitted visual sample, not from where the previous segment was
   supposed to start.
 - **Repeated click (same direction during motion).** Does not restart from
-  scratch. The reducer plans a fast in-flight advance to
-  `(1 + destinationPosition) · stepSize` of the current page
-  (`destinationPosition` is `1` on desktop, `0.99` on touch), with a
-  follow-up segment that normalises to a clean page boundary one full page
-  further. The fast segment's peak speed is `REPEATED_CLICK_SPEED_MULTIPLIER`
-  of a normal MOVE.
+  scratch. The reducer still resolves the next page boundary directly; it
+  only flags the segment so the motion layer selects the fast profile. The
+  fast segment's peak speed is `REPEATED_CLICK_SPEED_MULTIPLIER` of a normal
+  MOVE and it settles at the same page boundary as any other click.
 - **Drag / swipe.** Touch only (pointer events with `pointerType === "touch"`).
   EMA-smoothed velocity, edge resistance with a configurable curvature.
   Release resolves to a swipe direction via either a quick-flick (raw
@@ -258,10 +256,9 @@ For copy-paste / quick lookup. Source: `config/defaults.ts`,
 | `VISIBILITY_THRESHOLD` | `0.2` | viewport visibility fraction |
 | `AUTOPLAY_PAGINATION_FACTOR` | `0.2` | autoplay dot switch delay |
 | `SNAP_BACK_DURATION` | `1300` ms | drag snap-back |
-| `REPEATED_CLICK_DESTINATION_POSITION` | `1` (desktop) / `0.99` (touch) | repeated-click landing fraction |
-| `REPEATED_CLICK_SPEED_MULTIPLIER` | `7` | fast-segment peak vs. normal |
-| `REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE` | `0.3` | profile ramp-up |
-| `REPEATED_CLICK_DECELERATION_DISTANCE_SHARE` | `0.15` | profile ramp-down |
+| `REPEATED_CLICK_SPEED_MULTIPLIER` | `5` | fast-segment peak vs. normal |
+| `REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE` | `0.35` | profile ramp-up |
+| `REPEATED_CLICK_DECELERATION_DISTANCE_SHARE` | `0.35` | profile ramp-down |
 | `JUMP_BEZIER` | `cubic-bezier(0.16, 1, 0.3, 1)` | far jumps |
 | `MOVE_BEZIER` | `cubic-bezier(0.32, 0.2, 0.28, 1)` | normal step |
 | `AUTO_BEZIER` | `cubic-bezier(0.28, 0.72, 0.38, 1)` | autoplay step |
@@ -274,7 +271,6 @@ For copy-paste / quick lookup. Source: `config/defaults.ts`,
 | `CAROUSEL_INERTIAL_RELEASE_CONFIG.decelerationDistanceShare` | `0.25` | post-release tail share |
 | `MOTION_EPSILON` | `0.0001` | sample comparison tolerance |
 | `DRAG_RELEASE_EPSILON` | `0.001` | drag "on target" tolerance |
-| `REPEATED_CLICK_EPSILON` | `0.0001` | repeated-click target tolerance |
 | `RENDER_WINDOW_BUFFER_MULTIPLIER` | `1` | mounted-slide neighbour count |
 
 These are part of the visual contract. Changing them changes how the
@@ -293,7 +289,7 @@ Every responsibility has exactly one owner. The orchestrator
 | Resolved runtime config | `useCarouselConfig` | One memo. Substitutes defaults only for `undefined` props; never normalises explicit values. |
 | Slide records | `useCarouselSlideDeck` | Builds slide records, optionally extends to fill perfect pages. |
 | Layout facts | `useCarouselSlideDeck` | `length`, `visibleSlidesCount`, `pageCount`, `virtualLength`, `canSlide`, `isFinite`, `dataKey`. |
-| Logical state | `useCarouselState` | Reducer-backed. Owns `activePageIndex`, `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`, `followUpVirtualIndex`, `gesture`, `isRepeatedClickAdvance`, `moveReason`. |
+| Logical state | `useCarouselState` | Reducer-backed. Owns `activePageIndex`, `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`, `gesture`, `isRepeatedClickAdvance`, `moveReason`. |
 | Visual sampled position | `useVisualPosition` | Wraps a single `MotionController`. Sole SSOT for the visible track offset. |
 | Motion execution | `useMotionRunner` | Reads logical state, builds a segment, calls into the controller. |
 | Track DOM | `useTrackBinding` | Measures slot size and subscribes to visual position; writes `transform`. |
@@ -317,7 +313,6 @@ The system has four SSOTs, each owned by exactly one layer.
 
 1. **Logical state** — `useCarouselState`. Holds `activePageIndex`,
    `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`,
-   `followUpVirtualIndex` (the optional follow-up for repeated-click),
    `gesture` (the velocity payload of the latest END_DRAG), and
    `isRepeatedClickAdvance`. No timing. Reducer-pure: every transition is
    a pure function of `(state, command, context)`.
@@ -374,14 +369,10 @@ A `Segment` is one of:
   deceleration profile with a per-zone speed solve. If acceleration and
   deceleration shares sum above `1`, runtime normalizes the profile to
   `0.5 / 0.5` with no cruise zone. Used for:
-  - **repeated-click fast advance** (peak speed
-    `REPEATED_CLICK_SPEED_MULTIPLIER x normalMoveSpeed`),
-  - **repeated-click follow-up** (peak speed = normal),
-  - **inertial gesture release** (peak speed derived from EMA-smoothed
-    release velocity × `inertiaBoost`),
-  - **click handoff** (when a click arrives during motion and the
-    current velocity is non-zero in the same direction as the new
-    target).
+  - **repeated-click fast advance** - one segment directly to the next page
+    boundary, peak speed `REPEATED_CLICK_SPEED_MULTIPLIER x normalMoveSpeed`;
+  - **inertial gesture release** - peak speed derived from EMA-smoothed
+    release velocity × `inertiaBoost`.
 
 ### 4.2 Handoff invariant
 
@@ -411,14 +402,11 @@ must preserve the invariant: "intent immediately, controller retarget on a
 frame boundary, position from emitted visual frame, velocity from current
 segment sample, time from new segment start".
 
-For the repeated-click follow-up (a separate handoff from a settled
-segment to its chain successor), the new segment's `startedAt` is anchored
-at the previous segment's settle timestamp so the two are contiguous in
-time as well as in space.
-
-When the controller completes, the runner dispatches `MOTION_SETTLED`,
-which advances the state machine into either the chain follow-up or the
-idle state.
+When the controller completes, the runner dispatches
+`MOTION_SETTLED { settledPosition }`. If a newer click already replaced the
+logical target while the previous segment was settling, the reducer re-anchors
+the next segment to the actual settled position instead of snapping to the
+new target.
 
 ### 4.3 No projection-source layer
 
@@ -473,8 +461,8 @@ union:
   controls / autoplay step.
 - `GO_TO { targetPageIndex, moveReason, fromVirtualIndex, isInstant? }`
   — pagination click / autoplay loop-back / external jump.
-- `MOTION_SETTLED` — fired by the motion runner when the controller
-  completes.
+- `MOTION_SETTLED { settledPosition }` — fired by the motion runner when the
+  controller completes.
 
 `motionPhase` is a discriminated union:
 `"idle" | "step-normal" | "step-jump" | "step-snap" | "step-instant" | "dragging"`.

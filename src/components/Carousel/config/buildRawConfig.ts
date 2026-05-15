@@ -3,15 +3,12 @@ import {
   DRAG_RELEASE_EPSILON,
   MOTION_EPSILON,
   RENDER_WINDOW_BUFFER_MULTIPLIER,
-  REPEATED_CLICK_EPSILON,
 } from "./constants";
 import { CAROUSEL_SWIPE_CONFIG, CAROUSEL_INERTIAL_RELEASE_CONFIG } from "./gesture";
 import {
   REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
   REPEATED_CLICK_DECELERATION_DISTANCE_SHARE,
-  REPEATED_CLICK_DESTINATION_POSITION,
   REPEATED_CLICK_SPEED_MULTIPLIER,
-  REPEATED_CLICK_TOUCH_DESTINATION_POSITION,
   SNAP_BACK_DURATION,
 } from "./motion";
 import {
@@ -27,7 +24,7 @@ const useDefault = <T>(value: unknown, fallback: T): T =>
 /**
  * Assemble the runtime config. Defaults are applied only when a prop is
  * `undefined`; any explicitly-provided value flows through unchanged. The
- * carousel intentionally trusts its inputs — see the diagnostic layer for
+ * carousel intentionally trusts its inputs - see the diagnostic layer for
  * observability.
  */
 export const buildRawCarouselConfig = ({
@@ -49,12 +46,9 @@ export const buildRawCarouselConfig = ({
     epsilon: MOTION_EPSILON,
   },
   repeatedClick: {
-    destinationPosition: REPEATED_CLICK_DESTINATION_POSITION,
-    touchDestinationPosition: REPEATED_CLICK_TOUCH_DESTINATION_POSITION,
     speedMultiplier: REPEATED_CLICK_SPEED_MULTIPLIER,
     accelerationDistanceShare: REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
     decelerationDistanceShare: REPEATED_CLICK_DECELERATION_DISTANCE_SHARE,
-    epsilon: REPEATED_CLICK_EPSILON,
   },
   interaction: {
     hoverPauseDelay: HOVER_PAUSE_DELAY,

@@ -7,7 +7,6 @@ export const buildInitialState = (layout: CarouselLayout): CarouselState => ({
   targetPageIndex: 0,
   fromVirtualIndex: 0,
   virtualIndex: 0,
-  followUpVirtualIndex: null,
   isRepeatedClickAdvance: false,
   motionPhase: "idle",
   moveReason: "unknown",

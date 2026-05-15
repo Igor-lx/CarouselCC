@@ -27,7 +27,12 @@ export interface CarouselState {
   targetPageIndex: number;
   fromVirtualIndex: number;
   virtualIndex: number;
-  followUpVirtualIndex: number | null;
+  /**
+   * True when this segment was started by a click that arrived while the
+   * carousel was already moving in the same direction. It selects the fast
+   * acceleration profile instead of plain bezier easing - the segment still
+   * drives straight to the page boundary and decays to zero speed.
+   */
   isRepeatedClickAdvance: boolean;
   motionPhase: MotionPhase;
   moveReason: MoveReason;
@@ -70,6 +75,16 @@ export interface EndDragCommand extends VirtualIndexSource {
 
 export interface MotionSettledCommand {
   type: "MOTION_SETTLED";
+  /**
+   * The visual position where the controller actually settled.
+   *
+   * Between the RAF tick that settles a segment and the reducer turn that
+   * handles MOTION_SETTLED, another click may already have replaced
+   * `state.virtualIndex` with a later target. The reducer needs the settled
+   * position to distinguish "the current target finished" from "an older
+   * target finished while a newer one is already pending".
+   */
+  settledPosition: number;
 }
 
 export type CarouselCommand =

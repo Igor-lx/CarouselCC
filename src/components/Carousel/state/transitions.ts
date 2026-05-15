@@ -4,9 +4,7 @@ import {
   normalizePageIndex,
   pageStart,
   shortestCyclicDistance,
-  type CarouselLayout,
 } from "../domain";
-import type { RepeatedClickSettings } from "../config";
 import type {
   CarouselState,
   GoToCommand,
@@ -93,79 +91,23 @@ export const resolveStepTransition = (
   };
 };
 
-interface RepeatedClickPlanInput {
-  state: CarouselState;
-  fromVirtualIndex: number;
-  step: number;
-  repeated: RepeatedClickSettings;
-}
-
-interface RepeatedClickPlan {
-  nextTargetPageIndex: number;
-  nextAdvanceVirtualIndex: number;
-  followUpVirtualIndex: number | null;
-}
-
-const clampRepeatedVirtualIndex = (virtualIndex: number, layout: CarouselLayout) => {
-  if (!layout.isFinite) return virtualIndex;
-  const min = 0;
-  const max = pageStart(layout.pageCount - 1, layout.visibleSlidesCount);
-  return clamp(virtualIndex, min, max);
-};
-
-export const resolveRepeatedClickPlan = ({
-  state,
-  fromVirtualIndex,
-  step,
-  repeated,
-}: RepeatedClickPlanInput): RepeatedClickPlan | null => {
-  const { layout } = state;
+/**
+ * A repeated click is a MOVE click that arrives while the carousel is already
+ * animating in the same direction. It does not change the destination model:
+ * the next target is still the next page boundary. It only selects the fast
+ * motion profile in the motion layer.
+ */
+export const isSameDirectionRepeat = (
+  state: CarouselState,
+  step: number,
+): boolean => {
   const direction = Math.sign(step);
-  const stepSize = layout.visibleSlidesCount;
-  const { epsilon } = repeated;
-
-  if (direction === 0 || stepSize <= epsilon) return null;
-
+  if (direction === 0) return false;
+  if (state.motionPhase === "idle" || state.motionPhase === "dragging") {
+    return false;
+  }
   const currentDirection = Math.sign(state.virtualIndex - state.fromVirtualIndex);
-  const isSameDirectionRepeat =
-    state.motionPhase !== "idle" &&
-    state.motionPhase !== "dragging" &&
-    currentDirection !== 0 &&
-    currentDirection === direction;
-
-  if (!isSameDirectionRepeat) return null;
-
-  const { destinationPosition } = repeated;
-  const currentPageOrigin =
-    direction > 0
-      ? Math.floor(fromVirtualIndex / stepSize) * stepSize
-      : Math.ceil(fromVirtualIndex / stepSize) * stepSize;
-
-  const nextAdvanceVirtualIndex = clampRepeatedVirtualIndex(
-    currentPageOrigin + direction * (1 + destinationPosition) * stepSize,
-    layout,
-  );
-
-  const nextTargetVirtualIndex = clampRepeatedVirtualIndex(
-    currentPageOrigin + direction * 2 * stepSize,
-    layout,
-  );
-
-  const targetPageIndex = Math.round(nextTargetVirtualIndex / stepSize);
-  const nextTargetPageIndex = layout.isFinite
-    ? clamp(targetPageIndex, 0, layout.pageCount - 1)
-    : normalizePageIndex(targetPageIndex, layout.pageCount);
-
-  const followUpVirtualIndex =
-    Math.abs(nextTargetVirtualIndex - nextAdvanceVirtualIndex) >= epsilon
-      ? nextTargetVirtualIndex
-      : null;
-
-  return {
-    nextTargetPageIndex,
-    nextAdvanceVirtualIndex,
-    followUpVirtualIndex,
-  };
+  return currentDirection !== 0 && currentDirection === direction;
 };
 
 export const hasReachedDragTarget = (

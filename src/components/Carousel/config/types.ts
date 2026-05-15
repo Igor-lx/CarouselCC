@@ -18,12 +18,9 @@ export interface MotionSettings {
 }
 
 export interface RepeatedClickSettings {
-  destinationPosition: number;
-  touchDestinationPosition: number;
   speedMultiplier: number;
   accelerationDistanceShare: number;
   decelerationDistanceShare: number;
-  epsilon: number;
 }
 
 export interface InteractionSettings {
