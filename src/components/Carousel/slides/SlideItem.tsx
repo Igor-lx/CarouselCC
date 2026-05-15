@@ -90,8 +90,6 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
           <img
             src={slideData.content}
             alt={slideData.alt || ""}
-            decoding="async"
-            fetchPriority={isActive ? "high" : "low"}
             draggable={false}
             onLoad={() => updateImageError(false)}
             onError={() => updateImageError(true)}

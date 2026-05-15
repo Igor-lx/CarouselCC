@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 
 import appStyles from "./App.module.scss";
 import { CAROUSEL_SOURCES, CAROUSEL_SOURCES2 } from "./carouselData";
-import { useImagePreload } from "./useImagePreload";
 import { useCompactLandscape } from "./useCompactLandscape";
 import { useBreakpoint, useIsTouchDevice } from "../shared";
 import Carousel, { type Slide } from "../components/Carousel";
@@ -46,23 +45,13 @@ export default function App() {
     isTouch && isCompactLandscape ? COMPACT_LANDSCAPE_VISIBLE_SLIDES : device;
   const useMobileImages = isTouch || device === VISIBLE_BY_BREAKPOINT.MOBILE;
 
-  const slideImageUrls = useMemo(
-    () =>
-      ACTIVE_CAROUSEL_SOURCES.map((entry) =>
-        useMobileImages ? entry.mobile : entry.mobile,
-      ),
-    [useMobileImages],
-  );
-
-  useImagePreload(slideImageUrls);
-
   const slidesData = useMemo(
     () =>
-      ACTIVE_CAROUSEL_SOURCES.map((entry, index) => ({
+      ACTIVE_CAROUSEL_SOURCES.map((entry) => ({
         id: entry.id,
-        content: slideImageUrls[index],
+        content: useMobileImages ? entry.mobile : entry.desktop,
       })),
-    [slideImageUrls],
+    [useMobileImages],
   );
 
   return (
