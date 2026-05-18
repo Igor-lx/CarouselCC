@@ -18,6 +18,7 @@ interface UseSlideImagePreloadInput {
   currentVirtualIndex: number;
   isIdle: boolean;
   isContentImg: boolean;
+  isDataSaverEnabled: boolean;
   /** `null` when `isContentImg` is off - the hook then does no work at all. */
   store: ImageResourceStore | null;
 }
@@ -114,6 +115,12 @@ const collectPreloadWindowUrls = ({
  *    each side (see `config/slides`). It is computed only while the carousel
  *    is idle and handed to the store as one atomic preparation session.
  *
+ * Warm-up is speculative and gated by the reduced-data environment signal
+ * received from the Carousel root: when the user has opted into reduced data
+ * usage (`prefers-reduced-data` / `saveData`) no preparation window is opened,
+ * so no eager fetch or decode happens. The store, render SSOT, image errors,
+ * and retry stay fully active; only optional background warming is skipped.
+ *
  * When `isContentImg` is off, `store` is `null` and the URL sets stay the
  * frozen empty list: no traversal of `records`, no effects firing, no fetch,
  * no decode - the hook is fully inert.
@@ -127,8 +134,11 @@ export function useSlideImagePreload({
   currentVirtualIndex,
   isIdle,
   isContentImg,
+  isDataSaverEnabled,
   store,
 }: UseSlideImagePreloadInput): void {
+  const isWarmupEnabled = isContentImg && !isDataSaverEnabled;
+
   const deckUrls = useMemo(
     () => (isContentImg ? collectDeckImageUrls(records) : EMPTY_URLS),
     [isContentImg, records],
@@ -136,10 +146,10 @@ export function useSlideImagePreload({
 
   const preloadUrls = useMemo(
     () =>
-      isContentImg && isIdle
+      isWarmupEnabled && isIdle
         ? collectPreloadWindowUrls({ records, layout, currentVirtualIndex })
         : EMPTY_URLS,
-    [isContentImg, isIdle, layout, records, currentVirtualIndex],
+    [isWarmupEnabled, isIdle, layout, records, currentVirtualIndex],
   );
 
   // Keep retained entries bounded to the live deck. With no store (image
@@ -153,17 +163,17 @@ export function useSlideImagePreload({
   // declared before the motion runner in Carousel.tsx, so it closes background
   // preparation before the later layout effect starts a new motion segment.
   useIsomorphicLayoutEffect(() => {
-    if (!store || (isContentImg && isIdle)) return;
+    if (!store || (isWarmupEnabled && isIdle)) return;
     store.syncPreparationWindow({ enabled: false, urls: EMPTY_URLS });
-  }, [store, isContentImg, isIdle]);
+  }, [store, isWarmupEnabled, isIdle]);
 
   // Open or refresh the idle window only after child layout effects have
   // registered the currently rendered image owners.
   useEffect(() => {
-    if (!store || !isContentImg || !isIdle) return;
+    if (!store || !isWarmupEnabled || !isIdle) return;
     store.syncPreparationWindow({
       enabled: true,
       urls: preloadUrls,
     });
-  }, [store, isContentImg, isIdle, preloadUrls]);
+  }, [store, isWarmupEnabled, isIdle, preloadUrls]);
 }

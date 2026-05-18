@@ -6,8 +6,8 @@ import {
   resolveDragRelease,
   type CarouselLayout,
 } from "../domain";
+import type { CarouselCommands } from "../commands";
 import type { CarouselRuntimeConfig } from "../config";
-import type { CarouselDispatch } from "../state";
 import {
   usePointerSwipe,
   type PointerSwipeListeners,
@@ -19,7 +19,7 @@ interface UseCarouselGestureInput {
   enabled: boolean;
   viewportRef: RefObject<HTMLDivElement | null>;
   layout: CarouselLayout;
-  dispatch: CarouselDispatch;
+  commands: Pick<CarouselCommands, "startDrag" | "endDrag">;
   readCurrentPosition: () => number;
   applyTrackPosition: (position: number) => void;
   getSlotSize: () => number;
@@ -36,7 +36,7 @@ export function useCarouselGesture({
   enabled,
   viewportRef,
   layout,
-  dispatch,
+  commands,
   readCurrentPosition,
   applyTrackPosition,
   getSlotSize,
@@ -64,12 +64,17 @@ export function useCarouselGesture({
     originPositionRef.current = origin;
     originPageIndexRef.current = pageIndex;
 
-    dispatch({
-      type: "START_DRAG",
+    commands.startDrag({
       fromVirtualIndex: origin,
       targetPageIndex: pageIndex,
     });
-  }, [applyTrackPosition, dispatch, getSlotSize, layout, readCurrentPosition]);
+  }, [
+    applyTrackPosition,
+    commands,
+    getSlotSize,
+    layout,
+    readCurrentPosition,
+  ]);
 
   const handleDragMove = useCallback(
     (payload: PointerSwipeMovePayload) => {
@@ -96,8 +101,7 @@ export function useCarouselGesture({
 
       applyTrackPosition(releasePosition);
 
-      dispatch({
-        type: "END_DRAG",
+      commands.endDrag({
         fromVirtualIndex: releasePosition,
         targetPageIndex: releaseTarget.targetPageIndex,
         targetVirtualIndex: releaseTarget.targetVirtualIndex,
@@ -115,7 +119,7 @@ export function useCarouselGesture({
       originPositionRef.current = null;
       slotSizeRef.current = 0;
     },
-    [applyTrackPosition, dispatch, enabled, layout, offsetToPosition],
+    [applyTrackPosition, commands, enabled, layout, offsetToPosition],
   );
 
   const { isDragging, isInteracting, listeners } = usePointerSwipe({

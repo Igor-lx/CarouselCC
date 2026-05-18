@@ -207,10 +207,14 @@ These are the user-facing behaviours the implementation guarantees.
   layout phase before the motion runner starts, cancels queued decode work,
   aborts in-flight offscreen warm-up fetches, and invalidates stale callbacks.
   Warm-up fetches are low priority and decode only inside an active idle
-  session. A successful warm-up lands in the image-resource SSOT, so a slide
-  entering the render window can observe an already-`loaded` resource; a
-  speculative warm-up failure does not become a visible slide error. It never
-  changes navigation, layout, motion state, or slide rendering semantics.
+  session. The Carousel root reads the shared reduced-data environment signal
+  (`prefers-reduced-data` / `saveData`) alongside its other global device
+  signals; when it is on, speculative warm-up is skipped entirely while
+  normal visible loading, image errors, and retries remain unchanged. A
+  successful warm-up lands in the image-resource SSOT, so a slide entering
+  the render window can observe an already-`loaded` resource; a speculative
+  warm-up failure does not become a visible slide error. It never changes
+  navigation, layout, motion state, or slide rendering semantics.
 - **Image errors and retry.** A slide whose image fails to load renders a
   text placeholder (`alt`, or `errAltPlaceholder`) and is not interactive.
   While such a slide sits in the active band, the image-resource store
@@ -310,14 +314,15 @@ Every responsibility has exactly one owner. The orchestrator
 | Slide records | `useCarouselSlideDeck` | Builds slide records, optionally extends to fill perfect pages. |
 | Layout facts | `useCarouselSlideDeck` | `length`, `visibleSlidesCount`, `pageCount`, `virtualLength`, `canSlide`, `isFinite`, `dataKey`. |
 | Logical state | `useCarouselState` | Reducer-backed. Owns `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`, `gesture`, `isRepeatedClickAdvance`, `moveReason`. |
+| Command admission | `useCarouselCommandAdmission` | Single pre-state gateway for raw intents. Buffers/coalesces in-flight repeated clicks, passes accepted commands into the reducer. |
 | Visual sampled position | `useVisualPosition` | Wraps a single `MotionController`. Sole SSOT for the visible track offset. |
-| Motion execution | `useMotionRunner` | Reads logical state, builds a segment, calls into the controller. |
+| Motion execution | `useCarouselMotionExecution` + `useMotionRunner` | Post-state bridge. Owns duration publication + settle feedback, then reads logical state, builds a segment, and calls into the controller. |
 | Track DOM | `useTrackBinding` | Measures slot size and subscribes to visual position; writes `transform`. |
 | Render window | `useSlideRenderModel` | Memoised; expands during motion, snaps on idle. |
 | Image resources | image-resource store (`createImageResourceStore`) | Per-URL render status, explicit visible-owner count, warm-up lifecycle, retry policy, decode queue, and offscreen preparation session. One instance per carousel; the single authority on image renderability. |
 | Image preparation | `useSlideImagePreload` | React adapter that derives the deck + idle-window URL sets and drives the store through one atomic preparation-window API. Holds no image logic of its own. |
 | Slide image binding | `useImageResource` | Subscribes one `SlideItem` to its URL in the image-resource store via `useSyncExternalStore`. |
-| Gesture lifecycle | `useCarouselGesture` | Wraps the shared `usePointerSwipe`. Converts pointer events into dispatches and direct position writes. |
+| Gesture lifecycle | `useCarouselGesture` | Wraps the shared `usePointerSwipe`. Converts pointer events into accepted commands and direct position writes. |
 | Autoplay lifecycle | `useAutoplay` | Owns the interval timer, hover/visibility/dragging pause. |
 | Focus shift | `useFocusRecovery` | Triggers when the state settles. |
 | Module API | `useModuleContextValue` | Builds the value once, memoised. |
@@ -421,12 +426,16 @@ A `Segment` is one of:
 state changes: when `motionPhase` becomes a non-idle value, it samples the
 motion origin and builds the segment.
 
-When a previous segment is still running (repeated click,
-opposite-direction click, any interruption), the state change records the
-new intent immediately, but the controller retarget is deferred by a tiny
-frame-boundary window (`RETARGET_FRAME_DELAY`, currently two RAF ticks). The
-old segment keeps publishing during that window. At the deferred boundary the
-new segment starts from the live stream:
+Repeated same-direction clicks take a dedicated admission path. The raw click
+first enters `useCarouselCommandAdmission`, a tiny inbox that owns only
+*unaccepted* click steps. Same-burst steps are coalesced for two RAF ticks,
+then one accepted `MOVE` enters the reducer. Until that admission point the
+previous segment keeps painting unchanged, React state is not rewritten, and
+no second logical target exists: the buffer is only an inbox, while the
+reducer remains the SSOT for accepted targets.
+
+When any accepted intent interrupts an active segment, the successor starts
+from the live stream:
 
 - position comes from `controller.getSnapshot()` after the previous segment
   has had time to publish additional frames;
@@ -436,12 +445,15 @@ new segment starts from the live stream:
 
 This keeps the first handoff emit equal to the already-published track
 position, so retargeting is a DOM no-op, while the velocity is sampled close
-to the actual transition frame. Using a fresh unemitted position can make the
-carousel jump to a position the user never saw; retargeting synchronously in
-the input/layout-effect turn can feel like a micro-stop. Any future change
-must preserve the invariant: "intent immediately, controller retarget on a
-frame boundary, position from emitted visual frame, velocity from current
-segment sample, time from new segment start".
+to the actual transition frame. Repeated clicks have already waited at the
+command-admission boundary, so their accepted state starts the successor
+immediately; other active interruptions still use the runner's tiny deferred
+handoff window (`RETARGET_FRAME_DELAY`, currently two RAF ticks). Using a
+fresh unemitted position can make the carousel jump to a position the user
+never saw. Any future change must preserve the invariant: "unaccepted repeated
+clicks stay outside reducer state, accepted retargets start from the emitted
+visual frame, velocity comes from the current segment sample, and time comes
+from the successor start".
 
 When the controller completes, the runner dispatches
 `MOTION_SETTLED { settledPosition }`. If a newer click already replaced the
@@ -480,10 +492,10 @@ It is not carousel-specific and is reusable.
    delta using the recorded slot size and writes that into the visual
    position via `applyTrackPosition`. No React state per move;
 3. on release: computes the swipe target via `resolveDragRelease` (pure
-   helper in `domain/dragRelease.ts`) and dispatches `END_DRAG` with the
-   resolved target plus the pointer/UI release velocities.
+   helper in `domain/dragRelease.ts`) and submits `END_DRAG` through command
+   admission with the resolved target plus the pointer/UI release velocities.
 
-The dispatch carries the velocities into the state machine. They are
+The accepted command carries the velocities into the state machine. They are
 stored on the snapshot and read by `useMotionRunner` when it builds the
 release segment.
 
@@ -610,6 +622,9 @@ src/components/Carousel/
 │   ├── buildRawConfig.ts          merges raw input with defaults
 │   ├── types.ts                   CarouselRuntimeConfig + sub-shapes
 │   └── useCarouselConfig.ts
+├── commands/
+│   ├── index.ts
+│   └── useCarouselCommandAdmission.ts  raw intent → accepted reducer command
 ├── context/
 │   ├── CarouselModuleContext.ts   module-facing value
 │   ├── CarouselDiagnosticContext.ts  raw props/layout/slots for Diagnostic
@@ -638,6 +653,7 @@ src/components/Carousel/
 │   ├── duration.ts                bezier-segment duration math
 │   ├── segmentFactory.ts          builds the Segment for the next motion step
 │   ├── sampler.ts                 segment → MotionSampleData at timestamp
+│   ├── useCarouselMotionExecution.ts  post-state motion orchestration
 │   └── useMotionRunner.ts         state → segment → controller
 ├── position/
 │   ├── types.ts                   VisualPositionFrame, VisualPositionSource
@@ -645,7 +661,7 @@ src/components/Carousel/
 ├── geometry/
 │   └── useTrackBinding.ts         ResizeObserver + slot measure + transform writer
 ├── gesture/
-│   └── useCarouselGesture.ts      pointer-swipe → dispatch + visual position writes
+│   └── useCarouselGesture.ts      pointer-swipe → commands + visual position writes
 ├── autoplay/
 │   └── useAutoplay.ts
 ├── focus/
@@ -685,12 +701,14 @@ Reading order for someone new:
    becomes a visual segment.
 5. `position/useVisualPosition.ts` — how the visible position is sampled
    and exposed.
-6. `motion/useMotionRunner.ts` — how a state change becomes a controller
-   start; the handoff invariant (§4.2).
-7. `geometry/useTrackBinding.ts` — how the track DOM is written.
-8. `gesture/useCarouselGesture.ts` — how a touch swipe ends up as a
-   dispatch.
-9. The modules.
+6. `commands/useCarouselCommandAdmission.ts` — how raw intent becomes an
+   accepted reducer command.
+7. `motion/useCarouselMotionExecution.ts` + `motion/useMotionRunner.ts` —
+   how accepted state becomes a controller start; the handoff invariant (§4.2).
+8. `geometry/useTrackBinding.ts` — how the track DOM is written.
+9. `gesture/useCarouselGesture.ts` — how a touch swipe submits commands and
+   writes drag position.
+10. The modules.
 
 If a future reader can follow that order without bouncing for inverse
 dependencies, the architecture has held.
@@ -730,12 +748,12 @@ dependencies, the architecture has held.
   carousel semantics and never receives reducer state. Internal image
   preparation uses the carousel's own idle status directly; external consumers
   can still use the callback for application-owned non-critical work.
-- **Image warm-up retention is explicit.** `IMAGE_WARMUP_RETENTION_MODE`
-  selects whether heavyweight successful warm-up elements stay alive for the
-  whole live deck (`"deck"`, the current default) or only for the active idle
-  preload window (`"window"`). Lightweight per-URL render entries remain
-  store-owned regardless; the switch controls memory vs. reuse, not render
-  semantics.
+- **Image warm-up retention is bounded by design.** Heavyweight successful
+  warm-up elements live only while their URL is inside the active idle preload
+  window. Once a URL leaves that window, the offscreen `Image` handle is
+  released; lightweight per-URL render entries remain store-owned for the live
+  deck. The carousel therefore warms nearby content without turning itself
+  into a hidden cache for every image in a large deck.
 
 ---
 
@@ -763,6 +781,9 @@ dependencies, the architecture has held.
   The PaginationWidget binding short-circuits writes per dot. The motion
   controller emits only on actual sample change (per RAF tick of an
   active segment; one synchronous emit on cold segment start; active
-  retargets publish their first successor sample after the deferred
-  frame-boundary handoff; no emits while idle). Image preload/decode is scoped
-  to the slide layer and starts only from idle states.
+  non-repeated retargets publish their first successor sample after the
+  deferred frame-boundary handoff; no emits while idle). Repeated clicks that
+  land during motion are buffered and coalesced before they enter reducer
+  state, so one burst causes one accepted React transition instead of one
+  transition per physical press. Image preload/decode is scoped to the slide
+  layer and starts only from idle states.

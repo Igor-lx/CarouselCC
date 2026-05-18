@@ -1,9 +1,10 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 
 import styles from "./Carousel.module.scss";
 import {
   mergeStyleMaps,
   resolveSlots,
+  useDataSaver,
   useIsReducedMotion,
   useIsTouchDevice,
   useViewportVisibility,
@@ -16,10 +17,11 @@ import {
 } from "./context";
 import { carouselBoundaryState, slideFlexStyle } from "./domain";
 import { useAutoplay } from "./autoplay/useAutoplay";
+import { useCarouselCommandAdmission } from "./commands";
 import { useFocusRecovery } from "./focus/useFocusRecovery";
 import { useCarouselGesture } from "./gesture";
 import { useTrackBinding } from "./geometry";
-import { useMotionRunner } from "./motion";
+import { useCarouselMotionExecution } from "./motion";
 import { useCarouselNavigation } from "./navigation";
 import { useVisualPosition } from "./position";
 import { useModuleRenderPolicy } from "./render-policy/useModuleRenderPolicy";
@@ -66,6 +68,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // --- environment & overrides ----------------------------------------------
   const prefersReducedMotion = useIsReducedMotion();
   const detectedTouchDevice = useIsTouchDevice();
+  const isDataSaverEnabled = useDataSaver(isContentImg);
   const isInstantMode = isInstantMotion ?? prefersReducedMotion;
   const isTouch = isTouchDevice ?? detectedTouchDevice;
 
@@ -111,6 +114,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     currentVirtualIndex: state.virtualIndex,
     isIdle: status.isIdle,
     isContentImg,
+    isDataSaverEnabled,
     store: imageResourceStore,
   });
 
@@ -153,69 +157,30 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     applyVisualPosition: applyImmediatePosition,
   });
 
-  // --- motion runner: state ↔ controller -----------------------------------
-  const [motionDuration, setMotionDuration] = useState(0);
-  const motionDurationFrameRef = useRef<number | null>(null);
-  const motionDurationTimeoutRef = useRef<number | null>(null);
+  // --- command admission: raw intent -> accepted reducer command ------------
+  const commands = useCarouselCommandAdmission({
+    state,
+    dispatch,
+    controller,
+    enabled: layout.canSlide,
+    readCurrentPosition,
+  });
 
-  const cancelMotionDurationPublish = useCallback(() => {
-    if (typeof window === "undefined") return;
-
-    if (motionDurationFrameRef.current !== null) {
-      window.cancelAnimationFrame(motionDurationFrameRef.current);
-      motionDurationFrameRef.current = null;
-    }
-
-    if (motionDurationTimeoutRef.current !== null) {
-      window.clearTimeout(motionDurationTimeoutRef.current);
-      motionDurationTimeoutRef.current = null;
-    }
-  }, []);
-
-  const publishMotionDuration = useCallback((duration: number) => {
-    if (typeof window === "undefined") {
-      setMotionDuration(duration);
-      return;
-    }
-
-    cancelMotionDurationPublish();
-
-    motionDurationFrameRef.current = window.requestAnimationFrame(() => {
-      motionDurationFrameRef.current = null;
-      motionDurationTimeoutRef.current = window.setTimeout(() => {
-        motionDurationTimeoutRef.current = null;
-        setMotionDuration((current) => (current === duration ? current : duration));
-      }, 0);
-    });
-  }, [cancelMotionDurationPublish]);
-
-  useEffect(
-    () => cancelMotionDurationPublish,
-    [cancelMotionDurationPublish],
-  );
-
-  const handleMotionSettled = useCallback(
-    (settledPosition: number) =>
-      dispatch({ type: "MOTION_SETTLED", settledPosition }),
-    [dispatch],
-  );
-
-  useMotionRunner({
+  // --- motion execution: accepted state -> controller -----------------------
+  const { motionDuration } = useCarouselMotionExecution({
     state,
     config,
     controller,
+    dispatch,
     isInstantMode,
     isDragging: status.isDragging,
     enabled: layout.canSlide,
-    onSettle: handleMotionSettled,
-    onDurationChange: publishMotionDuration,
   });
 
   // --- navigation -----------------------------------------------------------
   const navigation = useCarouselNavigation({
     enabled: layout.canSlide,
-    dispatch,
-    readCurrentPosition,
+    commands,
     onSlideClick,
   });
 
@@ -224,7 +189,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     enabled: layout.canSlide,
     viewportRef,
     layout,
-    dispatch,
+    commands,
     readCurrentPosition,
     applyTrackPosition,
     getSlotSize,

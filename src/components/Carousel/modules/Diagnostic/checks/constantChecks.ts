@@ -9,8 +9,6 @@ import {
   IMAGE_RETRY_BASE_DELAY_MS,
   IMAGE_RETRY_MAX_ATTEMPTS,
   IMAGE_RETRY_MAX_DELAY_MS,
-  IMAGE_WARMUP_RETENTION_MODE,
-  IMAGE_WARMUP_RETENTION_MODES,
   JUMP_BEZIER,
   MOTION_EPSILON,
   MOVE_BEZIER,
@@ -397,25 +395,6 @@ const collectRetryDelayRelation = (): CarouselDiagnosticWarning | null => {
   };
 };
 
-const collectWarmupRetentionWarning = (): CarouselDiagnosticWarning | null => {
-  if (
-    (IMAGE_WARMUP_RETENTION_MODES as readonly string[]).includes(
-      IMAGE_WARMUP_RETENTION_MODE,
-    )
-  ) {
-    return null;
-  }
-  return {
-    severity: "LOGICAL",
-    layer: "Slides",
-    field: "IMAGE_WARMUP_RETENTION_MODE",
-    actual: IMAGE_WARMUP_RETENTION_MODE,
-    expected: `Expected one of: ${IMAGE_WARMUP_RETENTION_MODES.join(", ")}`,
-    consequence:
-      "Warm-up retention policy becomes undefined and heavyweight image handles may be retained or released unexpectedly",
-  };
-};
-
 /**
  * Audit every hand-written carousel constant used at runtime. The constants
  * are imported by value so the checks always see what the runtime sees.
@@ -430,8 +409,6 @@ export const collectConstantWarnings = (): CarouselDiagnosticWarning[] => {
   if (sumRelation) out.push(sumRelation);
   const retryDelayRelation = collectRetryDelayRelation();
   if (retryDelayRelation) out.push(retryDelayRelation);
-  const warmupRetentionWarning = collectWarmupRetentionWarning();
-  if (warmupRetentionWarning) out.push(warmupRetentionWarning);
   out.push(...collectPreloadWindowWarnings());
   out.push(...collectBezierWarnings());
   return out;

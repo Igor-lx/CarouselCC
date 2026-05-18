@@ -2,7 +2,6 @@ import {
   IMAGE_RETRY_BASE_DELAY_MS,
   IMAGE_RETRY_MAX_ATTEMPTS,
   IMAGE_RETRY_MAX_DELAY_MS,
-  IMAGE_WARMUP_RETENTION_MODE,
 } from "../../config";
 import type {
   ImagePreparationWindow,
@@ -21,7 +20,6 @@ const PRELOAD_FETCH_PRIORITY = "low" as const;
 const IDLE_DECODE_MIN_BUDGET_MS = 8;
 const IDLE_DECODE_FALLBACK_DELAY_MS = 160;
 const IDLE_DECODE_FALLBACK_BATCH_SIZE = 1;
-const DECODE_QUEUE_COMPACT_HEAD_LIMIT = 32;
 
 /**
  * Shared snapshot for an untracked URL. A URL the store has never seen is
@@ -91,11 +89,10 @@ interface PreparationSession {
 export function createImageResourceStore(): ImageResourceStore {
   const entries = new Map<string, ImageEntry>();
   const listeners = new Map<string, Set<() => void>>();
+  /** Pending idle-decode work - bounded by one preparation window. */
   const decodeQueue: string[] = [];
-  const queuedDecodeUrls = new Set<string>();
   const canUseDom = typeof window !== "undefined";
 
-  let decodeQueueHead = 0;
   let idleHandle: number | null = null;
   let idleTimer: number | null = null;
   let nextPreparationSessionId = 0;
@@ -197,8 +194,6 @@ export function createImageResourceStore(): ImageResourceStore {
 
   const clearDecodeQueue = (): void => {
     decodeQueue.length = 0;
-    queuedDecodeUrls.clear();
-    decodeQueueHead = 0;
   };
 
   const cancelScheduledDecode = (): void => {
@@ -209,10 +204,9 @@ export function createImageResourceStore(): ImageResourceStore {
     idleTimer = null;
   };
 
-  const applyWarmupRetention = (
+  const releaseWarmupsOutsideWindow = (
     allowedWindow: ReadonlySet<string> | null,
   ): void => {
-    if (IMAGE_WARMUP_RETENTION_MODE === "deck") return;
     entries.forEach((entry, url) => {
       if (allowedWindow?.has(url)) return;
       if (entry.warmup.status !== "ready") return;
@@ -239,7 +233,7 @@ export function createImageResourceStore(): ImageResourceStore {
       });
     }
 
-    applyWarmupRetention(retainedWindow);
+    releaseWarmupsOutsideWindow(retainedWindow);
   };
 
   // --- idle decode --------------------------------------------------------
@@ -247,38 +241,6 @@ export function createImageResourceStore(): ImageResourceStore {
   // the critical path: when the matching slide later mounts its `<img>`, the
   // browser's decoded-image cache is already warm. We do it on idle time so it
   // never contends with an in-flight motion segment.
-
-  const hasQueuedDecode = (): boolean => queuedDecodeUrls.size > 0;
-
-  const resetDecodeQueueIfEmpty = (): void => {
-    if (queuedDecodeUrls.size > 0) return;
-    decodeQueue.length = 0;
-    decodeQueueHead = 0;
-  };
-
-  const compactDecodeQueue = (): void => {
-    if (
-      decodeQueueHead < DECODE_QUEUE_COMPACT_HEAD_LIMIT ||
-      decodeQueueHead * 2 < decodeQueue.length
-    ) {
-      return;
-    }
-    decodeQueue.splice(0, decodeQueueHead);
-    decodeQueueHead = 0;
-  };
-
-  const dequeueDecode = (): string | null => {
-    while (decodeQueueHead < decodeQueue.length) {
-      const url = decodeQueue[decodeQueueHead++]!;
-      if (!queuedDecodeUrls.delete(url)) continue;
-      compactDecodeQueue();
-      resetDecodeQueueIfEmpty();
-      return url;
-    }
-    compactDecodeQueue();
-    resetDecodeQueueIfEmpty();
-    return null;
-  };
 
   const decodeOne = (url: string, sessionId: number): void => {
     if (!isActiveSession(sessionId, url)) return;
@@ -306,19 +268,17 @@ export function createImageResourceStore(): ImageResourceStore {
     idleHandle = null;
     idleTimer = null;
     if (!isActiveSession(sessionId)) return;
-    while (hasBudget()) {
-      const url = dequeueDecode();
-      if (url === null) break;
-      decodeOne(url, sessionId);
+    while (decodeQueue.length > 0 && hasBudget()) {
+      decodeOne(decodeQueue.shift()!, sessionId);
     }
-    if (hasQueuedDecode()) pumpDecodeQueue();
+    if (decodeQueue.length > 0) pumpDecodeQueue();
   };
 
   function pumpDecodeQueue(): void {
     const session = activePreparationSession;
     if (!canUseDom || disposed || session === null) return;
     if (idleHandle !== null || idleTimer !== null) return;
-    if (!hasQueuedDecode()) return;
+    if (decodeQueue.length === 0) return;
 
     if (typeof window.requestIdleCallback === "function") {
       idleHandle = window.requestIdleCallback((deadline) => {
@@ -347,8 +307,7 @@ export function createImageResourceStore(): ImageResourceStore {
     ) {
       return;
     }
-    if (queuedDecodeUrls.has(url)) return;
-    queuedDecodeUrls.add(url);
+    if (decodeQueue.includes(url)) return;
     decodeQueue.push(url);
     pumpDecodeQueue();
   };
@@ -472,7 +431,7 @@ export function createImageResourceStore(): ImageResourceStore {
       urls: nextUrls,
     };
     activePreparationSession = session;
-    applyWarmupRetention(session.urls);
+    releaseWarmupsOutsideWindow(session.urls);
     session.urls.forEach((url) => prepareIfEligible(url, session.id));
     pumpDecodeQueue();
   };
@@ -579,9 +538,9 @@ export function createImageResourceStore(): ImageResourceStore {
         if (entry.visibleOwnerCount > 0) return;
         releaseEntry(entry);
         entries.delete(url);
-        queuedDecodeUrls.delete(url);
+        const queued = decodeQueue.indexOf(url);
+        if (queued !== -1) decodeQueue.splice(queued, 1);
         session?.urls.delete(url);
-        resetDecodeQueueIfEmpty();
       });
     },
 

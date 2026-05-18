@@ -1,12 +1,12 @@
 import { useCallback, useMemo } from "react";
 
+import type { CarouselCommands } from "../commands";
+import type { MoveReason } from "../state";
 import type { Slide } from "../types";
-import type { CarouselDispatch, MoveReason } from "../state";
 
 interface UseCarouselNavigationInput {
   enabled: boolean;
-  dispatch: CarouselDispatch;
-  readCurrentPosition: () => number;
+  commands: Pick<CarouselCommands, "move" | "goTo">;
   onSlideClick?: (slide: Slide) => void;
 }
 
@@ -21,41 +21,23 @@ export interface CarouselNavigation {
 
 export function useCarouselNavigation({
   enabled,
-  dispatch,
-  readCurrentPosition,
+  commands,
   onSlideClick,
 }: UseCarouselNavigationInput): CarouselNavigation {
-  const move = useCallback(
-    (step: number, reason: MoveReason = "unknown") => {
-      if (!enabled) return;
-      dispatch({
-        type: "MOVE",
-        step,
-        moveReason: reason,
-        fromVirtualIndex: readCurrentPosition(),
-      });
-    },
-    [dispatch, enabled, readCurrentPosition],
-  );
-
-  const goTo = useCallback(
-    (pageIndex: number, reason: MoveReason = "unknown") => {
-      if (!enabled) return;
-      dispatch({
-        type: "GO_TO",
-        targetPageIndex: pageIndex,
-        moveReason: reason,
-        fromVirtualIndex: readCurrentPosition(),
-      });
-    },
-    [dispatch, enabled, readCurrentPosition],
-  );
-
-  const handlePrev = useCallback(() => move(-1, "click"), [move]);
-  const handleNext = useCallback(() => move(1, "click"), [move]);
+  const handlePrev = useCallback(() => {
+    if (!enabled) return;
+    commands.move(-1, "click");
+  }, [commands, enabled]);
+  const handleNext = useCallback(() => {
+    if (!enabled) return;
+    commands.move(1, "click");
+  }, [commands, enabled]);
   const handlePageSelect = useCallback(
-    (pageIndex: number) => goTo(pageIndex, "click"),
-    [goTo],
+    (pageIndex: number) => {
+      if (!enabled) return;
+      commands.goTo(pageIndex, "click");
+    },
+    [commands, enabled],
   );
   const handleSlideClick = useCallback(
     (slide: Slide) => onSlideClick?.(slide),
@@ -63,7 +45,21 @@ export function useCarouselNavigation({
   );
 
   return useMemo(
-    () => ({ move, goTo, handlePrev, handleNext, handlePageSelect, handleSlideClick }),
-    [goTo, handleNext, handlePageSelect, handlePrev, handleSlideClick, move],
+    () => ({
+      move: commands.move,
+      goTo: commands.goTo,
+      handlePrev,
+      handleNext,
+      handlePageSelect,
+      handleSlideClick,
+    }),
+    [
+      commands.goTo,
+      commands.move,
+      handleNext,
+      handlePageSelect,
+      handlePrev,
+      handleSlideClick,
+    ],
   );
 }

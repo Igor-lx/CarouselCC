@@ -226,15 +226,25 @@ export function useMotionRunner({
       });
     };
 
+    const startActiveHandoff = (retargetTimestamp: number) => {
+      const retargetVisualSample = controller.getSnapshot();
+      const retargetVelocitySample = controller.read(retargetTimestamp);
+      const retargetStart = buildStartFromVisualHandoff(
+        retargetVisualSample,
+        retargetVelocitySample,
+      );
+      startResolvedMotion(retargetStart, retargetTimestamp);
+    };
+
+    if (isActive && state.isRepeatedClickAdvance) {
+      cancelDeferredRetarget();
+      startActiveHandoff(startedNow);
+      return;
+    }
+
     if (isActive) {
       scheduleDeferredRetarget((retargetTimestamp) => {
-        const retargetVisualSample = controller.getSnapshot();
-        const retargetVelocitySample = controller.read(retargetTimestamp);
-        const retargetStart = buildStartFromVisualHandoff(
-          retargetVisualSample,
-          retargetVelocitySample,
-        );
-        startResolvedMotion(retargetStart, retargetTimestamp);
+        startActiveHandoff(retargetTimestamp);
       });
       return;
     }

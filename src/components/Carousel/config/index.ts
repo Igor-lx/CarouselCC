@@ -26,13 +26,10 @@ export {
 export {
   PRELOAD_PAGE_LOOKAHEAD_BY_VISIBLE,
   PRELOAD_PAGE_LOOKAHEAD_DEFAULT,
-  IMAGE_WARMUP_RETENTION_MODES,
-  IMAGE_WARMUP_RETENTION_MODE,
   IMAGE_RETRY_BASE_DELAY_MS,
   IMAGE_RETRY_MAX_DELAY_MS,
   IMAGE_RETRY_MAX_ATTEMPTS,
 } from "./slides";
-export type { ImageWarmupRetentionMode } from "./slides";
 export { buildRawCarouselConfig } from "./buildRawConfig";
 export { useCarouselConfig } from "./useCarouselConfig";
 export type {
