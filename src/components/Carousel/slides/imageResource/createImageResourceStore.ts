@@ -53,9 +53,10 @@ interface ImageEntry {
  * a plain observable map of `url -> ImageEntry`. `useImageResource` adapts it
  * to React with `useSyncExternalStore`.
  *
- * Ownership rules that keep "image health" single-sourced:
+ * Ownership rules that keep image renderability single-sourced:
  *  - exactly one entry per URL;
  *  - `preload` opens an offscreen fetch only for URLs nothing else tracks;
+ *  - speculative warm-up failures never become visible errors by themselves;
  *  - a rendered slide reports its real `<img>` outcome via `reportLoaded` /
  *    `reportError`, which is authoritative (it is what the user actually sees);
  *  - retry is owned here — one timer per URL, exponential backoff, capped.
@@ -68,6 +69,7 @@ export function createImageResourceStore(): ImageResourceStore {
 
   let idleHandle: number | null = null;
   let idleTimer: number | null = null;
+  let decodeEnabled = false;
   let disposed = false;
 
   const notify = (url: string): void => {
@@ -114,7 +116,7 @@ export function createImageResourceStore(): ImageResourceStore {
     if (element) {
       element.onload = null;
       element.onerror = null;
-      element.src = "";
+      element.removeAttribute("src");
       entry.preloadElement = null;
     }
   };
@@ -125,9 +127,18 @@ export function createImageResourceStore(): ImageResourceStore {
     commit(entry, url, "loaded", false);
   };
 
-  const handleError = (entry: ImageEntry, url: string): void => {
+  const handleVisibleError = (entry: ImageEntry, url: string): void => {
     entry.failureCount += 1;
     commit(entry, url, "error", false);
+  };
+
+  const handleWarmupError = (entry: ImageEntry, url: string): void => {
+    const element = entry.preloadElement;
+    if (!element) return;
+    element.onload = null;
+    element.onerror = null;
+    entry.preloadElement = null;
+    if (!listeners.get(url)?.size) entries.delete(url);
   };
 
   // --- idle decode --------------------------------------------------------
@@ -148,9 +159,18 @@ export function createImageResourceStore(): ImageResourceStore {
     }
   };
 
+  const cancelScheduledDecode = (): void => {
+    if (!canUseDom) return;
+    if (idleHandle !== null) window.cancelIdleCallback?.(idleHandle);
+    if (idleTimer !== null) window.clearTimeout(idleTimer);
+    idleHandle = null;
+    idleTimer = null;
+  };
+
   const drainDecodeQueue = (hasBudget: () => boolean): void => {
     idleHandle = null;
     idleTimer = null;
+    if (!decodeEnabled) return;
     while (decodeQueue.length > 0 && hasBudget()) {
       decodeOne(decodeQueue.shift()!);
     }
@@ -158,7 +178,7 @@ export function createImageResourceStore(): ImageResourceStore {
   };
 
   function pumpDecodeQueue(): void {
-    if (!canUseDom || disposed) return;
+    if (!canUseDom || disposed || !decodeEnabled) return;
     if (idleHandle !== null || idleTimer !== null) return;
     if (decodeQueue.length === 0) return;
 
@@ -199,7 +219,7 @@ export function createImageResourceStore(): ImageResourceStore {
     };
     element.onerror = () => {
       if (disposed) return;
-      handleError(entry, url);
+      handleWarmupError(entry, url);
     };
 
     element.src = url;
@@ -229,6 +249,10 @@ export function createImageResourceStore(): ImageResourceStore {
       return entries.get(url)?.snapshot ?? LOADING_SNAPSHOT;
     },
 
+    observe(url) {
+      observeEntry(url);
+    },
+
     subscribe(url, listener) {
       let set = listeners.get(url);
       if (!set) {
@@ -256,12 +280,21 @@ export function createImageResourceStore(): ImageResourceStore {
       }
     },
 
+    setDecodeEnabled(enabled) {
+      decodeEnabled = enabled;
+      if (!enabled) {
+        cancelScheduledDecode();
+        return;
+      }
+      pumpDecodeQueue();
+    },
+
     reportLoaded(url) {
       handleLoaded(observeEntry(url), url);
     },
 
     reportError(url) {
-      handleError(observeEntry(url), url);
+      handleVisibleError(observeEntry(url), url);
     },
 
     requestRetry(url) {
@@ -301,12 +334,7 @@ export function createImageResourceStore(): ImageResourceStore {
 
     dispose() {
       disposed = true;
-      if (canUseDom) {
-        if (idleHandle !== null) window.cancelIdleCallback?.(idleHandle);
-        if (idleTimer !== null) window.clearTimeout(idleTimer);
-      }
-      idleHandle = null;
-      idleTimer = null;
+      cancelScheduledDecode();
       entries.forEach(releaseEntry);
       entries.clear();
       listeners.clear();

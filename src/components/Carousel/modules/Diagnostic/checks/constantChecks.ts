@@ -6,9 +6,14 @@ import {
   CAROUSEL_SWIPE_CONFIG,
   DRAG_RELEASE_EPSILON,
   HOVER_PAUSE_DELAY,
+  IMAGE_RETRY_BASE_DELAY_MS,
+  IMAGE_RETRY_MAX_ATTEMPTS,
+  IMAGE_RETRY_MAX_DELAY_MS,
   JUMP_BEZIER,
   MOTION_EPSILON,
   MOVE_BEZIER,
+  PRELOAD_PAGE_LOOKAHEAD_BY_VISIBLE,
+  PRELOAD_PAGE_LOOKAHEAD_DEFAULT,
   REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
   REPEATED_CLICK_DECELERATION_DISTANCE_SHARE,
   REPEATED_CLICK_SPEED_MULTIPLIER,
@@ -51,6 +56,8 @@ const inRangeExclusiveUpper = (min: number, max: number) => (v: number) =>
   v >= min && v < max;
 const greaterThan = (min: number) => (v: number) => v > min;
 const atLeast = (min: number) => (v: number) => v >= min;
+const isNonNegativeInteger = (v: number) => v >= 0 && Number.isInteger(v);
+const isPositiveInteger = (v: number) => v > 0 && Number.isInteger(v);
 
 const numericRules: NumericRule[] = [
   // Motion timings / factors
@@ -120,6 +127,42 @@ const numericRules: NumericRule[] = [
     expected: "Expected a non-negative finite integer",
     consequence: "Render window buffer collapses or oversizes, increasing churn or blank slides",
     predicate: atLeast(0),
+  },
+  {
+    layer: "Slides",
+    field: "PRELOAD_PAGE_LOOKAHEAD_DEFAULT",
+    value: PRELOAD_PAGE_LOOKAHEAD_DEFAULT,
+    severity: "LOGICAL",
+    expected: "Expected a non-negative finite integer",
+    consequence: "The idle preload window becomes malformed for unsupported visible-slide counts",
+    predicate: isNonNegativeInteger,
+  },
+  {
+    layer: "Slides",
+    field: "IMAGE_RETRY_BASE_DELAY_MS",
+    value: IMAGE_RETRY_BASE_DELAY_MS,
+    severity: "LOGICAL",
+    expected: "Expected a positive finite number of milliseconds",
+    consequence: "Retry backoff starts from an invalid delay",
+    predicate: greaterThan(0),
+  },
+  {
+    layer: "Slides",
+    field: "IMAGE_RETRY_MAX_DELAY_MS",
+    value: IMAGE_RETRY_MAX_DELAY_MS,
+    severity: "LOGICAL",
+    expected: "Expected a positive finite number of milliseconds",
+    consequence: "Retry backoff clamps to an invalid delay",
+    predicate: greaterThan(0),
+  },
+  {
+    layer: "Slides",
+    field: "IMAGE_RETRY_MAX_ATTEMPTS",
+    value: IMAGE_RETRY_MAX_ATTEMPTS,
+    severity: "LOGICAL",
+    expected: "Expected a positive finite integer",
+    consequence: "Image retry cap becomes incoherent",
+    predicate: isPositiveInteger,
   },
 
   // Interaction
@@ -319,6 +362,39 @@ const collectRepeatedShareRelation = (): CarouselDiagnosticWarning | null => {
   };
 };
 
+const collectPreloadWindowWarnings = (): CarouselDiagnosticWarning[] => {
+  const out: CarouselDiagnosticWarning[] = [];
+  for (const [visibleSlidesCount, lookahead] of Object.entries(
+    PRELOAD_PAGE_LOOKAHEAD_BY_VISIBLE,
+  )) {
+    if (isFiniteNumber(lookahead) && isNonNegativeInteger(lookahead)) continue;
+    out.push({
+      severity: "LOGICAL",
+      layer: "Slides",
+      field: `PRELOAD_PAGE_LOOKAHEAD_BY_VISIBLE[${visibleSlidesCount}]`,
+      actual: lookahead,
+      expected: "Expected a non-negative finite integer",
+      consequence: "The idle preload window becomes malformed for this visible-slide count",
+    });
+  }
+  return out;
+};
+
+const collectRetryDelayRelation = (): CarouselDiagnosticWarning | null => {
+  if (IMAGE_RETRY_MAX_DELAY_MS >= IMAGE_RETRY_BASE_DELAY_MS) return null;
+  return {
+    severity: "LOGICAL",
+    layer: "Slides",
+    field: "IMAGE_RETRY_MAX_DELAY_MS >= IMAGE_RETRY_BASE_DELAY_MS",
+    actual: {
+      baseDelayMs: IMAGE_RETRY_BASE_DELAY_MS,
+      maxDelayMs: IMAGE_RETRY_MAX_DELAY_MS,
+    },
+    expected: "Expected max retry delay to be greater than or equal to the base delay",
+    consequence: "Exponential backoff clamps below its own starting delay",
+  };
+};
+
 /**
  * Audit every hand-written carousel constant used at runtime. The constants
  * are imported by value so the checks always see what the runtime sees.
@@ -331,6 +407,9 @@ export const collectConstantWarnings = (): CarouselDiagnosticWarning[] => {
   }
   const sumRelation = collectRepeatedShareRelation();
   if (sumRelation) out.push(sumRelation);
+  const retryDelayRelation = collectRetryDelayRelation();
+  if (retryDelayRelation) out.push(retryDelayRelation);
+  out.push(...collectPreloadWindowWarnings());
   out.push(...collectBezierWarnings());
   return out;
 };

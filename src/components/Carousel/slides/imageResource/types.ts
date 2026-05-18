@@ -5,10 +5,11 @@
  * warm-up `Image()` (preload) and the on-screen `<img>` of a rendered slide.
  * Without a shared owner those would each hold their own opinion of "is this
  * image healthy", and a third probe would be needed to retry. This module
- * makes the *image resource* a first-class single source of truth: one entry
- * per URL, one status, one retry policy. Preload writes into it, the slide
- * subscribes to it, and "has this image failed" is a derived read — never a
- * second piece of state.
+ * makes the *renderable image resource* a first-class single source of truth:
+ * one entry per URL, one render status, one retry policy. Warm-up success may
+ * promote a resource to `loaded`; warm-up failure is deliberately
+ * non-authoritative, so "has this image failed" remains a derived read of a
+ * real rendered `<img>` outcome, never a second piece of state.
  */
 
 /** Lifecycle of one image URL as the carousel observes it. */
@@ -40,15 +41,27 @@ export interface ImageResourceStore {
    * `<img>` and reports the real outcome back.
    */
   getSnapshot(url: string): ImageResourceSnapshot;
+  /**
+   * Register that a rendered slide is now loading this URL. The registration
+   * happens before idle preload work so the store never opens an offscreen
+   * fetch for an image already owned by the DOM.
+   */
+  observe(url: string): void;
   /** Per-URL subscription for `useSyncExternalStore`. Returns an unsubscribe. */
   subscribe(url: string, listener: () => void): () => void;
   /**
    * Warm a set of URLs: for any URL not already tracked, start an offscreen
-   * low-priority fetch + idle decode. URLs already tracked (by an earlier
+   * low-priority fetch + queued decode. URLs already tracked (by an earlier
    * warm-up or by a rendered slide) are skipped, so the store never opens a
    * redundant connection for an image a slide is already loading.
    */
   preload(urls: readonly string[]): void;
+  /**
+   * Gate queued decode work. Fetch initiation is owned by the caller; decode
+   * draining is owned here so a queue started in idle cannot keep consuming
+   * main-thread work after motion resumes.
+   */
+  setDecodeEnabled(enabled: boolean): void;
   /** Record the outcome of a real, on-screen `<img>`. */
   reportLoaded(url: string): void;
   reportError(url: string): void;

@@ -91,7 +91,7 @@ visible.
 | ----------------- | ------- | ------ |
 | `durationAutoplay` | `3000` | Duration of an autoplay-driven page step. |
 | `intervalAutoplay` | `3000` | Idle interval between two autoplay steps. |
-| `durationStep`    | `2000`  | Base duration of one click / gesture-driven step. Repeated-click fast segment duration is `durationStep ÷ REPEATED_CLICK_SPEED_MULTIPLIER`. Multi-page click distances scale linearly. |
+| `durationStep`    | `2000`  | Base duration of duration-authored click / gesture-driven steps. Repeated-click profile segments instead derive duration from their speed profile. Multi-page click distances scale linearly. |
 | `durationJump`    | `800`   | Duration of `GO_TO` jumps (e.g. pagination click to a far page, autoplay loop-back). Also used as the fallback duration when reduced-motion mode requires a hard jump. |
 
 #### Module gates
@@ -204,10 +204,12 @@ These are the user-facing behaviours the implementation guarantees.
   page-steps via a lookahead schedule (`config/slides`) that shrinks as the
   visible band widens, keeping the absolute warmed buffer bounded. It starts
   on initial idle mount and resumes after later movements only while the
-  carousel is idle. Warm-up fetches are low priority and decode on idle
-  browser time. The result lands in the image-resource SSOT, so a slide
-  entering the render window observes an already-`loaded` resource. It never
-  changes navigation, layout, motion state, or slide rendering semantics.
+  carousel is idle. Warm-up fetches are low priority and decode only while
+  the carousel remains idle. A successful warm-up lands in the
+  image-resource SSOT, so a slide entering the render window can observe an
+  already-`loaded` resource; a speculative warm-up failure does not become a
+  visible slide error. It never changes navigation, layout, motion state, or
+  slide rendering semantics.
 - **Image errors and retry.** A slide whose image fails to load renders a
   text placeholder (`alt`, or `errAltPlaceholder`) and is not interactive.
   While such a slide sits in the active band, the image-resource store
@@ -306,12 +308,12 @@ Every responsibility has exactly one owner. The orchestrator
 | Resolved runtime config | `useCarouselConfig` | One memo. Substitutes defaults only for `undefined` props; never normalises explicit values. |
 | Slide records | `useCarouselSlideDeck` | Builds slide records, optionally extends to fill perfect pages. |
 | Layout facts | `useCarouselSlideDeck` | `length`, `visibleSlidesCount`, `pageCount`, `virtualLength`, `canSlide`, `isFinite`, `dataKey`. |
-| Logical state | `useCarouselState` | Reducer-backed. Owns `activePageIndex`, `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`, `gesture`, `isRepeatedClickAdvance`, `moveReason`. |
+| Logical state | `useCarouselState` | Reducer-backed. Owns `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`, `gesture`, `isRepeatedClickAdvance`, `moveReason`. |
 | Visual sampled position | `useVisualPosition` | Wraps a single `MotionController`. Sole SSOT for the visible track offset. |
 | Motion execution | `useMotionRunner` | Reads logical state, builds a segment, calls into the controller. |
 | Track DOM | `useTrackBinding` | Measures slot size and subscribes to visual position; writes `transform`. |
 | Render window | `useSlideRenderModel` | Memoised; expands during motion, snaps on idle. |
-| Image resources | image-resource store (`createImageResourceStore`) | Per-URL load/error/decode state, retry policy, and offscreen warm-up. One instance per carousel; the single authority on image health. |
+| Image resources | image-resource store (`createImageResourceStore`) | Per-URL render status, retry policy, decode queue, and offscreen warm-up. One instance per carousel; the single authority on image renderability. |
 | Image preparation | `useSlideImagePreload` | React adapter that derives the deck + idle-window URL sets and drives the image-resource store. Holds no image logic of its own. |
 | Slide image binding | `useImageResource` | Subscribes one `SlideItem` to its URL in the image-resource store via `useSyncExternalStore`. |
 | Gesture lifecycle | `useCarouselGesture` | Wraps the shared `usePointerSwipe`. Converts pointer events into dispatches and direct position writes. |
@@ -331,8 +333,8 @@ context provider.
 
 The system has five SSOTs, each owned by exactly one layer.
 
-1. **Logical state** — `useCarouselState`. Holds `activePageIndex`,
-   `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`,
+1. **Logical state** — `useCarouselState`. Holds `targetPageIndex`,
+   `fromVirtualIndex`, `virtualIndex`, `motionPhase`,
    `gesture` (the velocity payload of the latest END_DRAG), and
    `isRepeatedClickAdvance`. No timing. Reducer-pure: every transition is
    a pure function of `(state, command, context)`.
@@ -350,14 +352,15 @@ The system has five SSOTs, each owned by exactly one layer.
 5. **Image resources** — the image-resource store
    (`createImageResourceStore`, one instance per carousel, created only when
    `isContentImg` is on). Holds one entry
-   per image URL: `status` (`loading | loaded | error`), a retry
-   `generation`, and the offscreen warm-up element. It is the single
-   authority on "is this image healthy". `useSlideImagePreload` is its only
-   writer of warm-up intent; each `SlideItem` subscribes to its own URL via
-   `useImageResource` and reports the real `<img>` outcome back. "Has this
-   slide's image failed" is a *derived read* of this SSOT, never a second
-   copy of state. Observation-only: it never feeds navigation, layout, or
-   motion.
+    per image URL: render `status` (`loading | loaded | error`), a retry
+    `generation`, and the offscreen warm-up element. It is the single
+    authority on "is this image renderable". `useSlideImagePreload` is its
+    only writer of warm-up intent; each `SlideItem` registers/subscribes to
+    its own URL via `useImageResource` and reports the real `<img>` outcome
+    back. Warm-up success may publish `loaded`; warm-up failure remains
+    speculative and does not publish `error`. "Has this slide's image failed"
+    is a *derived read* of this SSOT, never a second copy of state.
+    Observation-only: it never feeds navigation, layout, or motion.
 
 No layer mirrors another layer's value. The state machine never reads a
 sampled motion value: the gesture controller reads the visual position and
@@ -397,8 +400,9 @@ A `Segment` is one of:
   click step / non-inertial gesture release (`MOVE_BEZIER`), and
   snap-back (`SNAP_BACK_BEZIER`).
 - **Profile segment** - a smoothstep-driven acceleration / cruise /
-  deceleration profile with a per-zone speed solve. If acceleration and
-  deceleration shares sum above `1`, runtime normalizes the profile to
+  deceleration profile. These segments are speed-authored: start / peak /
+  end speeds plus zone distances derive the segment duration. If acceleration
+  and deceleration shares sum above `1`, runtime normalizes the profile to
   `0.5 / 0.5` with no cruise zone. Used for:
   - **repeated-click fast advance** - one segment directly to the next page
     boundary, peak speed `REPEATED_CLICK_SPEED_MULTIPLIER x normalMoveSpeed`;
@@ -519,7 +523,7 @@ The `CarouselModuleContext` exposes a partitioned value:
   status: { isIdle, isMoving, isJumping, isDragging, isInteracting, motionPhase },
   layout: { pageCount, canSlide, isAtStart, isAtEnd, isTouch,
             isReducedMotion, isDiagnosticActive },
-  intent: { activePageIndex, targetPageIndex, moveReason,
+  intent: { targetPageIndex, moveReason,
             motionDuration, autoplayPaginationFactor },
   navigation: { handlePrev, handleNext, handlePageSelect },
   visualPosition: VisualPositionSource | null,  // null when reduced motion
@@ -544,7 +548,7 @@ modules with their own checks (`PaginationWidget` via
 ### 8.1 `<Pagination />`
 
 Desktop dot pagination. One `PaginationDot` per page. Reads
-`intent.activePageIndex`, `intent.motionDuration`,
+`intent.targetPageIndex`, `intent.motionDuration`,
 `intent.autoplayPaginationFactor`, and `layout.pageCount` from the
 context. During autoplay, dot switching is delayed by
 `motionDuration · autoplayPaginationFactor` via `usePaginationSync`. On
@@ -625,7 +629,7 @@ src/components/Carousel/
 │   ├── bezier.ts                  cubic-bezier sampler + cache + carousel curves
 │   ├── profile.ts                 smoothstep profile (accel/cruise/decel)
 │   ├── speed.ts                   averageSpeed, sameDirectionSpeed, signedVelocity
-│   ├── duration.ts                duration math per intent
+│   ├── duration.ts                bezier-segment duration math
 │   ├── segmentFactory.ts          builds the Segment for the next motion step
 │   ├── sampler.ts                 segment → MotionSampleData at timestamp
 │   └── useMotionRunner.ts         state → segment → controller

@@ -261,7 +261,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   useFocusRecovery({
     containerRef: viewportRef,
     isIdle: status.isIdle,
-    activePageIndex: state.targetPageIndex,
+    targetPageIndex: state.targetPageIndex,
   });
 
   // --- module render policy & values ---------------------------------------

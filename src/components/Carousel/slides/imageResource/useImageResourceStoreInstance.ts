@@ -9,9 +9,10 @@ import type { ImageResourceStore } from "./types";
  * The store is created lazily and *only when `enabled`* — i.e. only when the
  * carousel renders image content (`isContentImg`). While `enabled` is false
  * nothing is allocated and `null` is returned: no store, no maps, no timers,
- * no fetches, no decodes. Once created the store is kept (a later
- * `isContentImg` toggle does not churn it) and disposed on unmount, which
- * releases every offscreen image, retry timer, and idle callback.
+ * no fetches, no decodes. Once created the store is kept even if a later
+ * render turns `enabled` back off, avoiding lifecycle churn; the retained
+ * store is disposed on unmount, which releases every offscreen image, retry
+ * timer, and idle callback.
  */
 export function useImageResourceStoreInstance(
   enabled: boolean,

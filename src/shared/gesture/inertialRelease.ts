@@ -15,7 +15,6 @@ export const DEFAULT_INERTIAL_RELEASE_CONFIG: InertialReleaseConfig = {
 
 export interface InertialReleaseResult {
   effectiveReleaseSpeed: number;
-  duration: number;
   isInertialRelease: boolean;
 }
 
@@ -33,7 +32,7 @@ interface ResolveReleaseInput {
 }
 
 /**
- * Resolve the speed/duration of an inertial release. Inputs are trusted —
+ * Resolve the speed intent of an inertial release. Inputs are trusted —
  * the caller is responsible for finite, in-range values. The function performs
  * algorithmic math only.
  */
@@ -52,17 +51,8 @@ export function resolveInertialRelease({
     : minimumSpeed > 0
       ? Math.max(boostedReleaseSpeed, minimumSpeed)
       : boostedReleaseSpeed;
-  const decelerationShare = fasterThanBase ? config.decelerationDistanceShare : 0;
-
-  let duration = baseDuration;
-  const absDistance = Math.abs(distanceToTarget);
-  if (absDistance > 0 && effectiveReleaseSpeed > 0) {
-    duration = (absDistance / effectiveReleaseSpeed) * (1 + decelerationShare);
-  }
-
   return {
     effectiveReleaseSpeed,
-    duration,
     isInertialRelease: fasterThanBase,
   };
 }

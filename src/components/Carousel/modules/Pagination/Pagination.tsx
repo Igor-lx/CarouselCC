@@ -25,7 +25,7 @@ const PaginationBase = memo(function Pagination({ className }: PaginationProps) 
     intent.moveReason !== "autoplay" || status.isJumping || layout.isReducedMotion;
 
   const displayedPageIndex = usePaginationSync({
-    targetPageIndex: intent.activePageIndex,
+    targetPageIndex: intent.targetPageIndex,
     shouldSyncInstantly,
     motionDuration: intent.motionDuration,
     autoplayPaginationFactor: intent.autoplayPaginationFactor,

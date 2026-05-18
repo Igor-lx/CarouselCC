@@ -1,25 +1,5 @@
-/**
- * Image-preload tuning for the slide layer.
- *
- * The carousel scrolls in *pages*: one step moves it by `visibleSlidesCount`
- * slides. Preload warms whole page-steps on each side of the visible band —
- * `lookahead` page-steps, i.e. `visibleSlidesCount * lookahead` images per
- * side.
- *
- * Lookahead is keyed by `visibleSlidesCount` so the *absolute* warmed buffer
- * stays bounded as the visible band widens: a wide band already fetches many
- * images per step, so deep lookahead would add bandwidth without much gain.
- *
- *   visibleSlidesCount | lookahead | warmed buffer (both sides)
- *   ------------------ | --------- | --------------------------
- *   1                  | 3         | 6 images
- *   2                  | 2         | 8 images
- *   3+                 | 1         | 2 * visibleSlidesCount images
- *
- * `PRELOAD_PAGE_LOOKAHEAD_DEFAULT` applies to any count not in the map.
- * Tune by editing the map — raising an entry trades bandwidth for more
- * burst-click runway, lowering it does the reverse.
- */
+// Image-preload tuning for the slide layer.
+
 export const PRELOAD_PAGE_LOOKAHEAD_BY_VISIBLE: Readonly<
   Record<number, number>
 > = {

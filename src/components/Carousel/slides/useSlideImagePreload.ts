@@ -149,6 +149,11 @@ export function useSlideImagePreload({
     store.prune(deckUrls);
   }, [store, deckUrls]);
 
+  useEffect(() => {
+    if (!store) return;
+    store.setDecodeEnabled(isContentImg && isIdle);
+  }, [store, isContentImg, isIdle]);
+
   // Warm the idle viewport neighbourhood. `preloadUrls` is the stable empty
   // list while moving or when image content is off, so this effect does no
   // work during motion and none at all without a store.

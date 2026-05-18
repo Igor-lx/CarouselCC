@@ -23,7 +23,6 @@ export const ZERO_GESTURE_RELEASE: GestureRelease = {
 
 export interface CarouselState {
   layout: CarouselLayout;
-  activePageIndex: number;
   targetPageIndex: number;
   fromVirtualIndex: number;
   virtualIndex: number;

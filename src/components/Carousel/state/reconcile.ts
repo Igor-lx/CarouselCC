@@ -38,11 +38,6 @@ export const reconcileStateToLayout = (
 
   if (hardReset) return buildInitialState(nextLayout);
 
-  const activePageIndex = reconciledPageIndex(
-    state.activePageIndex,
-    currentLayout,
-    nextLayout,
-  );
   const targetPageIndex = reconciledPageIndex(
     state.targetPageIndex,
     currentLayout,
@@ -53,7 +48,6 @@ export const reconcileStateToLayout = (
   return {
     ...state,
     layout: nextLayout,
-    activePageIndex,
     targetPageIndex,
     fromVirtualIndex: virtualIndex,
     virtualIndex,
