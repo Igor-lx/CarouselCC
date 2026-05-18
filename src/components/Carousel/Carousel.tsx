@@ -23,7 +23,12 @@ import { useMotionRunner } from "./motion";
 import { useCarouselNavigation } from "./navigation";
 import { useVisualPosition } from "./position";
 import { useModuleRenderPolicy } from "./render-policy/useModuleRenderPolicy";
-import { SlideItem, useCarouselSlideDeck, useSlideRenderModel } from "./slides";
+import {
+  SlideItem,
+  useCarouselSlideDeck,
+  useSlideImagePreload,
+  useSlideRenderModel,
+} from "./slides";
 import { CAROUSEL_SLOTS } from "./slots";
 import { motionStatus, useCarouselState } from "./state";
 import {
@@ -91,6 +96,14 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     isInstantMode,
   });
   const lastReportedMotionIdleRef = useRef<boolean | null>(null);
+
+  useSlideImagePreload({
+    records,
+    layout,
+    currentVirtualIndex: state.virtualIndex,
+    isIdle: status.isIdle,
+    isContentImg,
+  });
 
   useEffect(() => {
     if (!onMotionIdleStatusChange) return;

@@ -1,21 +1,30 @@
 @layer components {
   .paginationWrapper {
+    --pagination-padding-block-start: 20px;
+    --pagination-padding-inline: 15px;
+    --pagination-row-gap: 10px;
+    --pagination-column-gap: 35px;
+    --pagination-dot-w: 25px;
+    --pagination-dot-h: 6px;
+    --pagination-dot-radius: 2px;
+
     display: flex;
     align-items: center;
     justify-content: center;
     flex-wrap: wrap;
     width: 100%;
     height: auto;
-    padding: 20px 15px 0;
-    gap: 10px 35px;
+    padding: var(--pagination-padding-block-start)
+      var(--pagination-padding-inline) 0;
+    gap: var(--pagination-row-gap) var(--pagination-column-gap);
     pointer-events: none;
   }
 
   .dot {
-    width: 25px;
-    height: 6px;
+    width: var(--pagination-dot-w);
+    height: var(--pagination-dot-h);
     border: none;
-    border-radius: 2px;
+    border-radius: var(--pagination-dot-radius);
     background-color: var(--color);
     opacity: 0.2;
     transition:
@@ -38,20 +47,22 @@
   }
 
   [data-touch="true"] .dot {
-    width: 34px;
-    height: 11px;
-    border-radius: 6px;
+    --pagination-dot-w: 34px;
+    --pagination-dot-h: 11px;
+    --pagination-dot-radius: 6px;
   }
 
   @media (width <= 767px) {
     .paginationWrapper {
-      padding: 12px 10px 0;
-      gap: 8px 18px;
+      --pagination-padding-block-start: 12px;
+      --pagination-padding-inline: 10px;
+      --pagination-row-gap: 8px;
+      --pagination-column-gap: 18px;
     }
 
     [data-touch="true"] .dot {
-      width: 28px;
-      height: 9px;
+      --pagination-dot-w: 28px;
+      --pagination-dot-h: 9px;
     }
   }
 

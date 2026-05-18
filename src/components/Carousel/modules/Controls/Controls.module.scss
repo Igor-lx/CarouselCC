@@ -1,5 +1,10 @@
 @layer components {
   .navZone {
+    --nav-button-w: 45px;
+    --nav-button-h: 45px;
+    --nav-button-radius: 50%;
+    --nav-edge-inset: 0px;
+
     position: absolute;
     top: 0;
     z-index: 10;
@@ -35,10 +40,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 45px;
-    height: 45px;
+    width: var(--nav-button-w);
+    height: var(--nav-button-h);
     border: none;
-    border-radius: 50%;
+    border-radius: var(--nav-button-radius);
     color: rgb(245 245 245 / 80.7%);
     background-color: rgb(0 0 0 / 45%);
     user-select: none;
@@ -51,8 +56,8 @@
 
   [data-touch="true"] .navZone {
     top: 50%;
-    width: 45px;
-    height: 45px;
+    width: var(--nav-button-w);
+    height: var(--nav-button-h);
     background-color: transparent;
     opacity: 1;
     transform: translateY(-50%);
@@ -60,11 +65,11 @@
   }
 
   [data-touch="true"] .navZoneL {
-    left: 10px;
+    left: var(--nav-edge-inset);
   }
 
   [data-touch="true"] .navZoneR {
-    right: 10px;
+    right: var(--nav-edge-inset);
   }
 
   [data-touch="true"] .navButton {
@@ -76,60 +81,29 @@
   }
 
   @media (width <= 1024px) {
-    .navZoneL {
-      left: 4px;
-    }
-
-    .navZoneR {
-      right: 4px;
-    }
-
-    .navButton {
-      width: 70px;
-      height: 200px;
-      border-radius: 8px;
-    }
-
-    [data-touch="true"] .navZone {
-      width: 144px;
-      height: 88px;
-    }
-
-    [data-touch="true"] .navZoneL {
-      left: 8px;
-    }
-
-    [data-touch="true"] .navZoneR {
-      right: 8px;
+    .navZone {
+      --nav-button-w: 48px;
+      --nav-button-h: 96px;
+      --nav-button-radius: 10px;
+      --nav-edge-inset: 8px;
     }
   }
 
   @media (width <= 767px) {
-    [data-touch="true"] .navZone {
-      width: 38px;
-      height: 72px;
-    }
-
-    [data-touch="true"] .navZoneL {
-      left: 6px;
-    }
-
-    [data-touch="true"] .navZoneR {
-      right: 6px;
-    }
-
-    .navButton {
-      width: 38px;
-      height: 72px;
-      border-radius: 8px;
+    .navZone {
+      --nav-button-w: 40px;
+      --nav-button-h: 80px;
+      --nav-button-radius: 8px;
+      --nav-edge-inset: 6px;
     }
   }
 
   @media (orientation: landscape) and (height <= 520px) {
-    [data-touch="true"] .navZone,
-    .navButton {
-      width: 34px;
-      height: 52px;
+    .navZone {
+      --nav-button-w: 36px;
+      --nav-button-h: 56px;
+      --nav-button-radius: 8px;
+      --nav-edge-inset: 6px;
     }
   }
 
