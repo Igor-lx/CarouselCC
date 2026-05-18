@@ -19,7 +19,6 @@ interface UseModuleContextValueInput {
   navigation: CarouselNavigation;
   isTouch: boolean;
   isReducedMotion: boolean;
-  isInteracting: boolean;
   motionDuration: number;
   visualPosition: VisualPositionSource | null;
   isAtStart: boolean;
@@ -34,7 +33,6 @@ export function useModuleContextValue({
   navigation,
   isTouch,
   isReducedMotion,
-  isInteracting,
   motionDuration,
   visualPosition,
   isAtStart,
@@ -48,10 +46,8 @@ export function useModuleContextValue({
       isMoving: status.isMoving,
       isJumping: status.isJumping,
       isDragging: status.isDragging,
-      isInteracting,
     }),
     [
-      isInteracting,
       state.motionPhase,
       status.isDragging,
       status.isIdle,

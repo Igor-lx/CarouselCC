@@ -85,10 +85,12 @@ interface PreparationSession {
  *    `reportError`, which is authoritative (it is what the user actually sees);
  *  - retry is owned here — one timer per URL, exponential backoff, capped.
  *
- * A successful warm-up element is retained until its URL leaves the deck
- * (`prune`) or the store is disposed, maximizing reuse; the decode queue only
- * ever holds the current preparation window, so a plain array is the right
- * structure for it.
+ * Heavyweight offscreen warm-up elements are bounded by the active
+ * preparation window: once a URL leaves the window its `Image` handle is
+ * released, so warming nearby content never turns the store into a hidden
+ * cache for an entire large deck. Lightweight per-URL render entries persist
+ * for the live deck; the decode queue only ever holds the current window, so
+ * a plain array is the right structure for it.
  */
 export function createImageResourceStore(): ImageResourceStore {
   const entries = new Map<string, ImageEntry>();
@@ -208,7 +210,30 @@ export function createImageResourceStore(): ImageResourceStore {
     idleTimer = null;
   };
 
-  const closePreparationSession = (): void => {
+  /**
+   * Release the heavyweight `Image` handle of every `ready` warm-up whose URL
+   * is not in `retainedWindow` (a `null` window retains nothing). The render
+   * entry is untouched; only the offscreen element is dropped, and the warm-up
+   * lifecycle is reset to `unattempted` so it never claims `ready` without an
+   * element behind it. Keeps warm-up memory bounded to the active window
+   * regardless of deck size.
+   */
+  const releaseWarmupsOutsideWindow = (
+    retainedWindow: ReadonlySet<string> | null,
+  ): void => {
+    entries.forEach((entry, url) => {
+      if (retainedWindow?.has(url)) return;
+      if (entry.warmup.status !== "ready") return;
+      releaseWarmupElement(entry);
+      entry.warmup.status = "unattempted";
+      entry.warmup.sessionId = null;
+      entry.warmup.decodeRequested = false;
+    });
+  };
+
+  const closePreparationSession = (
+    retainedWindow: ReadonlySet<string> | null = null,
+  ): void => {
     const session = activePreparationSession;
     activePreparationSession = null;
     cancelScheduledDecode();
@@ -224,6 +249,8 @@ export function createImageResourceStore(): ImageResourceStore {
         }
       });
     }
+
+    releaseWarmupsOutsideWindow(retainedWindow);
   };
 
   // --- idle decode --------------------------------------------------------
@@ -413,10 +440,13 @@ export function createImageResourceStore(): ImageResourceStore {
     urls.every((url) => session.urls.has(url));
 
   const openPreparationSession = (urls: readonly string[]): void => {
-    closePreparationSession();
+    const nextUrls = new Set(urls);
+    // Closing with the next window as the retained set releases warm-ups
+    // outside it in one pass — no separate release call is needed here.
+    closePreparationSession(nextUrls);
     const session: PreparationSession = {
       id: ++nextPreparationSessionId,
-      urls: new Set(urls),
+      urls: nextUrls,
     };
     activePreparationSession = session;
     session.urls.forEach((url) => prepareIfEligible(url, session.id));

@@ -59,7 +59,8 @@ export interface PointerSwipeProps {
 }
 
 export interface PointerSwipeResult {
+  /** True only while a touch drag is in progress; a bare press is not a
+   *  React-reactive state, so press/release alone never re-renders consumers. */
   isDragging: boolean;
-  isInteracting: boolean;
   listeners: PointerSwipeListeners;
 }

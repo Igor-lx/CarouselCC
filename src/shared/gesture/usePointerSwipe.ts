@@ -2,8 +2,8 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useReducer,
   useRef,
+  useState,
   type CSSProperties,
 } from "react";
 import {
@@ -65,14 +65,7 @@ const createIdleSample = (width = 0, timestamp = 0): InternalSample => ({
   timestamp,
 });
 
-type PhaseAction = { type: "SET"; phase: PointerSwipePhase };
-
-const phaseReducer = (
-  state: { phase: PointerSwipePhase },
-  action: PhaseAction,
-) => (state.phase === action.phase ? state : { phase: action.phase });
-
-const resolveConfig = (config?: PointerSwipeConfig): ResolvedPointerSwipeConfig => ({
+const resolveConfig =(config?: PointerSwipeConfig): ResolvedPointerSwipeConfig => ({
   ...DEFAULT_CONFIG,
   ...config,
 });
@@ -90,11 +83,12 @@ export function usePointerSwipe({
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
-  const [state, dispatch] = useReducer(phaseReducer, { phase: "idle" as PointerSwipePhase });
-  // `phaseRef` mirrors `state.phase` for synchronous reads inside pointer
-  // handlers. Every phase change goes through `setPhase`, which writes the ref
-  // before dispatching — so no effect-based re-sync is needed.
-  const phaseRef = useRef<PointerSwipePhase>(state.phase);
+  const [isDragging, setIsDragging] = useState(false);
+  // The full pointer phase lives only in `phaseRef`; handlers read it
+  // synchronously. React state tracks just `isDragging` — the one phase
+  // distinction consumers react to — so a bare press/release never triggers a
+  // consumer re-render.
+  const phaseRef = useRef<PointerSwipePhase>("idle");
 
   const lockUntilRef = useRef(0);
   const allowedClickTargetRef = useRef<Element | null>(null);
@@ -114,7 +108,12 @@ export function usePointerSwipe({
 
   const setPhase = useCallback((phase: PointerSwipePhase) => {
     phaseRef.current = phase;
-    dispatch({ type: "SET", phase });
+    // Only the `dragging` distinction is React-reactive: a press/release that
+    // never becomes a drag leaves `isDragging` false, so React bails out.
+    setIsDragging((current) => {
+      const next = phase === "dragging";
+      return current === next ? current : next;
+    });
   }, []);
 
   const ensureCapture = useCallback((target: HTMLElement, pointerId: number) => {
@@ -443,9 +442,5 @@ export function usePointerSwipe({
     };
   }, [enabled, finishInteraction, handlePointerDown, handlePointerMove]);
 
-  return {
-    isDragging: state.phase === "dragging",
-    isInteracting: state.phase === "press" || state.phase === "dragging",
-    listeners,
-  };
+  return { isDragging, listeners };
 }

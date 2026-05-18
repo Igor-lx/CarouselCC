@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 
 import styles from "./Carousel.module.scss";
 import {
@@ -19,7 +19,7 @@ import { useAutoplay } from "./autoplay/useAutoplay";
 import { useFocusRecovery } from "./focus/useFocusRecovery";
 import { useCarouselGesture } from "./gesture";
 import { useTrackBinding } from "./geometry";
-import { useMotionRunner } from "./motion";
+import { useCarouselMotionExecution } from "./motion";
 import { useCarouselNavigation } from "./navigation";
 import { useVisualPosition } from "./position";
 import { useModuleRenderPolicy } from "./render-policy/useModuleRenderPolicy";
@@ -153,62 +153,15 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     applyVisualPosition: applyImmediatePosition,
   });
 
-  // --- motion runner: state ↔ controller -----------------------------------
-  const [motionDuration, setMotionDuration] = useState(0);
-  const motionDurationFrameRef = useRef<number | null>(null);
-  const motionDurationTimeoutRef = useRef<number | null>(null);
-
-  const cancelMotionDurationPublish = useCallback(() => {
-    if (typeof window === "undefined") return;
-
-    if (motionDurationFrameRef.current !== null) {
-      window.cancelAnimationFrame(motionDurationFrameRef.current);
-      motionDurationFrameRef.current = null;
-    }
-
-    if (motionDurationTimeoutRef.current !== null) {
-      window.clearTimeout(motionDurationTimeoutRef.current);
-      motionDurationTimeoutRef.current = null;
-    }
-  }, []);
-
-  const publishMotionDuration = useCallback((duration: number) => {
-    if (typeof window === "undefined") {
-      setMotionDuration(duration);
-      return;
-    }
-
-    cancelMotionDurationPublish();
-
-    motionDurationFrameRef.current = window.requestAnimationFrame(() => {
-      motionDurationFrameRef.current = null;
-      motionDurationTimeoutRef.current = window.setTimeout(() => {
-        motionDurationTimeoutRef.current = null;
-        setMotionDuration((current) => (current === duration ? current : duration));
-      }, 0);
-    });
-  }, [cancelMotionDurationPublish]);
-
-  useEffect(
-    () => cancelMotionDurationPublish,
-    [cancelMotionDurationPublish],
-  );
-
-  const handleMotionSettled = useCallback(
-    (settledPosition: number) =>
-      dispatch({ type: "MOTION_SETTLED", settledPosition }),
-    [dispatch],
-  );
-
-  useMotionRunner({
+  // --- motion execution: state -> controller, duration publication ---------
+  const { motionDuration } = useCarouselMotionExecution({
     state,
     config,
     controller,
+    dispatch,
     isInstantMode,
     isDragging: status.isDragging,
     enabled: layout.canSlide,
-    onSettle: handleMotionSettled,
-    onDurationChange: publishMotionDuration,
   });
 
   // --- navigation -----------------------------------------------------------
@@ -220,7 +173,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   });
 
   // --- gesture --------------------------------------------------------------
-  const { isDragging, isInteracting, listeners: dragListeners } = useCarouselGesture({
+  const { isDragging: isDragGesture, listeners: dragListeners } = useCarouselGesture({
     enabled: layout.canSlide,
     viewportRef,
     layout,
@@ -230,7 +183,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     getSlotSize,
     config,
   });
-  void isDragging; // included in status via dispatched START_DRAG/END_DRAG
 
   // --- visibility (for autoplay pause) -------------------------------------
   const visible = useViewportVisibility({
@@ -245,7 +197,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   );
 
   // --- autoplay -------------------------------------------------------------
-  const autoplayPaused = !visible || isInteracting || status.isMoving;
+  const autoplayPaused = !visible || isDragGesture || status.isMoving;
   const { handleHoverChange } = useAutoplay({
     enabled: isAuto && layout.canSlide,
     isPaused: autoplayPaused,
@@ -280,7 +232,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     navigation,
     isTouch,
     isReducedMotion: isInstantMode,
-    isInteracting,
     motionDuration,
     visualPosition: isInstantMode ? null : visualPosition,
     isAtStart,

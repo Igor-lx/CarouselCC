@@ -8,7 +8,6 @@ export interface CarouselStatusView {
   isMoving: boolean;
   isJumping: boolean;
   isDragging: boolean;
-  isInteracting: boolean;
 }
 
 export interface CarouselLayoutView {

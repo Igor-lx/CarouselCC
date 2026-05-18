@@ -209,8 +209,11 @@ These are the user-facing behaviours the implementation guarantees.
   and decode only inside an active idle session. A successful warm-up lands
   in the image-resource SSOT, so a slide entering the render window can
   observe an already-`loaded` resource; a speculative warm-up failure does
-  not become a visible slide error. It never changes navigation, layout,
-  motion state, or slide rendering semantics.
+  not become a visible slide error. Heavyweight offscreen warm-up `Image`
+  handles live only while their URL is inside the active preload window —
+  once it leaves, the handle is released, so even a 500-slide deck never
+  turns the store into a hidden full-deck image cache. It never changes
+  navigation, layout, motion state, or slide rendering semantics.
 
   Warm-up is purely speculative, so it is skipped — on every device — when
   the user has opted into reduced data usage (`prefers-reduced-data` or the
@@ -317,7 +320,7 @@ Every responsibility has exactly one owner. The orchestrator
 | Layout facts | `useCarouselSlideDeck` | `length`, `visibleSlidesCount`, `pageCount`, `virtualLength`, `canSlide`, `isFinite`, `dataKey`. |
 | Logical state | `useCarouselState` | Reducer-backed. Owns `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`, `gesture`, `isRepeatedClickAdvance`, `moveReason`. |
 | Visual sampled position | `useVisualPosition` | Wraps a single `MotionController`. Sole SSOT for the visible track offset. |
-| Motion execution | `useMotionRunner` | Reads logical state, builds a segment, calls into the controller. |
+| Motion execution | `useCarouselMotionExecution` + `useMotionRunner` | Owns motion-duration publication and settle feedback, then reads logical state, builds a segment, and calls into the controller. |
 | Track DOM | `useTrackBinding` | Measures slot size and subscribes to visual position; writes `transform`. |
 | Render window | `useSlideRenderModel` | Memoised; expands during motion, snaps on idle. |
 | Image resources | image-resource store (`createImageResourceStore`) | Per-URL render status, explicit visible-owner count, speculative warm-up lifecycle, retry policy, and a session-scoped decode queue. One instance per carousel; the single authority on image renderability. |
@@ -533,7 +536,7 @@ The `CarouselModuleContext` exposes a partitioned value:
 
 ```ts
 {
-  status: { isIdle, isMoving, isJumping, isDragging, isInteracting, motionPhase },
+  status: { isIdle, isMoving, isJumping, isDragging, motionPhase },
   layout: { pageCount, canSlide, isAtStart, isAtEnd, isTouch,
             isReducedMotion, isDiagnosticActive },
   intent: { targetPageIndex, moveReason,
@@ -645,7 +648,8 @@ src/components/Carousel/
 │   ├── duration.ts                bezier-segment duration math
 │   ├── segmentFactory.ts          builds the Segment for the next motion step
 │   ├── sampler.ts                 segment → MotionSampleData at timestamp
-│   └── useMotionRunner.ts         state → segment → controller
+│   ├── useMotionRunner.ts         state → segment → controller
+│   └── useCarouselMotionExecution.ts  runner + motion-duration publication
 ├── position/
 │   ├── types.ts                   VisualPositionFrame, VisualPositionSource
 │   └── useVisualPosition.ts       VisualPositionSource owner

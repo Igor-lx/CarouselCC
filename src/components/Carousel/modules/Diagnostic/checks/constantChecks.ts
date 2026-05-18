@@ -126,7 +126,7 @@ const numericRules: NumericRule[] = [
     severity: "LOGICAL",
     expected: "Expected a non-negative finite integer",
     consequence: "Render window buffer collapses or oversizes, increasing churn or blank slides",
-    predicate: atLeast(0),
+    predicate: isNonNegativeInteger,
   },
   {
     layer: "Slides",
