@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 
-import { useIsomorphicLayoutEffect } from "../../../shared";
+import { useDataSaver, useIsomorphicLayoutEffect } from "../../../shared";
 import {
   loopedSlideIndex,
   type CarouselLayout,
@@ -114,6 +114,12 @@ const collectPreloadWindowUrls = ({
  *    each side (see `config/slides`). It is computed only while the carousel
  *    is idle and handed to the store as one atomic preparation session.
  *
+ * Warm-up is *speculative* and gated on `useDataSaver()`: when the user has
+ * opted into reduced data usage (`prefers-reduced-data` / `saveData`) no
+ * preparation window is opened, so no eager fetch or decode happens — on any
+ * device. The store, its render SSOT, and image error handling / retry stay
+ * fully active regardless; only the optional warm-up is skipped.
+ *
  * The preparation window is synced in a single layout effect. Correctness
  * does not depend on the order this hook is declared among Carousel's hooks:
  *  - it runs after every `SlideItem` child's `observe` layout effect (React
@@ -139,6 +145,11 @@ export function useSlideImagePreload({
   isContentImg,
   store,
 }: UseSlideImagePreloadInput): void {
+  // Speculative warm-up is skipped entirely when the user opted into reduced
+  // data usage. This never touches the store or its render SSOT.
+  const isDataSaver = useDataSaver();
+  const isWarmupEnabled = isContentImg && !isDataSaver;
+
   const deckUrls = useMemo(
     () => (isContentImg ? collectDeckImageUrls(records) : EMPTY_URLS),
     [isContentImg, records],
@@ -146,10 +157,10 @@ export function useSlideImagePreload({
 
   const preloadUrls = useMemo(
     () =>
-      isContentImg && isIdle
+      isWarmupEnabled && isIdle
         ? collectPreloadWindowUrls({ records, layout, currentVirtualIndex })
         : EMPTY_URLS,
-    [isContentImg, isIdle, layout, records, currentVirtualIndex],
+    [isWarmupEnabled, isIdle, layout, records, currentVirtualIndex],
   );
 
   // Keep retained entries bounded to the live deck. With no store (image
@@ -166,9 +177,9 @@ export function useSlideImagePreload({
   useIsomorphicLayoutEffect(() => {
     if (!store) return;
     store.syncPreparationWindow(
-      isContentImg && isIdle
+      isWarmupEnabled && isIdle
         ? { enabled: true, urls: preloadUrls }
         : { enabled: false, urls: EMPTY_URLS },
     );
-  }, [store, isContentImg, isIdle, preloadUrls]);
+  }, [store, isWarmupEnabled, isIdle, preloadUrls]);
 }

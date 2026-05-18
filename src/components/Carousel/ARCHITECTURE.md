@@ -211,6 +211,12 @@ These are the user-facing behaviours the implementation guarantees.
   observe an already-`loaded` resource; a speculative warm-up failure does
   not become a visible slide error. It never changes navigation, layout,
   motion state, or slide rendering semantics.
+
+  Warm-up is purely speculative, so it is skipped — on every device — when
+  the user has opted into reduced data usage (`prefers-reduced-data` or the
+  Network Information API `saveData` flag, observed via `useDataSaver`). The
+  image-resource store, its render SSOT, and image error handling / retry are
+  unaffected: those are correctness, not optimization, and always run.
 - **Image errors and retry.** A slide whose image fails to load renders a
   text placeholder (`alt`, or `errAltPlaceholder`) and is not interactive.
   While such a slide sits in the active band, the image-resource store
