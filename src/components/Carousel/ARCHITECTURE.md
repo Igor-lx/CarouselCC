@@ -202,12 +202,15 @@ These are the user-facing behaviours the implementation guarantees.
   buffer on each side, nearest-first. The carousel steps a whole page
   (`visibleSlidesCount` slides) at a time, so the buffer is sized in
   page-steps via a lookahead schedule (`config/slides`) that shrinks as the
-  visible band widens, keeping the absolute warmed buffer bounded. It starts
-  on initial idle mount and resumes after later movements only while the
-  carousel is idle. Warm-up fetches are low priority and decode on idle
-  browser time. The result lands in the image-resource SSOT, so a slide
-  entering the render window observes an already-`loaded` resource. It never
-  changes navigation, layout, motion state, or slide rendering semantics.
+  visible band widens, keeping the absolute warmed buffer bounded. Each idle
+  period is one preparation session; entering motion closes that session in
+  the layout phase before paint — aborting in-flight offscreen warm-up
+  fetches and cancelling queued decode work. Warm-up fetches are low priority
+  and decode only inside an active idle session. A successful warm-up lands
+  in the image-resource SSOT, so a slide entering the render window can
+  observe an already-`loaded` resource; a speculative warm-up failure does
+  not become a visible slide error. It never changes navigation, layout,
+  motion state, or slide rendering semantics.
 - **Image errors and retry.** A slide whose image fails to load renders a
   text placeholder (`alt`, or `errAltPlaceholder`) and is not interactive.
   While such a slide sits in the active band, the image-resource store
@@ -311,9 +314,9 @@ Every responsibility has exactly one owner. The orchestrator
 | Motion execution | `useMotionRunner` | Reads logical state, builds a segment, calls into the controller. |
 | Track DOM | `useTrackBinding` | Measures slot size and subscribes to visual position; writes `transform`. |
 | Render window | `useSlideRenderModel` | Memoised; expands during motion, snaps on idle. |
-| Image resources | image-resource store (`createImageResourceStore`) | Per-URL load/error/decode state, retry policy, and offscreen warm-up. One instance per carousel; the single authority on image health. |
-| Image preparation | `useSlideImagePreload` | React adapter that derives the deck + idle-window URL sets and drives the image-resource store. Holds no image logic of its own. |
-| Slide image binding | `useImageResource` | Subscribes one `SlideItem` to its URL in the image-resource store via `useSyncExternalStore`. |
+| Image resources | image-resource store (`createImageResourceStore`) | Per-URL render status, explicit visible-owner count, speculative warm-up lifecycle, retry policy, and a session-scoped decode queue. One instance per carousel; the single authority on image renderability. |
+| Image preparation | `useSlideImagePreload` | React adapter that derives the deck + idle-window URL sets and drives the store through one atomic preparation-window API. Holds no image logic of its own. |
+| Slide image binding | `useImageResource` | Registers a `SlideItem` as a visible owner of its URL and subscribes to the URL's snapshot via `useSyncExternalStore`. |
 | Gesture lifecycle | `useCarouselGesture` | Wraps the shared `usePointerSwipe`. Converts pointer events into dispatches and direct position writes. |
 | Autoplay lifecycle | `useAutoplay` | Owns the interval timer, hover/visibility/dragging pause. |
 | Focus shift | `useFocusRecovery` | Triggers when the state settles. |
@@ -349,12 +352,19 @@ The system has five SSOTs, each owned by exactly one layer.
    resolved config.
 5. **Image resources** — the image-resource store
    (`createImageResourceStore`, one instance per carousel, created only when
-   `isContentImg` is on). Holds one entry
-   per image URL: `status` (`loading | loaded | error`), a retry
-   `generation`, and the offscreen warm-up element. It is the single
-   authority on "is this image healthy". `useSlideImagePreload` is its only
-   writer of warm-up intent; each `SlideItem` subscribes to its own URL via
-   `useImageResource` and reports the real `<img>` outcome back. "Has this
+   `isContentImg` is on). Holds one entry per image URL with two separate
+   models:
+   - render SSOT: `status` (`loading | loaded | error`) plus retry
+     `generation`;
+   - preparation lifecycle: visible owner count, warm-up status
+     (`unattempted | fetching | ready | failed | suspended`), retained
+     offscreen element, and decode ownership.
+
+   `useSlideImagePreload` is its only writer of preparation intent; each
+   `SlideItem` registers as a visible owner and subscribes to its URL via
+   `useImageResource`, then reports the real `<img>` outcome back. Warm-up
+   success may publish `loaded` only while no real visible failure exists;
+   warm-up failure stays speculative and never publishes `error`. "Has this
    slide's image failed" is a *derived read* of this SSOT, never a second
    copy of state. Observation-only: it never feeds navigation, layout, or
    motion.

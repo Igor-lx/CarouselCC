@@ -4,6 +4,7 @@ import {
   IMAGE_RETRY_MAX_DELAY_MS,
 } from "../../config";
 import type {
+  ImagePreparationWindow,
   ImageResourceSnapshot,
   ImageResourceStore,
   ImageStatus,
@@ -29,23 +30,45 @@ const LOADING_SNAPSHOT: ImageResourceSnapshot = Object.freeze({
   generation: 0,
 });
 
+/**
+ * Lifecycle of speculative offscreen preparation. It is intentionally
+ * separate from public render status: warm-up is best-effort infrastructure,
+ * not a second opinion about what the user can currently see.
+ */
+type WarmupStatus =
+  | "unattempted"
+  | "fetching"
+  | "ready"
+  | "failed"
+  | "suspended";
+
+interface WarmupLifecycle {
+  status: WarmupStatus;
+  sessionId: number | null;
+  element: HTMLImageElement | null;
+  decodeRequested: boolean;
+}
+
 /** Internal, mutable bookkeeping for one image URL. */
 interface ImageEntry {
+  /** Public renderability SSOT exposed through snapshots. */
   status: ImageStatus;
   generation: number;
-  /** Failed attempts so far — drives retry backoff and the give-up cap. */
+  /** Failed visible attempts so far — drives retry backoff and the give-up cap. */
   failureCount: number;
-  /**
-   * Offscreen warm-up element when the store owns the fetch; `null` when the
-   * resource is only observed through a rendered slide's on-screen `<img>`.
-   */
-  preloadElement: HTMLImageElement | null;
-  /** True once `preloadElement` has been handed to `decode()`. */
-  decodeRequested: boolean;
+  /** Count of currently mounted on-screen `<img>` owners for this URL. */
+  visibleOwnerCount: number;
+  /** Speculative offscreen preparation, modeled independently of render state. */
+  warmup: WarmupLifecycle;
   /** Pending retry timer handle, or `null`. */
   retryTimer: number | null;
   /** Frozen snapshot exposed to React; replaced only on a real change. */
   snapshot: ImageResourceSnapshot;
+}
+
+interface PreparationSession {
+  readonly id: number;
+  readonly urls: Set<string>;
 }
 
 /**
@@ -53,21 +76,31 @@ interface ImageEntry {
  * a plain observable map of `url -> ImageEntry`. `useImageResource` adapts it
  * to React with `useSyncExternalStore`.
  *
- * Ownership rules that keep "image health" single-sourced:
- *  - exactly one entry per URL;
- *  - `preload` opens an offscreen fetch only for URLs nothing else tracks;
+ * Ownership rules that keep image renderability single-sourced:
+ *  - exactly one render entry per URL;
+ *  - visible DOM ownership and speculative warm-up ownership are explicit;
+ *  - warm-up lifecycle is first-class, never inferred from `entries.has(url)`;
+ *  - speculative warm-up failures never become visible errors by themselves;
  *  - a rendered slide reports its real `<img>` outcome via `reportLoaded` /
  *    `reportError`, which is authoritative (it is what the user actually sees);
  *  - retry is owned here — one timer per URL, exponential backoff, capped.
+ *
+ * A successful warm-up element is retained until its URL leaves the deck
+ * (`prune`) or the store is disposed, maximizing reuse; the decode queue only
+ * ever holds the current preparation window, so a plain array is the right
+ * structure for it.
  */
 export function createImageResourceStore(): ImageResourceStore {
   const entries = new Map<string, ImageEntry>();
   const listeners = new Map<string, Set<() => void>>();
+  /** Pending idle-decode work — bounded by one preparation window. */
   const decodeQueue: string[] = [];
   const canUseDom = typeof window !== "undefined";
 
   let idleHandle: number | null = null;
   let idleTimer: number | null = null;
+  let nextPreparationSessionId = 0;
+  let activePreparationSession: PreparationSession | null = null;
   let disposed = false;
 
   const notify = (url: string): void => {
@@ -76,7 +109,7 @@ export function createImageResourceStore(): ImageResourceStore {
     set.forEach((listener) => listener());
   };
 
-  /** Apply a status change and publish a fresh frozen snapshot if it differs. */
+  /** Apply a render-status change and publish a fresh frozen snapshot. */
   const commit = (
     entry: ImageEntry,
     url: string,
@@ -95,8 +128,13 @@ export function createImageResourceStore(): ImageResourceStore {
     status: "loading",
     generation: 0,
     failureCount: 0,
-    preloadElement: null,
-    decodeRequested: false,
+    visibleOwnerCount: 0,
+    warmup: {
+      status: "unattempted",
+      sessionId: null,
+      element: null,
+      decodeRequested: false,
+    },
     retryTimer: null,
     snapshot: LOADING_SNAPSHOT,
   });
@@ -107,64 +145,135 @@ export function createImageResourceStore(): ImageResourceStore {
     entry.retryTimer = null;
   };
 
-  /** Detach an offscreen warm-up element so it stops fetching and can be GC'd. */
-  const releaseEntry = (entry: ImageEntry): void => {
-    clearRetryTimer(entry);
-    const element = entry.preloadElement;
-    if (element) {
-      element.onload = null;
-      element.onerror = null;
-      element.src = "";
-      entry.preloadElement = null;
-    }
+  const releaseWarmupElement = (entry: ImageEntry): void => {
+    const element = entry.warmup.element;
+    if (!element) return;
+    element.onload = null;
+    element.onerror = null;
+    element.removeAttribute("src");
+    entry.warmup.element = null;
   };
 
-  const handleLoaded = (entry: ImageEntry, url: string): void => {
+  const suspendWarmup = (entry: ImageEntry): void => {
+    if (entry.warmup.status !== "fetching") return;
+    releaseWarmupElement(entry);
+    entry.warmup.status = "suspended";
+    entry.warmup.sessionId = null;
+  };
+
+  /** Release every heavyweight resource owned by one entry. */
+  const releaseEntry = (entry: ImageEntry): void => {
+    clearRetryTimer(entry);
+    releaseWarmupElement(entry);
+    entry.warmup.sessionId = null;
+  };
+
+  const handleVisibleLoaded = (entry: ImageEntry, url: string): void => {
+    // Once the real DOM image has loaded, an in-flight speculative duplicate is
+    // redundant. The visible outcome remains authoritative.
+    suspendWarmup(entry);
     entry.failureCount = 0;
     clearRetryTimer(entry);
     commit(entry, url, "loaded", false);
   };
 
-  const handleError = (entry: ImageEntry, url: string): void => {
+  const handleVisibleError = (entry: ImageEntry, url: string): void => {
+    // Do not let a later speculative success overwrite the actual failed DOM
+    // outcome the user observed.
+    suspendWarmup(entry);
     entry.failureCount += 1;
     commit(entry, url, "error", false);
   };
 
+  // --- idle preparation session ------------------------------------------
+
+  const isActiveSession = (sessionId: number, url?: string): boolean => {
+    const session = activePreparationSession;
+    return (
+      session !== null &&
+      session.id === sessionId &&
+      (url === undefined || session.urls.has(url))
+    );
+  };
+
+  const clearDecodeQueue = (): void => {
+    decodeQueue.length = 0;
+  };
+
+  const cancelScheduledDecode = (): void => {
+    if (!canUseDom) return;
+    if (idleHandle !== null) window.cancelIdleCallback?.(idleHandle);
+    if (idleTimer !== null) window.clearTimeout(idleTimer);
+    idleHandle = null;
+    idleTimer = null;
+  };
+
+  const closePreparationSession = (): void => {
+    const session = activePreparationSession;
+    activePreparationSession = null;
+    cancelScheduledDecode();
+    clearDecodeQueue();
+
+    if (session) {
+      entries.forEach((entry) => {
+        if (
+          entry.warmup.status === "fetching" &&
+          entry.warmup.sessionId === session.id
+        ) {
+          suspendWarmup(entry);
+        }
+      });
+    }
+  };
+
   // --- idle decode --------------------------------------------------------
-  // Decoding an offscreen image moves the (otherwise on-paint) decode cost off
+  // Decoding an offscreen image moves the otherwise on-paint decode cost off
   // the critical path: when the matching slide later mounts its `<img>`, the
   // browser's decoded-image cache is already warm. We do it on idle time so it
   // never contends with an in-flight motion segment.
 
-  const decodeOne = (url: string): void => {
+  const decodeOne = (url: string, sessionId: number): void => {
+    if (!isActiveSession(sessionId, url)) return;
     const entry = entries.get(url);
-    if (!entry || entry.decodeRequested) return;
-    const element = entry.preloadElement;
-    if (!element || entry.status !== "loaded") return;
-    entry.decodeRequested = true;
+    if (!entry || entry.warmup.decodeRequested) return;
+    const element = entry.warmup.element;
+    if (
+      !element ||
+      entry.status !== "loaded" ||
+      entry.warmup.status !== "ready"
+    ) {
+      return;
+    }
+    entry.warmup.decodeRequested = true;
     if (typeof element.decode === "function") {
       // Best-effort: a decode rejection (e.g. element re-pointed) is harmless.
       element.decode().catch(() => undefined);
     }
   };
 
-  const drainDecodeQueue = (hasBudget: () => boolean): void => {
+  const drainDecodeQueue = (
+    sessionId: number,
+    hasBudget: () => boolean,
+  ): void => {
     idleHandle = null;
     idleTimer = null;
+    if (!isActiveSession(sessionId)) return;
     while (decodeQueue.length > 0 && hasBudget()) {
-      decodeOne(decodeQueue.shift()!);
+      decodeOne(decodeQueue.shift()!, sessionId);
     }
     if (decodeQueue.length > 0) pumpDecodeQueue();
   };
 
   function pumpDecodeQueue(): void {
-    if (!canUseDom || disposed) return;
+    const session = activePreparationSession;
+    if (!canUseDom || disposed || session === null) return;
     if (idleHandle !== null || idleTimer !== null) return;
     if (decodeQueue.length === 0) return;
 
     if (typeof window.requestIdleCallback === "function") {
       idleHandle = window.requestIdleCallback((deadline) => {
         drainDecodeQueue(
+          session.id,
           () => deadline.timeRemaining() > IDLE_DECODE_MIN_BUDGET_MS,
         );
       });
@@ -172,13 +281,21 @@ export function createImageResourceStore(): ImageResourceStore {
     }
 
     idleTimer = window.setTimeout(() => {
-      drainDecodeQueue(() => true);
+      drainDecodeQueue(session.id, () => true);
     }, IDLE_DECODE_FALLBACK_DELAY_MS);
   }
 
-  const enqueueDecode = (url: string): void => {
+  const enqueueDecode = (url: string, sessionId: number): void => {
+    if (!isActiveSession(sessionId, url)) return;
     const entry = entries.get(url);
-    if (!entry || entry.decodeRequested || !entry.preloadElement) return;
+    if (
+      !entry ||
+      entry.warmup.decodeRequested ||
+      !entry.warmup.element ||
+      entry.warmup.status !== "ready"
+    ) {
+      return;
+    }
     if (decodeQueue.includes(url)) return;
     decodeQueue.push(url);
     pumpDecodeQueue();
@@ -186,20 +303,65 @@ export function createImageResourceStore(): ImageResourceStore {
 
   // --- offscreen warm-up fetch -------------------------------------------
 
-  const startPreloadFetch = (url: string, entry: ImageEntry): void => {
+  const handleWarmupLoaded = (
+    entry: ImageEntry,
+    url: string,
+    sessionId: number,
+  ): void => {
+    if (!isActiveSession(sessionId, url)) return;
+    if (
+      entry.warmup.status !== "fetching" ||
+      entry.warmup.sessionId !== sessionId
+    ) {
+      return;
+    }
+
+    entry.warmup.status = "ready";
+    entry.warmup.sessionId = null;
+
+    // Warm-up may promote an untouched resource to loaded, but it must never
+    // override a real visible failure or reset its retry history.
+    if (entry.status === "loading" && entry.failureCount === 0) {
+      commit(entry, url, "loaded", false);
+    }
+
+    enqueueDecode(url, sessionId);
+  };
+
+  const handleWarmupError = (entry: ImageEntry, sessionId: number): void => {
+    if (
+      entry.warmup.status !== "fetching" ||
+      entry.warmup.sessionId !== sessionId
+    ) {
+      return;
+    }
+    releaseWarmupElement(entry);
+    // Speculative misses are non-authoritative and terminal for background
+    // warming; visible `<img>` loading remains the real source of truth.
+    entry.warmup.status = "failed";
+    entry.warmup.sessionId = null;
+  };
+
+  const startWarmupFetch = (
+    url: string,
+    entry: ImageEntry,
+    sessionId: number,
+  ): void => {
     const element = new Image();
-    entry.preloadElement = element;
+    entry.warmup.status = "fetching";
+    entry.warmup.sessionId = sessionId;
+    entry.warmup.element = element;
+    entry.warmup.decodeRequested = false;
     element.decoding = "async";
     element.fetchPriority = PRELOAD_FETCH_PRIORITY;
 
     element.onload = () => {
       if (disposed) return;
-      handleLoaded(entry, url);
-      enqueueDecode(url);
+      handleWarmupLoaded(entry, url, sessionId);
     };
     element.onerror = () => {
       if (disposed) return;
-      handleError(entry, url);
+      handleWarmupError(entry, sessionId);
     };
 
     element.src = url;
@@ -207,8 +369,7 @@ export function createImageResourceStore(): ImageResourceStore {
     // A URL already in the browser cache can resolve synchronously; the load
     // event would then never fire, so settle it here.
     if (element.complete && element.naturalWidth > 0) {
-      handleLoaded(entry, url);
-      enqueueDecode(url);
+      handleWarmupLoaded(entry, url, sessionId);
     }
   };
 
@@ -222,11 +383,73 @@ export function createImageResourceStore(): ImageResourceStore {
     return entry;
   };
 
+  const prepareIfEligible = (url: string, sessionId: number): void => {
+    if (!isActiveSession(sessionId, url)) return;
+    const entry = observeEntry(url);
+
+    if (entry.warmup.status === "ready") {
+      enqueueDecode(url, sessionId);
+      return;
+    }
+
+    if (
+      entry.status !== "loading" ||
+      entry.failureCount > 0 ||
+      entry.visibleOwnerCount > 0 ||
+      entry.warmup.status === "fetching" ||
+      entry.warmup.status === "failed"
+    ) {
+      return;
+    }
+
+    startWarmupFetch(url, entry, sessionId);
+  };
+
+  const matchesPreparationWindow = (
+    session: PreparationSession,
+    urls: readonly string[],
+  ): boolean =>
+    session.urls.size === urls.length &&
+    urls.every((url) => session.urls.has(url));
+
+  const openPreparationSession = (urls: readonly string[]): void => {
+    closePreparationSession();
+    const session: PreparationSession = {
+      id: ++nextPreparationSessionId,
+      urls: new Set(urls),
+    };
+    activePreparationSession = session;
+    session.urls.forEach((url) => prepareIfEligible(url, session.id));
+    pumpDecodeQueue();
+  };
+
   // --- public API ---------------------------------------------------------
 
   return {
     getSnapshot(url) {
       return entries.get(url)?.snapshot ?? LOADING_SNAPSHOT;
+    },
+
+    observe(url) {
+      const entry = observeEntry(url);
+      entry.visibleOwnerCount += 1;
+      // If a real DOM owner appears while an offscreen duplicate is still
+      // fetching, the speculative owner is no longer useful.
+      suspendWarmup(entry);
+
+      return () => {
+        if (entries.get(url) !== entry) return;
+        entry.visibleOwnerCount = Math.max(0, entry.visibleOwnerCount - 1);
+
+        const session = activePreparationSession;
+        if (
+          entry.visibleOwnerCount === 0 &&
+          session !== null &&
+          session.urls.has(url)
+        ) {
+          prepareIfEligible(url, session.id);
+        }
+      };
     },
 
     subscribe(url, listener) {
@@ -244,24 +467,30 @@ export function createImageResourceStore(): ImageResourceStore {
       };
     },
 
-    preload(urls) {
+    syncPreparationWindow(preparationWindow: ImagePreparationWindow) {
       if (!canUseDom || disposed) return;
-      for (const url of urls) {
-        // Skip anything already tracked: a warm-up is redundant once either an
-        // earlier preload or a rendered slide owns the fetch for this URL.
-        if (entries.has(url)) continue;
-        const entry = createEntry();
-        entries.set(url, entry);
-        startPreloadFetch(url, entry);
+
+      if (!preparationWindow.enabled || preparationWindow.urls.length === 0) {
+        closePreparationSession();
+        return;
       }
+
+      const session = activePreparationSession;
+      if (session && matchesPreparationWindow(session, preparationWindow.urls)) {
+        session.urls.forEach((url) => prepareIfEligible(url, session.id));
+        pumpDecodeQueue();
+        return;
+      }
+
+      openPreparationSession(preparationWindow.urls);
     },
 
     reportLoaded(url) {
-      handleLoaded(observeEntry(url), url);
+      handleVisibleLoaded(observeEntry(url), url);
     },
 
     reportError(url) {
-      handleError(observeEntry(url), url);
+      handleVisibleError(observeEntry(url), url);
     },
 
     requestRetry(url) {
@@ -288,29 +517,28 @@ export function createImageResourceStore(): ImageResourceStore {
 
     prune(allowed) {
       const keep = new Set(allowed);
+      const session = activePreparationSession;
+
       entries.forEach((entry, url) => {
         if (keep.has(url)) return;
-        // A URL with live subscribers is still on screen — never drop it.
-        if (listeners.get(url)?.size) return;
+        // A live rendered owner is still on screen — never drop it.
+        if (entry.visibleOwnerCount > 0) return;
         releaseEntry(entry);
         entries.delete(url);
         const queued = decodeQueue.indexOf(url);
         if (queued !== -1) decodeQueue.splice(queued, 1);
+        session?.urls.delete(url);
       });
     },
 
     dispose() {
       disposed = true;
-      if (canUseDom) {
-        if (idleHandle !== null) window.cancelIdleCallback?.(idleHandle);
-        if (idleTimer !== null) window.clearTimeout(idleTimer);
-      }
-      idleHandle = null;
-      idleTimer = null;
+      cancelScheduledDecode();
       entries.forEach(releaseEntry);
       entries.clear();
       listeners.clear();
-      decodeQueue.length = 0;
+      clearDecodeQueue();
+      activePreparationSession = null;
     },
   };
 }
