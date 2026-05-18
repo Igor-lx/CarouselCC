@@ -56,7 +56,8 @@ export function useImageResource(url: string | null): ImageResourceHandle {
   const store = useContext(CarouselImageResourceContext);
 
   useIsomorphicLayoutEffect(() => {
-    if (store !== null && url !== null) store.observe(url);
+    if (store === null || url === null) return;
+    return store.observe(url);
   }, [store, url]);
 
   const subscribe = useCallback(

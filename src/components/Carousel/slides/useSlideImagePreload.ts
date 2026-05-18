@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 
+import { useIsomorphicLayoutEffect } from "../../../shared";
 import {
   loopedSlideIndex,
   type CarouselLayout,
@@ -17,11 +18,11 @@ interface UseSlideImagePreloadInput {
   currentVirtualIndex: number;
   isIdle: boolean;
   isContentImg: boolean;
-  /** `null` when `isContentImg` is off — the hook then does no work at all. */
+  /** `null` when `isContentImg` is off - the hook then does no work at all. */
   store: ImageResourceStore | null;
 }
 
-/** Stable empty list — keeps effect dependencies referentially constant. */
+/** Stable empty list - keeps effect dependencies referentially constant. */
 const EMPTY_URLS: readonly string[] = Object.freeze([]);
 
 const slideImageSource = (record: CarouselSlideRecord): string | null =>
@@ -29,7 +30,7 @@ const slideImageSource = (record: CarouselSlideRecord): string | null =>
     ? record.slideData.content
     : null;
 
-/** Every distinct image URL in the deck — the upper bound the store retains. */
+/** Every distinct image URL in the deck - the upper bound the store retains. */
 const collectDeckImageUrls = (records: CarouselSlideRecord[]): string[] => {
   const urls = new Set<string>();
   for (const record of records) {
@@ -48,7 +49,7 @@ const finiteWindowIndex = (
     : null;
 
 /**
- * Preload radius in *slides*, on each side of the visible band. The carousel
+ * Preload radius in slides, on each side of the visible band. The carousel
  * steps a whole page (`visibleSlidesCount` slides) at a time, so the radius is
  * `visibleSlidesCount` times the page-lookahead resolved from the schedule.
  */
@@ -107,16 +108,15 @@ const collectPreloadWindowUrls = ({
  * two URL sets from the current deck and viewport and hands them to the store,
  * which owns all fetching, decoding, error tracking, and retry.
  *
- *  - The **deck set** bounds what the store retains; it is pushed through
- *    `prune` so memory tracks the live deck and nothing more.
- *  - The **preload window** is the visible band plus a page-lookahead buffer
- *    on each side (see `config/slides`). It is computed (and thus warmed)
- *    only while the carousel is idle — warm-up fetches must never compete
- *    with the network or main thread during an active motion segment.
+ *  - The deck set bounds what the store retains; it is pushed through `prune`
+ *    so retained entries track the live deck and nothing more.
+ *  - The preload window is the visible band plus a page-lookahead buffer on
+ *    each side (see `config/slides`). It is computed only while the carousel
+ *    is idle and handed to the store as one atomic preparation session.
  *
  * When `isContentImg` is off, `store` is `null` and the URL sets stay the
  * frozen empty list: no traversal of `records`, no effects firing, no fetch,
- * no decode — the hook is fully inert.
+ * no decode - the hook is fully inert.
  *
  * Image preparation is observation-only: it never feeds back into navigation,
  * layout, motion state, or slide-render semantics.
@@ -142,23 +142,28 @@ export function useSlideImagePreload({
     [isContentImg, isIdle, layout, records, currentVirtualIndex],
   );
 
-  // Keep the store's tracked set bounded to the live deck. With no store
-  // (image content off) there is nothing to bound, so the effect is inert.
+  // Keep retained entries bounded to the live deck. With no store (image
+  // content off) there is nothing to bound, so the effect is inert.
   useEffect(() => {
     if (!store) return;
     store.prune(deckUrls);
   }, [store, deckUrls]);
 
-  useEffect(() => {
-    if (!store) return;
-    store.setDecodeEnabled(isContentImg && isIdle);
+  // Close the idle session before the non-idle commit paints. This hook is
+  // declared before the motion runner in Carousel.tsx, so it closes background
+  // preparation before the later layout effect starts a new motion segment.
+  useIsomorphicLayoutEffect(() => {
+    if (!store || (isContentImg && isIdle)) return;
+    store.syncPreparationWindow({ enabled: false, urls: EMPTY_URLS });
   }, [store, isContentImg, isIdle]);
 
-  // Warm the idle viewport neighbourhood. `preloadUrls` is the stable empty
-  // list while moving or when image content is off, so this effect does no
-  // work during motion and none at all without a store.
+  // Open or refresh the idle window only after child layout effects have
+  // registered the currently rendered image owners.
   useEffect(() => {
-    if (!store || preloadUrls.length === 0) return;
-    store.preload(preloadUrls);
-  }, [store, preloadUrls]);
+    if (!store || !isContentImg || !isIdle) return;
+    store.syncPreparationWindow({
+      enabled: true,
+      urls: preloadUrls,
+    });
+  }, [store, isContentImg, isIdle, preloadUrls]);
 }

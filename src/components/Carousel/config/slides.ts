@@ -12,6 +12,19 @@ export const PRELOAD_PAGE_LOOKAHEAD_BY_VISIBLE: Readonly<
 export const PRELOAD_PAGE_LOOKAHEAD_DEFAULT = 1;
 
 /**
+ * Heavy warm-up retention after a URL leaves the active preload window.
+ *
+ * `deck` keeps successful offscreen warm-up elements for every URL still in
+ * the live deck, maximizing reuse for small finite decks.
+ * `window` keeps only the current idle preload window, trading a little reuse
+ * for tighter memory bounds on larger decks.
+ */
+export const IMAGE_WARMUP_RETENTION_MODES = ["deck", "window"] as const;
+export type ImageWarmupRetentionMode =
+  (typeof IMAGE_WARMUP_RETENTION_MODES)[number];
+export const IMAGE_WARMUP_RETENTION_MODE: ImageWarmupRetentionMode = "deck";
+
+/**
  * Image-retry policy. A slide image that fails to load is retried while the
  * slide sits in the active band, on an exponential backoff
  * (`BASE * 2^(failures - 1)`, clamped to `MAX`), and is given up after
