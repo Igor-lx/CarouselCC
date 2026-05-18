@@ -30,15 +30,21 @@ export interface MotionProfileInput {
  * for an invalid input.
  */
 const MIN_PROFILE_SPEED = 1e-6;
-/**
- * Fallback share applied to each end of the profile when the configured
- * acceleration + deceleration shares sum above 1 (no room for a cruise
- * zone). Splitting the profile evenly between accel and decel produces a
- * well-behaved "no cruise" curve; the Diagnostic surfaces the normalisation
- * as a LOGICAL warning so the developer can see runtime is repairing the
- * input.
- */
 const OVERALLOCATED_PROFILE_SHARE = 0.5;
+/**
+ * Iteration cap for the peak-speed solver — both the bracket-expansion phase
+ * and the bisection phase are bounded by it. Well above the count needed to
+ * converge to sub-pixel precision; it exists only to guarantee termination.
+ */
+const PEAK_SPEED_SOLVE_ITERATIONS = 24;
+
+const smoothstep = (progress: number) => progress * progress * (3 - 2 * progress);
+
+const smoothstepIntegral = (progress: number) =>
+  progress * progress * progress - 0.5 * progress * progress * progress * progress;
+
+const lerp = (from: number, to: number, progress: number) =>
+  from + (to - from) * progress;
 
 export interface MotionProfileShares {
   accelerationShare: number;
@@ -47,13 +53,6 @@ export interface MotionProfileShares {
   wasNormalized: boolean;
 }
 
-/**
- * Resolve the three profile zone shares from a (possibly invalid) input
- * pair. The runtime normalisation has exactly one trigger — accel + decel
- * sum above 1 — and exactly one outcome (`OVERALLOCATED_PROFILE_SHARE` on
- * each end, no cruise). Diagnostic uses the same helper to know whether to
- * report the normalisation.
- */
 export const normalizeMotionProfileShares = (
   accelerationDistanceShare: number,
   decelerationDistanceShare: number,
@@ -76,14 +75,6 @@ export const normalizeMotionProfileShares = (
     wasNormalized: false,
   };
 };
-
-const smoothstep = (progress: number) => progress * progress * (3 - 2 * progress);
-
-const smoothstepIntegral = (progress: number) =>
-  progress * progress * progress - 0.5 * progress * progress * progress * progress;
-
-const lerp = (from: number, to: number, progress: number) =>
-  from + (to - from) * progress;
 
 const zoneDuration = (distance: number, startSpeed: number, endSpeed: number) => {
   if (!(distance > 0)) return 0;
@@ -120,14 +111,18 @@ const solvePeakForDuration = (input: {
   let upper = lower;
   let upperDuration = profileDurationForPeak({ ...input, peakSpeed: upper });
 
-  for (let i = 0; upperDuration > input.targetDuration && i < 24; i += 1) {
+  for (
+    let i = 0;
+    upperDuration > input.targetDuration && i < PEAK_SPEED_SOLVE_ITERATIONS;
+    i += 1
+  ) {
     upper *= 2;
     upperDuration = profileDurationForPeak({ ...input, peakSpeed: upper });
   }
 
   if (upperDuration > input.targetDuration) return upper;
 
-  for (let i = 0; i < 24; i += 1) {
+  for (let i = 0; i < PEAK_SPEED_SOLVE_ITERATIONS; i += 1) {
     const middle = (lower + upper) / 2;
     const middleDuration = profileDurationForPeak({ ...input, peakSpeed: middle });
     if (middleDuration > input.targetDuration) lower = middle;

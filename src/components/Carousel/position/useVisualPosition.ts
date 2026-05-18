@@ -38,25 +38,6 @@ const toFrame = (
   progress: sample.progress,
 });
 
-/**
- * Sole owner of the visual position SSOT. Wraps a single `MotionController`
- * and exposes:
- *
- * - `subscribe(listener)` — per-frame stream while a segment is active.
- *   Subscribers (track binding, pagination widget binding) mutate their own
- *   DOM inside the callback; React is not involved at this tempo.
- * - `getSnapshot()` returns the last *emitted* visual frame. Cold reads on
- *   user events (gesture press start, navigation click) read through this
- *   so the captured origin matches what DOM subscribers have already
- *   received, not a freshly re-sampled but unpainted controller value. A
- *   re-sampled now-value would force the track to "catch up" in a single
- *   composite frame, which the eye perceives as a forward jerk on click /
- *   press.
- * - `applyImmediatePosition(position)` — publish a position into the stream
- *   during drag. Internally calls `controller.set`, which cancels any active
- *   motion and emits, so the track, the widget, and the motion runner all
- *   observe one consistent source of truth throughout the gesture.
- */
 export function useVisualPosition({
   visibleSlidesCount,
 }: UseVisualPositionInput): UseVisualPositionResult {

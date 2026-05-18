@@ -68,7 +68,7 @@ const numericRules: NumericRule[] = [
     field: "REPEATED_CLICK_SPEED_MULTIPLIER",
     value: REPEATED_CLICK_SPEED_MULTIPLIER,
     severity: "LOGICAL",
-    expected: "Expected a finite number greater than 1 (4.5 is the product baseline)",
+    expected: "Expected a finite number greater than 1",
     consequence: "Repeated-click acceleration loses the feel of an in-flight boost",
     predicate: greaterThan(1),
   },
@@ -295,14 +295,10 @@ const collectRepeatedShareRelation = (): CarouselDiagnosticWarning | null => {
     accelerationDistanceShare,
     decelerationDistanceShare,
   );
+  const sum =
+    REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE +
+    REPEATED_CLICK_DECELERATION_DISTANCE_SHARE;
   if (!normalized.wasNormalized) return null;
-
-  // Runtime substitutes the overallocated pair with the (0.5, 0.5, 0)
-  // fallback. That is an *explicit* normalisation, so we downgrade the
-  // severity from CRITICAL to LOGICAL and report `normalizedTo` — the
-  // developer still sees the misconfiguration without the carousel
-  // visibly misbehaving.
-  const sum = accelerationDistanceShare + decelerationDistanceShare;
   return {
     severity: "LOGICAL",
     layer: "Motion",
@@ -317,8 +313,7 @@ const collectRepeatedShareRelation = (): CarouselDiagnosticWarning | null => {
       decelerationDistanceShare: normalized.decelerationShare,
       cruiseDistanceShare: normalized.cruiseShare,
     },
-    expected:
-      "Expected accelerationShare + decelerationShare <= 1 for an explicit cruise zone",
+    expected: "Expected accelerationShare + decelerationShare <= 1 for an explicit cruise zone",
     consequence:
       "Motion profile runtime normalizes overallocated shares to 50% acceleration and 50% deceleration",
   };

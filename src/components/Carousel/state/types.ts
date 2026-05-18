@@ -30,7 +30,7 @@ export interface CarouselState {
   /**
    * True when this segment was started by a click that arrived while the
    * carousel was already moving in the same direction. It selects the fast
-   * acceleration profile instead of plain bezier easing — the segment still
+   * acceleration profile instead of plain bezier easing - the segment still
    * drives straight to the page boundary and decays to zero speed.
    */
   isRepeatedClickAdvance: boolean;
@@ -76,14 +76,13 @@ export interface EndDragCommand extends VirtualIndexSource {
 export interface MotionSettledCommand {
   type: "MOTION_SETTLED";
   /**
-   * The visual position at which the motion controller actually settled.
-   * Required because, between the moment a segment naturally settles in the
-   * RAF tick and the moment the React reducer runs MOTION_SETTLED, the user
-   * may have dispatched a click that overwrote `state.virtualIndex` with a
-   * new target. The reducer must use this canonical "where the track really
-   * stopped" value as the chain / idle origin — using `state.virtualIndex`
-   * would race with that overwrite and snap the track to the post-click
-   * target instead of continuing to animate to it.
+   * The visual position where the controller actually settled.
+   *
+   * Between the RAF tick that settles a segment and the reducer turn that
+   * handles MOTION_SETTLED, another click may already have replaced
+   * `state.virtualIndex` with a later target. The reducer needs the settled
+   * position to distinguish "the current target finished" from "an older
+   * target finished while a newer one is already pending".
    */
   settledPosition: number;
 }

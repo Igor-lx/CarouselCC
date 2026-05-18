@@ -24,7 +24,7 @@ const useDefault = <T>(value: unknown, fallback: T): T =>
 /**
  * Assemble the runtime config. Defaults are applied only when a prop is
  * `undefined`; any explicitly-provided value flows through unchanged. The
- * carousel intentionally trusts its inputs — see the diagnostic layer for
+ * carousel intentionally trusts its inputs - see the diagnostic layer for
  * observability.
  */
 export const buildRawCarouselConfig = ({

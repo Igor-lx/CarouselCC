@@ -178,12 +178,6 @@ export function createMotionController<Strategy extends string = string>(
         completion,
       };
 
-      // Initial emit aligned with the segment's *declared* start time, not
-      // `now()`. The motion runner sets `segment.startedAt` together with the
-      // segment's `from` position so the curve at `startedAt` evaluates to
-      // `from` — emitting at this exact point gives subscribers a no-op DOM
-      // write (the same value they've already painted) instead of a
-      // catch-up jump.
       const initial = sampleActive(segment.startedAt);
       emit(initial);
 

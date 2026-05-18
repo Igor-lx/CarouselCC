@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type RefObject } from "react";
+import { useCallback, useRef, type RefObject } from "react";
 
 import {
   measureSlotSize,
@@ -25,15 +25,13 @@ export interface TrackBindingApi {
 }
 
 /**
- * Wires the track DOM to the visual position source. Owns slot-size
- * measurement (ResizeObserver + window resize) and the per-frame transform
- * write (subscribes to the visual position and mutates `transform` directly,
- * outside React).
- *
- * The imperative `applyTrackPosition` is the drag entry point: it publishes
- * the new position back into the visual position stream so the track, the
- * pagination widget binding, and the motion runner all observe one source
- * of truth throughout a gesture.
+ * Wires the track DOM to the visual position source. Owns the slot-size
+ * measurement (ResizeObserver + window resize) and the transform write
+ * (subscribes to the visual position and mutates `transform` directly).
+ * Returns a small imperative API used by the gesture adapter and the
+ * navigation controller. Imperative gesture writes are published back into
+ * the visual position stream so track, widgets, and motion handoff share one
+ * source of truth.
  */
 export function useTrackBinding({
   trackRef,
@@ -168,11 +166,6 @@ export function useTrackBinding({
   );
 
   const getSlotSize = useCallback(() => slotSizeRef.current ?? 0, []);
-
-  // Initial geometry write before any subscription
-  useEffect(() => {
-    syncGeometry();
-  }, [syncGeometry]);
 
   return { applyTrackPosition, readCurrentPosition, getSlotSize };
 }

@@ -1,13 +1,21 @@
 import clsx from "clsx";
-import { memo } from "react";
+import { memo, useEffect } from "react";
+
+import { useImageResource } from "./imageResource";
 import type { SlideItemProps } from "./SlideItem.types";
-import { useSlideImageErrorState } from "./useSlideImageErrorState";
 
 /**
  * Renders one slide. The active band is derived externally via
- * `isActive`/`isActual`. The slide becomes a `button` when it is interactive,
- * the click handler is provided, and the optional image content has loaded
- * successfully.
+ * `isActive` / `isActual`.
+ *
+ * Image content is governed by the image-resource SSOT (`useImageResource`):
+ * the slide does not keep its own load/error state. It renders the `<img>`
+ * while the resource is `loading` or `loaded`, reports the element's real
+ * outcome back to the store, and falls back to a text placeholder on `error`.
+ *
+ * A slide is interactive only when it is configured interactive, a click
+ * handler is provided, and — for image slides — the image has actually
+ * loaded. Text slides are interactive as soon as a handler is provided.
  */
 export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
   const {
@@ -28,12 +36,26 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
       ? slideData.content
       : null;
 
-  const { hasImageError, markImageFailed, markImageLoaded } =
-    useSlideImageErrorState({ imageSource, isActual });
+  const { status, generation, reportLoaded, reportError, requestRetry } =
+    useImageResource(imageSource);
+
+  const isImageSlide = imageSource !== null;
+  const hasImageError = isImageSlide && status === "error";
+
+  // An errored image that is currently in the active band is retried on a
+  // backed-off schedule owned by the store. A successful retry flips the
+  // resource back to `loading` with a new `generation`, which remounts the
+  // `<img>` below and triggers a fresh fetch. The store deduplicates and caps
+  // attempts, so re-running this effect on every status change is safe.
+  useEffect(() => {
+    if (hasImageError && isActual) requestRetry();
+  }, [hasImageError, isActual, requestRetry]);
 
   if (!slideData) return null;
 
-  const isClickable = Boolean(onSlideClick) && isInteractive && !hasImageError;
+  const isContentReady = !isImageSlide || status === "loaded";
+  const isClickable =
+    Boolean(onSlideClick) && isInteractive && isContentReady;
   const Tag = isClickable ? "button" : "div";
 
   return (
@@ -42,6 +64,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
       style={style}
       inert={!isActive ? true : undefined}
       data-active-zone={isActual}
+      data-image-status={isImageSlide ? status : undefined}
       className={clsx(
         className.slide,
         hasImageError && className.slideError,
@@ -51,17 +74,19 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
       {...(isClickable && { type: "button" as const })}
       onClick={isClickable ? () => onSlideClick?.(slideData) : undefined}
     >
-      {isContentImg && typeof slideData.content === "string" ? (
-        !hasImageError ? (
+      {imageSource !== null ? (
+        hasImageError ? (
+          slideData.alt || errAltPlaceholder
+        ) : (
           <img
-            src={slideData.content}
+            key={generation}
+            src={imageSource}
             alt={slideData.alt || ""}
             draggable={false}
-            onLoad={markImageLoaded}
-            onError={markImageFailed}
+            decoding="async"
+            onLoad={reportLoaded}
+            onError={reportError}
           />
-        ) : (
-          slideData.alt || errAltPlaceholder
         )
       ) : (
         slideData.content

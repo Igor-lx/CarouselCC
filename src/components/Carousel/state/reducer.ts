@@ -102,10 +102,6 @@ export function carouselReducer(
         phase,
       } = resolveStepTransition(synced, command, context.isInstantMode);
 
-      // A repeated click (a same-direction MOVE click while motion is
-      // running) does not get a special destination — it steps to the next
-      // page boundary like any click. The flag only tells the motion layer
-      // to use the fast acceleration profile for this segment.
       const isRepeatedClickAdvance =
         command.type === "MOVE" &&
         command.moveReason === "click" &&
@@ -160,15 +156,6 @@ export function carouselReducer(
         Math.abs(settledPosition - synced.virtualIndex) >
         context.config.motion.epsilon;
 
-      // The carousel stopped where the *active* segment was aimed
-      // (`settledPosition`), but the latest `state.virtualIndex` is a
-      // different target — a click landed after the segment had started
-      // settling but before this MOTION_SETTLED dispatch reached the
-      // reducer. We do not snap to the new target (that is what produced the
-      // "land short, freeze, jump" artefact); we re-anchor `fromVirtualIndex`
-      // to the actual settled position and leave `motionPhase` non-idle so
-      // the next motion-runner pass animates from there to the still-pending
-      // `virtualIndex`.
       if (targetChanged) {
         return {
           ...synced,

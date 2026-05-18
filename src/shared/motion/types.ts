@@ -62,9 +62,7 @@ export type MotionSubscriber<Strategy extends string = string> = (
 ) => void;
 
 export interface MotionController<Strategy extends string = string> {
-  /** Re-sample the active segment at `timestamp` (defaults to `now()`). */
   read: (timestamp?: number) => MotionSample<Strategy>;
-  /** Return the last *emitted* sample (cached). Cheap; never recomputes. */
   getSnapshot: () => MotionSample<Strategy>;
   isActive: () => boolean;
   subscribe: (

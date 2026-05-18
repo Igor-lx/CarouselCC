@@ -69,7 +69,7 @@ export const collectWidgetWarnings = (
       layer: LAYER,
       field: "scaleFactor",
       actual: input.scaleFactor,
-      expected: "Expected a finite number in the range (0, 1] (0.585 is the product baseline)",
+      expected: "Expected a finite number in the range (0, 1]",
       consequence: "Edge-dot scaling either explodes outward or collapses to a single point",
     });
   }

@@ -91,11 +91,10 @@ export function usePointerSwipe({
   settingsRef.current = settings;
 
   const [state, dispatch] = useReducer(phaseReducer, { phase: "idle" as PointerSwipePhase });
+  // `phaseRef` mirrors `state.phase` for synchronous reads inside pointer
+  // handlers. Every phase change goes through `setPhase`, which writes the ref
+  // before dispatching — so no effect-based re-sync is needed.
   const phaseRef = useRef<PointerSwipePhase>(state.phase);
-
-  useEffect(() => {
-    phaseRef.current = state.phase;
-  }, [state.phase]);
 
   const lockUntilRef = useRef(0);
   const allowedClickTargetRef = useRef<Element | null>(null);

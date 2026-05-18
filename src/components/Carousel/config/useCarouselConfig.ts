@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
 import { buildRawCarouselConfig } from "./buildRawConfig";
-import type { CarouselRuntimeConfig, RawConfigInput } from "./types";
+import type { CarouselRuntimeConfig } from "./types";
 
 interface UseCarouselConfigInput {
   visibleSlidesNr?: unknown;
@@ -15,7 +15,7 @@ interface UseCarouselConfigInput {
 /**
  * Resolve the runtime config from raw prop input. Defaults are substituted
  * only for `undefined` props (the public default contract). Other values flow
- * through unchanged — invalid input is the caller's responsibility and is
+ * through unchanged - invalid input is the caller's responsibility and is
  * surfaced by the diagnostic layer, never repaired here.
  */
 export function useCarouselConfig({
@@ -26,15 +26,16 @@ export function useCarouselConfig({
   intervalAutoplay,
   errAltPlaceholder,
 }: UseCarouselConfigInput): CarouselRuntimeConfig {
-  const rawInput = useMemo<RawConfigInput>(
-    () => ({
-      visibleSlidesNr,
-      durationAutoplay,
-      durationStep,
-      durationJump,
-      intervalAutoplay,
-      errAltPlaceholder,
-    }),
+  return useMemo<CarouselRuntimeConfig>(
+    () =>
+      buildRawCarouselConfig({
+        visibleSlidesNr,
+        durationAutoplay,
+        durationStep,
+        durationJump,
+        intervalAutoplay,
+        errAltPlaceholder,
+      }),
     [
       durationAutoplay,
       durationJump,
@@ -43,10 +44,5 @@ export function useCarouselConfig({
       intervalAutoplay,
       visibleSlidesNr,
     ],
-  );
-
-  return useMemo<CarouselRuntimeConfig>(
-    () => buildRawCarouselConfig(rawInput),
-    [rawInput],
   );
 }

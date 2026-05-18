@@ -32,12 +32,7 @@ const finishSentence = (message: string) => {
  * Build the canonical warning line shared by every diagnostic check.
  *
  *   [Carousel Diagnostic][SEVERITY] <Layer> -> <field> has value <actual>.
- *   [Runtime normalizes it to <normalizedTo>.] <expected>. <consequence>.
- *   Diagnostics is observe-only and does not apply runtime changes.
- *
- * The "normalizes it to" clause only appears when the warning carries a
- * `normalizedTo` value — i.e. when runtime has an explicit substitution rule
- * for the bad input (e.g. accel + decel shares overallocated → 0.5 / 0.5).
+ *   <expected>. <consequence>. Diagnostics is observe-only.
  */
 export const formatWarning = (warning: CarouselDiagnosticWarning): string =>
   [
@@ -49,9 +44,7 @@ export const formatWarning = (warning: CarouselDiagnosticWarning): string =>
     finishSentence(warning.expected),
     finishSentence(warning.consequence),
     TRAILER,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  ].filter(Boolean).join(" ");
 
 /** Deterministic signature for dedupe / cache. */
 export const warningSignature = (warning: CarouselDiagnosticWarning): string =>

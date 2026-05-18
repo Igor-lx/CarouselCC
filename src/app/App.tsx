@@ -25,7 +25,7 @@ const CAROUSEL_SOURCE_SETS = {
   CAROUSEL_SOURCES2,
 } as const;
 
-const ACTIVE_CAROUSEL_SOURCES = CAROUSEL_SOURCE_SETS.CAROUSEL_SOURCES2;
+const ACTIVE_CAROUSEL_SOURCES = CAROUSEL_SOURCE_SETS.CAROUSEL_SOURCES;
 
 const openSlide = (slide: Slide) => {
   window.open(String(slide.content), "_blank");
@@ -37,21 +37,21 @@ export default function App() {
   const isCompactLandscape = useCompactLandscape();
 
   const [isAutoplay, setIsAutoplay] = useState(false);
-  const [isInteractive, setIsInteractive] = useState(true);
+  const [isInteractive, setIsInteractive] = useState(false);
 
   const device = useBreakpoint(VISIBLE_BY_BREAKPOINT);
 
   const visibleSlidesNr =
     isTouch && isCompactLandscape ? COMPACT_LANDSCAPE_VISIBLE_SLIDES : device;
-  const useMobileImages = isTouch || device === VISIBLE_BY_BREAKPOINT.MOBILE;
+  const isMobileImagery = isTouch || device === VISIBLE_BY_BREAKPOINT.MOBILE;
 
   const slidesData = useMemo(
     () =>
       ACTIVE_CAROUSEL_SOURCES.map((entry) => ({
         id: entry.id,
-        content: useMobileImages ? entry.mobile : entry.desktop,
+        content: isMobileImagery ? entry.mobile : entry.desktop,
       })),
-    [useMobileImages],
+    [isMobileImagery],
   );
 
   return (
@@ -87,7 +87,7 @@ export default function App() {
             isPaginationOn
             isInteractive={isInteractive}
             durationAutoplay={5000}
-            durationStep={7000}
+            durationStep={6000}
             durationJump={450}
             intervalAutoplay={3000}
             isPagePaddingOn

@@ -1,9 +1,8 @@
 # Carousel
 
 A React 19 carousel deck with motion-controller-driven track movement, touch
-gesture, fast repeated-click acceleration, autoplay, dot pagination, an
-alternative touch pagination widget, edge controls, and a dev-only
-diagnostic slot.
+gesture, fast repeated-click acceleration, autoplay, dot pagination, an alternative
+touch pagination widget, edge controls, and a dev-only diagnostic slot.
 
 The component is a single composition root (`Carousel.tsx`) plus four pluggable
 slot modules. The track owns a horizontal `transform` that is mutated outside
@@ -92,7 +91,7 @@ visible.
 | ----------------- | ------- | ------ |
 | `durationAutoplay` | `3000` | Duration of an autoplay-driven page step. |
 | `intervalAutoplay` | `3000` | Idle interval between two autoplay steps. |
-| `durationStep`    | `2000`  | Base duration of one click / gesture-driven step. Repeated-click fast segment duration is `durationStep ÷ REPEATED_CLICK_SPEED_MULTIPLIER` (≈ `durationStep / 4.5`). Multi-page click distances scale linearly. |
+| `durationStep`    | `2000`  | Base duration of one click / gesture-driven step. Repeated-click fast segment duration is `durationStep ÷ REPEATED_CLICK_SPEED_MULTIPLIER`. Multi-page click distances scale linearly. |
 | `durationJump`    | `800`   | Duration of `GO_TO` jumps (e.g. pagination click to a far page, autoplay loop-back). Also used as the fallback duration when reduced-motion mode requires a hard jump. |
 
 #### Module gates
@@ -109,7 +108,7 @@ visible.
 | Prop                       | Type | Effect |
 | -------------------------- | ---- | ------ |
 | `onSlideClick`             | `(slide: Slide) => void` | Fires when an interactive slide is clicked. The slide is interactive only when `isInteractive`, the image (if any) loaded successfully, and this handler is provided. |
-| `onMotionIdleStatusChange` | `(isIdle: boolean) => void` | Fires when the carousel crosses the idle ↔ running boundary. **Observation-only**: it never drives carousel semantics. Intended for consumers that need to coordinate non-critical work around motion. The carousel also owns nearby slide-image preparation internally; the callback never receives reducer state, the visual position stream, or any internal detail. |
+| `onMotionIdleStatusChange` | `(isIdle: boolean) => void` | Fires when the carousel crosses the idle ↔ running boundary. **Observation-only**: it never drives carousel semantics. Intended for consumers that need to coordinate non-critical work around motion. The callback never receives the reducer state, the visual position stream, or any internal detail. |
 
 #### Styling
 
@@ -170,16 +169,13 @@ These are the user-facing behaviours the implementation guarantees.
   mode, `GO_TO` always travels the shortest cyclic distance.
 - **Click during motion (opposite direction).** Re-targets without
   restarting from the logical origin: the new segment continues from the
-  *current sampled visual position*, not from where the previous segment
-  was supposed to start.
+  last emitted visual sample, not from where the previous segment was
+  supposed to start.
 - **Repeated click (same direction during motion).** Does not restart from
-  scratch and does not get a special destination — it steps to the next
-  page boundary like any click. The reducer only flags the segment
-  (`isRepeatedClickAdvance`) so the motion layer drives it with a single
-  fast acceleration profile straight to `state.virtualIndex` (peak speed
-  `REPEATED_CLICK_SPEED_MULTIPLIER`, 4.5× a normal MOVE) instead of plain
-  bezier easing. There is no intermediate target and no chained follow-up
-  segment.
+  scratch. The reducer still resolves the next page boundary directly; it
+  only flags the segment so the motion layer selects the fast profile. The
+  fast segment's peak speed is `REPEATED_CLICK_SPEED_MULTIPLIER` of a normal
+  MOVE and it settles at the same page boundary as any other click.
 - **Drag / swipe.** Touch only (pointer events with `pointerType === "touch"`).
   EMA-smoothed velocity, edge resistance with a configurable curvature.
   Release resolves to a swipe direction via either a quick-flick (raw
@@ -199,13 +195,25 @@ These are the user-facing behaviours the implementation guarantees.
   page 0 via `GO_TO` (using `durationJump`).
 - **External motion-idle signal.** `onMotionIdleStatusChange` fires once on
   each idle↔running crossing. Consumers may use it to schedule non-critical
-  work around motion. The signal remains observation-only.
-- **Image preparation.** When `isContentImg` is on, the slide layer prepares
-  image URLs around the idle viewport (visible band plus three neighbouring
-  slides on each side). It starts on initial idle mount and resumes after
-  later movements only while the carousel is idle. Preparation loads and then
-  decodes images on idle browser time; it never changes navigation, layout,
-  motion state, or slide rendering semantics.
+  work around motion. The signal remains observation-only; the carousel also
+  runs its own image preparation for nearby image slides while idle.
+- **Image preparation.** When `isContentImg` is on, the slide layer warms
+  image URLs around the idle viewport: the visible band plus a page-lookahead
+  buffer on each side, nearest-first. The carousel steps a whole page
+  (`visibleSlidesCount` slides) at a time, so the buffer is sized in
+  page-steps via a lookahead schedule (`config/slides`) that shrinks as the
+  visible band widens, keeping the absolute warmed buffer bounded. It starts
+  on initial idle mount and resumes after later movements only while the
+  carousel is idle. Warm-up fetches are low priority and decode on idle
+  browser time. The result lands in the image-resource SSOT, so a slide
+  entering the render window observes an already-`loaded` resource. It never
+  changes navigation, layout, motion state, or slide rendering semantics.
+- **Image errors and retry.** A slide whose image fails to load renders a
+  text placeholder (`alt`, or `errAltPlaceholder`) and is not interactive.
+  While such a slide sits in the active band, the image-resource store
+  retries the URL on an exponential backoff (capped attempts); a successful
+  retry remounts the slide's `<img>` and restores it. Error and retry are a
+  single store-owned mechanism — slides hold no private error state.
 - **Reduced motion.** When `isInstantMotion` is set or
   `prefers-reduced-motion` is detected, every transition snaps instantly,
   the gesture adapter is disabled, and pagination dot transitions are
@@ -303,8 +311,9 @@ Every responsibility has exactly one owner. The orchestrator
 | Motion execution | `useMotionRunner` | Reads logical state, builds a segment, calls into the controller. |
 | Track DOM | `useTrackBinding` | Measures slot size and subscribes to visual position; writes `transform`. |
 | Render window | `useSlideRenderModel` | Memoised; expands during motion, snaps on idle. |
-| Image preparation | `useSlideImagePreload` | Slide-layer preload/decode for nearby image URLs. Runs only while idle and never feeds back into motion or state transitions. |
-| Slide image errors | `useSlideImageErrorState` | Local rendered-image error state and retry probe for a single `SlideItem`. |
+| Image resources | image-resource store (`createImageResourceStore`) | Per-URL load/error/decode state, retry policy, and offscreen warm-up. One instance per carousel; the single authority on image health. |
+| Image preparation | `useSlideImagePreload` | React adapter that derives the deck + idle-window URL sets and drives the image-resource store. Holds no image logic of its own. |
+| Slide image binding | `useImageResource` | Subscribes one `SlideItem` to its URL in the image-resource store via `useSyncExternalStore`. |
 | Gesture lifecycle | `useCarouselGesture` | Wraps the shared `usePointerSwipe`. Converts pointer events into dispatches and direct position writes. |
 | Autoplay lifecycle | `useAutoplay` | Owns the interval timer, hover/visibility/dragging pause. |
 | Focus shift | `useFocusRecovery` | Triggers when the state settles. |
@@ -320,14 +329,13 @@ context provider.
 
 ## 3. Single source of truth (SSOT)
 
-The system has four SSOTs, each owned by exactly one layer.
+The system has five SSOTs, each owned by exactly one layer.
 
 1. **Logical state** — `useCarouselState`. Holds `activePageIndex`,
    `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`,
    `gesture` (the velocity payload of the latest END_DRAG), and
-   `isRepeatedClickAdvance` (flags the fast-profile segment for a
-   same-direction repeated click). No timing. Reducer-pure: every
-   transition is a pure function of `(state, command, context)`.
+   `isRepeatedClickAdvance`. No timing. Reducer-pure: every transition is
+   a pure function of `(state, command, context)`.
 2. **Visual sampled position** — `useVisualPosition`. The motion
    controller's `value`/`velocity`/`target` are the only authority on
    "where the track is right now". Everything that needs a per-frame
@@ -339,6 +347,17 @@ The system has four SSOTs, each owned by exactly one layer.
    `undefined` props. Never coerces, clamps, or repairs explicit values;
    the diagnostic layer surfaces violations without modifying the
    resolved config.
+5. **Image resources** — the image-resource store
+   (`createImageResourceStore`, one instance per carousel, created only when
+   `isContentImg` is on). Holds one entry
+   per image URL: `status` (`loading | loaded | error`), a retry
+   `generation`, and the offscreen warm-up element. It is the single
+   authority on "is this image healthy". `useSlideImagePreload` is its only
+   writer of warm-up intent; each `SlideItem` subscribes to its own URL via
+   `useImageResource` and reports the real `<img>` outcome back. "Has this
+   slide's image failed" is a *derived read* of this SSOT, never a second
+   copy of state. Observation-only: it never feeds navigation, layout, or
+   motion.
 
 No layer mirrors another layer's value. The state machine never reads a
 sampled motion value: the gesture controller reads the visual position and
@@ -359,13 +378,10 @@ phase }`.
 - `subscribe(listener)` — per-frame stream while a segment is active.
   Subscribers (track binding, pagination widget binding) mutate their own
   DOM inside the callback; React is not involved at this tempo.
-- `getSnapshot()` returns the last **emitted** visual frame (cached). Cold
-  reads on user events (gesture press start, navigation click) read
-  through this so the captured origin matches what DOM subscribers have
-  *already painted* rather than a freshly re-sampled but unpainted
-  controller value. A freshly re-sampled `now`-value would force the
-  track to "catch up" in a single composite frame, which the eye reads as
-  a forward jerk on click.
+- `getSnapshot()` returns the last emitted visual frame. Cold reads on user
+  events (gesture press start, navigation click) use this so the captured
+  origin matches what DOM subscribers have already received, not a
+  mathematically fresh but unpainted controller sample.
 - `applyImmediatePosition(position)` — publish a position into the stream
   during drag. Internally calls `controller.set`, which cancels any
   active motion and emits, so the track, the widget, and the motion
@@ -380,58 +396,48 @@ A `Segment` is one of:
   Used for autoplay (`AUTO_BEZIER`), jump (`JUMP_BEZIER`),
   click step / non-inertial gesture release (`MOVE_BEZIER`), and
   snap-back (`SNAP_BACK_BEZIER`).
-- **Profile segment** — a smoothstep-driven acceleration / cruise /
+- **Profile segment** - a smoothstep-driven acceleration / cruise /
   deceleration profile with a per-zone speed solve. If acceleration and
-  deceleration shares sum above `1`, runtime normalises the profile to
-  `0.5 / 0.5` with no cruise zone (and Diagnostic surfaces the
-  normalisation as a LOGICAL warning). Used for:
-  - **repeated-click fast advance** — a single segment straight to the
-    next page boundary, peak speed
-    `REPEATED_CLICK_SPEED_MULTIPLIER × normalMoveSpeed`,
-  - **inertial gesture release** (peak speed derived from EMA-smoothed
-    release velocity × `inertiaBoost`).
+  deceleration shares sum above `1`, runtime normalizes the profile to
+  `0.5 / 0.5` with no cruise zone. Used for:
+  - **repeated-click fast advance** - one segment directly to the next page
+    boundary, peak speed `REPEATED_CLICK_SPEED_MULTIPLIER x normalMoveSpeed`;
+  - **inertial gesture release** - peak speed derived from EMA-smoothed
+    release velocity × `inertiaBoost`.
 
 ### 4.2 Handoff invariant
 
 `useMotionRunner` is the only place the controller is started. It runs on
-state changes: when `motionPhase` becomes a non-idle value, it records the
-new intent immediately, but the **controller retarget is deferred by a tiny
-frame-boundary window** (`RETARGET_FRAME_DELAY`, currently two RAF ticks).
-The old segment keeps publishing during that window. At the deferred
-boundary the new segment is built from the live stream:
+state changes: when `motionPhase` becomes a non-idle value, it samples the
+motion origin and builds the segment.
 
-- **position** comes from `controller.getSnapshot()` after the previous
-  segment has had time to publish additional frames — i.e. the position
-  DOM subscribers have already painted;
-- **velocity** comes from `controller.read(retargetTimestamp)` — the
-  instantaneous derivative of the *old* curve at that moment;
-- `segment.startedAt = retargetTimestamp`;
-- the controller emits the initial sample synchronously at that timestamp,
-  which by construction equals the already-painted position — a DOM
-  no-op.
+When a previous segment is still running (repeated click,
+opposite-direction click, any interruption), the state change records the
+new intent immediately, but the controller retarget is deferred by a tiny
+frame-boundary window (`RETARGET_FRAME_DELAY`, currently two RAF ticks). The
+old segment keeps publishing during that window. At the deferred boundary the
+new segment starts from the live stream:
 
-This keeps the first handoff emit equal to the painted track position
-(retargeting is visually free), while the velocity is sampled close to the
-actual transition frame so the profile's `startSpeed` matches the eye's
-expectation. The two-source split is deliberate: a freshly re-sampled
-*position* would publish a value the user has not painted yet (forward
-jump on click); a *stale* velocity (last emit, up to 16 ms old) would make
-the profile decelerate momentarily (visible hiccup).
+- position comes from `controller.getSnapshot()` after the previous segment
+  has had time to publish additional frames;
+- velocity comes from `controller.read(retargetTimestamp)`;
+- `startedAt = retargetTimestamp`;
+- the controller publishes the initial sample synchronously.
 
-When the controller completes a segment, the runner dispatches
-`MOTION_SETTLED` **with the exact visual position at settle**. The reducer
-compares that `settledPosition` against `state.virtualIndex`:
+This keeps the first handoff emit equal to the already-published track
+position, so retargeting is a DOM no-op, while the velocity is sampled close
+to the actual transition frame. Using a fresh unemitted position can make the
+carousel jump to a position the user never saw; retargeting synchronously in
+the input/layout-effect turn can feel like a micro-stop. Any future change
+must preserve the invariant: "intent immediately, controller retarget on a
+frame boundary, position from emitted visual frame, velocity from current
+segment sample, time from new segment start".
 
-- If they match within `MOTION_EPSILON`, the segment completed as
-  intended: the reducer advances to idle (using `settledPosition` as the
-  new `fromVirtualIndex`).
-- If they differ — a click landed during the settle frame and rewrote
-  `state.virtualIndex` to a new target — the reducer re-anchors
-  `fromVirtualIndex` to `settledPosition` and leaves `motionPhase`
-  non-idle. The next runner pass animates from the real settled point to
-  the still-pending target. This eliminates the "land short, freeze,
-  jump" artefact that occurs when the reducer would otherwise snap to the
-  post-click target.
+When the controller completes, the runner dispatches
+`MOTION_SETTLED { settledPosition }`. If a newer click already replaced the
+logical target while the previous segment was settling, the reducer re-anchors
+the next segment to the actual settled position instead of snapping to the
+new target.
 
 ### 4.3 No projection-source layer
 
@@ -439,9 +445,9 @@ There is no priority queue, no deferred-frame publisher between the
 controller and its consumers. The track binding subscribes to the visual
 position directly. The PaginationWidget binding subscribes at the same
 level. The two subscriptions are independent listeners on the same RAF
-tick — both run in the same frame. If a future module needs to read the
-sample *after* the track has written, it can call `getSnapshot()` from
-inside its own listener.
+tick - both run in the same frame. `getSnapshot()` is reserved for cold
+imperative reads; it returns the emitted visual frame and should not be used
+inside per-frame subscribers.
 
 ---
 
@@ -486,8 +492,8 @@ union:
   controls / autoplay step.
 - `GO_TO { targetPageIndex, moveReason, fromVirtualIndex, isInstant? }`
   — pagination click / autoplay loop-back / external jump.
-- `MOTION_SETTLED` — fired by the motion runner when the controller
-  completes.
+- `MOTION_SETTLED { settledPosition }` — fired by the motion runner when the
+  controller completes.
 
 `motionPhase` is a discriminated union:
 `"idle" | "step-normal" | "step-jump" | "step-snap" | "step-instant" | "dragging"`.
@@ -559,16 +565,6 @@ Edge navigation zones. Hidden by default on desktop, shown on
 viewport-hover or `:focus-visible`. Always visible on touch. The
 left/right zones are not rendered when `layout.isAtStart`/`isAtEnd` is
 true (finite mode), so there is no destination to navigate to.
-
-**Sizing system.** All breakpoint-dependent dimensions are expressed as
-four CSS custom properties on `.navZone` — `--nav-button-w`,
-`--nav-button-h`, `--nav-button-radius`, `--nav-edge-inset`. Both the
-touch zone (which *is* the button) and the non-touch button (centred
-inside an 8 %-wide hover strip) read the same tokens. Each media query
-overrides just the four tokens; the rules that consume them never change.
-The four breakpoint blocks are: default desktop (45 px circle), tablet
-and small desktop ≤ 1024 px (48 × 96 px pill), mobile portrait ≤ 767 px
-(40 × 80 px pill), compact landscape ≤ 520 px height (36 × 56 px pill).
 
 ### 8.4 `<Diagnostic />`
 
@@ -649,8 +645,13 @@ src/components/Carousel/
 ├── slides/
 │   ├── SlideItem.tsx
 │   ├── SlideItem.types.ts
-│   ├── useSlideImageErrorState.ts  rendered image load/error lifecycle
-│   ├── useSlideImagePreload.ts     idle image preload/decode window
+│   ├── imageResource/             image-resource SSOT (store + React bridge)
+│   │   ├── createImageResourceStore.ts  framework-agnostic store
+│   │   ├── context.ts             per-carousel store provider
+│   │   ├── useImageResource.ts    per-slide useSyncExternalStore binding
+│   │   ├── useImageResourceStoreInstance.ts  lifecycle owner
+│   │   └── types.ts
+│   ├── useSlideImagePreload.ts     idle warm-up window → image-resource store
 │   ├── useCarouselSlideDeck.ts    layout, records, perfect-page info
 │   └── useSlideRenderModel.ts     virtual slides + render window
 ├── slots/
@@ -745,6 +746,7 @@ dependencies, the architecture has held.
   binding short-circuits writes that would re-apply the same transform.
   The PaginationWidget binding short-circuits writes per dot. The motion
   controller emits only on actual sample change (per RAF tick of an
-  active segment; one synchronous emit on segment start; no emits while
-  idle). Image preload/decode is scoped to the slide layer and starts only
-  from idle states.
+  active segment; one synchronous emit on cold segment start; active
+  retargets publish their first successor sample after the deferred
+  frame-boundary handoff; no emits while idle). Image preload/decode is scoped
+  to the slide layer and starts only from idle states.

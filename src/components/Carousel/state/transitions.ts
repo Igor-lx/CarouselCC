@@ -92,11 +92,10 @@ export const resolveStepTransition = (
 };
 
 /**
- * A repeated click is a `MOVE` click that arrives while the carousel is
- * already animating in the *same* direction the click would move it. It does
- * not change the destination model — the step still resolves to the next
- * page boundary — it only flags the segment so the motion layer picks the
- * fast acceleration profile instead of plain bezier easing.
+ * A repeated click is a MOVE click that arrives while the carousel is already
+ * animating in the same direction. It does not change the destination model:
+ * the next target is still the next page boundary. It only selects the fast
+ * motion profile in the motion layer.
  */
 export const isSameDirectionRepeat = (
   state: CarouselState,

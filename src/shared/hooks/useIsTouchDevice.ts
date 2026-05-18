@@ -1,5 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { useIsomorphicLayoutEffect } from "./useIsomorphicLayoutEffect";
+import { useSyncExternalStore } from "react";
 
 let isTouch = false;
 let mediaQuery: MediaQueryList | null = null;
@@ -51,17 +50,11 @@ const subscribe = (callback: () => void) => {
 const getSnapshot = () => isTouch;
 const getServerSnapshot = () => false;
 
+/**
+ * Reports whether the device is touch-first. Backed by `useSyncExternalStore`,
+ * which handles the SSR/hydration snapshot split natively via
+ * `getServerSnapshot` — no manual mount gate needed.
+ */
 export function useIsTouchDevice(): boolean {
-  const [mounted, setMounted] = useState(false);
-  const detected = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-
-  useIsomorphicLayoutEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    // ensure subscription kept alive across re-renders
-  }, []);
-
-  return mounted ? detected : false;
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

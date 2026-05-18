@@ -1,10 +1,8 @@
 @layer components {
-  // ──────────────────────────────────────────────────────────────────────────
-  // Sizing tokens. One block per viewport class; both touch and non-touch
-  // variants read them. The non-touch zone is always an 8 %-wide hover/focus
-  // strip with a centred button — only the button reads the tokens. The
-  // touch zone *is* the button, also centred, and reads the same tokens.
-  // ──────────────────────────────────────────────────────────────────────────
+  // Sizing tokens. Both the non-touch button (centred in an 8%-wide
+  // hover/focus strip) and the touch zone (which *is* the button) read these
+  // four custom properties. Each breakpoint overrides only the tokens; the
+  // rules that consume them never change.
   .navZone {
     --nav-button-w: 45px;
     --nav-button-h: 45px;
@@ -60,7 +58,7 @@
     }
   }
 
-  // ─── Touch: the zone *is* the button, vertically centred ────────────────
+  // Touch: the zone *is* the button, vertically centred.
   [data-touch="true"] .navZone {
     top: 50%;
     width: var(--nav-button-w);
@@ -87,9 +85,8 @@
     transition: none;
   }
 
-  // ─── Scale tokens by viewport. One source of truth per breakpoint. ──────
-  // Tablet / small desktop: switch to a tall pill — easier to hit by thumb
-  // and visually distinct from the desktop circle.
+  // Scale the tokens per breakpoint — one source of truth each.
+  // Tablet / small desktop: a tall pill, easier to hit by thumb.
   @media (width <= 1024px) {
     .navZone {
       --nav-button-w: 48px;
@@ -109,8 +106,8 @@
     }
   }
 
-  // Compact landscape (low-height phones / handhelds): shorter pill so the
-  // button never exceeds the viewport edge-to-edge.
+  // Compact landscape (low-height handhelds): shorter pill that never
+  // exceeds the viewport edge-to-edge.
   @media (orientation: landscape) and (height <= 520px) {
     .navZone {
       --nav-button-w: 36px;
@@ -120,7 +117,7 @@
     }
   }
 
-  // ─── Desktop hover / focus reveal of the 8 %-wide strip ─────────────────
+  // Desktop: reveal the 8%-wide strip on viewport hover or focus-visible.
   [data-touch="false"]:has(*:focus-visible) .navZone,
   [data-touch="false"]:has([data-carousel-viewport]:hover) .navZone {
     opacity: 1;
