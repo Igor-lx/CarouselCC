@@ -146,8 +146,10 @@ export function useSlideImagePreload({
   store,
 }: UseSlideImagePreloadInput): void {
   // Speculative warm-up is skipped entirely when the user opted into reduced
-  // data usage. This never touches the store or its render SSOT.
-  const isDataSaver = useDataSaver();
+  // data usage. This never touches the store or its render SSOT. The signal
+  // is observed only for image carousels — a non-image carousel would never
+  // warm up regardless, so it does not subscribe to the reduced-data store.
+  const isDataSaver = useDataSaver(isContentImg);
   const isWarmupEnabled = isContentImg && !isDataSaver;
 
   const deckUrls = useMemo(
