@@ -83,7 +83,6 @@ export function useModuleContextValue({
 
   const intentView = useMemo<CarouselIntentView>(
     () => ({
-      activePageIndex: state.targetPageIndex,
       targetPageIndex: state.targetPageIndex,
       moveReason: state.moveReason,
       motionDuration,

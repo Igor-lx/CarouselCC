@@ -4,7 +4,7 @@ import { manageFocusShift, useIsomorphicLayoutEffect } from "../../../shared";
 interface UseFocusRecoveryInput {
   containerRef: RefObject<HTMLElement | null>;
   isIdle: boolean;
-  activePageIndex: number;
+  targetPageIndex: number;
 }
 
 /**
@@ -15,20 +15,20 @@ interface UseFocusRecoveryInput {
 export function useFocusRecovery({
   containerRef,
   isIdle,
-  activePageIndex,
+  targetPageIndex,
 }: UseFocusRecoveryInput): void {
-  const lastTriggerRef = useRef<{ isIdle: boolean; activePageIndex: number }>({
+  const lastTriggerRef = useRef<{ isIdle: boolean; targetPageIndex: number }>({
     isIdle: false,
-    activePageIndex,
+    targetPageIndex,
   });
 
   useIsomorphicLayoutEffect(() => {
     const previous = lastTriggerRef.current;
-    lastTriggerRef.current = { isIdle, activePageIndex };
+    lastTriggerRef.current = { isIdle, targetPageIndex };
 
     if (!isIdle) return;
-    if (previous.isIdle && previous.activePageIndex === activePageIndex) return;
+    if (previous.isIdle && previous.targetPageIndex === targetPageIndex) return;
 
     manageFocusShift(containerRef.current);
-  }, [containerRef, activePageIndex, isIdle]);
+  }, [containerRef, targetPageIndex, isIdle]);
 }

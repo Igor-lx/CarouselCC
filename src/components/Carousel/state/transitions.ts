@@ -13,18 +13,16 @@ import type {
 } from "./types";
 
 /**
- * Picks the "from" position for the next step. When motion is queued or a
- * non-zero target is pending, we anchor the segment to the current target;
- * otherwise we use the caller-provided origin (typically the visually
- * sampled position) so direction-change clicks and gesture handoff produce
- * the right segment.
+ * Picks the "from" position for the next step. `targetPageIndex` is the
+ * reducer's single logical page cursor: while motion is queued it already
+ * names the pending destination, and while idle it names the settled page.
+ * The caller-provided origin is used only as the lane reference for a fresh
+ * visual handoff.
  */
 const stepOrigin = (state: CarouselState, fromVirtualIndex: number) => {
   const stepSize = state.layout.visibleSlidesCount;
   const isQueued = state.layout.canSlide && state.motionPhase !== "idle";
-  const hasPending =
-    state.layout.canSlide && state.targetPageIndex !== state.activePageIndex;
-  const currentPageIndex = hasPending ? state.targetPageIndex : state.activePageIndex;
+  const currentPageIndex = state.targetPageIndex;
   const laneReference = isQueued ? state.virtualIndex : fromVirtualIndex;
   const currentVirtualIndex = state.layout.isFinite
     ? pageStart(currentPageIndex, stepSize)

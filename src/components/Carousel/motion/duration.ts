@@ -18,39 +18,39 @@ export const durationByVirtualSpan = ({
   return baseDuration * Math.max(0, span);
 };
 
-interface ResolveDurationInput {
+interface ResolveEasingDurationInput {
   motionPhase: MotionPhase;
   moveReason: MoveReason;
   isInstant: boolean;
   isDragging: boolean;
-  isRepeatedClickAdvance: boolean;
   segmentStartVirtualIndex: number;
   targetVirtualIndex: number;
   stepSize: number;
   snapBackDuration: number;
-  repeatedClickSpeedMultiplier: number;
   autoplayDuration: number;
   stepDuration: number;
   jumpDuration: number;
-  gestureReleaseDuration: number;
 }
 
-export const resolveCarouselDuration = ({
+/**
+ * Resolve durations only for duration-authored bezier segments.
+ *
+ * Profile segments are intentionally absent from this resolver: their speed
+ * model owns peak velocity and derives duration from distance + zone speeds.
+ */
+export const resolveEasingDuration = ({
   motionPhase,
   moveReason,
   isInstant,
   isDragging,
-  isRepeatedClickAdvance,
   segmentStartVirtualIndex,
   targetVirtualIndex,
   stepSize,
   snapBackDuration,
-  repeatedClickSpeedMultiplier,
   autoplayDuration,
   stepDuration,
   jumpDuration,
-  gestureReleaseDuration,
-}: ResolveDurationInput): number => {
+}: ResolveEasingDurationInput): number => {
   if (isDragging) return 0;
   if (motionPhase === "step-snap") return snapBackDuration;
   if (isInstant || motionPhase === "step-jump") return jumpDuration;
@@ -62,17 +62,13 @@ export const resolveCarouselDuration = ({
     baseDuration: stepDuration,
   });
 
-  if (moveReason === "click" && isRepeatedClickAdvance) {
-    return clickSegmentDuration / Math.max(1, repeatedClickSpeedMultiplier);
-  }
-
   switch (moveReason) {
     case "click":
       return clickSegmentDuration;
     case "autoplay":
       return autoplayDuration;
     case "gesture":
-      return gestureReleaseDuration;
+      return clickSegmentDuration;
     default:
       return autoplayDuration;
   }

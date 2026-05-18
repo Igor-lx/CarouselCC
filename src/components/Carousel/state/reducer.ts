@@ -34,7 +34,6 @@ export function carouselReducer(
       const dragPageIndex = envelope.targetPageIndex ?? synced.targetPageIndex;
       return {
         ...synced,
-        activePageIndex: dragPageIndex,
         targetPageIndex: dragPageIndex,
         fromVirtualIndex: dragOrigin,
         virtualIndex: dragOrigin,
@@ -60,7 +59,6 @@ export function carouselReducer(
       ) {
         return {
           ...synced,
-          activePageIndex: targetPageIndex,
           targetPageIndex,
           fromVirtualIndex: envelope.targetVirtualIndex,
           virtualIndex: envelope.targetVirtualIndex,
@@ -167,7 +165,6 @@ export function carouselReducer(
 
       return {
         ...synced,
-        activePageIndex: synced.targetPageIndex,
         fromVirtualIndex: settledPosition,
         isRepeatedClickAdvance: false,
         motionPhase: "idle",

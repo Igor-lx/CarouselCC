@@ -8,7 +8,7 @@ import type {
 } from "../config";
 import type { CarouselState } from "../state";
 import { carouselEasingString, parseBezier } from "./bezier";
-import { resolveCarouselDuration } from "./duration";
+import { durationByVirtualSpan, resolveEasingDuration } from "./duration";
 import { buildProfile } from "./profile";
 import { averageSpeed, sameDirectionSpeed, signedVelocity } from "./speed";
 import type {
@@ -77,7 +77,6 @@ const buildEasing = (
 const buildRepeatedProfile = (
   state: CarouselState,
   start: MotionStart,
-  duration: number,
   startedAt: number,
   repeated: RepeatedClickSettings,
   normalMoveSpeed: number,
@@ -87,51 +86,51 @@ const buildRepeatedProfile = (
     normalMoveSpeed * Math.max(1, repeated.speedMultiplier),
     distance,
   );
+  const profile = buildProfile({
+    from: start.position,
+    to: state.virtualIndex,
+    startSpeed: sameDirectionSpeed(start.velocity, distance),
+    peakSpeed: Math.abs(peakVelocity),
+    endSpeed: 0,
+    accelerationDistanceShare: repeated.accelerationDistanceShare,
+    decelerationDistanceShare: repeated.decelerationDistanceShare,
+  });
 
   return {
     strategy: "repeated",
     from: start.position,
     to: state.virtualIndex,
-    duration,
+    duration: profile.duration,
     startedAt,
-    profile: buildProfile({
-      from: start.position,
-      to: state.virtualIndex,
-      startSpeed: sameDirectionSpeed(start.velocity, distance),
-      peakSpeed: Math.abs(peakVelocity),
-      endSpeed: 0,
-      accelerationDistanceShare: repeated.accelerationDistanceShare,
-      decelerationDistanceShare: repeated.decelerationDistanceShare,
-      targetDuration: duration,
-    }),
+    profile,
   };
 };
 
 const buildGestureProfile = (
   state: CarouselState,
   start: MotionStart,
-  duration: number,
   startedAt: number,
   release: InertialReleaseConfig,
   releaseSpeed: number,
 ): ProfileSegment => {
   const distance = state.virtualIndex - start.position;
+  const profile = buildProfile({
+    from: start.position,
+    to: state.virtualIndex,
+    startSpeed: sameDirectionSpeed(start.velocity, distance),
+    peakSpeed: Math.abs(signedVelocity(releaseSpeed, distance)),
+    endSpeed: 0,
+    accelerationDistanceShare: 0,
+    decelerationDistanceShare: release.decelerationDistanceShare,
+  });
+
   return {
     strategy: "gesture",
     from: start.position,
     to: state.virtualIndex,
-    duration,
+    duration: profile.duration,
     startedAt,
-    profile: buildProfile({
-      from: start.position,
-      to: state.virtualIndex,
-      startSpeed: sameDirectionSpeed(start.velocity, distance),
-      peakSpeed: Math.abs(signedVelocity(releaseSpeed, distance)),
-      endSpeed: 0,
-      accelerationDistanceShare: 0,
-      decelerationDistanceShare: release.decelerationDistanceShare,
-      targetDuration: duration,
-    }),
+    profile,
   };
 };
 
@@ -145,72 +144,71 @@ export function buildCarouselSegment({
 }: BuildSegmentInput): BuildSegmentResult {
   const intent = intentFromState(state, isInstantMode);
   const stepSize = state.layout.visibleSlidesCount;
+  const gestureBaseDuration = durationByVirtualSpan({
+    from: state.fromVirtualIndex,
+    to: state.virtualIndex,
+    stepSize,
+    baseDuration: config.stepDuration,
+  });
   const baseRelease =
     intent === "gesture-release"
       ? resolveInertialRelease({
           gestureReleaseVelocity: state.gesture.pointerVelocity,
           distanceToTarget: state.virtualIndex - state.fromVirtualIndex,
-          baseDuration:
-            stepSize > 0
-              ? config.stepDuration *
-                Math.abs(state.virtualIndex - state.fromVirtualIndex) /
-                stepSize
-              : config.stepDuration,
+          baseDuration: gestureBaseDuration,
           config: config.releaseConfig,
         })
       : null;
 
-  const duration = resolveCarouselDuration({
-    motionPhase: state.motionPhase,
-    moveReason: state.moveReason,
-    isInstant: isInstantMode,
-    isDragging,
-    isRepeatedClickAdvance: state.isRepeatedClickAdvance,
-    segmentStartVirtualIndex: state.fromVirtualIndex,
-    targetVirtualIndex: state.virtualIndex,
-    stepSize,
-    snapBackDuration: config.motion.snapBackDuration,
-    repeatedClickSpeedMultiplier: config.repeatedClick.speedMultiplier,
-    autoplayDuration: config.autoplayDuration,
-    stepDuration: config.stepDuration,
-    jumpDuration: config.jumpDuration,
-    gestureReleaseDuration: baseRelease?.duration ?? config.stepDuration,
-  });
-
   const moveSpeed = averageSpeed(stepSize, config.stepDuration);
-  const fallbackMoveSpeed = moveSpeed || averageSpeed(state.virtualIndex - start.position, duration);
+  const fallbackMoveSpeed =
+    moveSpeed || averageSpeed(state.virtualIndex - start.position, config.stepDuration);
 
   if (intent === "repeated-click") {
+    const segment = buildRepeatedProfile(
+      state,
+      start,
+      startedAt,
+      config.repeatedClick,
+      fallbackMoveSpeed,
+    );
     return {
       intent,
-      duration,
+      duration: segment.duration,
       isInertialRelease: false,
-      segment: buildRepeatedProfile(
-        state,
-        start,
-        duration,
-        startedAt,
-        config.repeatedClick,
-        fallbackMoveSpeed,
-      ),
+      segment,
     };
   }
 
   if (intent === "gesture-release" && baseRelease?.isInertialRelease) {
+    const segment = buildGestureProfile(
+      state,
+      start,
+      startedAt,
+      config.releaseConfig,
+      baseRelease.effectiveReleaseSpeed,
+    );
     return {
       intent,
-      duration,
+      duration: segment.duration,
       isInertialRelease: true,
-      segment: buildGestureProfile(
-        state,
-        start,
-        duration,
-        startedAt,
-        config.releaseConfig,
-        baseRelease.effectiveReleaseSpeed,
-      ),
+      segment,
     };
   }
+
+  const duration = resolveEasingDuration({
+    motionPhase: state.motionPhase,
+    moveReason: state.moveReason,
+    isInstant: isInstantMode,
+    isDragging,
+    segmentStartVirtualIndex: state.fromVirtualIndex,
+    targetVirtualIndex: state.virtualIndex,
+    stepSize,
+    snapBackDuration: config.motion.snapBackDuration,
+    autoplayDuration: config.autoplayDuration,
+    stepDuration: config.stepDuration,
+    jumpDuration: config.jumpDuration,
+  });
 
   if (intent === "gesture-release") {
     return {

@@ -74,12 +74,12 @@ const PaginationWidgetBase = memo(function PaginationWidget({
 
   const staticDots = useMemo(() => {
     if (isMotionBound) return null;
-    const offset = intent.activePageIndex;
+    const offset = intent.targetPageIndex;
     return Array.from({ length: slotCount }, (_, index) => {
       const id = Math.round(offset) - Math.floor(slotCount / 2) + index;
       return projectDot(id, offset, geometry);
     });
-  }, [geometry, intent.activePageIndex, isMotionBound, slotCount]);
+  }, [geometry, intent.targetPageIndex, isMotionBound, slotCount]);
 
   if (layout.pageCount <= 1) return null;
 

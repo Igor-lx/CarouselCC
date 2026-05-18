@@ -3,7 +3,6 @@ import { ZERO_GESTURE_RELEASE, type CarouselState } from "./types";
 
 export const buildInitialState = (layout: CarouselLayout): CarouselState => ({
   layout,
-  activePageIndex: 0,
   targetPageIndex: 0,
   fromVirtualIndex: 0,
   virtualIndex: 0,

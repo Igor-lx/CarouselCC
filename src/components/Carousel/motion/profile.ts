@@ -11,6 +11,7 @@ export interface MotionProfileZone {
 
 export interface MotionProfile {
   duration: number;
+  endSpeed: number;
   zones: MotionProfileZone[];
 }
 
@@ -21,7 +22,6 @@ export interface MotionProfileInput {
   endSpeed: number;
   accelerationDistanceShare: number;
   decelerationDistanceShare: number;
-  targetDuration?: number;
 }
 
 /**
@@ -31,13 +31,6 @@ export interface MotionProfileInput {
  */
 const MIN_PROFILE_SPEED = 1e-6;
 const OVERALLOCATED_PROFILE_SHARE = 0.5;
-/**
- * Iteration cap for the peak-speed solver — both the bracket-expansion phase
- * and the bisection phase are bounded by it. Well above the count needed to
- * converge to sub-pixel precision; it exists only to guarantee termination.
- */
-const PEAK_SPEED_SOLVE_ITERATIONS = 24;
-
 const smoothstep = (progress: number) => progress * progress * (3 - 2 * progress);
 
 const smoothstepIntegral = (progress: number) =>
@@ -82,56 +75,6 @@ const zoneDuration = (distance: number, startSpeed: number, endSpeed: number) =>
   return distance / averageSpeed;
 };
 
-const profileDurationForPeak = (input: {
-  distance: number;
-  startSpeed: number;
-  peakSpeed: number;
-  endSpeed: number;
-  accelerationShare: number;
-  cruiseShare: number;
-  decelerationShare: number;
-}) =>
-  zoneDuration(input.distance * input.accelerationShare, input.startSpeed, input.peakSpeed) +
-  zoneDuration(input.distance * input.cruiseShare, input.peakSpeed, input.peakSpeed) +
-  zoneDuration(input.distance * input.decelerationShare, input.peakSpeed, input.endSpeed);
-
-const solvePeakForDuration = (input: {
-  distance: number;
-  targetDuration: number;
-  startSpeed: number;
-  peakSpeed: number;
-  endSpeed: number;
-  accelerationShare: number;
-  cruiseShare: number;
-  decelerationShare: number;
-}) => {
-  if (!(input.distance > 0) || !(input.targetDuration > 0)) return input.peakSpeed;
-
-  let lower = Math.max(MIN_PROFILE_SPEED, input.peakSpeed, input.startSpeed, input.endSpeed);
-  let upper = lower;
-  let upperDuration = profileDurationForPeak({ ...input, peakSpeed: upper });
-
-  for (
-    let i = 0;
-    upperDuration > input.targetDuration && i < PEAK_SPEED_SOLVE_ITERATIONS;
-    i += 1
-  ) {
-    upper *= 2;
-    upperDuration = profileDurationForPeak({ ...input, peakSpeed: upper });
-  }
-
-  if (upperDuration > input.targetDuration) return upper;
-
-  for (let i = 0; i < PEAK_SPEED_SOLVE_ITERATIONS; i += 1) {
-    const middle = (lower + upper) / 2;
-    const middleDuration = profileDurationForPeak({ ...input, peakSpeed: middle });
-    if (middleDuration > input.targetDuration) lower = middle;
-    else upper = middle;
-  }
-
-  return upper;
-};
-
 const pushZone = (
   zones: MotionProfileZone[],
   input: {
@@ -165,7 +108,6 @@ export const createMotionProfile = ({
   endSpeed,
   accelerationDistanceShare,
   decelerationDistanceShare,
-  targetDuration,
 }: MotionProfileInput): MotionProfile => {
   const absDistance = Math.abs(distance);
   const { accelerationShare, decelerationShare, cruiseShare } =
@@ -174,19 +116,7 @@ export const createMotionProfile = ({
       decelerationDistanceShare,
     );
 
-  const resolvedPeak =
-    typeof targetDuration === "number" && targetDuration > 0
-      ? solvePeakForDuration({
-          distance: absDistance,
-          targetDuration,
-          startSpeed,
-          peakSpeed,
-          endSpeed,
-          accelerationShare,
-          cruiseShare,
-          decelerationShare,
-        })
-      : peakSpeed;
+  const resolvedPeak = Math.max(peakSpeed, startSpeed, endSpeed);
 
   const zones: MotionProfileZone[] = [];
   let progress = 0;
@@ -218,7 +148,7 @@ export const createMotionProfile = ({
       ? zones[zones.length - 1]!.startTime + zones[zones.length - 1]!.duration
       : 0;
 
-  return { duration, zones };
+  return { duration, endSpeed, zones };
 };
 
 const zoneDistanceProgress = (
@@ -244,7 +174,10 @@ export const sampleMotionProfile = (
   distance: number,
 ) => {
   if (profile.zones.length === 0 || !(profile.duration > 0)) {
-    return { distanceProgress: 1, speed: 0 };
+    return { distanceProgress: 1, speed: profile.endSpeed };
+  }
+  if (elapsed >= profile.duration) {
+    return { distanceProgress: 1, speed: profile.endSpeed };
   }
   const time = clamp(elapsed, 0, profile.duration);
   const zone =
@@ -268,7 +201,6 @@ export interface ProfileSegmentInput {
   endSpeed: number;
   accelerationDistanceShare: number;
   decelerationDistanceShare: number;
-  targetDuration?: number;
 }
 
 export const buildProfile = ({
@@ -279,7 +211,6 @@ export const buildProfile = ({
   endSpeed,
   accelerationDistanceShare,
   decelerationDistanceShare,
-  targetDuration,
 }: ProfileSegmentInput) =>
   createMotionProfile({
     distance: to - from,
@@ -288,5 +219,4 @@ export const buildProfile = ({
     endSpeed,
     accelerationDistanceShare,
     decelerationDistanceShare,
-    targetDuration,
   });
