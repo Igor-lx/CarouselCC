@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 
 import appStyles from "./App.module.scss";
 import { CAROUSEL_SOURCES, CAROUSEL_SOURCES2 } from "./carouselData";
-import { useImagePreload } from "./useImagePreload";
 import { useCompactLandscape } from "./useCompactLandscape";
 import { useBreakpoint, useIsTouchDevice } from "../shared";
 import Carousel, { type Slide } from "../components/Carousel";
@@ -39,7 +38,6 @@ export default function App() {
 
   const [isAutoplay, setIsAutoplay] = useState(false);
   const [isInteractive, setIsInteractive] = useState(true);
-  const [isCarouselIdle, setIsCarouselIdle] = useState(true);
 
   const device = useBreakpoint(VISIBLE_BY_BREAKPOINT);
 
@@ -47,23 +45,13 @@ export default function App() {
     isTouch && isCompactLandscape ? COMPACT_LANDSCAPE_VISIBLE_SLIDES : device;
   const useMobileImages = isTouch || device === VISIBLE_BY_BREAKPOINT.MOBILE;
 
-  const slideImageUrls = useMemo(
-    () =>
-      ACTIVE_CAROUSEL_SOURCES.map((entry) =>
-        useMobileImages ? entry.mobile : entry.desktop,
-      ),
-    [useMobileImages],
-  );
-
-  useImagePreload(slideImageUrls, isCarouselIdle);
-
   const slidesData = useMemo(
     () =>
-      ACTIVE_CAROUSEL_SOURCES.map((entry, index) => ({
+      ACTIVE_CAROUSEL_SOURCES.map((entry) => ({
         id: entry.id,
-        content: slideImageUrls[index],
+        content: useMobileImages ? entry.mobile : entry.desktop,
       })),
-    [slideImageUrls],
+    [useMobileImages],
   );
 
   return (
@@ -105,7 +93,6 @@ export default function App() {
             isPagePaddingOn
             isTouchDevice={isTouch}
             onSlideClick={openSlide}
-            onMotionIdleStatusChange={setIsCarouselIdle}
           >
             {isTouch ? <PaginationWidget /> : <Pagination />}
             <Controls />

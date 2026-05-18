@@ -109,7 +109,7 @@ visible.
 | Prop                       | Type | Effect |
 | -------------------------- | ---- | ------ |
 | `onSlideClick`             | `(slide: Slide) => void` | Fires when an interactive slide is clicked. The slide is interactive only when `isInteractive`, the image (if any) loaded successfully, and this handler is provided. |
-| `onMotionIdleStatusChange` | `(isIdle: boolean) => void` | Fires when the carousel crosses the idle ↔ running boundary. **Observation-only**: it never drives carousel semantics. Intended for consumers that need to coordinate work around motion (e.g. defer image preload/decode until idle so the decoder does not compete with the motion RAF). The callback never receives the reducer state, the visual position stream, or any internal detail. |
+| `onMotionIdleStatusChange` | `(isIdle: boolean) => void` | Fires when the carousel crosses the idle ↔ running boundary. **Observation-only**: it never drives carousel semantics. Intended for consumers that need to coordinate non-critical work around motion. The carousel also owns nearby slide-image preparation internally; the callback never receives reducer state, the visual position stream, or any internal detail. |
 
 #### Styling
 
@@ -198,9 +198,14 @@ These are the user-facing behaviours the implementation guarantees.
   `isAuto`. On the final page in finite mode, the next step loops back to
   page 0 via `GO_TO` (using `durationJump`).
 - **External motion-idle signal.** `onMotionIdleStatusChange` fires once on
-  each idle↔running crossing. Asset preloaders should pause decoding while
-  `isIdle === false` so the image decoder does not compete with the motion
-  RAF and the React commit phase of state transitions.
+  each idle↔running crossing. Consumers may use it to schedule non-critical
+  work around motion. The signal remains observation-only.
+- **Image preparation.** When `isContentImg` is on, the slide layer prepares
+  image URLs around the idle viewport (visible band plus three neighbouring
+  slides on each side). It starts on initial idle mount and resumes after
+  later movements only while the carousel is idle. Preparation loads and then
+  decodes images on idle browser time; it never changes navigation, layout,
+  motion state, or slide rendering semantics.
 - **Reduced motion.** When `isInstantMotion` is set or
   `prefers-reduced-motion` is detected, every transition snaps instantly,
   the gesture adapter is disabled, and pagination dot transitions are
@@ -298,6 +303,8 @@ Every responsibility has exactly one owner. The orchestrator
 | Motion execution | `useMotionRunner` | Reads logical state, builds a segment, calls into the controller. |
 | Track DOM | `useTrackBinding` | Measures slot size and subscribes to visual position; writes `transform`. |
 | Render window | `useSlideRenderModel` | Memoised; expands during motion, snaps on idle. |
+| Image preparation | `useSlideImagePreload` | Slide-layer preload/decode for nearby image URLs. Runs only while idle and never feeds back into motion or state transitions. |
+| Slide image errors | `useSlideImageErrorState` | Local rendered-image error state and retry probe for a single `SlideItem`. |
 | Gesture lifecycle | `useCarouselGesture` | Wraps the shared `usePointerSwipe`. Converts pointer events into dispatches and direct position writes. |
 | Autoplay lifecycle | `useAutoplay` | Owns the interval timer, hover/visibility/dragging pause. |
 | Focus shift | `useFocusRecovery` | Triggers when the state settles. |
@@ -642,6 +649,8 @@ src/components/Carousel/
 ├── slides/
 │   ├── SlideItem.tsx
 │   ├── SlideItem.types.ts
+│   ├── useSlideImageErrorState.ts  rendered image load/error lifecycle
+│   ├── useSlideImagePreload.ts     idle image preload/decode window
 │   ├── useCarouselSlideDeck.ts    layout, records, perfect-page info
 │   └── useSlideRenderModel.ts     virtual slides + render window
 ├── slots/
@@ -707,10 +716,9 @@ dependencies, the architecture has held.
   geometry, malformed transforms) — which is the intended signal that
   the input must be fixed.
 - **`onMotionIdleStatusChange` is observation-only.** It never drives
-  carousel semantics, never receives reducer state, and never moves
-  asset-loading responsibility into the component. The carousel's
-  contract is the deck itself; preload coordination is an application
-  concern.
+  carousel semantics and never receives reducer state. Internal image
+  preparation uses the carousel's own idle status directly; external consumers
+  can still use the callback for application-owned non-critical work.
 
 ---
 
@@ -738,4 +746,5 @@ dependencies, the architecture has held.
   The PaginationWidget binding short-circuits writes per dot. The motion
   controller emits only on actual sample change (per RAF tick of an
   active segment; one synchronous emit on segment start; no emits while
-  idle).
+  idle). Image preload/decode is scoped to the slide layer and starts only
+  from idle states.

@@ -1,6 +1,7 @@
 import clsx from "clsx";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo } from "react";
 import type { SlideItemProps } from "./SlideItem.types";
+import { useSlideImageErrorState } from "./useSlideImageErrorState";
 
 /**
  * Renders one slide. The active band is derived externally via
@@ -22,54 +23,13 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
     ...ariaProps
   } = props;
 
-  // The image-error state is mirrored to a ref so that the per-event
-  // `onLoad` / `onError` handlers can deduplicate calls without scheduling a
-  // React commit when the value didn't actually change. The native `img`
-  // can fire `load` multiple times on the same src (e.g. when re-attaching
-  // attributes); a naive `setState(false)` on every fire is a tiny but real
-  // source of re-renders during normal motion.
-  const [hasImageError, setHasImageError] = useState(false);
-  const hasImageErrorRef = useRef(false);
-  const wasActualRef = useRef(Boolean(isActual));
-
-  const updateImageError = useCallback((next: boolean) => {
-    if (hasImageErrorRef.current === next) return;
-    hasImageErrorRef.current = next;
-    setHasImageError(next);
-  }, []);
-
   const imageSource =
     isContentImg && typeof slideData?.content === "string"
       ? slideData.content
       : null;
 
-  useEffect(() => {
-    updateImageError(false);
-  }, [imageSource, updateImageError]);
-
-  useEffect(() => {
-    const becameActual = Boolean(isActual) && !wasActualRef.current;
-    wasActualRef.current = Boolean(isActual);
-
-    if (!becameActual || !hasImageError || !imageSource) return;
-
-    let disposed = false;
-    const probe = new Image();
-
-    probe.onload = () => {
-      if (!disposed) updateImageError(false);
-    };
-    probe.onerror = () => {
-      if (!disposed) updateImageError(true);
-    };
-    probe.src = imageSource;
-
-    return () => {
-      disposed = true;
-      probe.onload = null;
-      probe.onerror = null;
-    };
-  }, [hasImageError, imageSource, isActual, updateImageError]);
+  const { hasImageError, markImageFailed, markImageLoaded } =
+    useSlideImageErrorState({ imageSource, isActual });
 
   if (!slideData) return null;
 
@@ -96,11 +56,9 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
           <img
             src={slideData.content}
             alt={slideData.alt || ""}
-            decoding="async"
-            fetchPriority={isActive ? "high" : "low"}
             draggable={false}
-            onLoad={() => updateImageError(false)}
-            onError={() => updateImageError(true)}
+            onLoad={markImageLoaded}
+            onError={markImageFailed}
           />
         ) : (
           slideData.alt || errAltPlaceholder
