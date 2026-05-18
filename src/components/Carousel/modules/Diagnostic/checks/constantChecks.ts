@@ -68,7 +68,7 @@ const numericRules: NumericRule[] = [
     field: "REPEATED_CLICK_SPEED_MULTIPLIER",
     value: REPEATED_CLICK_SPEED_MULTIPLIER,
     severity: "LOGICAL",
-    expected: "Expected a finite number greater than 1 (4.5 is the product baseline)",
+    expected: "Expected a finite number greater than 1",
     consequence: "Repeated-click acceleration loses the feel of an in-flight boost",
     predicate: greaterThan(1),
   },

@@ -197,12 +197,23 @@ These are the user-facing behaviours the implementation guarantees.
   each idle↔running crossing. Consumers may use it to schedule non-critical
   work around motion. The signal remains observation-only; the carousel also
   runs its own image preparation for nearby image slides while idle.
-- **Image preparation.** When `isContentImg` is on, the slide layer prepares
-  image URLs around the idle viewport (visible band plus three neighbouring
-  slides on each side). It starts on initial idle mount and resumes after
-  later movements only while the carousel is idle. Preparation loads and then
-  decodes images on idle browser time; it never changes navigation, layout,
-  motion state, or slide rendering semantics.
+- **Image preparation.** When `isContentImg` is on, the slide layer warms
+  image URLs around the idle viewport: the visible band plus a page-lookahead
+  buffer on each side, nearest-first. The carousel steps a whole page
+  (`visibleSlidesCount` slides) at a time, so the buffer is sized in
+  page-steps via a lookahead schedule (`config/slides`) that shrinks as the
+  visible band widens, keeping the absolute warmed buffer bounded. It starts
+  on initial idle mount and resumes after later movements only while the
+  carousel is idle. Warm-up fetches are low priority and decode on idle
+  browser time. The result lands in the image-resource SSOT, so a slide
+  entering the render window observes an already-`loaded` resource. It never
+  changes navigation, layout, motion state, or slide rendering semantics.
+- **Image errors and retry.** A slide whose image fails to load renders a
+  text placeholder (`alt`, or `errAltPlaceholder`) and is not interactive.
+  While such a slide sits in the active band, the image-resource store
+  retries the URL on an exponential backoff (capped attempts); a successful
+  retry remounts the slide's `<img>` and restores it. Error and retry are a
+  single store-owned mechanism — slides hold no private error state.
 - **Reduced motion.** When `isInstantMotion` is set or
   `prefers-reduced-motion` is detected, every transition snaps instantly,
   the gesture adapter is disabled, and pagination dot transitions are
@@ -300,8 +311,9 @@ Every responsibility has exactly one owner. The orchestrator
 | Motion execution | `useMotionRunner` | Reads logical state, builds a segment, calls into the controller. |
 | Track DOM | `useTrackBinding` | Measures slot size and subscribes to visual position; writes `transform`. |
 | Render window | `useSlideRenderModel` | Memoised; expands during motion, snaps on idle. |
-| Image preparation | `useSlideImagePreload` | Slide-layer preload/decode for nearby image URLs. Runs only while idle and never feeds back into motion or state transitions. |
-| Slide image errors | `useSlideImageErrorState` | Local rendered-image error state and retry probe for a single `SlideItem`. |
+| Image resources | image-resource store (`createImageResourceStore`) | Per-URL load/error/decode state, retry policy, and offscreen warm-up. One instance per carousel; the single authority on image health. |
+| Image preparation | `useSlideImagePreload` | React adapter that derives the deck + idle-window URL sets and drives the image-resource store. Holds no image logic of its own. |
+| Slide image binding | `useImageResource` | Subscribes one `SlideItem` to its URL in the image-resource store via `useSyncExternalStore`. |
 | Gesture lifecycle | `useCarouselGesture` | Wraps the shared `usePointerSwipe`. Converts pointer events into dispatches and direct position writes. |
 | Autoplay lifecycle | `useAutoplay` | Owns the interval timer, hover/visibility/dragging pause. |
 | Focus shift | `useFocusRecovery` | Triggers when the state settles. |
@@ -317,7 +329,7 @@ context provider.
 
 ## 3. Single source of truth (SSOT)
 
-The system has four SSOTs, each owned by exactly one layer.
+The system has five SSOTs, each owned by exactly one layer.
 
 1. **Logical state** — `useCarouselState`. Holds `activePageIndex`,
    `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`,
@@ -335,6 +347,17 @@ The system has four SSOTs, each owned by exactly one layer.
    `undefined` props. Never coerces, clamps, or repairs explicit values;
    the diagnostic layer surfaces violations without modifying the
    resolved config.
+5. **Image resources** — the image-resource store
+   (`createImageResourceStore`, one instance per carousel, created only when
+   `isContentImg` is on). Holds one entry
+   per image URL: `status` (`loading | loaded | error`), a retry
+   `generation`, and the offscreen warm-up element. It is the single
+   authority on "is this image healthy". `useSlideImagePreload` is its only
+   writer of warm-up intent; each `SlideItem` subscribes to its own URL via
+   `useImageResource` and reports the real `<img>` outcome back. "Has this
+   slide's image failed" is a *derived read* of this SSOT, never a second
+   copy of state. Observation-only: it never feeds navigation, layout, or
+   motion.
 
 No layer mirrors another layer's value. The state machine never reads a
 sampled motion value: the gesture controller reads the visual position and
@@ -622,8 +645,13 @@ src/components/Carousel/
 ├── slides/
 │   ├── SlideItem.tsx
 │   ├── SlideItem.types.ts
-│   ├── useSlideImageErrorState.ts  rendered image load/error lifecycle
-│   ├── useSlideImagePreload.ts     idle image preload/decode window
+│   ├── imageResource/             image-resource SSOT (store + React bridge)
+│   │   ├── createImageResourceStore.ts  framework-agnostic store
+│   │   ├── context.ts             per-carousel store provider
+│   │   ├── useImageResource.ts    per-slide useSyncExternalStore binding
+│   │   ├── useImageResourceStoreInstance.ts  lifecycle owner
+│   │   └── types.ts
+│   ├── useSlideImagePreload.ts     idle warm-up window → image-resource store
 │   ├── useCarouselSlideDeck.ts    layout, records, perfect-page info
 │   └── useSlideRenderModel.ts     virtual slides + render window
 ├── slots/

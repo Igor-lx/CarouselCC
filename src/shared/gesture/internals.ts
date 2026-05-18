@@ -2,6 +2,12 @@ import type { ResolvedPointerSwipeConfig } from "./types";
 
 const FRAME_BUDGET_MS = 1000 / 60;
 
+/**
+ * Lower bound for the `1 - resistance` denominator in the stiffness term.
+ * Keeps `applyResistance` finite as `resistance` approaches 1.
+ */
+const MIN_RESISTANCE_DENOMINATOR = 0.001;
+
 export const safeResistance = (value: number) => Math.max(0, Math.min(1, value));
 
 export const applyResistance = (
@@ -12,7 +18,8 @@ export const applyResistance = (
   const sign = Math.sign(offset);
   const abs = Math.abs(offset);
   const safe = safeResistance(resistance);
-  const stiffness = safe <= 0 ? 0 : safe / Math.max(1 - safe, 0.001);
+  const stiffness =
+    safe <= 0 ? 0 : safe / Math.max(1 - safe, MIN_RESISTANCE_DENOMINATOR);
   return sign * (abs / (1 + abs * Math.max(0, curvature) * stiffness));
 };
 

@@ -1,5 +1,4 @@
-import { useState, useSyncExternalStore } from "react";
-import { useIsomorphicLayoutEffect } from "./useIsomorphicLayoutEffect";
+import { useSyncExternalStore } from "react";
 
 let isReduced = false;
 let mediaQuery: MediaQueryList | null = null;
@@ -35,13 +34,11 @@ const subscribe = (callback: () => void) => {
 const getSnapshot = () => isReduced;
 const getServerSnapshot = () => false;
 
+/**
+ * Reports the `prefers-reduced-motion` setting. Backed by
+ * `useSyncExternalStore`, which handles the SSR/hydration snapshot split
+ * natively via `getServerSnapshot` — no manual mount gate needed.
+ */
 export function useIsReducedMotion(): boolean {
-  const [mounted, setMounted] = useState(false);
-  const detected = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-
-  useIsomorphicLayoutEffect(() => {
-    setMounted(true);
-  }, []);
-
-  return mounted ? detected : false;
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

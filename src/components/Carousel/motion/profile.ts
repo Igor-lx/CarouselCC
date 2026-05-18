@@ -31,6 +31,12 @@ export interface MotionProfileInput {
  */
 const MIN_PROFILE_SPEED = 1e-6;
 const OVERALLOCATED_PROFILE_SHARE = 0.5;
+/**
+ * Iteration cap for the peak-speed solver — both the bracket-expansion phase
+ * and the bisection phase are bounded by it. Well above the count needed to
+ * converge to sub-pixel precision; it exists only to guarantee termination.
+ */
+const PEAK_SPEED_SOLVE_ITERATIONS = 24;
 
 const smoothstep = (progress: number) => progress * progress * (3 - 2 * progress);
 
@@ -105,14 +111,18 @@ const solvePeakForDuration = (input: {
   let upper = lower;
   let upperDuration = profileDurationForPeak({ ...input, peakSpeed: upper });
 
-  for (let i = 0; upperDuration > input.targetDuration && i < 24; i += 1) {
+  for (
+    let i = 0;
+    upperDuration > input.targetDuration && i < PEAK_SPEED_SOLVE_ITERATIONS;
+    i += 1
+  ) {
     upper *= 2;
     upperDuration = profileDurationForPeak({ ...input, peakSpeed: upper });
   }
 
   if (upperDuration > input.targetDuration) return upper;
 
-  for (let i = 0; i < 24; i += 1) {
+  for (let i = 0; i < PEAK_SPEED_SOLVE_ITERATIONS; i += 1) {
     const middle = (lower + upper) / 2;
     const middleDuration = profileDurationForPeak({ ...input, peakSpeed: middle });
     if (middleDuration > input.targetDuration) lower = middle;

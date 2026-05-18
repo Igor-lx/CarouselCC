@@ -23,6 +23,13 @@ export {
   CAROUSEL_SWIPE_CONFIG,
   CAROUSEL_INERTIAL_RELEASE_CONFIG,
 } from "./gesture";
+export {
+  PRELOAD_PAGE_LOOKAHEAD_BY_VISIBLE,
+  PRELOAD_PAGE_LOOKAHEAD_DEFAULT,
+  IMAGE_RETRY_BASE_DELAY_MS,
+  IMAGE_RETRY_MAX_DELAY_MS,
+  IMAGE_RETRY_MAX_ATTEMPTS,
+} from "./slides";
 export { buildRawCarouselConfig } from "./buildRawConfig";
 export { useCarouselConfig } from "./useCarouselConfig";
 export type {

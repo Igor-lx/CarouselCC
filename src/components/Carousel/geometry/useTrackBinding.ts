@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type RefObject } from "react";
+import { useCallback, useRef, type RefObject } from "react";
 
 import {
   measureSlotSize,
@@ -166,11 +166,6 @@ export function useTrackBinding({
   );
 
   const getSlotSize = useCallback(() => slotSizeRef.current ?? 0, []);
-
-  // Initial geometry write before any subscription
-  useEffect(() => {
-    syncGeometry();
-  }, [syncGeometry]);
 
   return { applyTrackPosition, readCurrentPosition, getSlotSize };
 }

@@ -43,15 +43,15 @@ export default function App() {
 
   const visibleSlidesNr =
     isTouch && isCompactLandscape ? COMPACT_LANDSCAPE_VISIBLE_SLIDES : device;
-  const useMobileImages = isTouch || device === VISIBLE_BY_BREAKPOINT.MOBILE;
+  const isMobileImagery = isTouch || device === VISIBLE_BY_BREAKPOINT.MOBILE;
 
   const slidesData = useMemo(
     () =>
       ACTIVE_CAROUSEL_SOURCES.map((entry) => ({
         id: entry.id,
-        content: useMobileImages ? entry.mobile : entry.desktop,
+        content: isMobileImagery ? entry.mobile : entry.desktop,
       })),
-    [useMobileImages],
+    [isMobileImagery],
   );
 
   return (

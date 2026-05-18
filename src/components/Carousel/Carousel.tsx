@@ -24,8 +24,10 @@ import { useCarouselNavigation } from "./navigation";
 import { useVisualPosition } from "./position";
 import { useModuleRenderPolicy } from "./render-policy/useModuleRenderPolicy";
 import {
+  CarouselImageResourceContext,
   SlideItem,
   useCarouselSlideDeck,
+  useImageResourceStoreInstance,
   useSlideImagePreload,
   useSlideRenderModel,
 } from "./slides";
@@ -97,12 +99,19 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   });
   const lastReportedMotionIdleRef = useRef<boolean | null>(null);
 
+  // --- image-resource SSOT --------------------------------------------------
+  // The store exists only when the carousel renders image content; with
+  // `isContentImg` off it is `null` and no image machinery runs. Preload
+  // writes into it; every SlideItem subscribes to its own URL via context.
+  const imageResourceStore = useImageResourceStoreInstance(isContentImg);
+
   useSlideImagePreload({
     records,
     layout,
     currentVirtualIndex: state.virtualIndex,
     isIdle: status.isIdle,
     isContentImg,
+    store: imageResourceStore,
   });
 
   useEffect(() => {
@@ -350,49 +359,51 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   return (
     <CarouselModuleContext.Provider value={moduleContextValue}>
       <CarouselDiagnosticContext.Provider value={diagnosticContextValue}>
-        <div
-          className={classNames.outerContainer}
-          role="region"
-          aria-roledescription="carousel"
-          data-carousel-root=""
-          data-touch={isTouch}
-          data-reduced-motion={isInstantMode}
-        >
+        <CarouselImageResourceContext.Provider value={imageResourceStore}>
           <div
-            ref={viewportRef}
-            tabIndex={-1}
-            className={classNames.innerContainer}
-            data-carousel-viewport=""
-            onMouseEnter={() => handleHoverChange(true)}
-            onMouseLeave={() => handleHoverChange(false)}
-            {...dragListeners}
+            className={classNames.outerContainer}
+            role="region"
+            aria-roledescription="carousel"
+            data-carousel-root=""
+            data-touch={isTouch}
+            data-reduced-motion={isInstantMode}
           >
             <div
-              ref={trackRef}
-              className={classNames.slideContainer}
-              data-carousel-track=""
+              ref={viewportRef}
+              tabIndex={-1}
+              className={classNames.innerContainer}
+              data-carousel-viewport=""
+              onMouseEnter={() => handleHoverChange(true)}
+              onMouseLeave={() => handleHoverChange(false)}
+              {...dragListeners}
             >
-              {virtualSlides.map((slide) => (
-                <SlideItem
-                  key={slide.slideKey}
-                  slideData={slide.slideData}
-                  className={slideClassMap}
-                  style={slideStyle}
-                  isContentImg={isContentImg}
-                  errAltPlaceholder={config.errorAltPlaceholder}
-                  isInteractive={isInteractive}
-                  isActive={slide.isActive}
-                  isActual={slide.isActual}
-                  onSlideClick={navigation.handleSlideClick}
-                  {...slide.ariaProps}
-                />
-              ))}
+              <div
+                ref={trackRef}
+                className={classNames.slideContainer}
+                data-carousel-track=""
+              >
+                {virtualSlides.map((slide) => (
+                  <SlideItem
+                    key={slide.slideKey}
+                    slideData={slide.slideData}
+                    className={slideClassMap}
+                    style={slideStyle}
+                    isContentImg={isContentImg}
+                    errAltPlaceholder={config.errorAltPlaceholder}
+                    isInteractive={isInteractive}
+                    isActive={slide.isActive}
+                    isActual={slide.isActual}
+                    onSlideClick={navigation.handleSlideClick}
+                    {...slide.ariaProps}
+                  />
+                ))}
+              </div>
+              {renderPolicy.shouldRenderControls ? slots.controls : null}
             </div>
-            {renderPolicy.shouldRenderControls ? slots.controls : null}
+            {renderPolicy.shouldRenderPagination ? slots.pagination : null}
+            {slots.diagnostic}
           </div>
-          {renderPolicy.shouldRenderPagination ? slots.pagination : null}
-          {slots.diagnostic}
-        </div>
+        </CarouselImageResourceContext.Provider>
       </CarouselDiagnosticContext.Provider>
     </CarouselModuleContext.Provider>
   );
