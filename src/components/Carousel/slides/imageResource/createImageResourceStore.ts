@@ -18,6 +18,8 @@ const PRELOAD_FETCH_PRIORITY = "low" as const;
 /** Idle-decode scheduler tuning (mirrors the browser's idle-callback model). */
 const IDLE_DECODE_MIN_BUDGET_MS = 8;
 const IDLE_DECODE_FALLBACK_DELAY_MS = 160;
+const IDLE_DECODE_FALLBACK_BATCH_SIZE = 1;
+const DECODE_QUEUE_COMPACT_HEAD_LIMIT = 32;
 
 /**
  * Shared snapshot for an untracked URL. A URL the store has never seen is
@@ -65,8 +67,10 @@ export function createImageResourceStore(): ImageResourceStore {
   const entries = new Map<string, ImageEntry>();
   const listeners = new Map<string, Set<() => void>>();
   const decodeQueue: string[] = [];
+  const queuedDecodeUrls = new Set<string>();
   const canUseDom = typeof window !== "undefined";
 
+  let decodeQueueHead = 0;
   let idleHandle: number | null = null;
   let idleTimer: number | null = null;
   let decodeEnabled = false;
@@ -132,13 +136,14 @@ export function createImageResourceStore(): ImageResourceStore {
     commit(entry, url, "error", false);
   };
 
-  const handleWarmupError = (entry: ImageEntry, url: string): void => {
+  const handleWarmupError = (entry: ImageEntry): void => {
     const element = entry.preloadElement;
     if (!element) return;
     element.onload = null;
     element.onerror = null;
+    // Keep the entry: a speculative miss must not become a visible error, but
+    // it should also not be retried on every later idle window.
     entry.preloadElement = null;
-    if (!listeners.get(url)?.size) entries.delete(url);
   };
 
   // --- idle decode --------------------------------------------------------
@@ -159,6 +164,39 @@ export function createImageResourceStore(): ImageResourceStore {
     }
   };
 
+  const hasQueuedDecode = (): boolean =>
+    queuedDecodeUrls.size > 0;
+
+  const resetDecodeQueueIfEmpty = (): void => {
+    if (queuedDecodeUrls.size > 0) return;
+    decodeQueue.length = 0;
+    decodeQueueHead = 0;
+  };
+
+  const compactDecodeQueue = (): void => {
+    if (
+      decodeQueueHead < DECODE_QUEUE_COMPACT_HEAD_LIMIT ||
+      decodeQueueHead * 2 < decodeQueue.length
+    ) {
+      return;
+    }
+    decodeQueue.splice(0, decodeQueueHead);
+    decodeQueueHead = 0;
+  };
+
+  const dequeueDecode = (): string | null => {
+    while (decodeQueueHead < decodeQueue.length) {
+      const url = decodeQueue[decodeQueueHead++]!;
+      if (!queuedDecodeUrls.delete(url)) continue;
+      compactDecodeQueue();
+      resetDecodeQueueIfEmpty();
+      return url;
+    }
+    compactDecodeQueue();
+    resetDecodeQueueIfEmpty();
+    return null;
+  };
+
   const cancelScheduledDecode = (): void => {
     if (!canUseDom) return;
     if (idleHandle !== null) window.cancelIdleCallback?.(idleHandle);
@@ -171,16 +209,18 @@ export function createImageResourceStore(): ImageResourceStore {
     idleHandle = null;
     idleTimer = null;
     if (!decodeEnabled) return;
-    while (decodeQueue.length > 0 && hasBudget()) {
-      decodeOne(decodeQueue.shift()!);
+    while (hasBudget()) {
+      const url = dequeueDecode();
+      if (url === null) break;
+      decodeOne(url);
     }
-    if (decodeQueue.length > 0) pumpDecodeQueue();
+    if (hasQueuedDecode()) pumpDecodeQueue();
   };
 
   function pumpDecodeQueue(): void {
     if (!canUseDom || disposed || !decodeEnabled) return;
     if (idleHandle !== null || idleTimer !== null) return;
-    if (decodeQueue.length === 0) return;
+    if (!hasQueuedDecode()) return;
 
     if (typeof window.requestIdleCallback === "function") {
       idleHandle = window.requestIdleCallback((deadline) => {
@@ -192,14 +232,16 @@ export function createImageResourceStore(): ImageResourceStore {
     }
 
     idleTimer = window.setTimeout(() => {
-      drainDecodeQueue(() => true);
+      let remaining = IDLE_DECODE_FALLBACK_BATCH_SIZE;
+      drainDecodeQueue(() => remaining-- > 0);
     }, IDLE_DECODE_FALLBACK_DELAY_MS);
   }
 
   const enqueueDecode = (url: string): void => {
     const entry = entries.get(url);
     if (!entry || entry.decodeRequested || !entry.preloadElement) return;
-    if (decodeQueue.includes(url)) return;
+    if (queuedDecodeUrls.has(url)) return;
+    queuedDecodeUrls.add(url);
     decodeQueue.push(url);
     pumpDecodeQueue();
   };
@@ -219,7 +261,7 @@ export function createImageResourceStore(): ImageResourceStore {
     };
     element.onerror = () => {
       if (disposed) return;
-      handleWarmupError(entry, url);
+      handleWarmupError(entry);
     };
 
     element.src = url;
@@ -327,8 +369,8 @@ export function createImageResourceStore(): ImageResourceStore {
         if (listeners.get(url)?.size) return;
         releaseEntry(entry);
         entries.delete(url);
-        const queued = decodeQueue.indexOf(url);
-        if (queued !== -1) decodeQueue.splice(queued, 1);
+        queuedDecodeUrls.delete(url);
+        resetDecodeQueueIfEmpty();
       });
     },
 
@@ -339,6 +381,8 @@ export function createImageResourceStore(): ImageResourceStore {
       entries.clear();
       listeners.clear();
       decodeQueue.length = 0;
+      queuedDecodeUrls.clear();
+      decodeQueueHead = 0;
     },
   };
 }
