@@ -191,10 +191,11 @@ These are the user-facing behaviours the implementation guarantees.
   (`swipeThresholdRatio` of the viewport width with a hard min). When the
   intent is `NONE`, the track snaps back via the snap-back curve over
   `SNAP_BACK_DURATION` (1300 ms).
-- **Gesture interrupts motion.** Once the pointer crosses the horizontal drag
-  threshold while the carousel is animating, the drag starts from the visually
-  sampled position at that moment. A plain tap does not enter reducer state.
-  The cancel is published
+- **Gesture interrupts motion.** A touch on the non-interactive carousel
+  surface cancels active motion at press-down and starts from the visually
+  sampled position. A touch on an interactive child (button/link-like slide)
+  waits until horizontal swipe intent is recognised, so ordinary taps remain
+  clickable. The cancel is published
   through the visual-position SSOT, so the pagination widget, the track,
   and the motion runner all observe one consistent state during the
   gesture.
@@ -524,11 +525,10 @@ It is not carousel-specific and is reusable.
 
 `useCarouselGesture` is the carousel-specific adapter. It:
 
-1. on drag-start (after horizontal intent is recognised): records the visually
-   sampled origin position and the slot size (`getSlotSize()`), dispatches
-   `START_DRAG`, then publishes the drag position into the visual stream via
-   `applyTrackPosition`. A tap that never becomes a drag stays outside the
-   carousel reducer;
+1. on press-start for the non-interactive surface, or on horizontal intent for
+   an interactive child: records the visually sampled origin position and the
+   slot size (`getSlotSize()`), dispatches `START_DRAG`, then publishes the
+   origin into the visual stream via `applyTrackPosition`;
 2. on every move payload: translates `uiOffset` into a virtual-index
    delta using the recorded slot size and writes that into the visual
    position via `applyTrackPosition`. No React state per move;
@@ -547,8 +547,9 @@ release segment.
 A reducer-backed state machine in `state/`. Discriminated `CarouselCommand`
 union:
 
-- `START_DRAG { fromVirtualIndex, targetPageIndex }` - fires when the pointer
-  crosses the horizontal drag threshold.
+- `START_DRAG { fromVirtualIndex, targetPageIndex }` - fires at press-down on
+  the non-interactive surface, or after horizontal intent on an interactive
+  child.
 - `END_DRAG { targetPageIndex, targetVirtualIndex, isSnap, isInstant,
   pointerReleaseVelocity, uiReleaseVelocity }` — fires at gesture release.
 - `MOVE { step, moveReason, fromVirtualIndex, isInstant? }` — click /

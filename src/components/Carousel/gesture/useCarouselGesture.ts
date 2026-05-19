@@ -53,8 +53,9 @@ export function useCarouselGesture({
     [],
   );
 
-  const handleDragStart = useCallback(
-    (payload: PointerSwipeMovePayload) => {
+  const startDragFromCurrentPosition = useCallback(() => {
+    if (originPositionRef.current !== null) return;
+
       slotSizeRef.current = getSlotSize();
       const origin = readCurrentPosition();
       applyTrackPosition(origin);
@@ -68,16 +69,23 @@ export function useCarouselGesture({
         fromVirtualIndex: origin,
         targetPageIndex: pageIndex,
       });
+  }, [
+    applyTrackPosition,
+    dispatch,
+    getSlotSize,
+    layout,
+    readCurrentPosition,
+  ]);
 
+  const handleDragStart = useCallback(
+    (payload: PointerSwipeMovePayload) => {
+      startDragFromCurrentPosition();
       applyTrackPosition(offsetToPosition(payload.uiOffset));
     },
     [
       applyTrackPosition,
-      dispatch,
-      getSlotSize,
-      layout,
       offsetToPosition,
-      readCurrentPosition,
+      startDragFromCurrentPosition,
     ],
   );
 
@@ -133,6 +141,7 @@ export function useCarouselGesture({
     enabled,
     measureRef: viewportRef,
     config: config.swipeConfig,
+    onPressStart: startDragFromCurrentPosition,
     onDragStart: handleDragStart,
     onDragMove: handleDragMove,
     onRelease: handleRelease,
