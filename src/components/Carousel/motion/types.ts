@@ -5,12 +5,15 @@ export type CarouselMotionStrategy =
   | "gesture-easing"
   | "gesture"
   | "repeated"
+  | "jump"
   | "idle";
 
 export type CarouselMotionIntent =
   | "instant"
   | "snap"
   | "jump"
+  | "teleport-preflight"
+  | "teleport-approach"
   | "click-step"
   | "repeated-click"
   | "autoplay-step"
@@ -38,7 +41,7 @@ export interface EasingSegment extends SegmentBase {
 }
 
 export interface ProfileSegment extends SegmentBase {
-  strategy: "gesture" | "repeated";
+  strategy: "gesture" | "repeated" | "jump";
   profile: MotionProfile;
 }
 

@@ -19,6 +19,13 @@ const PRELOAD_FETCH_PRIORITY = "low" as const;
 /** Idle-decode scheduler tuning (mirrors the browser's idle-callback model). */
 const IDLE_DECODE_MIN_BUDGET_MS = 8;
 const IDLE_DECODE_FALLBACK_DELAY_MS = 160;
+/**
+ * `requestIdleCallback` exposes a real frame budget; the `setTimeout` fallback
+ * does not, so it drains a fixed small batch per tick instead of the whole
+ * queue at once - decoding the full window in one synchronous burst can jank
+ * the main thread on a low-end device.
+ */
+const IDLE_DECODE_FALLBACK_BATCH_SIZE = 1;
 
 /**
  * Shared snapshot for an untracked URL. A URL the store has never seen is
@@ -308,7 +315,8 @@ export function createImageResourceStore(): ImageResourceStore {
     }
 
     idleTimer = window.setTimeout(() => {
-      drainDecodeQueue(session.id, () => true);
+      let remaining = IDLE_DECODE_FALLBACK_BATCH_SIZE;
+      drainDecodeQueue(session.id, () => remaining-- > 0);
     }, IDLE_DECODE_FALLBACK_DELAY_MS);
   }
 

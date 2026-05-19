@@ -28,6 +28,7 @@ interface UseCarouselGestureInput {
 
 export interface CarouselGestureResult {
   isDragging: boolean;
+  isInteracting: boolean;
   listeners: PointerSwipeListeners;
 }
 
@@ -117,7 +118,7 @@ export function useCarouselGesture({
     [applyTrackPosition, dispatch, enabled, layout, offsetToPosition],
   );
 
-  const { isDragging, listeners } = usePointerSwipe({
+  const { isDragging, isInteracting, listeners } = usePointerSwipe({
     enabled,
     measureRef: viewportRef,
     config: config.swipeConfig,
@@ -126,5 +127,5 @@ export function useCarouselGesture({
     onRelease: handleRelease,
   });
 
-  return { isDragging, listeners };
+  return { isDragging, isInteracting, listeners };
 }

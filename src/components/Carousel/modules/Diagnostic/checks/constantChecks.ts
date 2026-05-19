@@ -5,11 +5,13 @@ import {
   CAROUSEL_INERTIAL_RELEASE_CONFIG,
   CAROUSEL_SWIPE_CONFIG,
   DRAG_RELEASE_EPSILON,
+  GO_TO_ACCELERATION_DISTANCE_SHARE,
+  GO_TO_DECELERATION_DISTANCE_SHARE,
+  GO_TO_MAX_ANIMATED_PAGE_SPAN,
   HOVER_PAUSE_DELAY,
   IMAGE_RETRY_BASE_DELAY_MS,
   IMAGE_RETRY_MAX_ATTEMPTS,
   IMAGE_RETRY_MAX_DELAY_MS,
-  JUMP_BEZIER,
   MOTION_EPSILON,
   MOVE_BEZIER,
   PRELOAD_PAGE_LOOKAHEAD_BY_VISIBLE,
@@ -95,6 +97,33 @@ const numericRules: NumericRule[] = [
     severity: "CRITICAL",
     expected: "Expected a finite number in the range [0, 1]",
     consequence: "Deceleration zone share outside [0,1] leads to malformed motion profile zones",
+    predicate: inRangeInclusive(0, 1),
+  },
+  {
+    layer: "Motion",
+    field: "GO_TO_MAX_ANIMATED_PAGE_SPAN",
+    value: GO_TO_MAX_ANIMATED_PAGE_SPAN,
+    severity: "LOGICAL",
+    expected: "Expected a positive finite integer (page screens)",
+    consequence: "Far GO_TO teleport threshold is incoherent; jumps mis-bound the render window",
+    predicate: isPositiveInteger,
+  },
+  {
+    layer: "Motion",
+    field: "GO_TO_ACCELERATION_DISTANCE_SHARE",
+    value: GO_TO_ACCELERATION_DISTANCE_SHARE,
+    severity: "CRITICAL",
+    expected: "Expected a finite number in the range [0, 1]",
+    consequence: "Acceleration zone share outside [0,1] leads to malformed GO_TO profile zones",
+    predicate: inRangeInclusive(0, 1),
+  },
+  {
+    layer: "Motion",
+    field: "GO_TO_DECELERATION_DISTANCE_SHARE",
+    value: GO_TO_DECELERATION_DISTANCE_SHARE,
+    severity: "CRITICAL",
+    expected: "Expected a finite number in the range [0, 1]",
+    consequence: "Deceleration zone share outside [0,1] leads to malformed GO_TO profile zones",
     predicate: inRangeInclusive(0, 1),
   },
 
@@ -310,7 +339,6 @@ const numericRules: NumericRule[] = [
 const collectBezierWarnings = (): CarouselDiagnosticWarning[] => {
   const entries: Array<[string, string]> = [
     ["MOVE_BEZIER", MOVE_BEZIER],
-    ["JUMP_BEZIER", JUMP_BEZIER],
     ["AUTO_BEZIER", AUTO_BEZIER],
     ["SNAP_BACK_BEZIER", SNAP_BACK_BEZIER],
   ];
@@ -362,6 +390,31 @@ const collectRepeatedShareRelation = (): CarouselDiagnosticWarning | null => {
   };
 };
 
+/**
+ * The GO_TO profile must keep a positive cruise zone: the teleport of a far
+ * jump is spliced inside the cruise, the one interval where splicing does not
+ * break velocity continuity.
+ */
+const collectGoToShareRelation = (): CarouselDiagnosticWarning | null => {
+  const sum =
+    GO_TO_ACCELERATION_DISTANCE_SHARE + GO_TO_DECELERATION_DISTANCE_SHARE;
+  if (Number.isFinite(sum) && sum < 1) return null;
+  return {
+    severity: "LOGICAL",
+    layer: "Motion",
+    field: "GO_TO_ACCELERATION_DISTANCE_SHARE + GO_TO_DECELERATION_DISTANCE_SHARE",
+    actual: {
+      accelerationDistanceShare: GO_TO_ACCELERATION_DISTANCE_SHARE,
+      decelerationDistanceShare: GO_TO_DECELERATION_DISTANCE_SHARE,
+      sum,
+    },
+    expected:
+      "Expected acceleration + deceleration share < 1 so the GO_TO profile keeps a cruise zone",
+    consequence:
+      "Without a cruise zone a far-jump teleport has no velocity-continuous point to splice into",
+  };
+};
+
 const collectPreloadWindowWarnings = (): CarouselDiagnosticWarning[] => {
   const out: CarouselDiagnosticWarning[] = [];
   for (const [visibleSlidesCount, lookahead] of Object.entries(
@@ -407,6 +460,8 @@ export const collectConstantWarnings = (): CarouselDiagnosticWarning[] => {
   }
   const sumRelation = collectRepeatedShareRelation();
   if (sumRelation) out.push(sumRelation);
+  const goToShareRelation = collectGoToShareRelation();
+  if (goToShareRelation) out.push(goToShareRelation);
   const retryDelayRelation = collectRetryDelayRelation();
   if (retryDelayRelation) out.push(retryDelayRelation);
   out.push(...collectPreloadWindowWarnings());

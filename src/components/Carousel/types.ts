@@ -66,7 +66,7 @@ export const CarouselPropsSchema = z.object({
   durationAutoplay: z.number().optional(),
   intervalAutoplay: z.number().optional(),
   durationStep: z.number().optional(),
-  durationJump: z.number().optional(),
+  jumpSpeedMultiplier: z.number().optional(),
   isContentImg: z.boolean().optional(),
   errAltPlaceholder: z.string().optional(),
   isAuto: z.boolean().optional(),

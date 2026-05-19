@@ -53,7 +53,7 @@ export interface CarouselDiagnosticContextValue {
     visibleSlidesNr: unknown;
     durationAutoplay: unknown;
     durationStep: unknown;
-    durationJump: unknown;
+    jumpSpeedMultiplier: unknown;
     intervalAutoplay: unknown;
     errAltPlaceholder: unknown;
   };

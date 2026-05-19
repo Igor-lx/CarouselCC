@@ -6,6 +6,9 @@ import {
 } from "./constants";
 import { CAROUSEL_SWIPE_CONFIG, CAROUSEL_INERTIAL_RELEASE_CONFIG } from "./gesture";
 import {
+  GO_TO_ACCELERATION_DISTANCE_SHARE,
+  GO_TO_DECELERATION_DISTANCE_SHARE,
+  GO_TO_MAX_ANIMATED_PAGE_SPAN,
   REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
   REPEATED_CLICK_DECELERATION_DISTANCE_SHARE,
   REPEATED_CLICK_SPEED_MULTIPLIER,
@@ -31,19 +34,25 @@ export const buildRawCarouselConfig = ({
   visibleSlidesNr,
   durationAutoplay,
   durationStep,
-  durationJump,
+  jumpSpeedMultiplier,
   intervalAutoplay,
   errAltPlaceholder,
 }: RawConfigInput): CarouselRuntimeConfig => ({
   visibleSlidesCount: useDefault(visibleSlidesNr, CAROUSEL_DEFAULTS.visibleSlidesNr),
   autoplayDuration: useDefault(durationAutoplay, CAROUSEL_DEFAULTS.durationAutoplay),
   stepDuration: useDefault(durationStep, CAROUSEL_DEFAULTS.durationStep),
-  jumpDuration: useDefault(durationJump, CAROUSEL_DEFAULTS.durationJump),
+  jumpSpeedMultiplier: useDefault(
+    jumpSpeedMultiplier,
+    CAROUSEL_DEFAULTS.jumpSpeedMultiplier,
+  ),
   autoplayInterval: useDefault(intervalAutoplay, CAROUSEL_DEFAULTS.intervalAutoplay),
   errorAltPlaceholder: useDefault(errAltPlaceholder, CAROUSEL_DEFAULTS.errAltPlaceholder),
   motion: {
     snapBackDuration: SNAP_BACK_DURATION,
     epsilon: MOTION_EPSILON,
+    goToMaxAnimatedPageSpan: GO_TO_MAX_ANIMATED_PAGE_SPAN,
+    goToAccelerationDistanceShare: GO_TO_ACCELERATION_DISTANCE_SHARE,
+    goToDecelerationDistanceShare: GO_TO_DECELERATION_DISTANCE_SHARE,
   },
   repeatedClick: {
     speedMultiplier: REPEATED_CLICK_SPEED_MULTIPLIER,

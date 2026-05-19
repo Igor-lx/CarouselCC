@@ -83,11 +83,10 @@ export function usePointerSwipe({
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
-  const [isDragging, setIsDragging] = useState(false);
-  // The full pointer phase lives only in `phaseRef`; handlers read it
-  // synchronously. React state tracks just `isDragging` — the one phase
-  // distinction consumers react to — so a bare press/release never triggers a
-  // consumer re-render.
+  // `phaseRef` is read synchronously inside pointer handlers; `reactPhase`
+  // mirrors it for consumers (`isDragging` / `isInteracting`). `useState` bails
+  // on an unchanged value, so only real phase transitions re-render consumers.
+  const [reactPhase, setReactPhase] = useState<PointerSwipePhase>("idle");
   const phaseRef = useRef<PointerSwipePhase>("idle");
 
   const lockUntilRef = useRef(0);
@@ -108,12 +107,7 @@ export function usePointerSwipe({
 
   const setPhase = useCallback((phase: PointerSwipePhase) => {
     phaseRef.current = phase;
-    // Only the `dragging` distinction is React-reactive: a press/release that
-    // never becomes a drag leaves `isDragging` false, so React bails out.
-    setIsDragging((current) => {
-      const next = phase === "dragging";
-      return current === next ? current : next;
-    });
+    setReactPhase(phase);
   }, []);
 
   const ensureCapture = useCallback((target: HTMLElement, pointerId: number) => {
@@ -442,5 +436,9 @@ export function usePointerSwipe({
     };
   }, [enabled, finishInteraction, handlePointerDown, handlePointerMove]);
 
-  return { isDragging, listeners };
+  return {
+    isDragging: reactPhase === "dragging",
+    isInteracting: reactPhase === "press" || reactPhase === "dragging",
+    listeners,
+  };
 }

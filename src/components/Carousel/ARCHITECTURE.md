@@ -48,7 +48,7 @@ With overrides:
   isAuto
   isPagePaddingOn
   durationStep={2000}
-  durationJump={800}
+  jumpSpeedMultiplier={8}
   intervalAutoplay={3000}
   onSlideClick={(slide) => openInNewTab(String(slide.content))}
   onMotionIdleStatusChange={setIsIdle}
@@ -85,14 +85,14 @@ visible.
 | `isInstantMotion` | `boolean` | — *(reads `prefers-reduced-motion`)* | Explicit override for the OS-level reduced-motion preference. When set or detected: every transition snaps instantly, gesture is disabled, the PaginationWidget runs in static (non-motion-bound) mode. |
 | `isTouchDevice` | `boolean` | — *(detects via `(pointer:coarse)`)* | Explicit override for touch detection. Controls: gesture eligibility, `data-touch` outer attribute, hover-pause exemption for autoplay. |
 
-#### Timings (milliseconds)
+#### Motion timing
 
 | Prop              | Default | Effect |
 | ----------------- | ------- | ------ |
-| `durationAutoplay` | `3000` | Duration of an autoplay-driven page step. |
-| `intervalAutoplay` | `3000` | Idle interval between two autoplay steps. |
-| `durationStep`    | `2000`  | Base duration of duration-authored click / gesture-driven steps. Repeated-click profile segments instead derive their duration from their speed profile. Multi-page click distances scale linearly. |
-| `durationJump`    | `800`   | Duration of `GO_TO` jumps (e.g. pagination click to a far page, autoplay loop-back). Also used as the fallback duration when reduced-motion mode requires a hard jump. |
+| `durationAutoplay` | `3000` ms | Duration of an autoplay-driven page step. |
+| `intervalAutoplay` | `3000` ms | Idle interval between two autoplay steps. |
+| `durationStep`    | `2000` ms | Base duration of duration-authored click / gesture-driven steps. Repeated-click profile segments instead derive their duration from their speed profile. Multi-page click distances scale linearly. |
+| `jumpSpeedMultiplier` | `8` | `GO_TO` peak cruise speed as a multiple of the normal one-step speed. A jump's duration is derived from distance and this multiplier, so a near and a far jump share one consistent speed. Drives short jumps and the bounded segments of a far-jump teleport alike. |
 
 #### Module gates
 
@@ -167,6 +167,14 @@ These are the user-facing behaviours the implementation guarantees.
 - **Step semantics.** `MOVE(+1)` advances one page, `MOVE(-1)` retreats one
   page, `GO_TO(pageIndex)` jumps over a possibly larger distance. In cyclic
   mode, `GO_TO` always travels the shortest cyclic distance.
+- **GO_TO motion.** Every `GO_TO` follows one speed profile — accelerate,
+  cruise, decelerate. A jump within `GO_TO_MAX_ANIMATED_PAGE_SPAN` page
+  screens animates its whole distance. A longer jump animates a bounded
+  preflight, teleports instantly across the un-rendered middle (spliced into
+  the constant-speed cruise, so velocity stays continuous — only the position
+  jumps), then animates a bounded approach that decays to rest. The preflight
+  and approach are slices of the same canonical profile, so a 3-page jump and
+  a 30-page jump share an identical ramp-up and ramp-down. See §4.4.
 - **Click during motion (opposite direction).** Re-targets without
   restarting from the logical origin: the new segment continues from the
   last emitted visual sample, not from where the previous segment was
@@ -192,7 +200,7 @@ These are the user-facing behaviours the implementation guarantees.
 - **Autoplay.** A `setTimeout(intervalAutoplay)` schedules the next step
   whenever the carousel is in the eligible state described under
   `isAuto`. On the final page in finite mode, the next step loops back to
-  page 0 via `GO_TO` (using `durationJump`).
+  page 0 via `GO_TO`.
 - **External motion-idle signal.** `onMotionIdleStatusChange` fires once on
   each idle↔running crossing. Consumers may use it to schedule non-critical
   work around motion. The signal remains observation-only; the carousel also
@@ -279,7 +287,7 @@ For copy-paste / quick lookup. Source: `config/defaults.ts`,
 | `durationAutoplay` (default) | `3000` ms | autoplay step duration |
 | `intervalAutoplay` (default) | `3000` ms | autoplay idle interval |
 | `durationStep` (default) | `2000` ms | click/gesture-driven step |
-| `durationJump` (default) | `800` ms | `GO_TO` jumps |
+| `jumpSpeedMultiplier` (default) | `8` | `GO_TO` peak speed vs. one-step speed |
 | `errAltPlaceholder` (default) | `"Downloading Error"` | image error text |
 | `HOVER_PAUSE_DELAY` | `150` ms | hover-pause debounce |
 | `VISIBILITY_THRESHOLD` | `0.2` | viewport visibility fraction |
@@ -288,7 +296,9 @@ For copy-paste / quick lookup. Source: `config/defaults.ts`,
 | `REPEATED_CLICK_SPEED_MULTIPLIER` | `5` | fast-segment peak vs. normal |
 | `REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE` | `0.35` | profile ramp-up |
 | `REPEATED_CLICK_DECELERATION_DISTANCE_SHARE` | `0.35` | profile ramp-down |
-| `JUMP_BEZIER` | `cubic-bezier(0.16, 1, 0.3, 1)` | far jumps |
+| `GO_TO_MAX_ANIMATED_PAGE_SPAN` | `2` | far-jump teleport threshold (page screens) |
+| `GO_TO_ACCELERATION_DISTANCE_SHARE` | `0.12` | GO_TO profile ramp-up |
+| `GO_TO_DECELERATION_DISTANCE_SHARE` | `0.5` | GO_TO profile ramp-down |
 | `MOVE_BEZIER` | `cubic-bezier(0.32, 0.2, 0.28, 1)` | normal step |
 | `AUTO_BEZIER` | `cubic-bezier(0.28, 0.72, 0.38, 1)` | autoplay step |
 | `SNAP_BACK_BEZIER` | `cubic-bezier(0.18, 0.82, 0.28, 1)` | drag snap-back |
@@ -318,7 +328,7 @@ Every responsibility has exactly one owner. The orchestrator
 | Resolved runtime config | `useCarouselConfig` | One memo. Substitutes defaults only for `undefined` props; never normalises explicit values. |
 | Slide records | `useCarouselSlideDeck` | Builds slide records, optionally extends to fill perfect pages. |
 | Layout facts | `useCarouselSlideDeck` | `length`, `visibleSlidesCount`, `pageCount`, `virtualLength`, `canSlide`, `isFinite`, `dataKey`. |
-| Logical state | `useCarouselState` | Reducer-backed. Owns `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`, `gesture`, `isRepeatedClickAdvance`, `moveReason`. |
+| Logical state | `useCarouselState` | Reducer-backed. Owns `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, optional `teleportVirtualIndex`, `isTeleportApproach`, `motionPhase`, `gesture`, `isRepeatedClickAdvance`, `moveReason`. |
 | Visual sampled position | `useVisualPosition` | Wraps a single `MotionController`. Sole SSOT for the visible track offset. |
 | Motion execution | `useCarouselMotionExecution` + `useMotionRunner` | Owns motion-duration publication and settle feedback, then reads logical state, builds a segment, and calls into the controller. |
 | Track DOM | `useTrackBinding` | Measures slot size and subscribes to visual position; writes `transform`. |
@@ -344,7 +354,8 @@ context provider.
 The system has five SSOTs, each owned by exactly one layer.
 
 1. **Logical state** — `useCarouselState`. Holds `targetPageIndex`,
-   `fromVirtualIndex`, `virtualIndex`, `motionPhase`,
+   `fromVirtualIndex`, `virtualIndex`, optional `teleportVirtualIndex`,
+   `isTeleportApproach`, `motionPhase`,
    `gesture` (the velocity payload of the latest END_DRAG), and
    `isRepeatedClickAdvance`. No timing. Reducer-pure: every transition is
    a pure function of `(state, command, context)`.
@@ -412,16 +423,19 @@ phase }`.
 A `Segment` is one of:
 
 - **Bezier segment** — a cubic-bezier eased move with a known duration.
-  Used for autoplay (`AUTO_BEZIER`), jump (`JUMP_BEZIER`),
-  click step / non-inertial gesture release (`MOVE_BEZIER`), and
-  snap-back (`SNAP_BACK_BEZIER`).
+  Used for autoplay (`AUTO_BEZIER`), click step / non-inertial gesture
+  release (`MOVE_BEZIER`), and snap-back (`SNAP_BACK_BEZIER`).
 - **Profile segment** - a smoothstep-driven acceleration / cruise /
   deceleration profile. These segments are speed-authored: start / peak /
   end speeds plus zone distances derive the segment duration. If acceleration
   and deceleration shares sum above `1`, runtime normalizes the profile to
   `0.5 / 0.5` with no cruise zone. Used for:
+  - **every GO_TO** - one canonical `accelerate / cruise / decelerate`
+    profile, peak speed `jumpSpeedMultiplier × normalStepSpeed`. A short jump
+    is the whole profile; a far jump is two slices of it around a teleport
+    (§4.4);
   - **repeated-click fast advance** - one segment directly to the next page
-    boundary, peak speed `REPEATED_CLICK_SPEED_MULTIPLIER x normalMoveSpeed`;
+    boundary, peak speed `REPEATED_CLICK_SPEED_MULTIPLIER × normalMoveSpeed`;
   - **inertial gesture release** - peak speed derived from EMA-smoothed
     release velocity × `inertiaBoost`.
 
@@ -468,6 +482,33 @@ level. The two subscriptions are independent listeners on the same RAF
 tick - both run in the same frame. `getSnapshot()` is reserved for cold
 imperative reads; it returns the emitted visual frame and should not be used
 inside per-frame subscribers.
+
+### 4.4 Far GO_TO teleport
+
+A `GO_TO` longer than `GO_TO_MAX_ANIMATED_PAGE_SPAN` page screens cannot
+animate edge-to-edge — it would mount every intermediate slide. Instead it is
+split by one pure geometry resolver (`motion/timing.ts` `resolveGoToPlan`),
+consumed by both the reducer and the segment factory so the logical landing
+positions and the animated profile can never drift apart:
+
+- **Preflight.** The reducer sets `virtualIndex` to a bounded landing and
+  keeps the final target in `teleportVirtualIndex`. `virtualIndex` is kept
+  bounded on purpose — the render window is built from it, so the far target
+  must not leak in before the teleport. The segment is the canonical profile's
+  acceleration zone plus the first half of its cruise; it ends at cruise speed.
+- **Teleport.** When the preflight settles, the reducer teleports
+  `fromVirtualIndex` / `virtualIndex` to a bounded origin just before the
+  final target and clears `teleportVirtualIndex`. The track `transform` jumps
+  by the cut-out distance in a single frame.
+- **Approach.** A second profile slice — the second half of the cruise plus
+  the deceleration zone — enters at cruise speed (handoff-continuous with the
+  preflight) and decays to rest at the final target.
+
+The teleport is spliced inside the cruise, the one constant-speed interval, so
+only the position jumps — never the speed. The preflight and approach slices
+come from the same canonical profile as a short jump, so every jump, near or
+far, shares one ramp-up and ramp-down. This is the only intentional visual
+teleport.
 
 ---
 
@@ -614,7 +655,7 @@ src/components/Carousel/
 ├── config/                        config resolution
 │   ├── defaults.ts                public-prop defaults
 │   ├── constants.ts               tunable runtime constants (epsilons, buffers)
-│   ├── motion.ts                  bezier strings, repeated-click factors
+│   ├── motion.ts                  bezier strings, repeated-click + GO_TO factors
 │   ├── gesture.ts                 drag config + inertial release config
 │   ├── interaction.ts             hover delay, visibility threshold, autoplay pagination factor
 │   ├── buildRawConfig.ts          merges raw input with defaults
@@ -644,7 +685,8 @@ src/components/Carousel/
 │   ├── types.ts                   Segment, MotionIntent, MotionStart
 │   ├── bezier.ts                  cubic-bezier sampler + cache + carousel curves
 │   ├── profile.ts                 smoothstep profile (accel/cruise/decel)
-│   ├── speed.ts                   averageSpeed, sameDirectionSpeed, signedVelocity
+│   ├── speed.ts                   sameDirectionSpeed, signedVelocity
+│   ├── timing.ts                  GO_TO speed + teleport geometry (resolveGoToPlan)
 │   ├── duration.ts                bezier-segment duration math
 │   ├── segmentFactory.ts          builds the Segment for the next motion step
 │   ├── sampler.ts                 segment → MotionSampleData at timestamp

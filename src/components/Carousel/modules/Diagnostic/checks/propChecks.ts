@@ -44,7 +44,6 @@ export const collectPropWarnings = (
   }> = [
     { key: "durationAutoplay", name: "durationAutoplay" },
     { key: "durationStep", name: "durationStep" },
-    { key: "durationJump", name: "durationJump" },
   ];
 
   for (const { key, name } of durationFields) {
@@ -61,6 +60,21 @@ export const collectPropWarnings = (
           "Motion-runner duration math will produce NaN or zero-length segments and the carousel will jump or freeze",
       });
     }
+  }
+
+  if (
+    typeof props.jumpSpeedMultiplier !== "undefined" &&
+    !isPositiveFinite(props.jumpSpeedMultiplier)
+  ) {
+    out.push({
+      severity: "CRITICAL",
+      layer: LAYER,
+      field: "jumpSpeedMultiplier",
+      actual: props.jumpSpeedMultiplier,
+      expected: "Expected a positive finite number",
+      consequence:
+        "GO_TO peak speed becomes zero, negative or NaN and far jumps freeze or break",
+    });
   }
 
   if (
@@ -94,18 +108,17 @@ export const collectPropWarnings = (
   }
 
   if (
-    isPositiveFinite(props.durationJump) &&
-    isPositiveFinite(props.durationStep) &&
-    props.durationJump > props.durationStep
+    isPositiveFinite(props.jumpSpeedMultiplier) &&
+    props.jumpSpeedMultiplier < 1
   ) {
     out.push({
       severity: "LOGICAL",
       layer: LAYER,
-      field: "durationJump",
-      actual: props.durationJump,
-      expected: `Expected durationJump <= durationStep (${props.durationStep} ms)`,
+      field: "jumpSpeedMultiplier",
+      actual: props.jumpSpeedMultiplier,
+      expected: "Expected jumpSpeedMultiplier >= 1 (a jump at least as fast as a step)",
       consequence:
-        "A jump animation slower than a single step inverts the visual contract and feels wrong",
+        "A GO_TO slower than a single step inverts the visual contract and feels wrong",
     });
   }
 

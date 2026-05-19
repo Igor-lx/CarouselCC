@@ -148,6 +148,8 @@ export function useMotionRunner({
       state.moveReason,
       state.virtualIndex,
       state.fromVirtualIndex,
+      state.teleportVirtualIndex,
+      state.isTeleportApproach,
       state.isRepeatedClickAdvance,
       state.gesture.pointerVelocity,
       state.gesture.uiVelocity,
@@ -263,9 +265,11 @@ export function useMotionRunner({
     state.fromVirtualIndex,
     state.gesture.pointerVelocity,
     state.gesture.uiVelocity,
+    state.isTeleportApproach,
     state.isRepeatedClickAdvance,
     state.motionPhase,
     state.moveReason,
+    state.teleportVirtualIndex,
     state.virtualIndex,
   ]);
 

@@ -45,7 +45,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     visibleSlidesNr,
     durationAutoplay,
     durationStep,
-    durationJump,
+    jumpSpeedMultiplier,
     intervalAutoplay,
     errAltPlaceholder,
     isPagePaddingOn = CAROUSEL_DEFAULTS.isPagePaddingOn,
@@ -78,7 +78,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     visibleSlidesNr,
     durationAutoplay,
     durationStep,
-    durationJump,
+    jumpSpeedMultiplier,
     intervalAutoplay,
     errAltPlaceholder,
   });
@@ -173,7 +173,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   });
 
   // --- gesture --------------------------------------------------------------
-  const { isDragging: isDragGesture, listeners: dragListeners } = useCarouselGesture({
+  const { isInteracting, listeners: dragListeners } = useCarouselGesture({
     enabled: layout.canSlide,
     viewportRef,
     layout,
@@ -197,7 +197,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   );
 
   // --- autoplay -------------------------------------------------------------
-  const autoplayPaused = !visible || isDragGesture || status.isMoving;
+  const autoplayPaused = !visible || isInteracting || status.isMoving;
   const { handleHoverChange } = useAutoplay({
     enabled: isAuto && layout.canSlide,
     isPaused: autoplayPaused,
@@ -249,7 +249,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
         visibleSlidesNr,
         durationAutoplay,
         durationStep,
-        durationJump,
+        jumpSpeedMultiplier,
         intervalAutoplay,
         errAltPlaceholder,
       },
@@ -270,7 +270,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     }),
     [
       durationAutoplay,
-      durationJump,
+      jumpSpeedMultiplier,
       durationStep,
       errAltPlaceholder,
       intervalAutoplay,

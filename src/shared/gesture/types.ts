@@ -59,8 +59,14 @@ export interface PointerSwipeProps {
 }
 
 export interface PointerSwipeResult {
-  /** True only while a touch drag is in progress; a bare press is not a
-   *  React-reactive state, so press/release alone never re-renders consumers. */
+  /** True only while a committed touch drag is in progress. */
   isDragging: boolean;
+  /**
+   * True from press-down through release - it covers the press-settling
+   * window before a drag is even recognised. Consumers that must react the
+   * instant a finger touches the surface (e.g. pausing autoplay) use this
+   * rather than `isDragging`.
+   */
+  isInteracting: boolean;
   listeners: PointerSwipeListeners;
 }

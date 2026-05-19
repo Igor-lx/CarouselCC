@@ -5,6 +5,8 @@ import {
   pageStart,
   shortestCyclicDistance,
 } from "../domain";
+import type { MotionSettings } from "../config";
+import { resolveGoToPlan } from "../motion/timing";
 import type {
   CarouselState,
   GoToCommand,
@@ -35,6 +37,11 @@ interface StepResolution {
   nextFromVirtualIndex: number;
   nextTargetPageIndex: number;
   nextVirtualIndex: number;
+  /**
+   * Final virtual position of a far GO_TO, or `null` for a step that does not
+   * teleport. When set, `nextVirtualIndex` is the bounded preflight landing.
+   */
+  nextTeleportVirtualIndex: number | null;
   phase: MotionPhase;
 }
 
@@ -50,6 +57,7 @@ export const resolveStepTransition = (
   state: CarouselState,
   command: MoveCommand | GoToCommand,
   isInstantMode: boolean,
+  motion: MotionSettings,
 ): StepResolution => {
   const { layout } = state;
   const stepSize = layout.visibleSlidesCount;
@@ -77,14 +85,29 @@ export const resolveStepTransition = (
       : normalizePageIndex(currentPageIndex + pageDelta, layout.pageCount);
   }
 
-  const nextVirtualIndex = layout.isFinite
+  // The full visual destination, before any teleport bounding is applied.
+  const canonicalVirtualIndex = layout.isFinite
     ? pageStart(nextTargetPageIndex, stepSize)
     : currentVirtualIndex + pageDelta * stepSize;
+
+  // A GO_TO over a long span animates only a bounded preflight; the rest is
+  // teleported. `virtualIndex` is kept at the preflight landing on purpose -
+  // the render window is built from it, so it must not name the far target.
+  const goToPlan =
+    command.type === "GO_TO" && !command.isInstant && !isInstantMode
+      ? resolveGoToPlan(Math.abs(pageDelta), stepSize, motion)
+      : null;
+  const isTeleport = goToPlan !== null && goToPlan.isTeleport;
+  const nextVirtualIndex =
+    isTeleport && goToPlan
+      ? currentVirtualIndex + Math.sign(pageDelta) * goToPlan.leadDistance
+      : canonicalVirtualIndex;
 
   return {
     nextFromVirtualIndex,
     nextTargetPageIndex,
     nextVirtualIndex,
+    nextTeleportVirtualIndex: isTeleport ? canonicalVirtualIndex : null,
     phase: stepPhase(command, isInstantMode),
   };
 };
