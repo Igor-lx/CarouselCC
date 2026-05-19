@@ -4,6 +4,7 @@ import styles from "./Carousel.module.scss";
 import {
   mergeStyleMaps,
   resolveSlots,
+  useDataSaver,
   useIsReducedMotion,
   useIsTouchDevice,
   useViewportVisibility,
@@ -66,6 +67,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // --- environment & overrides ----------------------------------------------
   const prefersReducedMotion = useIsReducedMotion();
   const detectedTouchDevice = useIsTouchDevice();
+  const isDataSaverEnabled = useDataSaver(isContentImg);
   const isInstantMode = isInstantMotion ?? prefersReducedMotion;
   const isTouch = isTouchDevice ?? detectedTouchDevice;
 
@@ -111,6 +113,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     currentVirtualIndex: state.virtualIndex,
     isIdle: status.isIdle,
     isContentImg,
+    isDataSaverEnabled,
     store: imageResourceStore,
   });
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 
-import { useDataSaver, useIsomorphicLayoutEffect } from "../../../shared";
+import { useIsomorphicLayoutEffect } from "../../../shared";
 import {
   loopedSlideIndex,
   type CarouselLayout,
@@ -18,6 +18,11 @@ interface UseSlideImagePreloadInput {
   currentVirtualIndex: number;
   isIdle: boolean;
   isContentImg: boolean;
+  /**
+   * Reduced-data environment signal, read once at the Carousel root alongside
+   * the other device signals. When true, speculative warm-up is skipped.
+   */
+  isDataSaverEnabled: boolean;
   /** `null` when `isContentImg` is off - the hook then does no work at all. */
   store: ImageResourceStore | null;
 }
@@ -114,11 +119,12 @@ const collectPreloadWindowUrls = ({
  *    each side (see `config/slides`). It is computed only while the carousel
  *    is idle and handed to the store as one atomic preparation session.
  *
- * Warm-up is *speculative* and gated on `useDataSaver()`: when the user has
- * opted into reduced data usage (`prefers-reduced-data` / `saveData`) no
- * preparation window is opened, so no eager fetch or decode happens — on any
- * device. The store, its render SSOT, and image error handling / retry stay
- * fully active regardless; only the optional warm-up is skipped.
+ * Warm-up is *speculative* and gated on the reduced-data signal
+ * (`isDataSaverEnabled`), read once at the Carousel root alongside the other
+ * device signals: when the user has opted into reduced data usage
+ * (`prefers-reduced-data` / `saveData`) no preparation window is opened, so no
+ * eager fetch or decode happens. The store, its render SSOT, and image error
+ * handling / retry stay fully active regardless; only the warm-up is skipped.
  *
  * The preparation window is synced in a single layout effect. Correctness
  * does not depend on the order this hook is declared among Carousel's hooks:
@@ -143,14 +149,12 @@ export function useSlideImagePreload({
   currentVirtualIndex,
   isIdle,
   isContentImg,
+  isDataSaverEnabled,
   store,
 }: UseSlideImagePreloadInput): void {
   // Speculative warm-up is skipped entirely when the user opted into reduced
-  // data usage. This never touches the store or its render SSOT. The signal
-  // is observed only for image carousels — a non-image carousel would never
-  // warm up regardless, so it does not subscribe to the reduced-data store.
-  const isDataSaver = useDataSaver(isContentImg);
-  const isWarmupEnabled = isContentImg && !isDataSaver;
+  // data usage. This never touches the store or its render SSOT.
+  const isWarmupEnabled = isContentImg && !isDataSaverEnabled;
 
   const deckUrls = useMemo(
     () => (isContentImg ? collectDeckImageUrls(records) : EMPTY_URLS),
