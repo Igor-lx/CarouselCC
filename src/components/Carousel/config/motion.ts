@@ -13,29 +13,24 @@ export const REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE = 0.35;
 export const REPEATED_CLICK_DECELERATION_DISTANCE_SHARE = 0.35;
 
 /**
- * Largest GO_TO span, in page screens, that is animated edge-to-edge. A jump
- * within this span animates its whole distance; a longer jump animates a
- * bounded preflight, teleports across the un-rendered middle, then animates a
- * bounded approach. Keeps far jumps from mounting every intermediate slide in
- * large decks. See `motion/timing.ts` (`resolveGoToPlan`).
+ * Number of page screens animated before a far-GO_TO teleport. After the
+ * teleport the carousel always shows one cruise page and the final approach
+ * page. GO_TO spans that fit within that visible budget animate directly
+ * without teleport.
  */
-export const GO_TO_MAX_ANIMATED_PAGE_SPAN = 2;
+export const GO_TO_PREFLIGHT_PAGE_SPAN = 2;
 
 /**
- * Acceleration / deceleration distance shares of the *one* canonical GO_TO
- * speed profile (`[accelerate] -> [cruise] -> [decelerate]`).
+ * Acceleration / deceleration distance shares of the GO_TO profile.
  *
- * - A short GO_TO applies the shares to its real distance.
- * - A teleport applies them to a fixed visible distance, so every long jump
- *   has a byte-identical ramp-up and ramp-down regardless of span.
+ * Both shares are local to one page screen:
+ * - acceleration is measured inside the first page screen;
+ * - deceleration is measured inside the final page screen.
  *
- * The remainder (`1 - acceleration - deceleration`) is the constant-speed
- * cruise zone. Cruise is the only interval where a teleport can be spliced
- * without a velocity discontinuity, so it must stay positive. A small
- * acceleration share with a larger deceleration share reproduces the historic
- * "shoot out, ease in" jump feel.
+ * A deceleration share of `1` means "use the whole final page screen to slow
+ * down"; `0` means cruise to the target and stop sharply there.
  */
-export const GO_TO_ACCELERATION_DISTANCE_SHARE = 0.12;
+export const GO_TO_ACCELERATION_DISTANCE_SHARE = 0.5;
 export const GO_TO_DECELERATION_DISTANCE_SHARE = 0.5;
 
 /** Cubic-bezier curves expressed as CSS strings. */

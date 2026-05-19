@@ -27,76 +27,41 @@ export const resolveJumpPeakSpeed = (
   jumpSpeedMultiplier: number,
 ): number => resolveSpeed(stepSize, stepDuration) * jumpSpeedMultiplier;
 
-/**
- * Minimum page screens animated on each side of the teleport. The diagnostic
- * layer validates that the resulting whole-page cut can still sit inside the
- * cruise zone for the configured GO_TO profile.
- */
-const MIN_TELEPORT_SIDE_PAGES = 1;
+const POST_TELEPORT_CRUISE_PAGE_SPAN = 1;
+const FINAL_APPROACH_PAGE_SPAN = 1;
+const POST_TELEPORT_APPROACH_PAGE_SPAN =
+  POST_TELEPORT_CRUISE_PAGE_SPAN + FINAL_APPROACH_PAGE_SPAN;
 
-export interface TeleportZones {
-  /** Distance actually animated on screen for any teleport (span-independent). */
-  visibleDistance: number;
-  /** Ramp-up zone length. Identical to a short jump's acceleration zone. */
-  accelDistance: number;
-  /** Constant-speed zone length; the teleport is spliced inside this interval. */
-  cruiseDistance: number;
-  /** Ramp-down zone length. Identical to a short jump's deceleration zone. */
-  decelDistance: number;
-  /**
-   * Preflight travel - a whole number of pages covering the acceleration zone
-   * and part of the cruise, so the teleport cut lands on a page boundary.
-   */
-  leadDistance: number;
-  /**
-   * Approach travel - the remaining whole pages: rest of the cruise plus the
-   * deceleration zone.
-   */
+export interface GoToProfileZones {
+  /** Acceleration distance, local to the first page screen of any GO_TO. */
+  accelerationDistance: number;
+  /** Deceleration distance, local to the final page screen of any GO_TO. */
+  decelerationDistance: number;
+  /** Distance animated before a far-GO_TO teleport. */
+  preflightDistance: number;
+  /** Fixed distance animated after a far-GO_TO teleport. */
   approachDistance: number;
 }
 
 /**
- * The canonical GO_TO profile, measured over the fixed visible distance a
- * teleport animates (`goToMaxAnimatedPageSpan` pages). Because this distance is
- * fixed, every long jump shares a byte-identical ramp-up and ramp-down; only
- * the invisible teleported middle differs.
+ * GO_TO zones are local, not global:
+ * - acceleration is measured only inside the first page screen;
+ * - deceleration is measured only inside the final page screen;
+ * - a far jump shows a configurable preflight, teleports the middle, then
+ *   shows one full cruise page plus the final deceleration page.
  */
-export const resolveTeleportZones = (
+export const resolveGoToProfileZones = (
   stepSize: number,
   motion: MotionSettings,
-): TeleportZones => {
-  const visibleDistance = motion.goToMaxAnimatedPageSpan * stepSize;
-  const accelDistance = visibleDistance * motion.goToAccelerationDistanceShare;
-  const decelDistance = visibleDistance * motion.goToDecelerationDistanceShare;
-  const cruiseDistance = visibleDistance - accelDistance - decelDistance;
-  const cruiseStartPage = Math.ceil(accelDistance / stepSize);
-  const cruiseEndPage = Math.floor((visibleDistance - decelDistance) / stepSize);
-  const firstLeadPage = Math.max(MIN_TELEPORT_SIDE_PAGES, cruiseStartPage);
-  const lastLeadPage = Math.min(
-    motion.goToMaxAnimatedPageSpan - MIN_TELEPORT_SIDE_PAGES,
-    cruiseEndPage,
-  );
-  const cruiseMidpointPage = Math.round(
-    (accelDistance + cruiseDistance / 2) / stepSize,
-  );
-  const leadPages = Math.min(
-    Math.max(cruiseMidpointPage, firstLeadPage),
-    lastLeadPage,
-  );
-  const leadDistance = leadPages * stepSize;
-
-  return {
-    visibleDistance,
-    accelDistance,
-    cruiseDistance,
-    decelDistance,
-    leadDistance,
-    approachDistance: visibleDistance - leadDistance,
-  };
-};
+): GoToProfileZones => ({
+  accelerationDistance: stepSize * motion.goToAccelerationDistanceShare,
+  decelerationDistance: stepSize * motion.goToDecelerationDistanceShare,
+  preflightDistance: motion.goToPreflightPageSpan * stepSize,
+  approachDistance: POST_TELEPORT_APPROACH_PAGE_SPAN * stepSize,
+});
 
 export interface GoToPlan {
-  /** `true` when the span exceeds `goToMaxAnimatedPageSpan`. */
+  /** `true` when the span exceeds the bounded preflight + approach distance. */
   isTeleport: boolean;
   /**
    * Unsigned distance the first (preflight) - or, for a short jump, the only -
@@ -112,11 +77,11 @@ export interface GoToPlan {
 /**
  * Lay out a GO_TO of `pageSpan` page screens.
  *
- * - Short jump (`pageSpan <= goToMaxAnimatedPageSpan`): the whole real distance
- *   is one animated lead segment, no teleport.
- * - Long jump: a bounded `leadDistance` is animated, `teleportDistance` is
- *   skipped instantly mid-cruise, then `approachDistance` is animated. The
- *   three always sum back to the real distance.
+ * - Short jump: the whole real distance is animated; acceleration and
+ *   deceleration stay local to the first and last page screens.
+ * - Long jump: `goToPreflightPageSpan` page screens are animated before the
+ *   teleport, the invisible middle is skipped, then one cruise page and the
+ *   final deceleration page are animated.
  *
  * `pageSpan` is unsigned; the caller applies travel direction.
  */
@@ -126,8 +91,11 @@ export const resolveGoToPlan = (
   motion: MotionSettings,
 ): GoToPlan => {
   const realDistance = pageSpan * stepSize;
+  const zones = resolveGoToProfileZones(stepSize, motion);
+  const visibleTeleportDistance =
+    zones.preflightDistance + zones.approachDistance;
 
-  if (pageSpan <= motion.goToMaxAnimatedPageSpan) {
+  if (realDistance <= visibleTeleportDistance) {
     return {
       isTeleport: false,
       leadDistance: realDistance,
@@ -136,21 +104,21 @@ export const resolveGoToPlan = (
     };
   }
 
-  const zones = resolveTeleportZones(stepSize, motion);
   return {
     isTeleport: true,
-    leadDistance: zones.leadDistance,
-    teleportDistance: realDistance - zones.visibleDistance,
+    leadDistance: zones.preflightDistance,
+    teleportDistance: realDistance - visibleTeleportDistance,
     approachDistance: zones.approachDistance,
   };
 };
 
 /**
  * Distance the post-teleport approach segment covers. Span-independent (it is
- * a slice of the fixed visible profile), so the reducer can resolve the
- * approach origin at `MOTION_SETTLED` time without re-deriving the full span.
+ * always one cruise page plus the final deceleration page), so the reducer can
+ * resolve the approach origin at `MOTION_SETTLED` time without re-deriving the
+ * full span.
  */
 export const resolveGoToApproachDistance = (
   stepSize: number,
   motion: MotionSettings,
-): number => resolveTeleportZones(stepSize, motion).approachDistance;
+): number => resolveGoToProfileZones(stepSize, motion).approachDistance;

@@ -20,8 +20,8 @@ export interface PropDerivedSettings {
 export interface MotionSettings {
   snapBackDuration: number;
   epsilon: number;
-  /** @see GO_TO_MAX_ANIMATED_PAGE_SPAN */
-  goToMaxAnimatedPageSpan: number;
+  /** @see GO_TO_PREFLIGHT_PAGE_SPAN */
+  goToPreflightPageSpan: number;
   /** @see GO_TO_ACCELERATION_DISTANCE_SHARE */
   goToAccelerationDistanceShare: number;
   /** @see GO_TO_DECELERATION_DISTANCE_SHARE */
