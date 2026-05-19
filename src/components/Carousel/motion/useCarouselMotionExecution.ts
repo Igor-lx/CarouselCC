@@ -17,11 +17,11 @@ interface UseCarouselMotionExecutionInput {
 }
 
 interface UseCarouselMotionExecutionResult {
-  motionDuration: number;
+  autoplayMotionDuration: number;
 }
 
 /**
- * Post-state motion orchestration. Keeps duration publication and
+ * Post-state motion orchestration. Keeps autoplay-pagination duration and
  * settle-feedback mechanics out of the composition root while the runner
  * remains the sole state -> segment -> controller bridge.
  */
@@ -34,49 +34,49 @@ export function useCarouselMotionExecution({
   isDragging,
   enabled,
 }: UseCarouselMotionExecutionInput): UseCarouselMotionExecutionResult {
-  const [motionDuration, setMotionDuration] = useState(0);
-  const motionDurationFrameRef = useRef<number | null>(null);
-  const motionDurationTimeoutRef = useRef<number | null>(null);
+  const [autoplayMotionDuration, setAutoplayMotionDuration] = useState(0);
+  const autoplayDurationFrameRef = useRef<number | null>(null);
+  const autoplayDurationTimeoutRef = useRef<number | null>(null);
 
-  const cancelMotionDurationPublish = useCallback(() => {
+  const cancelAutoplayDurationPublish = useCallback(() => {
     if (typeof window === "undefined") return;
 
-    if (motionDurationFrameRef.current !== null) {
-      window.cancelAnimationFrame(motionDurationFrameRef.current);
-      motionDurationFrameRef.current = null;
+    if (autoplayDurationFrameRef.current !== null) {
+      window.cancelAnimationFrame(autoplayDurationFrameRef.current);
+      autoplayDurationFrameRef.current = null;
     }
 
-    if (motionDurationTimeoutRef.current !== null) {
-      window.clearTimeout(motionDurationTimeoutRef.current);
-      motionDurationTimeoutRef.current = null;
+    if (autoplayDurationTimeoutRef.current !== null) {
+      window.clearTimeout(autoplayDurationTimeoutRef.current);
+      autoplayDurationTimeoutRef.current = null;
     }
   }, []);
 
-  const publishMotionDuration = useCallback(
+  const publishAutoplayDuration = useCallback(
     (duration: number) => {
       if (typeof window === "undefined") {
-        setMotionDuration(duration);
+        setAutoplayMotionDuration(duration);
         return;
       }
 
-      cancelMotionDurationPublish();
+      cancelAutoplayDurationPublish();
 
-      motionDurationFrameRef.current = window.requestAnimationFrame(() => {
-        motionDurationFrameRef.current = null;
-        motionDurationTimeoutRef.current = window.setTimeout(() => {
-          motionDurationTimeoutRef.current = null;
-          setMotionDuration((current) =>
+      autoplayDurationFrameRef.current = window.requestAnimationFrame(() => {
+        autoplayDurationFrameRef.current = null;
+        autoplayDurationTimeoutRef.current = window.setTimeout(() => {
+          autoplayDurationTimeoutRef.current = null;
+          setAutoplayMotionDuration((current) =>
             current === duration ? current : duration,
           );
         }, 0);
       });
     },
-    [cancelMotionDurationPublish],
+    [cancelAutoplayDurationPublish],
   );
 
   useEffect(
-    () => cancelMotionDurationPublish,
-    [cancelMotionDurationPublish],
+    () => cancelAutoplayDurationPublish,
+    [cancelAutoplayDurationPublish],
   );
 
   const handleMotionSettled = useCallback(
@@ -93,8 +93,9 @@ export function useCarouselMotionExecution({
     isDragging,
     enabled,
     onSettle: handleMotionSettled,
-    onDurationChange: publishMotionDuration,
+    onAutoplayDurationCancel: cancelAutoplayDurationPublish,
+    onAutoplayDurationChange: publishAutoplayDuration,
   });
 
-  return { motionDuration };
+  return { autoplayMotionDuration };
 }

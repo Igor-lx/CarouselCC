@@ -17,7 +17,6 @@ import {
 } from "./context";
 import { carouselBoundaryState, slideFlexStyle } from "./domain";
 import { useAutoplay } from "./autoplay/useAutoplay";
-import { useCarouselCommandAdmission } from "./commands";
 import { useFocusRecovery } from "./focus/useFocusRecovery";
 import { useCarouselGesture } from "./gesture";
 import { useTrackBinding } from "./geometry";
@@ -47,7 +46,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     visibleSlidesNr,
     durationAutoplay,
     durationStep,
-    durationJump,
+    jumpSpeedMultiplier,
     intervalAutoplay,
     errAltPlaceholder,
     isPagePaddingOn = CAROUSEL_DEFAULTS.isPagePaddingOn,
@@ -81,7 +80,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     visibleSlidesNr,
     durationAutoplay,
     durationStep,
-    durationJump,
+    jumpSpeedMultiplier,
     intervalAutoplay,
     errAltPlaceholder,
   });
@@ -157,17 +156,8 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     applyVisualPosition: applyImmediatePosition,
   });
 
-  // --- command admission: raw intent -> accepted reducer command ------------
-  const commands = useCarouselCommandAdmission({
-    state,
-    dispatch,
-    controller,
-    enabled: layout.canSlide,
-    readCurrentPosition,
-  });
-
-  // --- motion execution: accepted state -> controller -----------------------
-  const { motionDuration } = useCarouselMotionExecution({
+  // --- motion execution: state -> controller, autoplay duration signal -----
+  const { autoplayMotionDuration } = useCarouselMotionExecution({
     state,
     config,
     controller,
@@ -180,22 +170,22 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // --- navigation -----------------------------------------------------------
   const navigation = useCarouselNavigation({
     enabled: layout.canSlide,
-    commands,
+    dispatch,
+    readCurrentPosition,
     onSlideClick,
   });
 
   // --- gesture --------------------------------------------------------------
-  const { isDragging, isInteracting, listeners: dragListeners } = useCarouselGesture({
+  const { listeners: dragListeners } = useCarouselGesture({
     enabled: layout.canSlide,
     viewportRef,
     layout,
-    commands,
+    dispatch,
     readCurrentPosition,
     applyTrackPosition,
     getSlotSize,
     config,
   });
-  void isDragging; // included in status via dispatched START_DRAG/END_DRAG
 
   // --- visibility (for autoplay pause) -------------------------------------
   const visible = useViewportVisibility({
@@ -210,7 +200,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   );
 
   // --- autoplay -------------------------------------------------------------
-  const autoplayPaused = !visible || isInteracting || status.isMoving;
+  const autoplayPaused = !visible || status.isDragging || status.isMoving;
   const { handleHoverChange } = useAutoplay({
     enabled: isAuto && layout.canSlide,
     isPaused: autoplayPaused,
@@ -245,8 +235,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     navigation,
     isTouch,
     isReducedMotion: isInstantMode,
-    isInteracting,
-    motionDuration,
+    autoplayMotionDuration,
     visualPosition: isInstantMode ? null : visualPosition,
     isAtStart,
     isAtEnd,
@@ -263,7 +252,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
         visibleSlidesNr,
         durationAutoplay,
         durationStep,
-        durationJump,
+        jumpSpeedMultiplier,
         intervalAutoplay,
         errAltPlaceholder,
       },
@@ -284,7 +273,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     }),
     [
       durationAutoplay,
-      durationJump,
+      jumpSpeedMultiplier,
       durationStep,
       errAltPlaceholder,
       intervalAutoplay,

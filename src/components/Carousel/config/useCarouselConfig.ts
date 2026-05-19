@@ -7,7 +7,7 @@ interface UseCarouselConfigInput {
   visibleSlidesNr?: unknown;
   durationAutoplay?: unknown;
   durationStep?: unknown;
-  durationJump?: unknown;
+  jumpSpeedMultiplier?: unknown;
   intervalAutoplay?: unknown;
   errAltPlaceholder?: unknown;
 }
@@ -22,7 +22,7 @@ export function useCarouselConfig({
   visibleSlidesNr,
   durationAutoplay,
   durationStep,
-  durationJump,
+  jumpSpeedMultiplier,
   intervalAutoplay,
   errAltPlaceholder,
 }: UseCarouselConfigInput): CarouselRuntimeConfig {
@@ -32,16 +32,16 @@ export function useCarouselConfig({
         visibleSlidesNr,
         durationAutoplay,
         durationStep,
-        durationJump,
+        jumpSpeedMultiplier,
         intervalAutoplay,
         errAltPlaceholder,
       }),
     [
       durationAutoplay,
-      durationJump,
       durationStep,
       errAltPlaceholder,
       intervalAutoplay,
+      jumpSpeedMultiplier,
       visibleSlidesNr,
     ],
   );

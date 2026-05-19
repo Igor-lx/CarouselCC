@@ -5,11 +5,13 @@ import {
   CAROUSEL_INERTIAL_RELEASE_CONFIG,
   CAROUSEL_SWIPE_CONFIG,
   DRAG_RELEASE_EPSILON,
+  GO_TO_ACCELERATION_DISTANCE_SHARE,
+  GO_TO_DECELERATION_DISTANCE_SHARE,
+  GO_TO_MAX_ANIMATED_PAGE_SPAN,
   HOVER_PAUSE_DELAY,
   IMAGE_RETRY_BASE_DELAY_MS,
   IMAGE_RETRY_MAX_ATTEMPTS,
   IMAGE_RETRY_MAX_DELAY_MS,
-  JUMP_BEZIER,
   MOTION_EPSILON,
   MOVE_BEZIER,
   PRELOAD_PAGE_LOOKAHEAD_BY_VISIBLE,
@@ -58,6 +60,8 @@ const greaterThan = (min: number) => (v: number) => v > min;
 const atLeast = (min: number) => (v: number) => v >= min;
 const isNonNegativeInteger = (v: number) => v >= 0 && Number.isInteger(v);
 const isPositiveInteger = (v: number) => v > 0 && Number.isInteger(v);
+const isIntegerAtLeast = (min: number) => (v: number) =>
+  v >= min && Number.isInteger(v);
 
 const numericRules: NumericRule[] = [
   // Motion timings / factors
@@ -97,6 +101,34 @@ const numericRules: NumericRule[] = [
     consequence: "Deceleration zone share outside [0,1] leads to malformed motion profile zones",
     predicate: inRangeInclusive(0, 1),
   },
+  {
+    layer: "Motion",
+    field: "GO_TO_MAX_ANIMATED_PAGE_SPAN",
+    value: GO_TO_MAX_ANIMATED_PAGE_SPAN,
+    severity: "LOGICAL",
+    expected: "Expected an integer >= 2 (page screens)",
+    consequence:
+      "Far GO_TO teleport needs at least one animated page before and after the cut",
+    predicate: isIntegerAtLeast(2),
+  },
+  {
+    layer: "Motion",
+    field: "GO_TO_ACCELERATION_DISTANCE_SHARE",
+    value: GO_TO_ACCELERATION_DISTANCE_SHARE,
+    severity: "CRITICAL",
+    expected: "Expected a finite number in the range [0, 1]",
+    consequence: "Acceleration zone share outside [0,1] leads to malformed GO_TO profile zones",
+    predicate: inRangeInclusive(0, 1),
+  },
+  {
+    layer: "Motion",
+    field: "GO_TO_DECELERATION_DISTANCE_SHARE",
+    value: GO_TO_DECELERATION_DISTANCE_SHARE,
+    severity: "CRITICAL",
+    expected: "Expected a finite number in the range [0, 1]",
+    consequence: "Deceleration zone share outside [0,1] leads to malformed GO_TO profile zones",
+    predicate: inRangeInclusive(0, 1),
+  },
 
   // Epsilons (must be small positive)
   {
@@ -126,7 +158,7 @@ const numericRules: NumericRule[] = [
     severity: "LOGICAL",
     expected: "Expected a non-negative finite integer",
     consequence: "Render window buffer collapses or oversizes, increasing churn or blank slides",
-    predicate: atLeast(0),
+    predicate: isNonNegativeInteger,
   },
   {
     layer: "Slides",
@@ -310,7 +342,6 @@ const numericRules: NumericRule[] = [
 const collectBezierWarnings = (): CarouselDiagnosticWarning[] => {
   const entries: Array<[string, string]> = [
     ["MOVE_BEZIER", MOVE_BEZIER],
-    ["JUMP_BEZIER", JUMP_BEZIER],
     ["AUTO_BEZIER", AUTO_BEZIER],
     ["SNAP_BACK_BEZIER", SNAP_BACK_BEZIER],
   ];
@@ -362,6 +393,76 @@ const collectRepeatedShareRelation = (): CarouselDiagnosticWarning | null => {
   };
 };
 
+/**
+ * The GO_TO profile must keep a positive cruise zone: the teleport of a far
+ * jump is spliced inside the cruise, the one interval where splicing does not
+ * break velocity continuity.
+ */
+const collectGoToShareRelation = (): CarouselDiagnosticWarning | null => {
+  const sum =
+    GO_TO_ACCELERATION_DISTANCE_SHARE + GO_TO_DECELERATION_DISTANCE_SHARE;
+  if (Number.isFinite(sum) && sum < 1) return null;
+  return {
+    severity: "LOGICAL",
+    layer: "Motion",
+    field: "GO_TO_ACCELERATION_DISTANCE_SHARE + GO_TO_DECELERATION_DISTANCE_SHARE",
+    actual: {
+      accelerationDistanceShare: GO_TO_ACCELERATION_DISTANCE_SHARE,
+      decelerationDistanceShare: GO_TO_DECELERATION_DISTANCE_SHARE,
+      sum,
+    },
+    expected:
+      "Expected acceleration + deceleration share < 1 so the GO_TO profile keeps a cruise zone",
+    consequence:
+      "Without a cruise zone a far-jump teleport has no velocity-continuous point to splice into",
+  };
+};
+
+/**
+ * The far-GO_TO splice is intentionally made at a whole page boundary to avoid
+ * catching the slide strip mid-slot. That boundary must still lie inside the
+ * cruise interval; otherwise the teleport cuts through acceleration or
+ * deceleration and creates a visible velocity discontinuity.
+ */
+const collectGoToTeleportBoundaryRelation = (): CarouselDiagnosticWarning | null => {
+  const span = GO_TO_MAX_ANIMATED_PAGE_SPAN;
+  const firstLeadPage = Math.max(
+    1,
+    Math.ceil(span * GO_TO_ACCELERATION_DISTANCE_SHARE),
+  );
+  const lastLeadPage = Math.min(
+    span - 1,
+    Math.floor(span * (1 - GO_TO_DECELERATION_DISTANCE_SHARE)),
+  );
+
+  if (
+    Number.isInteger(span) &&
+    span >= 2 &&
+    Number.isFinite(firstLeadPage) &&
+    Number.isFinite(lastLeadPage) &&
+    firstLeadPage <= lastLeadPage
+  ) {
+    return null;
+  }
+
+  return {
+    severity: "LOGICAL",
+    layer: "Motion",
+    field: "GO_TO whole-page teleport splice",
+    actual: {
+      goToMaxAnimatedPageSpan: span,
+      accelerationDistanceShare: GO_TO_ACCELERATION_DISTANCE_SHARE,
+      decelerationDistanceShare: GO_TO_DECELERATION_DISTANCE_SHARE,
+      firstValidLeadPage: firstLeadPage,
+      lastValidLeadPage: lastLeadPage,
+    },
+    expected:
+      "Expected at least one whole-page boundary inside the GO_TO cruise zone",
+    consequence:
+      "The far-jump teleport cannot stay both on-grid and velocity-continuous",
+  };
+};
+
 const collectPreloadWindowWarnings = (): CarouselDiagnosticWarning[] => {
   const out: CarouselDiagnosticWarning[] = [];
   for (const [visibleSlidesCount, lookahead] of Object.entries(
@@ -407,6 +508,10 @@ export const collectConstantWarnings = (): CarouselDiagnosticWarning[] => {
   }
   const sumRelation = collectRepeatedShareRelation();
   if (sumRelation) out.push(sumRelation);
+  const goToShareRelation = collectGoToShareRelation();
+  if (goToShareRelation) out.push(goToShareRelation);
+  const goToTeleportBoundaryRelation = collectGoToTeleportBoundaryRelation();
+  if (goToTeleportBoundaryRelation) out.push(goToTeleportBoundaryRelation);
   const retryDelayRelation = collectRetryDelayRelation();
   if (retryDelayRelation) out.push(retryDelayRelation);
   out.push(...collectPreloadWindowWarnings());

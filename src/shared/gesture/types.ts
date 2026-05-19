@@ -59,7 +59,5 @@ export interface PointerSwipeProps {
 }
 
 export interface PointerSwipeResult {
-  isDragging: boolean;
-  isInteracting: boolean;
   listeners: PointerSwipeListeners;
 }

@@ -19,6 +19,12 @@ const PRELOAD_FETCH_PRIORITY = "low" as const;
 /** Idle-decode scheduler tuning (mirrors the browser's idle-callback model). */
 const IDLE_DECODE_MIN_BUDGET_MS = 8;
 const IDLE_DECODE_FALLBACK_DELAY_MS = 160;
+/**
+ * `requestIdleCallback` exposes a real frame budget; the `setTimeout` fallback
+ * does not, so it drains a fixed small batch per tick instead of the whole
+ * queue at once - decoding the full window in one synchronous burst can jank
+ * the main thread on a low-end device.
+ */
 const IDLE_DECODE_FALLBACK_BATCH_SIZE = 1;
 
 /**
@@ -55,7 +61,7 @@ interface ImageEntry {
   /** Public renderability SSOT exposed through snapshots. */
   status: ImageStatus;
   generation: number;
-  /** Failed visible attempts so far - drives retry backoff and the give-up cap. */
+  /** Failed visible attempts so far — drives retry backoff and the give-up cap. */
   failureCount: number;
   /** Count of currently mounted on-screen `<img>` owners for this URL. */
   visibleOwnerCount: number;
@@ -84,12 +90,19 @@ interface PreparationSession {
  *  - speculative warm-up failures never become visible errors by themselves;
  *  - a rendered slide reports its real `<img>` outcome via `reportLoaded` /
  *    `reportError`, which is authoritative (it is what the user actually sees);
- *  - retry is owned here - one timer per URL, exponential backoff, capped.
+ *  - retry is owned here — one timer per URL, exponential backoff, capped.
+ *
+ * Heavyweight offscreen warm-up elements are bounded by the active
+ * preparation window: once a URL leaves the window its `Image` handle is
+ * released, so warming nearby content never turns the store into a hidden
+ * cache for an entire large deck. Lightweight per-URL render entries persist
+ * for the live deck; the decode queue only ever holds the current window, so
+ * a plain array is the right structure for it.
  */
 export function createImageResourceStore(): ImageResourceStore {
   const entries = new Map<string, ImageEntry>();
   const listeners = new Map<string, Set<() => void>>();
-  /** Pending idle-decode work - bounded by one preparation window. */
+  /** Pending idle-decode work — bounded by one preparation window. */
   const decodeQueue: string[] = [];
   const canUseDom = typeof window !== "undefined";
 
@@ -204,13 +217,24 @@ export function createImageResourceStore(): ImageResourceStore {
     idleTimer = null;
   };
 
+  /**
+   * Release the heavyweight `Image` handle of every `ready` warm-up whose URL
+   * is not in `retainedWindow` (a `null` window retains nothing). The render
+   * entry is untouched; only the offscreen element is dropped, and the warm-up
+   * lifecycle is reset to `unattempted` so it never claims `ready` without an
+   * element behind it. Keeps warm-up memory bounded to the active window
+   * regardless of deck size.
+   */
   const releaseWarmupsOutsideWindow = (
-    allowedWindow: ReadonlySet<string> | null,
+    retainedWindow: ReadonlySet<string> | null,
   ): void => {
     entries.forEach((entry, url) => {
-      if (allowedWindow?.has(url)) return;
+      if (retainedWindow?.has(url)) return;
       if (entry.warmup.status !== "ready") return;
       releaseWarmupElement(entry);
+      entry.warmup.status = "unattempted";
+      entry.warmup.sessionId = null;
+      entry.warmup.decodeRequested = false;
     });
   };
 
@@ -425,13 +449,14 @@ export function createImageResourceStore(): ImageResourceStore {
 
   const openPreparationSession = (urls: readonly string[]): void => {
     const nextUrls = new Set(urls);
+    // Closing with the next window as the retained set releases warm-ups
+    // outside it in one pass — no separate release call is needed here.
     closePreparationSession(nextUrls);
     const session: PreparationSession = {
       id: ++nextPreparationSessionId,
       urls: nextUrls,
     };
     activePreparationSession = session;
-    releaseWarmupsOutsideWindow(session.urls);
     session.urls.forEach((url) => prepareIfEligible(url, session.id));
     pumpDecodeQueue();
   };
@@ -534,7 +559,7 @@ export function createImageResourceStore(): ImageResourceStore {
 
       entries.forEach((entry, url) => {
         if (keep.has(url)) return;
-        // A live rendered owner is still on screen - never drop it.
+        // A live rendered owner is still on screen — never drop it.
         if (entry.visibleOwnerCount > 0) return;
         releaseEntry(entry);
         entries.delete(url);

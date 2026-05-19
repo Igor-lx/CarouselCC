@@ -4,13 +4,19 @@ import {
 } from "../../../shared";
 import type {
   CarouselRuntimeConfig,
+  MotionSettings,
   RepeatedClickSettings,
 } from "../config";
 import type { CarouselState } from "../state";
 import { carouselEasingString, parseBezier } from "./bezier";
 import { durationByVirtualSpan, resolveEasingDuration } from "./duration";
 import { buildProfile } from "./profile";
-import { averageSpeed, sameDirectionSpeed, signedVelocity } from "./speed";
+import { sameDirectionSpeed, signedVelocity } from "./speed";
+import {
+  resolveJumpPeakSpeed,
+  resolveSpeed,
+  resolveTeleportZones,
+} from "./timing";
 import type {
   CarouselMotionIntent,
   CarouselSegment,
@@ -21,6 +27,8 @@ import type {
 
 const intentFromState = (state: CarouselState, isInstant: boolean): CarouselMotionIntent => {
   if (isInstant || state.motionPhase === "step-instant") return "instant";
+  if (state.teleportVirtualIndex !== null) return "teleport-preflight";
+  if (state.isTeleportApproach) return "teleport-approach";
   if (state.motionPhase === "step-snap") return "snap";
   if (state.motionPhase === "step-jump") return "jump";
   if (state.isRepeatedClickAdvance) return "repeated-click";
@@ -83,7 +91,7 @@ const buildRepeatedProfile = (
 ): ProfileSegment => {
   const distance = state.virtualIndex - start.position;
   const peakVelocity = signedVelocity(
-    normalMoveSpeed * Math.max(1, repeated.speedMultiplier),
+    normalMoveSpeed * repeated.speedMultiplier,
     distance,
   );
   const profile = buildProfile({
@@ -134,6 +142,88 @@ const buildGestureProfile = (
   };
 };
 
+type GoToProfilePhase = "single" | "preflight" | "approach";
+
+/**
+ * Builds one segment of the *single* canonical GO_TO speed profile
+ * `[accelerate] -> [cruise] -> [decelerate]`.
+ *
+ * - `single`    - a short jump: the whole profile over the real distance.
+ * - `preflight` - a teleport's first slice: acceleration zone + enough cruise
+ *   to reach an on-grid page boundary. It ends at the cruise speed, so the
+ *   teleport that follows is velocity-continuous.
+ * - `approach`  - the remaining cruise plus deceleration zone. It enters at
+ *   cruise speed and decays to rest.
+ *
+ * Preflight and approach are slices of the same canonical profile measured
+ * over a fixed visible distance, so their acceleration and deceleration zones
+ * are byte-identical to a short jump's. A 3-page jump and a 30-page jump share
+ * one law - the long jump just has the cruise interrupted by a teleport.
+ */
+const buildGoToProfile = (
+  state: CarouselState,
+  start: MotionStart,
+  startedAt: number,
+  motion: MotionSettings,
+  stepSize: number,
+  peakSpeed: number,
+  phase: GoToProfilePhase,
+): ProfileSegment => {
+  const distance = state.virtualIndex - start.position;
+  const absDistance = Math.abs(distance);
+  const startSpeed = sameDirectionSpeed(start.velocity, distance);
+
+  let accelerationDistanceShare: number;
+  let decelerationDistanceShare: number;
+  let endSpeed: number;
+
+  if (phase === "single") {
+    accelerationDistanceShare = motion.goToAccelerationDistanceShare;
+    decelerationDistanceShare = motion.goToDecelerationDistanceShare;
+    endSpeed = 0;
+  } else {
+    // A teleport slice re-expresses the canonical absolute zone size as a
+    // share of *this* segment's distance, so the ramp matches a short jump.
+    const zones = resolveTeleportZones(stepSize, motion);
+    if (phase === "preflight") {
+      accelerationDistanceShare =
+        absDistance > 0 ? zones.accelDistance / absDistance : 0;
+      decelerationDistanceShare = 0;
+      endSpeed = peakSpeed; // hand the cruise speed to the approach segment
+    } else {
+      accelerationDistanceShare = 0;
+      decelerationDistanceShare =
+        absDistance > 0 ? zones.decelDistance / absDistance : 0;
+      endSpeed = 0;
+    }
+  }
+
+  const profile = buildProfile({
+    from: start.position,
+    to: state.virtualIndex,
+    startSpeed,
+    peakSpeed,
+    endSpeed,
+    accelerationDistanceShare,
+    decelerationDistanceShare,
+  });
+
+  return {
+    strategy: "jump",
+    from: start.position,
+    to: state.virtualIndex,
+    duration: profile.duration,
+    startedAt,
+    profile,
+  };
+};
+
+const goToProfilePhase = (intent: CarouselMotionIntent): GoToProfilePhase => {
+  if (intent === "teleport-preflight") return "preflight";
+  if (intent === "teleport-approach") return "approach";
+  return "single";
+};
+
 export function buildCarouselSegment({
   state,
   config,
@@ -160,9 +250,7 @@ export function buildCarouselSegment({
         })
       : null;
 
-  const moveSpeed = averageSpeed(stepSize, config.stepDuration);
-  const fallbackMoveSpeed =
-    moveSpeed || averageSpeed(state.virtualIndex - start.position, config.stepDuration);
+  const moveSpeed = resolveSpeed(stepSize, config.stepDuration);
 
   if (intent === "repeated-click") {
     const segment = buildRepeatedProfile(
@@ -170,7 +258,29 @@ export function buildCarouselSegment({
       start,
       startedAt,
       config.repeatedClick,
-      fallbackMoveSpeed,
+      moveSpeed,
+    );
+    return {
+      intent,
+      duration: segment.duration,
+      isInertialRelease: false,
+      segment,
+    };
+  }
+
+  if (
+    intent === "jump" ||
+    intent === "teleport-preflight" ||
+    intent === "teleport-approach"
+  ) {
+    const segment = buildGoToProfile(
+      state,
+      start,
+      startedAt,
+      config.motion,
+      stepSize,
+      resolveJumpPeakSpeed(stepSize, config.stepDuration, config.jumpSpeedMultiplier),
+      goToProfilePhase(intent),
     );
     return {
       intent,
@@ -207,7 +317,6 @@ export function buildCarouselSegment({
     snapBackDuration: config.motion.snapBackDuration,
     autoplayDuration: config.autoplayDuration,
     stepDuration: config.stepDuration,
-    jumpDuration: config.jumpDuration,
   });
 
   if (intent === "gesture-release") {

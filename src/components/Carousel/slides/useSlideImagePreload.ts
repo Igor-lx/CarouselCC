@@ -18,6 +18,10 @@ interface UseSlideImagePreloadInput {
   currentVirtualIndex: number;
   isIdle: boolean;
   isContentImg: boolean;
+  /**
+   * Reduced-data environment signal, read once at the Carousel root alongside
+   * the other device signals. When true, speculative warm-up is skipped.
+   */
   isDataSaverEnabled: boolean;
   /** `null` when `isContentImg` is off - the hook then does no work at all. */
   store: ImageResourceStore | null;
@@ -115,11 +119,22 @@ const collectPreloadWindowUrls = ({
  *    each side (see `config/slides`). It is computed only while the carousel
  *    is idle and handed to the store as one atomic preparation session.
  *
- * Warm-up is speculative and gated by the reduced-data environment signal
- * received from the Carousel root: when the user has opted into reduced data
- * usage (`prefers-reduced-data` / `saveData`) no preparation window is opened,
- * so no eager fetch or decode happens. The store, render SSOT, image errors,
- * and retry stay fully active; only optional background warming is skipped.
+ * Warm-up is *speculative* and gated on the reduced-data signal
+ * (`isDataSaverEnabled`), read once at the Carousel root alongside the other
+ * device signals: when the user has opted into reduced data usage
+ * (`prefers-reduced-data` / `saveData`) no preparation window is opened, so no
+ * eager fetch or decode happens. The store, its render SSOT, and image error
+ * handling / retry stay fully active regardless; only the warm-up is skipped.
+ *
+ * The preparation window is synced in a single layout effect. Correctness
+ * does not depend on the order this hook is declared among Carousel's hooks:
+ *  - it runs after every `SlideItem` child's `observe` layout effect (React
+ *    fires child layout effects before the parent's), so `visibleOwnerCount`
+ *    is already accurate when the session opens;
+ *  - it runs synchronously before paint, and `syncPreparationWindow` aborts
+ *    in-flight warm-up fetches and queued decodes synchronously, so a
+ *    transition into motion frees the network/main thread within the same
+ *    commit regardless of when the motion runner's own layout effect runs.
  *
  * When `isContentImg` is off, `store` is `null` and the URL sets stay the
  * frozen empty list: no traversal of `records`, no effects firing, no fetch,
@@ -137,6 +152,8 @@ export function useSlideImagePreload({
   isDataSaverEnabled,
   store,
 }: UseSlideImagePreloadInput): void {
+  // Speculative warm-up is skipped entirely when the user opted into reduced
+  // data usage. This never touches the store or its render SSOT.
   const isWarmupEnabled = isContentImg && !isDataSaverEnabled;
 
   const deckUrls = useMemo(
@@ -159,21 +176,16 @@ export function useSlideImagePreload({
     store.prune(deckUrls);
   }, [store, deckUrls]);
 
-  // Close the idle session before the non-idle commit paints. This hook is
-  // declared before the motion runner in Carousel.tsx, so it closes background
-  // preparation before the later layout effect starts a new motion segment.
+  // Single owner of the preparation window. Runs in the layout phase so the
+  // session is opened after child `observe` effects and closed before paint
+  // on entering motion. See the hook docstring for why this needs no ordering
+  // assumption against the motion runner.
   useIsomorphicLayoutEffect(() => {
-    if (!store || (isWarmupEnabled && isIdle)) return;
-    store.syncPreparationWindow({ enabled: false, urls: EMPTY_URLS });
-  }, [store, isWarmupEnabled, isIdle]);
-
-  // Open or refresh the idle window only after child layout effects have
-  // registered the currently rendered image owners.
-  useEffect(() => {
-    if (!store || !isWarmupEnabled || !isIdle) return;
-    store.syncPreparationWindow({
-      enabled: true,
-      urls: preloadUrls,
-    });
+    if (!store) return;
+    store.syncPreparationWindow(
+      isWarmupEnabled && isIdle
+        ? { enabled: true, urls: preloadUrls }
+        : { enabled: false, urls: EMPTY_URLS },
+    );
   }, [store, isWarmupEnabled, isIdle, preloadUrls]);
 }

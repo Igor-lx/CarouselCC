@@ -1,4 +1,5 @@
 import { clamp, normalizePageIndex } from "../domain";
+import { resolveGoToApproachDistance } from "../motion/timing";
 import { reconcileStateToLayout } from "./reconcile";
 import {
   hasReachedDragTarget,
@@ -37,6 +38,8 @@ export function carouselReducer(
         targetPageIndex: dragPageIndex,
         fromVirtualIndex: dragOrigin,
         virtualIndex: dragOrigin,
+        teleportVirtualIndex: null,
+        isTeleportApproach: false,
         isRepeatedClickAdvance: false,
         motionPhase: "dragging",
         moveReason: "gesture",
@@ -62,6 +65,8 @@ export function carouselReducer(
           targetPageIndex,
           fromVirtualIndex: envelope.targetVirtualIndex,
           virtualIndex: envelope.targetVirtualIndex,
+          teleportVirtualIndex: null,
+          isTeleportApproach: false,
           isRepeatedClickAdvance: false,
           motionPhase: "idle",
           moveReason: "gesture",
@@ -82,6 +87,8 @@ export function carouselReducer(
         targetPageIndex,
         fromVirtualIndex: dragOrigin,
         virtualIndex: envelope.targetVirtualIndex,
+        teleportVirtualIndex: null,
+        isTeleportApproach: false,
         isRepeatedClickAdvance: false,
         motionPhase: dragReleasePhase(envelope, context.isInstantMode),
         moveReason: "gesture",
@@ -97,8 +104,14 @@ export function carouselReducer(
         nextFromVirtualIndex,
         nextTargetPageIndex,
         nextVirtualIndex,
+        nextTeleportVirtualIndex,
         phase,
-      } = resolveStepTransition(synced, command, context.isInstantMode);
+      } = resolveStepTransition(
+        synced,
+        command,
+        context.isInstantMode,
+        context.config.motion,
+      );
 
       const isRepeatedClickAdvance =
         command.type === "MOVE" &&
@@ -115,6 +128,8 @@ export function carouselReducer(
           return {
             ...synced,
             fromVirtualIndex: nextFromVirtualIndex,
+            teleportVirtualIndex: null,
+            isTeleportApproach: false,
             isRepeatedClickAdvance: false,
             motionPhase: "step-snap",
             moveReason: "gesture",
@@ -125,6 +140,8 @@ export function carouselReducer(
           ...synced,
           fromVirtualIndex: nextFromVirtualIndex,
           virtualIndex: nextVirtualIndex,
+          teleportVirtualIndex: null,
+          isTeleportApproach: false,
           isRepeatedClickAdvance: false,
           motionPhase: isInstant ? "step-instant" : synced.motionPhase,
           moveReason: command.moveReason,
@@ -137,6 +154,8 @@ export function carouselReducer(
         targetPageIndex: nextTargetPageIndex,
         fromVirtualIndex: nextFromVirtualIndex,
         virtualIndex: nextVirtualIndex,
+        teleportVirtualIndex: nextTeleportVirtualIndex,
+        isTeleportApproach: false,
         isRepeatedClickAdvance,
         motionPhase: phase,
         moveReason: command.moveReason,
@@ -155,10 +174,53 @@ export function carouselReducer(
         context.config.motion.epsilon;
 
       if (targetChanged) {
+        // A newer click already replaced the target while this segment was
+        // settling - re-anchor to where it actually settled, keep motion.
         return {
           ...synced,
           fromVirtualIndex: settledPosition,
+          teleportVirtualIndex: null,
+          isTeleportApproach: false,
           isRepeatedClickAdvance: false,
+          gesture: ZERO_GESTURE_RELEASE,
+        };
+      }
+
+      if (synced.teleportVirtualIndex !== null) {
+        // A far GO_TO's bounded preflight just settled. Teleport across the
+        // un-rendered middle and start the approach slice from a bounded
+        // origin, so the render window never spans the full jump.
+        const direction = Math.sign(
+          synced.teleportVirtualIndex - settledPosition,
+        );
+
+        if (direction !== 0) {
+          const approachDistance = resolveGoToApproachDistance(
+            synced.layout.visibleSlidesCount,
+            context.config.motion,
+          );
+          return {
+            ...synced,
+            fromVirtualIndex:
+              synced.teleportVirtualIndex - direction * approachDistance,
+            virtualIndex: synced.teleportVirtualIndex,
+            teleportVirtualIndex: null,
+            isTeleportApproach: true,
+            isRepeatedClickAdvance: false,
+            motionPhase: "step-jump",
+            gesture: ZERO_GESTURE_RELEASE,
+          };
+        }
+
+        // Degenerate: the final target coincides with the preflight landing.
+        return {
+          ...synced,
+          fromVirtualIndex: synced.teleportVirtualIndex,
+          virtualIndex: synced.teleportVirtualIndex,
+          teleportVirtualIndex: null,
+          isTeleportApproach: false,
+          isRepeatedClickAdvance: false,
+          motionPhase: "idle",
           gesture: ZERO_GESTURE_RELEASE,
         };
       }
@@ -166,6 +228,8 @@ export function carouselReducer(
       return {
         ...synced,
         fromVirtualIndex: settledPosition,
+        teleportVirtualIndex: null,
+        isTeleportApproach: false,
         isRepeatedClickAdvance: false,
         motionPhase: "idle",
         gesture: ZERO_GESTURE_RELEASE,

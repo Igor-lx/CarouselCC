@@ -48,7 +48,7 @@ With overrides:
   isAuto
   isPagePaddingOn
   durationStep={2000}
-  durationJump={800}
+  jumpSpeedMultiplier={8}
   intervalAutoplay={3000}
   onSlideClick={(slide) => openInNewTab(String(slide.content))}
   onMotionIdleStatusChange={setIsIdle}
@@ -85,14 +85,14 @@ visible.
 | `isInstantMotion` | `boolean` | — *(reads `prefers-reduced-motion`)* | Explicit override for the OS-level reduced-motion preference. When set or detected: every transition snaps instantly, gesture is disabled, the PaginationWidget runs in static (non-motion-bound) mode. |
 | `isTouchDevice` | `boolean` | — *(detects via `(pointer:coarse)`)* | Explicit override for touch detection. Controls: gesture eligibility, `data-touch` outer attribute, hover-pause exemption for autoplay. |
 
-#### Timings (milliseconds)
+#### Motion timing
 
 | Prop              | Default | Effect |
 | ----------------- | ------- | ------ |
-| `durationAutoplay` | `3000` | Duration of an autoplay-driven page step. |
-| `intervalAutoplay` | `3000` | Idle interval between two autoplay steps. |
-| `durationStep`    | `2000`  | Base duration of duration-authored click / gesture-driven steps. Repeated-click profile segments instead derive duration from their speed profile. Multi-page click distances scale linearly. |
-| `durationJump`    | `800`   | Duration of `GO_TO` jumps (e.g. pagination click to a far page, autoplay loop-back). Also used as the fallback duration when reduced-motion mode requires a hard jump. |
+| `durationAutoplay` | `3000` ms | Duration of an autoplay-driven page step. |
+| `intervalAutoplay` | `3000` ms | Idle interval between two autoplay steps. |
+| `durationStep`    | `2000` ms | Base duration of duration-authored click / gesture-driven steps. Repeated-click profile segments instead derive their duration from their speed profile. Multi-page click distances scale linearly. |
+| `jumpSpeedMultiplier` | `8` | `GO_TO` peak cruise speed as a multiple of the normal one-step speed. A jump's duration is derived from distance and this multiplier, so a near and a far jump share one consistent speed. Drives short jumps and the bounded segments of a far-jump teleport alike. |
 
 #### Module gates
 
@@ -167,6 +167,14 @@ These are the user-facing behaviours the implementation guarantees.
 - **Step semantics.** `MOVE(+1)` advances one page, `MOVE(-1)` retreats one
   page, `GO_TO(pageIndex)` jumps over a possibly larger distance. In cyclic
   mode, `GO_TO` always travels the shortest cyclic distance.
+- **GO_TO motion.** Every `GO_TO` follows one speed profile — accelerate,
+  cruise, decelerate. A jump within `GO_TO_MAX_ANIMATED_PAGE_SPAN` page
+  screens animates its whole distance. A longer jump animates a bounded
+  preflight, teleports instantly across the un-rendered middle (spliced into
+  the constant-speed cruise, so velocity stays continuous — only the position
+  jumps), then animates a bounded approach that decays to rest. The preflight
+  and approach are slices of the same canonical profile, so a 3-page jump and
+  a 30-page jump share an identical ramp-up and ramp-down. See §4.4.
 - **Click during motion (opposite direction).** Re-targets without
   restarting from the logical origin: the new segment continues from the
   last emitted visual sample, not from where the previous segment was
@@ -183,16 +191,17 @@ These are the user-facing behaviours the implementation guarantees.
   (`swipeThresholdRatio` of the viewport width with a hard min). When the
   intent is `NONE`, the track snaps back via the snap-back curve over
   `SNAP_BACK_DURATION` (1300 ms).
-- **Gesture interrupts motion.** Starting a drag while the carousel is
-  animating cancels the active motion *immediately* at press-down; the
-  drag starts from the visually sampled position. The cancel is published
+- **Gesture interrupts motion.** Once the pointer crosses the horizontal drag
+  threshold while the carousel is animating, the drag starts from the visually
+  sampled position at that moment. A plain tap does not enter reducer state.
+  The cancel is published
   through the visual-position SSOT, so the pagination widget, the track,
   and the motion runner all observe one consistent state during the
   gesture.
 - **Autoplay.** A `setTimeout(intervalAutoplay)` schedules the next step
   whenever the carousel is in the eligible state described under
   `isAuto`. On the final page in finite mode, the next step loops back to
-  page 0 via `GO_TO` (using `durationJump`).
+  page 0 via `GO_TO`.
 - **External motion-idle signal.** `onMotionIdleStatusChange` fires once on
   each idle↔running crossing. Consumers may use it to schedule non-critical
   work around motion. The signal remains observation-only; the carousel also
@@ -203,18 +212,23 @@ These are the user-facing behaviours the implementation guarantees.
   (`visibleSlidesCount` slides) at a time, so the buffer is sized in
   page-steps via a lookahead schedule (`config/slides`) that shrinks as the
   visible band widens, keeping the absolute warmed buffer bounded. Each idle
-  period is one preparation session. Entering motion closes that session in
-  layout phase before the motion runner starts, cancels queued decode work,
-  aborts in-flight offscreen warm-up fetches, and invalidates stale callbacks.
-  Warm-up fetches are low priority and decode only inside an active idle
-  session. The Carousel root reads the shared reduced-data environment signal
-  (`prefers-reduced-data` / `saveData`) alongside its other global device
-  signals; when it is on, speculative warm-up is skipped entirely while
-  normal visible loading, image errors, and retries remain unchanged. A
-  successful warm-up lands in the image-resource SSOT, so a slide entering
-  the render window can observe an already-`loaded` resource; a speculative
-  warm-up failure does not become a visible slide error. It never changes
+  period is one preparation session; entering motion closes that session in
+  the layout phase before paint — aborting in-flight offscreen warm-up
+  fetches and cancelling queued decode work. Warm-up fetches are low priority
+  and decode only inside an active idle session. A successful warm-up lands
+  in the image-resource SSOT, so a slide entering the render window can
+  observe an already-`loaded` resource; a speculative warm-up failure does
+  not become a visible slide error. Heavyweight offscreen warm-up `Image`
+  handles live only while their URL is inside the active preload window —
+  once it leaves, the handle is released, so even a 500-slide deck never
+  turns the store into a hidden full-deck image cache. It never changes
   navigation, layout, motion state, or slide rendering semantics.
+
+  Warm-up is purely speculative, so it is skipped — on every device — when
+  the user has opted into reduced data usage (`prefers-reduced-data` or the
+  Network Information API `saveData` flag, observed via `useDataSaver`). The
+  image-resource store, its render SSOT, and image error handling / retry are
+  unaffected: those are correctness, not optimization, and always run.
 - **Image errors and retry.** A slide whose image fails to load renders a
   text placeholder (`alt`, or `errAltPlaceholder`) and is not interactive.
   While such a slide sits in the active band, the image-resource store
@@ -228,7 +242,7 @@ These are the user-facing behaviours the implementation guarantees.
 - **Pagination (`Pagination`).** One dot per page. The active dot reflects
   the `targetPageIndex` immediately on click and gesture. During
   *autoplay*, the dot switch is delayed by
-  `motionDuration · AUTOPLAY_PAGINATION_FACTOR` (default 20 % of the
+  `autoplayMotionDuration * AUTOPLAY_PAGINATION_FACTOR` (default 20 % of the
   animation) — this matches the historical product behaviour where
   autoplay rolls the dot later than the visual.
 - **PaginationWidget (touch).** A fixed-width odd-count widget (default
@@ -274,7 +288,7 @@ For copy-paste / quick lookup. Source: `config/defaults.ts`,
 | `durationAutoplay` (default) | `3000` ms | autoplay step duration |
 | `intervalAutoplay` (default) | `3000` ms | autoplay idle interval |
 | `durationStep` (default) | `2000` ms | click/gesture-driven step |
-| `durationJump` (default) | `800` ms | `GO_TO` jumps |
+| `jumpSpeedMultiplier` (default) | `8` | `GO_TO` peak speed vs. one-step speed |
 | `errAltPlaceholder` (default) | `"Downloading Error"` | image error text |
 | `HOVER_PAUSE_DELAY` | `150` ms | hover-pause debounce |
 | `VISIBILITY_THRESHOLD` | `0.2` | viewport visibility fraction |
@@ -283,7 +297,9 @@ For copy-paste / quick lookup. Source: `config/defaults.ts`,
 | `REPEATED_CLICK_SPEED_MULTIPLIER` | `5` | fast-segment peak vs. normal |
 | `REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE` | `0.35` | profile ramp-up |
 | `REPEATED_CLICK_DECELERATION_DISTANCE_SHARE` | `0.35` | profile ramp-down |
-| `JUMP_BEZIER` | `cubic-bezier(0.16, 1, 0.3, 1)` | far jumps |
+| `GO_TO_MAX_ANIMATED_PAGE_SPAN` | `2` | far-jump teleport threshold (page screens) |
+| `GO_TO_ACCELERATION_DISTANCE_SHARE` | `0.12` | GO_TO profile ramp-up |
+| `GO_TO_DECELERATION_DISTANCE_SHARE` | `0.5` | GO_TO profile ramp-down |
 | `MOVE_BEZIER` | `cubic-bezier(0.32, 0.2, 0.28, 1)` | normal step |
 | `AUTO_BEZIER` | `cubic-bezier(0.28, 0.72, 0.38, 1)` | autoplay step |
 | `SNAP_BACK_BEZIER` | `cubic-bezier(0.18, 0.82, 0.28, 1)` | drag snap-back |
@@ -313,16 +329,15 @@ Every responsibility has exactly one owner. The orchestrator
 | Resolved runtime config | `useCarouselConfig` | One memo. Substitutes defaults only for `undefined` props; never normalises explicit values. |
 | Slide records | `useCarouselSlideDeck` | Builds slide records, optionally extends to fill perfect pages. |
 | Layout facts | `useCarouselSlideDeck` | `length`, `visibleSlidesCount`, `pageCount`, `virtualLength`, `canSlide`, `isFinite`, `dataKey`. |
-| Logical state | `useCarouselState` | Reducer-backed. Owns `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, `motionPhase`, `gesture`, `isRepeatedClickAdvance`, `moveReason`. |
-| Command admission | `useCarouselCommandAdmission` | Single pre-state gateway for raw intents. Buffers/coalesces in-flight repeated clicks, passes accepted commands into the reducer. |
+| Logical state | `useCarouselState` | Reducer-backed. Owns `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, optional `teleportVirtualIndex`, `isTeleportApproach`, `motionPhase`, `gesture`, `isRepeatedClickAdvance`, `moveReason`. |
 | Visual sampled position | `useVisualPosition` | Wraps a single `MotionController`. Sole SSOT for the visible track offset. |
-| Motion execution | `useCarouselMotionExecution` + `useMotionRunner` | Post-state bridge. Owns duration publication + settle feedback, then reads logical state, builds a segment, and calls into the controller. |
+| Motion execution | `useCarouselMotionExecution` + `useMotionRunner` | Owns motion-duration publication and settle feedback, then reads logical state, builds a segment, and calls into the controller. |
 | Track DOM | `useTrackBinding` | Measures slot size and subscribes to visual position; writes `transform`. |
 | Render window | `useSlideRenderModel` | Memoised; expands during motion, snaps on idle. |
-| Image resources | image-resource store (`createImageResourceStore`) | Per-URL render status, explicit visible-owner count, warm-up lifecycle, retry policy, decode queue, and offscreen preparation session. One instance per carousel; the single authority on image renderability. |
+| Image resources | image-resource store (`createImageResourceStore`) | Per-URL render status, explicit visible-owner count, speculative warm-up lifecycle, retry policy, and a session-scoped decode queue. One instance per carousel; the single authority on image renderability. |
 | Image preparation | `useSlideImagePreload` | React adapter that derives the deck + idle-window URL sets and drives the store through one atomic preparation-window API. Holds no image logic of its own. |
-| Slide image binding | `useImageResource` | Subscribes one `SlideItem` to its URL in the image-resource store via `useSyncExternalStore`. |
-| Gesture lifecycle | `useCarouselGesture` | Wraps the shared `usePointerSwipe`. Converts pointer events into accepted commands and direct position writes. |
+| Slide image binding | `useImageResource` | Registers a `SlideItem` as a visible owner of its URL and subscribes to the URL's snapshot via `useSyncExternalStore`. |
+| Gesture lifecycle | `useCarouselGesture` | Wraps the shared `usePointerSwipe`. Converts pointer events into dispatches and direct position writes. |
 | Autoplay lifecycle | `useAutoplay` | Owns the interval timer, hover/visibility/dragging pause. |
 | Focus shift | `useFocusRecovery` | Triggers when the state settles. |
 | Module API | `useModuleContextValue` | Builds the value once, memoised. |
@@ -340,7 +355,8 @@ context provider.
 The system has five SSOTs, each owned by exactly one layer.
 
 1. **Logical state** — `useCarouselState`. Holds `targetPageIndex`,
-   `fromVirtualIndex`, `virtualIndex`, `motionPhase`,
+   `fromVirtualIndex`, `virtualIndex`, optional `teleportVirtualIndex`,
+   `isTeleportApproach`, `motionPhase`,
    `gesture` (the velocity payload of the latest END_DRAG), and
    `isRepeatedClickAdvance`. No timing. Reducer-pure: every transition is
    a pure function of `(state, command, context)`.
@@ -366,12 +382,13 @@ The system has five SSOTs, each owned by exactly one layer.
      offscreen element, and decode ownership.
 
    `useSlideImagePreload` is its only writer of preparation intent; each
-   `SlideItem` registers/subscribes to its own URL via `useImageResource` and
-   reports the real `<img>` outcome back. Warm-up success may publish `loaded`
-   only while no real visible failure exists; warm-up failure remains
-   speculative and does not publish `error`. "Has this slide's image failed"
-   is a derived read of this SSOT, never a second copy of state.
-   Observation-only: it never feeds navigation, layout, or motion.
+   `SlideItem` registers as a visible owner and subscribes to its URL via
+   `useImageResource`, then reports the real `<img>` outcome back. Warm-up
+   success may publish `loaded` only while no real visible failure exists;
+   warm-up failure stays speculative and never publishes `error`. "Has this
+   slide's image failed" is a *derived read* of this SSOT, never a second
+   copy of state. Observation-only: it never feeds navigation, layout, or
+   motion.
 
 No layer mirrors another layer's value. The state machine never reads a
 sampled motion value: the gesture controller reads the visual position and
@@ -407,16 +424,19 @@ phase }`.
 A `Segment` is one of:
 
 - **Bezier segment** — a cubic-bezier eased move with a known duration.
-  Used for autoplay (`AUTO_BEZIER`), jump (`JUMP_BEZIER`),
-  click step / non-inertial gesture release (`MOVE_BEZIER`), and
-  snap-back (`SNAP_BACK_BEZIER`).
+  Used for autoplay (`AUTO_BEZIER`), click step / non-inertial gesture
+  release (`MOVE_BEZIER`), and snap-back (`SNAP_BACK_BEZIER`).
 - **Profile segment** - a smoothstep-driven acceleration / cruise /
   deceleration profile. These segments are speed-authored: start / peak /
   end speeds plus zone distances derive the segment duration. If acceleration
   and deceleration shares sum above `1`, runtime normalizes the profile to
   `0.5 / 0.5` with no cruise zone. Used for:
+  - **every GO_TO** - one canonical `accelerate / cruise / decelerate`
+    profile, peak speed `jumpSpeedMultiplier × normalStepSpeed`. A short jump
+    is the whole profile; a far jump is two slices of it around a teleport
+    (§4.4);
   - **repeated-click fast advance** - one segment directly to the next page
-    boundary, peak speed `REPEATED_CLICK_SPEED_MULTIPLIER x normalMoveSpeed`;
+    boundary, peak speed `REPEATED_CLICK_SPEED_MULTIPLIER × normalMoveSpeed`;
   - **inertial gesture release** - peak speed derived from EMA-smoothed
     release velocity × `inertiaBoost`.
 
@@ -426,16 +446,12 @@ A `Segment` is one of:
 state changes: when `motionPhase` becomes a non-idle value, it samples the
 motion origin and builds the segment.
 
-Repeated same-direction clicks take a dedicated admission path. The raw click
-first enters `useCarouselCommandAdmission`, a tiny inbox that owns only
-*unaccepted* click steps. Same-burst steps are coalesced for two RAF ticks,
-then one accepted `MOVE` enters the reducer. Until that admission point the
-previous segment keeps painting unchanged, React state is not rewritten, and
-no second logical target exists: the buffer is only an inbox, while the
-reducer remains the SSOT for accepted targets.
-
-When any accepted intent interrupts an active segment, the successor starts
-from the live stream:
+When a previous segment is still running (repeated click,
+opposite-direction click, any interruption), the state change records the
+new intent immediately, but the controller retarget is deferred by a tiny
+frame-boundary window (`RETARGET_FRAME_DELAY`, currently two RAF ticks). The
+old segment keeps publishing during that window. At the deferred boundary the
+new segment starts from the live stream:
 
 - position comes from `controller.getSnapshot()` after the previous segment
   has had time to publish additional frames;
@@ -445,15 +461,12 @@ from the live stream:
 
 This keeps the first handoff emit equal to the already-published track
 position, so retargeting is a DOM no-op, while the velocity is sampled close
-to the actual transition frame. Repeated clicks have already waited at the
-command-admission boundary, so their accepted state starts the successor
-immediately; other active interruptions still use the runner's tiny deferred
-handoff window (`RETARGET_FRAME_DELAY`, currently two RAF ticks). Using a
-fresh unemitted position can make the carousel jump to a position the user
-never saw. Any future change must preserve the invariant: "unaccepted repeated
-clicks stay outside reducer state, accepted retargets start from the emitted
-visual frame, velocity comes from the current segment sample, and time comes
-from the successor start".
+to the actual transition frame. Using a fresh unemitted position can make the
+carousel jump to a position the user never saw; retargeting synchronously in
+the input/layout-effect turn can feel like a micro-stop. Any future change
+must preserve the invariant: "intent immediately, controller retarget on a
+frame boundary, position from emitted visual frame, velocity from current
+segment sample, time from new segment start".
 
 When the controller completes, the runner dispatches
 `MOTION_SETTLED { settledPosition }`. If a newer click already replaced the
@@ -471,6 +484,35 @@ tick - both run in the same frame. `getSnapshot()` is reserved for cold
 imperative reads; it returns the emitted visual frame and should not be used
 inside per-frame subscribers.
 
+### 4.4 Far GO_TO teleport
+
+A `GO_TO` longer than `GO_TO_MAX_ANIMATED_PAGE_SPAN` page screens cannot
+animate edge-to-edge — it would mount every intermediate slide. Instead it is
+split by one pure geometry resolver (`motion/timing.ts` `resolveGoToPlan`),
+consumed by both the reducer and the segment factory so the logical landing
+positions and the animated profile can never drift apart:
+
+- **Preflight.** The reducer sets `virtualIndex` to a bounded landing and
+  keeps the final target in `teleportVirtualIndex`. `virtualIndex` is kept
+  bounded on purpose — the render window is built from it, so the far target
+  must not leak in before the teleport. The segment is the canonical profile's
+  acceleration zone plus enough cruise to reach a whole-page boundary; it ends
+  at cruise speed.
+- **Teleport.** When the preflight settles, the reducer teleports
+  `fromVirtualIndex` / `virtualIndex` to a bounded origin just before the
+  final target and clears `teleportVirtualIndex`. The track `transform` jumps
+  by the cut-out distance in a single frame.
+- **Approach.** A second profile slice - the remaining cruise plus the
+  deceleration zone - enters at cruise speed (handoff-continuous with the
+  preflight) and decays to rest at the final target.
+
+The teleport is spliced inside the cruise, the one constant-speed interval, at
+a whole-page boundary. Only the position jumps - never the speed. The preflight
+and approach slices
+come from the same canonical profile as a short jump, so every jump, near or
+far, shares one ramp-up and ramp-down. This is the only intentional visual
+teleport.
+
 ---
 
 ## 5. Gesture model
@@ -482,20 +524,19 @@ It is not carousel-specific and is reusable.
 
 `useCarouselGesture` is the carousel-specific adapter. It:
 
-1. on press-start: records the visually sampled origin position and the
-   slot size (`getSlotSize()`), then publishes the origin into the visual
-   position stream via `applyTrackPosition`. This cancels any active
-   motion *at the moment the user touches the screen*, not on the next
-   React render — eliminating the small lag between press-down and the
-   carousel actually stopping;
+1. on drag-start (after horizontal intent is recognised): records the visually
+   sampled origin position and the slot size (`getSlotSize()`), dispatches
+   `START_DRAG`, then publishes the drag position into the visual stream via
+   `applyTrackPosition`. A tap that never becomes a drag stays outside the
+   carousel reducer;
 2. on every move payload: translates `uiOffset` into a virtual-index
    delta using the recorded slot size and writes that into the visual
    position via `applyTrackPosition`. No React state per move;
 3. on release: computes the swipe target via `resolveDragRelease` (pure
-   helper in `domain/dragRelease.ts`) and submits `END_DRAG` through command
-   admission with the resolved target plus the pointer/UI release velocities.
+   helper in `domain/dragRelease.ts`) and dispatches `END_DRAG` with the
+   resolved target plus the pointer/UI release velocities.
 
-The accepted command carries the velocities into the state machine. They are
+The dispatch carries the velocities into the state machine. They are
 stored on the snapshot and read by `useMotionRunner` when it builds the
 release segment.
 
@@ -506,8 +547,8 @@ release segment.
 A reducer-backed state machine in `state/`. Discriminated `CarouselCommand`
 union:
 
-- `START_DRAG { fromVirtualIndex, targetPageIndex }` — fires at gesture
-  press-start.
+- `START_DRAG { fromVirtualIndex, targetPageIndex }` - fires when the pointer
+  crosses the horizontal drag threshold.
 - `END_DRAG { targetPageIndex, targetVirtualIndex, isSnap, isInstant,
   pointerReleaseVelocity, uiReleaseVelocity }` — fires at gesture release.
 - `MOVE { step, moveReason, fromVirtualIndex, isInstant? }` — click /
@@ -538,11 +579,11 @@ The `CarouselModuleContext` exposes a partitioned value:
 
 ```ts
 {
-  status: { isIdle, isMoving, isJumping, isDragging, isInteracting, motionPhase },
+  status: { isIdle, isMoving, isJumping, isDragging, motionPhase },
   layout: { pageCount, canSlide, isAtStart, isAtEnd, isTouch,
             isReducedMotion, isDiagnosticActive },
   intent: { targetPageIndex, moveReason,
-            motionDuration, autoplayPaginationFactor },
+            autoplayMotionDuration, autoplayPaginationFactor },
   navigation: { handlePrev, handleNext, handlePageSelect },
   visualPosition: VisualPositionSource | null,  // null when reduced motion
 }
@@ -566,10 +607,10 @@ modules with their own checks (`PaginationWidget` via
 ### 8.1 `<Pagination />`
 
 Desktop dot pagination. One `PaginationDot` per page. Reads
-`intent.targetPageIndex`, `intent.motionDuration`,
+`intent.targetPageIndex`, `intent.autoplayMotionDuration`,
 `intent.autoplayPaginationFactor`, and `layout.pageCount` from the
 context. During autoplay, dot switching is delayed by
-`motionDuration · autoplayPaginationFactor` via `usePaginationSync`. On
+`autoplayMotionDuration * autoplayPaginationFactor` via `usePaginationSync`. On
 click, `navigation.handlePageSelect(pageIndex)` is dispatched as `GO_TO`.
 
 ### 8.2 `<PaginationWidget />`
@@ -616,15 +657,12 @@ src/components/Carousel/
 ├── config/                        config resolution
 │   ├── defaults.ts                public-prop defaults
 │   ├── constants.ts               tunable runtime constants (epsilons, buffers)
-│   ├── motion.ts                  bezier strings, repeated-click factors
+│   ├── motion.ts                  bezier strings, repeated-click + GO_TO factors
 │   ├── gesture.ts                 drag config + inertial release config
 │   ├── interaction.ts             hover delay, visibility threshold, autoplay pagination factor
 │   ├── buildRawConfig.ts          merges raw input with defaults
 │   ├── types.ts                   CarouselRuntimeConfig + sub-shapes
 │   └── useCarouselConfig.ts
-├── commands/
-│   ├── index.ts
-│   └── useCarouselCommandAdmission.ts  raw intent → accepted reducer command
 ├── context/
 │   ├── CarouselModuleContext.ts   module-facing value
 │   ├── CarouselDiagnosticContext.ts  raw props/layout/slots for Diagnostic
@@ -649,19 +687,20 @@ src/components/Carousel/
 │   ├── types.ts                   Segment, MotionIntent, MotionStart
 │   ├── bezier.ts                  cubic-bezier sampler + cache + carousel curves
 │   ├── profile.ts                 smoothstep profile (accel/cruise/decel)
-│   ├── speed.ts                   averageSpeed, sameDirectionSpeed, signedVelocity
+│   ├── speed.ts                   sameDirectionSpeed, signedVelocity
+│   ├── timing.ts                  GO_TO speed + teleport geometry (resolveGoToPlan)
 │   ├── duration.ts                bezier-segment duration math
 │   ├── segmentFactory.ts          builds the Segment for the next motion step
 │   ├── sampler.ts                 segment → MotionSampleData at timestamp
-│   ├── useCarouselMotionExecution.ts  post-state motion orchestration
-│   └── useMotionRunner.ts         state → segment → controller
+│   ├── useMotionRunner.ts         state → segment → controller
+│   └── useCarouselMotionExecution.ts  runner + motion-duration publication
 ├── position/
 │   ├── types.ts                   VisualPositionFrame, VisualPositionSource
 │   └── useVisualPosition.ts       VisualPositionSource owner
 ├── geometry/
 │   └── useTrackBinding.ts         ResizeObserver + slot measure + transform writer
 ├── gesture/
-│   └── useCarouselGesture.ts      pointer-swipe → commands + visual position writes
+│   └── useCarouselGesture.ts      pointer-swipe → dispatch + visual position writes
 ├── autoplay/
 │   └── useAutoplay.ts
 ├── focus/
@@ -701,14 +740,12 @@ Reading order for someone new:
    becomes a visual segment.
 5. `position/useVisualPosition.ts` — how the visible position is sampled
    and exposed.
-6. `commands/useCarouselCommandAdmission.ts` — how raw intent becomes an
-   accepted reducer command.
-7. `motion/useCarouselMotionExecution.ts` + `motion/useMotionRunner.ts` —
-   how accepted state becomes a controller start; the handoff invariant (§4.2).
-8. `geometry/useTrackBinding.ts` — how the track DOM is written.
-9. `gesture/useCarouselGesture.ts` — how a touch swipe submits commands and
-   writes drag position.
-10. The modules.
+6. `motion/useMotionRunner.ts` — how a state change becomes a controller
+   start; the handoff invariant (§4.2).
+7. `geometry/useTrackBinding.ts` — how the track DOM is written.
+8. `gesture/useCarouselGesture.ts` — how a touch swipe ends up as a
+   dispatch.
+9. The modules.
 
 If a future reader can follow that order without bouncing for inverse
 dependencies, the architecture has held.
@@ -748,12 +785,6 @@ dependencies, the architecture has held.
   carousel semantics and never receives reducer state. Internal image
   preparation uses the carousel's own idle status directly; external consumers
   can still use the callback for application-owned non-critical work.
-- **Image warm-up retention is bounded by design.** Heavyweight successful
-  warm-up elements live only while their URL is inside the active idle preload
-  window. Once a URL leaves that window, the offscreen `Image` handle is
-  released; lightweight per-URL render entries remain store-owned for the live
-  deck. The carousel therefore warms nearby content without turning itself
-  into a hidden cache for every image in a large deck.
 
 ---
 
@@ -781,9 +812,6 @@ dependencies, the architecture has held.
   The PaginationWidget binding short-circuits writes per dot. The motion
   controller emits only on actual sample change (per RAF tick of an
   active segment; one synchronous emit on cold segment start; active
-  non-repeated retargets publish their first successor sample after the
-  deferred frame-boundary handoff; no emits while idle). Repeated clicks that
-  land during motion are buffered and coalesced before they enter reducer
-  state, so one burst causes one accepted React transition instead of one
-  transition per physical press. Image preload/decode is scoped to the slide
-  layer and starts only from idle states.
+  retargets publish their first successor sample after the deferred
+  frame-boundary handoff; no emits while idle). Image preload/decode is scoped
+  to the slide layer and starts only from idle states.

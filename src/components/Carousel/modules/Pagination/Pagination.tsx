@@ -27,7 +27,7 @@ const PaginationBase = memo(function Pagination({ className }: PaginationProps) 
   const displayedPageIndex = usePaginationSync({
     targetPageIndex: intent.targetPageIndex,
     shouldSyncInstantly,
-    motionDuration: intent.motionDuration,
+    autoplayMotionDuration: intent.autoplayMotionDuration,
     autoplayPaginationFactor: intent.autoplayPaginationFactor,
   });
 

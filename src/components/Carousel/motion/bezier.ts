@@ -1,6 +1,5 @@
 import {
   AUTO_BEZIER,
-  JUMP_BEZIER,
   MOVE_BEZIER,
   SNAP_BACK_BEZIER,
 } from "../config";
@@ -16,7 +15,6 @@ export const carouselEasingString = (
   motionPhase: MotionPhase,
   moveReason: MoveReason,
 ): string => {
-  if (motionPhase === "step-jump") return JUMP_BEZIER;
   if (motionPhase === "step-snap") return SNAP_BACK_BEZIER;
 
   switch (moveReason) {

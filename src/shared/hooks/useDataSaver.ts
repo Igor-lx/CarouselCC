@@ -72,7 +72,7 @@ const subscribe = (callback: () => void): (() => void) => {
 const getSnapshot = (): boolean => prefersReducedData || saveDataEnabled;
 
 /**
- * Neutral snapshot used both for SSR/hydration and for the disabled hook -
+ * Neutral snapshot used both for SSR/hydration and for the disabled hook —
  * in either case there is no observed signal, so data-saving reads as off.
  */
 const getNeutralSnapshot = (): boolean => false;
@@ -81,17 +81,17 @@ const getNeutralSnapshot = (): boolean => false;
 const noopSubscribe = (): (() => void) => () => undefined;
 
 /**
- * Reports whether the user has opted into reduced data usage - via the
+ * Reports whether the user has opted into reduced data usage — via the
  * `prefers-reduced-data` media query or the Network Information API's
  * `saveData` flag. Backed by `useSyncExternalStore`, which handles the
  * SSR/hydration snapshot split natively.
  *
  * Pass `enabled = false` to call the hook unconditionally (Rules of Hooks)
- * without subscribing to the store - for callers whose feature is itself
+ * without subscribing to the store — for callers whose feature is itself
  * inactive, so they would never act on the result anyway.
  *
- * Intended only to skip speculative network work (e.g. image warm-up). It
- * must never gate correctness-critical work - error handling, retry, or
+ * Intended only to skip *speculative* network work (e.g. image warm-up). It
+ * must never gate correctness-critical work — error handling, retry, or
  * anything the user actually sees.
  */
 export function useDataSaver(enabled = true): boolean {

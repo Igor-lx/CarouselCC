@@ -8,7 +8,6 @@ export interface CarouselStatusView {
   isMoving: boolean;
   isJumping: boolean;
   isDragging: boolean;
-  isInteracting: boolean;
 }
 
 export interface CarouselLayoutView {
@@ -29,7 +28,7 @@ export interface CarouselLayoutView {
 export interface CarouselIntentView {
   targetPageIndex: number;
   moveReason: MoveReason;
-  motionDuration: number;
+  autoplayMotionDuration: number;
   autoplayPaginationFactor: number;
 }
 
@@ -54,7 +53,7 @@ export interface CarouselDiagnosticContextValue {
     visibleSlidesNr: unknown;
     durationAutoplay: unknown;
     durationStep: unknown;
-    durationJump: unknown;
+    jumpSpeedMultiplier: unknown;
     intervalAutoplay: unknown;
     errAltPlaceholder: unknown;
   };

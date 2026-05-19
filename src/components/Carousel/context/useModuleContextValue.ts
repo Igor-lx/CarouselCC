@@ -19,8 +19,7 @@ interface UseModuleContextValueInput {
   navigation: CarouselNavigation;
   isTouch: boolean;
   isReducedMotion: boolean;
-  isInteracting: boolean;
-  motionDuration: number;
+  autoplayMotionDuration: number;
   visualPosition: VisualPositionSource | null;
   isAtStart: boolean;
   isAtEnd: boolean;
@@ -34,8 +33,7 @@ export function useModuleContextValue({
   navigation,
   isTouch,
   isReducedMotion,
-  isInteracting,
-  motionDuration,
+  autoplayMotionDuration,
   visualPosition,
   isAtStart,
   isAtEnd,
@@ -48,10 +46,8 @@ export function useModuleContextValue({
       isMoving: status.isMoving,
       isJumping: status.isJumping,
       isDragging: status.isDragging,
-      isInteracting,
     }),
     [
-      isInteracting,
       state.motionPhase,
       status.isDragging,
       status.isIdle,
@@ -85,12 +81,12 @@ export function useModuleContextValue({
     () => ({
       targetPageIndex: state.targetPageIndex,
       moveReason: state.moveReason,
-      motionDuration,
+      autoplayMotionDuration,
       autoplayPaginationFactor: config.interaction.autoplayPaginationFactor,
     }),
     [
+      autoplayMotionDuration,
       config.interaction.autoplayPaginationFactor,
-      motionDuration,
       state.moveReason,
       state.targetPageIndex,
     ],
