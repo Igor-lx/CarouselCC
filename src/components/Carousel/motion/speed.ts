@@ -14,4 +14,4 @@ export const sameDirectionSpeed = (velocity: number, distance: number) => {
 
 /** A non-negative speed re-signed to point along `distance`. */
 export const signedVelocity = (speed: number, distance: number) =>
-  Math.sign(distance) * Math.max(0, speed);
+  Math.sign(distance) * speed;

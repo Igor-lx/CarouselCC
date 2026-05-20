@@ -188,7 +188,7 @@ export function carouselReducer(
 
       if (synced.teleportVirtualIndex !== null) {
         // A far GO_TO's bounded preflight just settled. Teleport across the
-        // un-rendered middle and start the approach slice from a bounded
+        // un-rendered middle and start the fixed approach from a bounded
         // origin, so the render window never spans the full jump.
         const direction = Math.sign(
           synced.teleportVirtualIndex - settledPosition,

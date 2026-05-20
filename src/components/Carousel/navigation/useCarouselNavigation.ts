@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 
-import type { Slide } from "../types";
 import type { CarouselDispatch, MoveReason } from "../state";
+import type { Slide } from "../types";
 
 interface UseCarouselNavigationInput {
   enabled: boolean;
@@ -51,19 +51,33 @@ export function useCarouselNavigation({
     [dispatch, enabled, readCurrentPosition],
   );
 
-  const handlePrev = useCallback(() => move(-1, "click"), [move]);
-  const handleNext = useCallback(() => move(1, "click"), [move]);
+  const handlePrev = useCallback(() => {
+    move(-1, "click");
+  }, [move]);
+
+  const handleNext = useCallback(() => {
+    move(1, "click");
+  }, [move]);
+
   const handlePageSelect = useCallback(
     (pageIndex: number) => goTo(pageIndex, "click"),
     [goTo],
   );
+
   const handleSlideClick = useCallback(
     (slide: Slide) => onSlideClick?.(slide),
     [onSlideClick],
   );
 
   return useMemo(
-    () => ({ move, goTo, handlePrev, handleNext, handlePageSelect, handleSlideClick }),
+    () => ({
+      move,
+      goTo,
+      handlePrev,
+      handleNext,
+      handlePageSelect,
+      handleSlideClick,
+    }),
     [goTo, handleNext, handlePageSelect, handlePrev, handleSlideClick, move],
   );
 }

@@ -25,7 +25,8 @@ interface UseMotionRunnerInput {
    * click had already been queued.
    */
   onSettle: (settledPosition: number) => void;
-  onDurationChange?: (duration: number) => void;
+  onAutoplayDurationCancel?: () => void;
+  onAutoplayDurationChange?: (duration: number) => void;
 }
 
 /**
@@ -90,7 +91,8 @@ export function useMotionRunner({
   isDragging,
   enabled,
   onSettle,
-  onDurationChange,
+  onAutoplayDurationCancel,
+  onAutoplayDurationChange,
 }: UseMotionRunnerInput): void {
   const lastKeyRef = useRef<string>("");
   const retargetFrameRef = useRef<number | null>(null);
@@ -162,31 +164,31 @@ export function useMotionRunner({
 
     if (!enabled) {
       cancelDeferredRetarget();
+      onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, { strategy: "idle" });
-      onDurationChange?.(0);
       return;
     }
 
     if (state.motionPhase === "idle") {
       cancelDeferredRetarget();
+      onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, { strategy: "idle" });
-      onDurationChange?.(0);
       return;
     }
 
     if (state.motionPhase === "dragging") {
       cancelDeferredRetarget();
-      onDurationChange?.(0);
+      onAutoplayDurationCancel?.();
       return;
     }
 
     if (state.motionPhase === "step-instant") {
       cancelDeferredRetarget();
+      onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, {
         strategy: "idle",
         onComplete: settle,
       });
-      onDurationChange?.(0);
       return;
     }
 
@@ -206,11 +208,11 @@ export function useMotionRunner({
           velocity: resolvedStart.velocity,
           onComplete: settle,
         });
-        onDurationChange?.(0);
+        onAutoplayDurationCancel?.();
         return;
       }
 
-      const { segment, duration } = buildCarouselSegment({
+      const { segment, duration, intent } = buildCarouselSegment({
         state,
         config,
         isInstantMode,
@@ -219,7 +221,11 @@ export function useMotionRunner({
         startedAt: resolvedStartedAt,
       });
 
-      onDurationChange?.(duration);
+      if (intent === "autoplay-step") {
+        onAutoplayDurationChange?.(duration);
+      } else {
+        onAutoplayDurationCancel?.();
+      }
 
       controller.start({
         segment,
@@ -259,7 +265,8 @@ export function useMotionRunner({
     enabled,
     isDragging,
     isInstantMode,
-    onDurationChange,
+    onAutoplayDurationCancel,
+    onAutoplayDurationChange,
     scheduleDeferredRetarget,
     settle,
     state.fromVirtualIndex,

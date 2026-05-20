@@ -7,7 +7,7 @@ import {
   DRAG_RELEASE_EPSILON,
   GO_TO_ACCELERATION_DISTANCE_SHARE,
   GO_TO_DECELERATION_DISTANCE_SHARE,
-  GO_TO_MAX_ANIMATED_PAGE_SPAN,
+  GO_TO_PREFLIGHT_PAGE_SPAN,
   HOVER_PAUSE_DELAY,
   IMAGE_RETRY_BASE_DELAY_MS,
   IMAGE_RETRY_MAX_ATTEMPTS,
@@ -101,11 +101,12 @@ const numericRules: NumericRule[] = [
   },
   {
     layer: "Motion",
-    field: "GO_TO_MAX_ANIMATED_PAGE_SPAN",
-    value: GO_TO_MAX_ANIMATED_PAGE_SPAN,
+    field: "GO_TO_PREFLIGHT_PAGE_SPAN",
+    value: GO_TO_PREFLIGHT_PAGE_SPAN,
     severity: "LOGICAL",
     expected: "Expected a positive finite integer (page screens)",
-    consequence: "Far GO_TO teleport threshold is incoherent; jumps mis-bound the render window",
+    consequence:
+      "Far GO_TO teleport needs at least one animated preflight page before the cut",
     predicate: isPositiveInteger,
   },
   {
@@ -390,28 +391,34 @@ const collectRepeatedShareRelation = (): CarouselDiagnosticWarning | null => {
   };
 };
 
-/**
- * The GO_TO profile must keep a positive cruise zone: the teleport of a far
- * jump is spliced inside the cruise, the one interval where splicing does not
- * break velocity continuity.
- */
 const collectGoToShareRelation = (): CarouselDiagnosticWarning | null => {
-  const sum =
-    GO_TO_ACCELERATION_DISTANCE_SHARE + GO_TO_DECELERATION_DISTANCE_SHARE;
-  if (Number.isFinite(sum) && sum < 1) return null;
+  const accelerationDistanceShare = GO_TO_ACCELERATION_DISTANCE_SHARE;
+  const decelerationDistanceShare = GO_TO_DECELERATION_DISTANCE_SHARE;
+  const normalized = normalizeMotionProfileShares(
+    accelerationDistanceShare,
+    decelerationDistanceShare,
+  );
+  const sum = accelerationDistanceShare + decelerationDistanceShare;
+  if (!normalized.wasNormalized) return null;
+
   return {
     severity: "LOGICAL",
     layer: "Motion",
     field: "GO_TO_ACCELERATION_DISTANCE_SHARE + GO_TO_DECELERATION_DISTANCE_SHARE",
     actual: {
-      accelerationDistanceShare: GO_TO_ACCELERATION_DISTANCE_SHARE,
-      decelerationDistanceShare: GO_TO_DECELERATION_DISTANCE_SHARE,
+      accelerationDistanceShare,
+      decelerationDistanceShare,
       sum,
     },
+    normalizedTo: {
+      accelerationDistanceShare: normalized.accelerationShare,
+      decelerationDistanceShare: normalized.decelerationShare,
+      cruiseDistanceShare: normalized.cruiseShare,
+    },
     expected:
-      "Expected acceleration + deceleration share < 1 so the GO_TO profile keeps a cruise zone",
+      "Expected accelerationShare + decelerationShare <= 1 for a one-page direct GO_TO",
     consequence:
-      "Without a cruise zone a far-jump teleport has no velocity-continuous point to splice into",
+      "A one-page direct GO_TO runtime profile normalizes overallocated local zones to 50% acceleration and 50% deceleration",
   };
 };
 

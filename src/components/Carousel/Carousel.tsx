@@ -156,8 +156,8 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     applyVisualPosition: applyImmediatePosition,
   });
 
-  // --- motion execution: state -> controller, duration publication ---------
-  const { motionDuration } = useCarouselMotionExecution({
+  // --- motion execution: state -> controller, autoplay duration signal -----
+  const { autoplayMotionDuration } = useCarouselMotionExecution({
     state,
     config,
     controller,
@@ -176,7 +176,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   });
 
   // --- gesture --------------------------------------------------------------
-  const { isInteracting, listeners: dragListeners } = useCarouselGesture({
+  const { listeners: dragListeners } = useCarouselGesture({
     enabled: layout.canSlide,
     viewportRef,
     layout,
@@ -200,7 +200,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   );
 
   // --- autoplay -------------------------------------------------------------
-  const autoplayPaused = !visible || isInteracting || status.isMoving;
+  const autoplayPaused = !visible || status.isDragging || status.isMoving;
   const { handleHoverChange } = useAutoplay({
     enabled: isAuto && layout.canSlide,
     isPaused: autoplayPaused,
@@ -235,7 +235,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     navigation,
     isTouch,
     isReducedMotion: isInstantMode,
-    motionDuration,
+    autoplayMotionDuration,
     visualPosition: isInstantMode ? null : visualPosition,
     isAtStart,
     isAtEnd,

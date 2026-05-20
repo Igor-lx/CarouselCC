@@ -27,8 +27,6 @@ interface UseCarouselGestureInput {
 }
 
 export interface CarouselGestureResult {
-  isDragging: boolean;
-  isInteracting: boolean;
   listeners: PointerSwipeListeners;
 }
 
@@ -55,24 +53,45 @@ export function useCarouselGesture({
     [],
   );
 
-  const handlePressStart = useCallback(() => {
-    slotSizeRef.current = getSlotSize();
-    const origin = readCurrentPosition();
-    applyTrackPosition(origin);
-    const pageIndex = nearestPageIndex(origin, layout);
+  const startDragFromCurrentPosition = useCallback(() => {
+    if (originPositionRef.current !== null) return;
 
-    originPositionRef.current = origin;
-    originPageIndexRef.current = pageIndex;
+      slotSizeRef.current = getSlotSize();
+      const origin = readCurrentPosition();
+      applyTrackPosition(origin);
+      const pageIndex = nearestPageIndex(origin, layout);
 
-    dispatch({
-      type: "START_DRAG",
-      fromVirtualIndex: origin,
-      targetPageIndex: pageIndex,
-    });
-  }, [applyTrackPosition, dispatch, getSlotSize, layout, readCurrentPosition]);
+      originPositionRef.current = origin;
+      originPageIndexRef.current = pageIndex;
+
+      dispatch({
+        type: "START_DRAG",
+        fromVirtualIndex: origin,
+        targetPageIndex: pageIndex,
+      });
+  }, [
+    applyTrackPosition,
+    dispatch,
+    getSlotSize,
+    layout,
+    readCurrentPosition,
+  ]);
+
+  const handleDragStart = useCallback(
+    (payload: PointerSwipeMovePayload) => {
+      startDragFromCurrentPosition();
+      applyTrackPosition(offsetToPosition(payload.uiOffset));
+    },
+    [
+      applyTrackPosition,
+      offsetToPosition,
+      startDragFromCurrentPosition,
+    ],
+  );
 
   const handleDragMove = useCallback(
     (payload: PointerSwipeMovePayload) => {
+      if (originPositionRef.current === null) return;
       applyTrackPosition(offsetToPosition(payload.uiOffset));
     },
     [applyTrackPosition, offsetToPosition],
@@ -80,7 +99,7 @@ export function useCarouselGesture({
 
   const handleRelease = useCallback(
     (payload: PointerSwipeReleasePayload) => {
-      if (!enabled) {
+      if (!enabled || originPositionRef.current === null) {
         originPositionRef.current = null;
         slotSizeRef.current = 0;
         return;
@@ -118,14 +137,15 @@ export function useCarouselGesture({
     [applyTrackPosition, dispatch, enabled, layout, offsetToPosition],
   );
 
-  const { isDragging, isInteracting, listeners } = usePointerSwipe({
+  const { listeners } = usePointerSwipe({
     enabled,
     measureRef: viewportRef,
     config: config.swipeConfig,
-    onPressStart: handlePressStart,
+    onPressStart: startDragFromCurrentPosition,
+    onDragStart: handleDragStart,
     onDragMove: handleDragMove,
     onRelease: handleRelease,
   });
 
-  return { isDragging, isInteracting, listeners };
+  return { listeners };
 }

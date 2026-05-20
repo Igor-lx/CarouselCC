@@ -28,7 +28,7 @@ export interface CarouselLayoutView {
 export interface CarouselIntentView {
   targetPageIndex: number;
   moveReason: MoveReason;
-  motionDuration: number;
+  autoplayMotionDuration: number;
   autoplayPaginationFactor: number;
 }
 

@@ -2,25 +2,27 @@ import { useEffect, useRef, useState } from "react";
 
 interface UsePaginationSyncInput {
   targetPageIndex: number;
-  motionDuration: number;
+  autoplayMotionDuration: number;
   shouldSyncInstantly: boolean;
   autoplayPaginationFactor: number;
 }
 
-const resolveDelay = (motionDuration: number, factor: number) => {
-  if (!Number.isFinite(motionDuration) || motionDuration <= 0) return 0;
+const resolveDelay = (autoplayMotionDuration: number, factor: number) => {
+  if (!Number.isFinite(autoplayMotionDuration) || autoplayMotionDuration <= 0) {
+    return 0;
+  }
   if (!(factor > 0 && factor < 1)) return 0;
-  return motionDuration * factor;
+  return autoplayMotionDuration * factor;
 };
 
 /**
  * Returns the page index the pagination dots should *show*. Differs from
  * `targetPageIndex` during autoplay: the dot switches at
- * `motionDuration * autoplayPaginationFactor`, not immediately.
+ * `autoplayMotionDuration * autoplayPaginationFactor`, not immediately.
  */
 export function usePaginationSync({
   targetPageIndex,
-  motionDuration,
+  autoplayMotionDuration,
   shouldSyncInstantly,
   autoplayPaginationFactor,
 }: UsePaginationSyncInput): number {
@@ -35,7 +37,7 @@ export function usePaginationSync({
 
     const delay = shouldSyncInstantly
       ? 0
-      : resolveDelay(motionDuration, autoplayPaginationFactor);
+      : resolveDelay(autoplayMotionDuration, autoplayPaginationFactor);
 
     if (delay <= 0) {
       setDisplayed((prev) => (prev === targetPageIndex ? prev : targetPageIndex));
@@ -53,7 +55,12 @@ export function usePaginationSync({
         timerRef.current = null;
       }
     };
-  }, [autoplayPaginationFactor, motionDuration, shouldSyncInstantly, targetPageIndex]);
+  }, [
+    autoplayMotionDuration,
+    autoplayPaginationFactor,
+    shouldSyncInstantly,
+    targetPageIndex,
+  ]);
 
   return displayed;
 }

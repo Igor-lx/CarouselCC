@@ -3,7 +3,6 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
   type CSSProperties,
 } from "react";
 import {
@@ -65,7 +64,7 @@ const createIdleSample = (width = 0, timestamp = 0): InternalSample => ({
   timestamp,
 });
 
-const resolveConfig =(config?: PointerSwipeConfig): ResolvedPointerSwipeConfig => ({
+const resolveConfig = (config?: PointerSwipeConfig): ResolvedPointerSwipeConfig => ({
   ...DEFAULT_CONFIG,
   ...config,
 });
@@ -83,10 +82,9 @@ export function usePointerSwipe({
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
-  // `phaseRef` is read synchronously inside pointer handlers; `reactPhase`
-  // mirrors it for consumers (`isDragging` / `isInteracting`). `useState` bails
-  // on an unchanged value, so only real phase transitions re-render consumers.
-  const [reactPhase, setReactPhase] = useState<PointerSwipePhase>("idle");
+  // The full pointer phase is internal and synchronous. The carousel reducer
+  // owns public dragging state, so pointer bookkeeping never re-renders React
+  // by itself.
   const phaseRef = useRef<PointerSwipePhase>("idle");
 
   const lockUntilRef = useRef(0);
@@ -107,7 +105,6 @@ export function usePointerSwipe({
 
   const setPhase = useCallback((phase: PointerSwipePhase) => {
     phaseRef.current = phase;
-    setReactPhase(phase);
   }, []);
 
   const ensureCapture = useCallback((target: HTMLElement, pointerId: number) => {
@@ -436,9 +433,5 @@ export function usePointerSwipe({
     };
   }, [enabled, finishInteraction, handlePointerDown, handlePointerMove]);
 
-  return {
-    isDragging: reactPhase === "dragging",
-    isInteracting: reactPhase === "press" || reactPhase === "dragging",
-    listeners,
-  };
+  return { listeners };
 }

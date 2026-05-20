@@ -90,9 +90,10 @@ export const resolveStepTransition = (
     ? pageStart(nextTargetPageIndex, stepSize)
     : currentVirtualIndex + pageDelta * stepSize;
 
-  // A GO_TO over a long span animates only a bounded preflight; the rest is
-  // teleported. `virtualIndex` is kept at the preflight landing on purpose -
-  // the render window is built from it, so it must not name the far target.
+  // A GO_TO over a long span animates a bounded preflight, teleports the
+  // middle, then animates a fixed approach near the final target.
+  // `virtualIndex` is kept at the preflight landing on purpose - the render
+  // window is built from it, so it must not name the far target.
   const goToPlan =
     command.type === "GO_TO" && !command.isInstant && !isInstantMode
       ? resolveGoToPlan(Math.abs(pageDelta), stepSize, motion)

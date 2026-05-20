@@ -13,9 +13,9 @@ import { durationByVirtualSpan, resolveEasingDuration } from "./duration";
 import { buildProfile } from "./profile";
 import { sameDirectionSpeed, signedVelocity } from "./speed";
 import {
+  resolveGoToProfileZones,
   resolveJumpPeakSpeed,
   resolveSpeed,
-  resolveTeleportZones,
 } from "./timing";
 import type {
   CarouselMotionIntent,
@@ -91,7 +91,7 @@ const buildRepeatedProfile = (
 ): ProfileSegment => {
   const distance = state.virtualIndex - start.position;
   const peakVelocity = signedVelocity(
-    normalMoveSpeed * Math.max(1, repeated.speedMultiplier),
+    normalMoveSpeed * repeated.speedMultiplier,
     distance,
   );
   const profile = buildProfile({
@@ -145,20 +145,18 @@ const buildGestureProfile = (
 type GoToProfilePhase = "single" | "preflight" | "approach";
 
 /**
- * Builds one segment of the *single* canonical GO_TO speed profile
- * `[accelerate] -> [cruise] -> [decelerate]`.
+ * Builds one segment of the GO_TO speed profile.
  *
- * - `single`    - a short jump: the whole profile over the real distance.
- * - `preflight` - a teleport's first slice: acceleration zone + first half of
- *   the cruise. It ends at the cruise speed, so the teleport that follows is
- *   velocity-continuous (only the position jumps, never the speed).
- * - `approach`  - a teleport's last slice: second half of the cruise +
- *   deceleration zone. It enters at the cruise speed and decays to rest.
+ * Acceleration and deceleration are local page-screen budgets, not shares of
+ * the whole visible jump. A long jump therefore starts the same way as a short
+ * one: accelerate inside the first page screen, cruise, teleport the hidden
+ * middle, then cruise/decelerate inside the final page screen.
  *
- * Preflight and approach are slices of the same canonical profile measured
- * over a fixed visible distance, so their acceleration and deceleration zones
- * are byte-identical to a short jump's. A 3-page jump and a 30-page jump share
- * one law - the long jump just has the cruise interrupted by a teleport.
+ * - `single`    - a direct jump: acceleration lives in the first page screen,
+ *   deceleration in the last page screen.
+ * - `preflight` - the pre-teleport slice: local acceleration, then cruise.
+ * - `approach`  - the post-teleport final page: cruise until the configured
+ *   deceleration distance starts, then stop on target.
  */
 const buildGoToProfile = (
   state: CarouselState,
@@ -177,23 +175,26 @@ const buildGoToProfile = (
   let decelerationDistanceShare: number;
   let endSpeed: number;
 
+  const zones = resolveGoToProfileZones(stepSize, motion);
+
   if (phase === "single") {
-    accelerationDistanceShare = motion.goToAccelerationDistanceShare;
-    decelerationDistanceShare = motion.goToDecelerationDistanceShare;
+    accelerationDistanceShare =
+      absDistance > 0 ? zones.accelerationDistance / absDistance : 0;
+    decelerationDistanceShare =
+      absDistance > 0 ? zones.decelerationDistance / absDistance : 0;
     endSpeed = 0;
   } else {
-    // A teleport slice re-expresses the canonical absolute zone size as a
-    // share of *this* segment's distance, so the ramp matches a short jump.
-    const zones = resolveTeleportZones(stepSize, motion);
+    // Each teleport slice re-expresses an absolute local page-screen budget as
+    // a share of that slice's own distance.
     if (phase === "preflight") {
       accelerationDistanceShare =
-        absDistance > 0 ? zones.accelDistance / absDistance : 0;
+        absDistance > 0 ? zones.accelerationDistance / absDistance : 0;
       decelerationDistanceShare = 0;
       endSpeed = peakSpeed; // hand the cruise speed to the approach segment
     } else {
       accelerationDistanceShare = 0;
       decelerationDistanceShare =
-        absDistance > 0 ? zones.decelDistance / absDistance : 0;
+        absDistance > 0 ? zones.decelerationDistance / absDistance : 0;
       endSpeed = 0;
     }
   }
@@ -251,9 +252,6 @@ export function buildCarouselSegment({
       : null;
 
   const moveSpeed = resolveSpeed(stepSize, config.stepDuration);
-  const fallbackMoveSpeed =
-    moveSpeed ||
-    resolveSpeed(state.virtualIndex - start.position, config.stepDuration);
 
   if (intent === "repeated-click") {
     const segment = buildRepeatedProfile(
@@ -261,7 +259,7 @@ export function buildCarouselSegment({
       start,
       startedAt,
       config.repeatedClick,
-      fallbackMoveSpeed,
+      moveSpeed,
     );
     return {
       intent,

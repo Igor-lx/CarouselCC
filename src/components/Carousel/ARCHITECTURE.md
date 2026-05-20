@@ -64,8 +64,10 @@ With overrides:
 All props are optional except `slidesData`. Defaults below are substituted only
 for `undefined` props. Other values pass through unchanged — invalid input
 (NaN, negative durations, mismatched slot counts) is surfaced by the
-`Diagnostic` slot but never repaired at runtime, so the failure mode is
-visible.
+`Diagnostic` slot but never repaired at config resolution time, so the failure
+mode is visible. Motion-profile share over-allocation is the one explicit
+runtime exception: profile math normalizes acceleration/deceleration zones to
+`0.5 / 0.5`, and Diagnostic reports that normalized shape.
 
 #### Slides
 
@@ -167,14 +169,13 @@ These are the user-facing behaviours the implementation guarantees.
 - **Step semantics.** `MOVE(+1)` advances one page, `MOVE(-1)` retreats one
   page, `GO_TO(pageIndex)` jumps over a possibly larger distance. In cyclic
   mode, `GO_TO` always travels the shortest cyclic distance.
-- **GO_TO motion.** Every `GO_TO` follows one speed profile — accelerate,
-  cruise, decelerate. A jump within `GO_TO_MAX_ANIMATED_PAGE_SPAN` page
-  screens animates its whole distance. A longer jump animates a bounded
-  preflight, teleports instantly across the un-rendered middle (spliced into
-  the constant-speed cruise, so velocity stays continuous — only the position
-  jumps), then animates a bounded approach that decays to rest. The preflight
-  and approach are slices of the same canonical profile, so a 3-page jump and
-  a 30-page jump share an identical ramp-up and ramp-down. See §4.4.
+- **GO_TO motion.** Every `GO_TO` follows a speed-authored profile:
+  accelerate, cruise, decelerate. Acceleration is measured inside the first
+  page screen; deceleration is measured inside the final page screen. A jump
+  that fits the visible preflight + approach budget animates its whole
+  distance. A far jump animates
+  `GO_TO_PREFLIGHT_PAGE_SPAN` page screens, teleports the un-rendered middle,
+  then animates the final approach page. See §4.4.
 - **Click during motion (opposite direction).** Re-targets without
   restarting from the logical origin: the new segment continues from the
   last emitted visual sample, not from where the previous segment was
@@ -191,9 +192,11 @@ These are the user-facing behaviours the implementation guarantees.
   (`swipeThresholdRatio` of the viewport width with a hard min). When the
   intent is `NONE`, the track snaps back via the snap-back curve over
   `SNAP_BACK_DURATION` (1300 ms).
-- **Gesture interrupts motion.** Starting a drag while the carousel is
-  animating cancels the active motion *immediately* at press-down; the
-  drag starts from the visually sampled position. The cancel is published
+- **Gesture interrupts motion.** A touch on the non-interactive carousel
+  surface cancels active motion at press-down and starts from the visually
+  sampled position. A touch on an interactive child (button/link-like slide)
+  waits until horizontal swipe intent is recognised, so ordinary taps remain
+  clickable. The cancel is published
   through the visual-position SSOT, so the pagination widget, the track,
   and the motion runner all observe one consistent state during the
   gesture.
@@ -241,7 +244,7 @@ These are the user-facing behaviours the implementation guarantees.
 - **Pagination (`Pagination`).** One dot per page. The active dot reflects
   the `targetPageIndex` immediately on click and gesture. During
   *autoplay*, the dot switch is delayed by
-  `motionDuration · AUTOPLAY_PAGINATION_FACTOR` (default 20 % of the
+  `autoplayMotionDuration * AUTOPLAY_PAGINATION_FACTOR` (default 20 % of the
   animation) — this matches the historical product behaviour where
   autoplay rolls the dot later than the visual.
 - **PaginationWidget (touch).** A fixed-width odd-count widget (default
@@ -296,9 +299,9 @@ For copy-paste / quick lookup. Source: `config/defaults.ts`,
 | `REPEATED_CLICK_SPEED_MULTIPLIER` | `5` | fast-segment peak vs. normal |
 | `REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE` | `0.35` | profile ramp-up |
 | `REPEATED_CLICK_DECELERATION_DISTANCE_SHARE` | `0.35` | profile ramp-down |
-| `GO_TO_MAX_ANIMATED_PAGE_SPAN` | `2` | far-jump teleport threshold (page screens) |
-| `GO_TO_ACCELERATION_DISTANCE_SHARE` | `0.12` | GO_TO profile ramp-up |
-| `GO_TO_DECELERATION_DISTANCE_SHARE` | `0.5` | GO_TO profile ramp-down |
+| `GO_TO_PREFLIGHT_PAGE_SPAN` | `2` | page screens animated before a far-GO_TO teleport |
+| `GO_TO_ACCELERATION_DISTANCE_SHARE` | `0.5` | GO_TO ramp-up share of the first page screen |
+| `GO_TO_DECELERATION_DISTANCE_SHARE` | `0.5` | GO_TO ramp-down share of the final page screen |
 | `MOVE_BEZIER` | `cubic-bezier(0.32, 0.2, 0.28, 1)` | normal step |
 | `AUTO_BEZIER` | `cubic-bezier(0.28, 0.72, 0.38, 1)` | autoplay step |
 | `SNAP_BACK_BEZIER` | `cubic-bezier(0.18, 0.82, 0.28, 1)` | drag snap-back |
@@ -325,7 +328,7 @@ Every responsibility has exactly one owner. The orchestrator
 | Concern | Owner | Notes |
 | --- | --- | --- |
 | Public props | `Carousel.tsx` | Frozen contract, declared in `types.ts`. |
-| Resolved runtime config | `useCarouselConfig` | One memo. Substitutes defaults only for `undefined` props; never normalises explicit values. |
+| Resolved runtime config | `useCarouselConfig` | One memo. Substitutes defaults only for `undefined` props; never normalises explicit values. Motion-profile share normalization happens later inside the profile builder, not in config. |
 | Slide records | `useCarouselSlideDeck` | Builds slide records, optionally extends to fill perfect pages. |
 | Layout facts | `useCarouselSlideDeck` | `length`, `visibleSlidesCount`, `pageCount`, `virtualLength`, `canSlide`, `isFinite`, `dataKey`. |
 | Logical state | `useCarouselState` | Reducer-backed. Owns `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, optional `teleportVirtualIndex`, `isTeleportApproach`, `motionPhase`, `gesture`, `isRepeatedClickAdvance`, `moveReason`. |
@@ -430,10 +433,11 @@ A `Segment` is one of:
   end speeds plus zone distances derive the segment duration. If acceleration
   and deceleration shares sum above `1`, runtime normalizes the profile to
   `0.5 / 0.5` with no cruise zone. Used for:
-  - **every GO_TO** - one canonical `accelerate / cruise / decelerate`
-    profile, peak speed `jumpSpeedMultiplier × normalStepSpeed`. A short jump
-    is the whole profile; a far jump is two slices of it around a teleport
-    (§4.4);
+  - **every GO_TO** - speed-authored profile motion at
+    `jumpSpeedMultiplier × normalStepSpeed`. A short jump uses one segment
+    with local first-screen acceleration and local final-screen deceleration;
+    a far jump uses a preflight segment, a position teleport, and a fixed
+    one-page approach (§4.4);
   - **repeated-click fast advance** - one segment directly to the next page
     boundary, peak speed `REPEATED_CLICK_SPEED_MULTIPLIER × normalMoveSpeed`;
   - **inertial gesture release** - peak speed derived from EMA-smoothed
@@ -485,30 +489,31 @@ inside per-frame subscribers.
 
 ### 4.4 Far GO_TO teleport
 
-A `GO_TO` longer than `GO_TO_MAX_ANIMATED_PAGE_SPAN` page screens cannot
-animate edge-to-edge — it would mount every intermediate slide. Instead it is
-split by one pure geometry resolver (`motion/timing.ts` `resolveGoToPlan`),
-consumed by both the reducer and the segment factory so the logical landing
-positions and the animated profile can never drift apart:
+A far `GO_TO` cannot animate edge-to-edge — it would mount every intermediate
+slide. Instead it is split by one pure geometry resolver (`motion/timing.ts`
+`resolveGoToPlan`), consumed by both the reducer and the segment factory so
+the logical landing positions and the animated profile can never drift apart:
 
-- **Preflight.** The reducer sets `virtualIndex` to a bounded landing and
+- **Preflight.** The reducer sets `virtualIndex` to a bounded landing
+  `GO_TO_PREFLIGHT_PAGE_SPAN` page screens away from the current position and
   keeps the final target in `teleportVirtualIndex`. `virtualIndex` is kept
   bounded on purpose — the render window is built from it, so the far target
-  must not leak in before the teleport. The segment is the canonical profile's
-  acceleration zone plus the first half of its cruise; it ends at cruise speed.
+  must not leak in before the teleport. The segment accelerates only inside
+  its first page screen, then cruises.
 - **Teleport.** When the preflight settles, the reducer teleports
-  `fromVirtualIndex` / `virtualIndex` to a bounded origin just before the
-  final target and clears `teleportVirtualIndex`. The track `transform` jumps
-  by the cut-out distance in a single frame.
-- **Approach.** A second profile slice — the second half of the cruise plus
-  the deceleration zone — enters at cruise speed (handoff-continuous with the
-  preflight) and decays to rest at the final target.
+  `fromVirtualIndex` / `virtualIndex` to a bounded origin exactly one page
+  screen before the final target and clears `teleportVirtualIndex`. The track
+  `transform` jumps by the cut-out distance in a single frame.
+- **Approach.** The approach segment enters at cruise speed on the final page,
+  cruises until the configured deceleration distance starts, then decelerates
+  to rest at the target.
 
-The teleport is spliced inside the cruise, the one constant-speed interval, so
-only the position jumps — never the speed. The preflight and approach slices
-come from the same canonical profile as a short jump, so every jump, near or
-far, shares one ramp-up and ramp-down. This is the only intentional visual
-teleport.
+The speed intent is shared by short and far jumps:
+`jumpSpeedMultiplier × normalStepSpeed`. The geometry differs only in how much
+of the invisible middle is cut out. Acceleration and deceleration are local
+page-screen budgets, so `GO_TO_DECELERATION_DISTANCE_SHARE = 1` means "slow
+down over the whole final page screen", not "slow down over the whole jump".
+This is the only intentional visual teleport.
 
 ---
 
@@ -521,12 +526,10 @@ It is not carousel-specific and is reusable.
 
 `useCarouselGesture` is the carousel-specific adapter. It:
 
-1. on press-start: records the visually sampled origin position and the
-   slot size (`getSlotSize()`), then publishes the origin into the visual
-   position stream via `applyTrackPosition`. This cancels any active
-   motion *at the moment the user touches the screen*, not on the next
-   React render — eliminating the small lag between press-down and the
-   carousel actually stopping;
+1. on press-start for the non-interactive surface, or on horizontal intent for
+   an interactive child: records the visually sampled origin position and the
+   slot size (`getSlotSize()`), dispatches `START_DRAG`, then publishes the
+   origin into the visual stream via `applyTrackPosition`;
 2. on every move payload: translates `uiOffset` into a virtual-index
    delta using the recorded slot size and writes that into the visual
    position via `applyTrackPosition`. No React state per move;
@@ -545,8 +548,9 @@ release segment.
 A reducer-backed state machine in `state/`. Discriminated `CarouselCommand`
 union:
 
-- `START_DRAG { fromVirtualIndex, targetPageIndex }` — fires at gesture
-  press-start.
+- `START_DRAG { fromVirtualIndex, targetPageIndex }` - fires at press-down on
+  the non-interactive surface, or after horizontal intent on an interactive
+  child.
 - `END_DRAG { targetPageIndex, targetVirtualIndex, isSnap, isInstant,
   pointerReleaseVelocity, uiReleaseVelocity }` — fires at gesture release.
 - `MOVE { step, moveReason, fromVirtualIndex, isInstant? }` — click /
@@ -581,7 +585,7 @@ The `CarouselModuleContext` exposes a partitioned value:
   layout: { pageCount, canSlide, isAtStart, isAtEnd, isTouch,
             isReducedMotion, isDiagnosticActive },
   intent: { targetPageIndex, moveReason,
-            motionDuration, autoplayPaginationFactor },
+            autoplayMotionDuration, autoplayPaginationFactor },
   navigation: { handlePrev, handleNext, handlePageSelect },
   visualPosition: VisualPositionSource | null,  // null when reduced motion
 }
@@ -605,10 +609,10 @@ modules with their own checks (`PaginationWidget` via
 ### 8.1 `<Pagination />`
 
 Desktop dot pagination. One `PaginationDot` per page. Reads
-`intent.targetPageIndex`, `intent.motionDuration`,
+`intent.targetPageIndex`, `intent.autoplayMotionDuration`,
 `intent.autoplayPaginationFactor`, and `layout.pageCount` from the
 context. During autoplay, dot switching is delayed by
-`motionDuration · autoplayPaginationFactor` via `usePaginationSync`. On
+`autoplayMotionDuration * autoplayPaginationFactor` via `usePaginationSync`. On
 click, `navigation.handlePageSelect(pageIndex)` is dispatched as `GO_TO`.
 
 ### 8.2 `<PaginationWidget />`
@@ -775,10 +779,12 @@ dependencies, the architecture has held.
 - **Diagnostic is strictly observe-only.** The runtime values the
   carousel uses do not depend on whether the Diagnostic slot is attached.
   Diagnostic never normalises, validates, repairs, or substitutes any
-  value; it reads and warns. The trade-off is that the carousel will
-  visibly misbehave when fed invalid inputs (NaN propagation, impossible
-  geometry, malformed transforms) — which is the intended signal that
-  the input must be fixed.
+  value; it reads and warns. When runtime profile math intentionally
+  normalizes overallocated acceleration/deceleration shares, Diagnostic
+  reports the normalized shape without participating in the decision. The
+  trade-off is that the carousel will visibly misbehave when fed invalid
+  inputs (NaN propagation, impossible geometry, malformed transforms) —
+  which is the intended signal that the input must be fixed.
 - **`onMotionIdleStatusChange` is observation-only.** It never drives
   carousel semantics and never receives reducer state. Internal image
   preparation uses the carousel's own idle status directly; external consumers
@@ -800,10 +806,12 @@ dependencies, the architecture has held.
   visual position subscription returns a cleanup that disconnects from
   the controller.
 - **Runtime safety.** Layout reconciliation tolerates page-count changes
-  and resets on `dataKey` changes. Numeric inputs are *not* coerced or
-  repaired — invalid input is intentionally allowed to propagate so the
-  failure mode is visible. The diagnostic layer surfaces violations
-  separately, without ever feeding back into runtime.
+  and resets on `dataKey` changes. Numeric inputs are *not* generally
+  coerced or repaired — invalid input is intentionally allowed to propagate so
+  the failure mode is visible. The only runtime normalization is the
+  profile-level rule for overallocated acceleration/deceleration shares. The
+  diagnostic layer surfaces violations separately, without ever feeding back
+  into runtime.
 - **Performance.** Bezier and profile samplers cache their work where
   the inputs are known (parsed beziers, computed strips). The track
   binding short-circuits writes that would re-apply the same transform.
