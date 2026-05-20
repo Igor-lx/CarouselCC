@@ -7,6 +7,7 @@ import {
   DRAG_RELEASE_EPSILON,
   GO_TO_ACCELERATION_DISTANCE_SHARE,
   GO_TO_DECELERATION_DISTANCE_SHARE,
+  GO_TO_FINAL_APPROACH_PAGE_SPAN,
   GO_TO_PREFLIGHT_PAGE_SPAN,
   HOVER_PAUSE_DELAY,
   IMAGE_RETRY_BASE_DELAY_MS,
@@ -107,6 +108,16 @@ const numericRules: NumericRule[] = [
     expected: "Expected a positive finite integer (page screens)",
     consequence:
       "Far GO_TO teleport needs at least one animated preflight page before the cut",
+    predicate: isPositiveInteger,
+  },
+  {
+    layer: "Motion",
+    field: "GO_TO_FINAL_APPROACH_PAGE_SPAN",
+    value: GO_TO_FINAL_APPROACH_PAGE_SPAN,
+    severity: "LOGICAL",
+    expected: "Expected a positive finite integer (page screens)",
+    consequence:
+      "Far GO_TO needs at least one animated approach page after the teleport cut",
     predicate: isPositiveInteger,
   },
   {

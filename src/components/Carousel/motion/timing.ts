@@ -27,8 +27,6 @@ export const resolveJumpPeakSpeed = (
   jumpSpeedMultiplier: number,
 ): number => resolveSpeed(stepSize, stepDuration) * jumpSpeedMultiplier;
 
-const FINAL_APPROACH_PAGE_SPAN = 1;
-
 export interface GoToProfileZones {
   /** Acceleration distance, local to the first page screen of any GO_TO. */
   accelerationDistance: number;
@@ -54,7 +52,7 @@ export const resolveGoToProfileZones = (
   accelerationDistance: stepSize * motion.goToAccelerationDistanceShare,
   decelerationDistance: stepSize * motion.goToDecelerationDistanceShare,
   preflightDistance: motion.goToPreflightPageSpan * stepSize,
-  approachDistance: FINAL_APPROACH_PAGE_SPAN * stepSize,
+  approachDistance: motion.goToFinalApproachPageSpan * stepSize,
 });
 
 export interface GoToPlan {

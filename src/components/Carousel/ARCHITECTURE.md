@@ -300,6 +300,7 @@ For copy-paste / quick lookup. Source: `config/defaults.ts`,
 | `REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE` | `0.35` | profile ramp-up |
 | `REPEATED_CLICK_DECELERATION_DISTANCE_SHARE` | `0.35` | profile ramp-down |
 | `GO_TO_PREFLIGHT_PAGE_SPAN` | `2` | page screens animated before a far-GO_TO teleport |
+| `GO_TO_FINAL_APPROACH_PAGE_SPAN` | `1` | page screens animated after a far-GO_TO teleport |
 | `GO_TO_ACCELERATION_DISTANCE_SHARE` | `0.5` | GO_TO ramp-up share of the first page screen |
 | `GO_TO_DECELERATION_DISTANCE_SHARE` | `0.5` | GO_TO ramp-down share of the final page screen |
 | `MOVE_BEZIER` | `cubic-bezier(0.32, 0.2, 0.28, 1)` | normal step |
@@ -501,9 +502,11 @@ the logical landing positions and the animated profile can never drift apart:
   must not leak in before the teleport. The segment accelerates only inside
   its first page screen, then cruises.
 - **Teleport.** When the preflight settles, the reducer teleports
-  `fromVirtualIndex` / `virtualIndex` to a bounded origin exactly one page
-  screen before the final target and clears `teleportVirtualIndex`. The track
-  `transform` jumps by the cut-out distance in a single frame.
+  `fromVirtualIndex` / `virtualIndex` to a bounded origin
+  `GO_TO_FINAL_APPROACH_PAGE_SPAN` page screens before the final target and
+  clears `teleportVirtualIndex`. Because preflight and approach are both whole
+  page-screen counts, the teleport `transform` jump lands on a page boundary
+  by construction - no slide is caught part-way through its slot at the cut.
 - **Approach.** The approach segment enters at cruise speed on the final page,
   cruises until the configured deceleration distance starts, then decelerates
   to rest at the target.

@@ -15,9 +15,18 @@ export const REPEATED_CLICK_DECELERATION_DISTANCE_SHARE = 0.35;
 /**
  * Number of page screens animated before a far-GO_TO teleport. After the
  * teleport the carousel shows only the final approach page. GO_TO spans that
- * fit within that visible budget animate directly without teleport.
+ * fit within preflight + final approach animate directly without teleport.
  */
 export const GO_TO_PREFLIGHT_PAGE_SPAN = 2;
+
+/**
+ * Number of page screens animated AFTER a far-GO_TO teleport. The post-teleport
+ * approach is fixed (does not scale with span), so every far jump ends with
+ * the same calm settling distance regardless of how far the jump was. Bounding
+ * it to whole pages also keeps the teleport cut on a page boundary by
+ * construction.
+ */
+export const GO_TO_FINAL_APPROACH_PAGE_SPAN = 1;
 
 /**
  * Acceleration / deceleration distance shares of the GO_TO profile.
