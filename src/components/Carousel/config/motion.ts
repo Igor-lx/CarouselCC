@@ -14,11 +14,10 @@ export const REPEATED_CLICK_DECELERATION_DISTANCE_SHARE = 0.35;
 
 /**
  * Number of page screens animated before a far-GO_TO teleport. After the
- * teleport the carousel always shows one cruise page and the final approach
- * page. GO_TO spans that fit within that visible budget animate directly
- * without teleport.
+ * teleport the carousel shows only the final approach page. GO_TO spans that
+ * fit within that visible budget animate directly without teleport.
  */
-export const GO_TO_PREFLIGHT_PAGE_SPAN = 1;
+export const GO_TO_PREFLIGHT_PAGE_SPAN = 2;
 
 /**
  * Acceleration / deceleration distance shares of the GO_TO profile.
@@ -30,8 +29,8 @@ export const GO_TO_PREFLIGHT_PAGE_SPAN = 1;
  * A deceleration share of `1` means "use the whole final page screen to slow
  * down"; `0` means cruise to the target and stop sharply there.
  */
-export const GO_TO_ACCELERATION_DISTANCE_SHARE = 1;
-export const GO_TO_DECELERATION_DISTANCE_SHARE = 1;
+export const GO_TO_ACCELERATION_DISTANCE_SHARE = 0.5;
+export const GO_TO_DECELERATION_DISTANCE_SHARE = 0.5;
 
 /** Cubic-bezier curves expressed as CSS strings. */
 export const MOVE_BEZIER = "cubic-bezier(0.32, 0.2, 0.28, 1)";

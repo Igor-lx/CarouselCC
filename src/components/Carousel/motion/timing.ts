@@ -27,10 +27,7 @@ export const resolveJumpPeakSpeed = (
   jumpSpeedMultiplier: number,
 ): number => resolveSpeed(stepSize, stepDuration) * jumpSpeedMultiplier;
 
-const POST_TELEPORT_CRUISE_PAGE_SPAN = 1;
 const FINAL_APPROACH_PAGE_SPAN = 1;
-const POST_TELEPORT_APPROACH_PAGE_SPAN =
-  POST_TELEPORT_CRUISE_PAGE_SPAN + FINAL_APPROACH_PAGE_SPAN;
 
 export interface GoToProfileZones {
   /** Acceleration distance, local to the first page screen of any GO_TO. */
@@ -48,7 +45,7 @@ export interface GoToProfileZones {
  * - acceleration is measured only inside the first page screen;
  * - deceleration is measured only inside the final page screen;
  * - a far jump shows a configurable preflight, teleports the middle, then
- *   shows one full cruise page plus the final deceleration page.
+ *   shows the final approach page.
  */
 export const resolveGoToProfileZones = (
   stepSize: number,
@@ -57,7 +54,7 @@ export const resolveGoToProfileZones = (
   accelerationDistance: stepSize * motion.goToAccelerationDistanceShare,
   decelerationDistance: stepSize * motion.goToDecelerationDistanceShare,
   preflightDistance: motion.goToPreflightPageSpan * stepSize,
-  approachDistance: POST_TELEPORT_APPROACH_PAGE_SPAN * stepSize,
+  approachDistance: FINAL_APPROACH_PAGE_SPAN * stepSize,
 });
 
 export interface GoToPlan {
@@ -80,8 +77,8 @@ export interface GoToPlan {
  * - Short jump: the whole real distance is animated; acceleration and
  *   deceleration stay local to the first and last page screens.
  * - Long jump: `goToPreflightPageSpan` page screens are animated before the
- *   teleport, the invisible middle is skipped, then one cruise page and the
- *   final deceleration page are animated.
+ *   teleport, the invisible middle is skipped, then the final approach page is
+ *   animated.
  *
  * `pageSpan` is unsigned; the caller applies travel direction.
  */
@@ -114,9 +111,8 @@ export const resolveGoToPlan = (
 
 /**
  * Distance the post-teleport approach segment covers. Span-independent (it is
- * always one cruise page plus the final deceleration page), so the reducer can
- * resolve the approach origin at `MOTION_SETTLED` time without re-deriving the
- * full span.
+ * always the final approach page), so the reducer can resolve the approach
+ * origin at `MOTION_SETTLED` time without re-deriving the full span.
  */
 export const resolveGoToApproachDistance = (
   stepSize: number,

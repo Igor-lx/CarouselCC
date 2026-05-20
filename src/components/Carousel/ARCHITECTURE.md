@@ -175,7 +175,7 @@ These are the user-facing behaviours the implementation guarantees.
   that fits the visible preflight + approach budget animates its whole
   distance. A far jump animates
   `GO_TO_PREFLIGHT_PAGE_SPAN` page screens, teleports the un-rendered middle,
-  then animates one cruise page plus the final deceleration page. See §4.4.
+  then animates the final approach page. See §4.4.
 - **Click during motion (opposite direction).** Re-targets without
   restarting from the logical origin: the new segment continues from the
   last emitted visual sample, not from where the previous segment was
@@ -437,7 +437,7 @@ A `Segment` is one of:
     `jumpSpeedMultiplier × normalStepSpeed`. A short jump uses one segment
     with local first-screen acceleration and local final-screen deceleration;
     a far jump uses a preflight segment, a position teleport, and a fixed
-    two-page approach (§4.4);
+    one-page approach (§4.4);
   - **repeated-click fast advance** - one segment directly to the next page
     boundary, peak speed `REPEATED_CLICK_SPEED_MULTIPLIER × normalMoveSpeed`;
   - **inertial gesture release** - peak speed derived from EMA-smoothed
@@ -501,12 +501,12 @@ the logical landing positions and the animated profile can never drift apart:
   must not leak in before the teleport. The segment accelerates only inside
   its first page screen, then cruises.
 - **Teleport.** When the preflight settles, the reducer teleports
-  `fromVirtualIndex` / `virtualIndex` to a bounded origin exactly two page
-  screens before the final target and clears `teleportVirtualIndex`. The track
+  `fromVirtualIndex` / `virtualIndex` to a bounded origin exactly one page
+  screen before the final target and clears `teleportVirtualIndex`. The track
   `transform` jumps by the cut-out distance in a single frame.
-- **Approach.** The approach segment enters at cruise speed, travels one full
-  page screen at that speed, then decelerates inside the final page screen and
-  settles at the target.
+- **Approach.** The approach segment enters at cruise speed on the final page,
+  cruises until the configured deceleration distance starts, then decelerates
+  to rest at the target.
 
 The speed intent is shared by short and far jumps:
 `jumpSpeedMultiplier × normalStepSpeed`. The geometry differs only in how much

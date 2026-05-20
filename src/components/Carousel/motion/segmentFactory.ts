@@ -150,14 +150,13 @@ type GoToProfilePhase = "single" | "preflight" | "approach";
  * Acceleration and deceleration are local page-screen budgets, not shares of
  * the whole visible jump. A long jump therefore starts the same way as a short
  * one: accelerate inside the first page screen, cruise, teleport the hidden
- * middle, cruise one page after the teleport, then decelerate inside the final
- * page screen.
+ * middle, then cruise/decelerate inside the final page screen.
  *
  * - `single`    - a direct jump: acceleration lives in the first page screen,
  *   deceleration in the last page screen.
  * - `preflight` - the pre-teleport slice: local acceleration, then cruise.
- * - `approach`  - the post-teleport slice: one cruise page, then final
- *   deceleration.
+ * - `approach`  - the post-teleport final page: cruise until the configured
+ *   deceleration distance starts, then stop on target.
  */
 const buildGoToProfile = (
   state: CarouselState,

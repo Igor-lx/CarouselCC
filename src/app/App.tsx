@@ -88,7 +88,7 @@ export default function App() {
             isInteractive={isInteractive}
             durationAutoplay={5000}
             durationStep={6000}
-            jumpSpeedMultiplier={5}
+            jumpSpeedMultiplier={7}
             intervalAutoplay={3000}
             isPagePaddingOn
             isTouchDevice={isTouch}
