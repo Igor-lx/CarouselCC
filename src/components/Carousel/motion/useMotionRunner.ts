@@ -212,7 +212,7 @@ export function useMotionRunner({
         return;
       }
 
-      const { segment, duration, intent } = buildCarouselSegment({
+      const { segment, duration } = buildCarouselSegment({
         state,
         config,
         isInstantMode,
@@ -221,7 +221,12 @@ export function useMotionRunner({
         startedAt: resolvedStartedAt,
       });
 
-      if (intent === "autoplay-step") {
+      // Autoplay duration is the only thing the runner needs to publish, and
+      // it is published for every autoplay segment - including the finite-mode
+      // loop-back GO_TO, whose intent is "jump" but whose moveReason is still
+      // "autoplay". Reading moveReason keeps the runner free of intent
+      // taxonomy and matches the user-facing "during autoplay" guarantee.
+      if (state.moveReason === "autoplay") {
         onAutoplayDurationChange?.(duration);
       } else {
         onAutoplayDurationCancel?.();
