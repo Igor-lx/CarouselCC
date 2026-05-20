@@ -12,7 +12,7 @@ import { Diagnostic } from "../components/Carousel/modules/Diagnostic";
 import { useTheme } from "../theme/useTheme";
 
 const VISIBLE_BY_BREAKPOINT = {
-  DESKTOP: 1,
+  DESKTOP: 3,
   TABLET: 2,
   MOBILE: 1,
   DEFAULT: 3,
@@ -88,7 +88,7 @@ export default function App() {
             isInteractive={isInteractive}
             durationAutoplay={5000}
             durationStep={6000}
-            jumpSpeedMultiplier={7}
+            jumpSpeedMultiplier={8}
             intervalAutoplay={3000}
             isPagePaddingOn
             isTouchDevice={isTouch}
