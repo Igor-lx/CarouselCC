@@ -1,4 +1,4 @@
-import { useCallback, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useRef, type RefObject } from "react";
 
 import {
   nearestPageIndex,
@@ -54,21 +54,25 @@ export function useCarouselGesture({
   );
 
   const startDragFromCurrentPosition = useCallback(() => {
+    // Called from two paths: `onPressStart` on a non-interactive surface
+    // (immediate motion cancel), and `onDragStart` for an interactive child
+    // once horizontal intent is recognised. The early return deduplicates the
+    // second path when the first has already initialised this drag.
     if (originPositionRef.current !== null) return;
 
-      slotSizeRef.current = getSlotSize();
-      const origin = readCurrentPosition();
-      applyTrackPosition(origin);
-      const pageIndex = nearestPageIndex(origin, layout);
+    slotSizeRef.current = getSlotSize();
+    const origin = readCurrentPosition();
+    applyTrackPosition(origin);
+    const pageIndex = nearestPageIndex(origin, layout);
 
-      originPositionRef.current = origin;
-      originPageIndexRef.current = pageIndex;
+    originPositionRef.current = origin;
+    originPageIndexRef.current = pageIndex;
 
-      dispatch({
-        type: "START_DRAG",
-        fromVirtualIndex: origin,
-        targetPageIndex: pageIndex,
-      });
+    dispatch({
+      type: "START_DRAG",
+      fromVirtualIndex: origin,
+      targetPageIndex: pageIndex,
+    });
   }, [
     applyTrackPosition,
     dispatch,
@@ -136,6 +140,20 @@ export function useCarouselGesture({
     },
     [applyTrackPosition, dispatch, enabled, layout, offsetToPosition],
   );
+
+  // When the carousel becomes non-sliding (`enabled` flips false because a
+  // resize or slidesData replace collapsed the deck to a single page), the
+  // pointer-swipe listeners are torn down without ever delivering `onRelease`.
+  // The reducer recovers from the stale `dragging` phase on its own via layout
+  // reconciliation, but the adapter's drag-origin refs would otherwise stay
+  // pinned — and `startDragFromCurrentPosition` early-returns while
+  // `originPositionRef` is non-null, so the *next* drag would start from a
+  // stale origin. Clearing the refs here keeps a later drag correct.
+  useEffect(() => {
+    if (enabled) return;
+    originPositionRef.current = null;
+    slotSizeRef.current = 0;
+  }, [enabled]);
 
   const { listeners } = usePointerSwipe({
     enabled,
