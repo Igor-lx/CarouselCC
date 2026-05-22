@@ -1,10 +1,14 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import appStyles from "./App.module.scss";
 import { CAROUSEL_SOURCES, CAROUSEL_SOURCES2 } from "./carouselData";
 import { useCompactLandscape } from "./useCompactLandscape";
 import { useBreakpoint, useUserEnvironment } from "../shared";
-import Carousel, { type Slide } from "../components/Carousel";
+import Carousel, {
+  type CarouselHandle,
+  type CarouselStatusSnapshot,
+  type Slide,
+} from "../components/Carousel";
 import { Controls } from "../components/Carousel/modules/Controls";
 import { Pagination } from "../components/Carousel/modules/Pagination";
 import { PaginationWidget } from "../components/Carousel/modules/PaginationWidget";
@@ -42,6 +46,12 @@ export default function App() {
 
   const [isAutoplay, setIsAutoplay] = useState(false);
   const [isInteractive, setIsInteractive] = useState(false);
+
+  // External control + status: the carousel is driven from a different part of
+  // the page through its imperative handle, and reports a low-frequency status
+  // snapshot ("page X of Y" + idle) back for the label.
+  const carouselRef = useRef<CarouselHandle>(null);
+  const [status, setStatus] = useState<CarouselStatusSnapshot | null>(null);
 
   const device = useBreakpoint(VISIBLE_BY_BREAKPOINT);
 
@@ -85,6 +95,7 @@ export default function App() {
 
         <div className={appStyles.component}>
           <Carousel
+            ref={carouselRef}
             visibleSlidesNr={visibleSlidesNr}
             slidesData={slidesData}
             isAuto={isAutoplay}
@@ -97,6 +108,7 @@ export default function App() {
             isPagePaddingOn
             userEnvironment={userEnvironment}
             onSlideClick={openSlide}
+            onCarouselStatusChange={(snapshot) => setStatus(snapshot)}
           >
             {isTouch ? <PaginationWidget /> : <Pagination />}
             <Controls />
@@ -104,7 +116,25 @@ export default function App() {
           </Carousel>
         </div>
       </section>
-      <section className={appStyles.page} />
+      <section className={appStyles.page}>
+        <div className={appStyles.header}>
+          <button
+            className={appStyles.button}
+            onClick={() => carouselRef.current?.prev()}
+          >
+            ‹
+          </button>
+          <span className={appStyles.button} style={{ cursor: "default" }}>
+            {status ? `${status.currentPageIndex + 1} / ${status.pageCount}` : "—"}
+          </span>
+          <button
+            className={appStyles.button}
+            onClick={() => carouselRef.current?.next()}
+          >
+            ›
+          </button>
+        </div>
+      </section>
     </main>
   );
 }
