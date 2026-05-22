@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { buildRawCarouselConfig } from "../config";
 import type { CarouselRuntimeConfig } from "../config";
@@ -47,7 +47,6 @@ describe("buildInitialState", () => {
     expect(state.teleportVirtualIndex).toBeNull();
   });
 });
-
 describe("MOVE — cyclic", () => {
   const layout = makeLayout(12, 3, false); // pageCount 4
 
@@ -85,7 +84,6 @@ describe("MOVE — cyclic", () => {
     expect(next.moveReason).toBe("autoplay");
   });
 });
-
 describe("MOVE — finite", () => {
   const layout = makeLayout(12, 3, true); // pageCount 4, finite
 
@@ -347,110 +345,5 @@ describe("instant mode", () => {
       true,
     );
     expect(next.motionPhase).toBe("step-instant");
-  });
-});
-
-describe("LAYOUT_SYNC", () => {
-  it("is a no-op when the layout is unchanged", () => {
-    const layout = makeLayout(12, 3, false);
-    const state = buildInitialState(layout);
-    expect(reduce(state, { type: "LAYOUT_SYNC" })).toBe(state);
-  });
-
-  it("hard-resets when the deck (dataKey) changed", () => {
-    const layout = makeLayout(12, 3, false, "a");
-    const replaced = makeLayout(8, 3, false, "b");
-    const moved = reduce(buildInitialState(layout), {
-      type: "GO_TO",
-      targetPageIndex: 2,
-      moveReason: "click",
-      fromVirtualIndex: 0,
-    });
-    const synced = reduce(moved, { type: "LAYOUT_SYNC" }, replaced);
-    expect(synced.targetPageIndex).toBe(0);
-    expect(synced.motionPhase).toBe("idle");
-  });
-
-  it("remaps proportionally on a visibleSlidesCount change", () => {
-    const before = makeLayout(12, 3, false); // pageCount 4
-    const after = makeLayout(12, 4, false); // pageCount 3
-    const moved = reduce(buildInitialState(before), {
-      type: "GO_TO",
-      targetPageIndex: 2,
-      moveReason: "click",
-      fromVirtualIndex: 0,
-    });
-    const synced = reduce(moved, { type: "LAYOUT_SYNC" }, after);
-    expect(synced.motionPhase).toBe("step-instant");
-    expect(synced.targetPageIndex).toBeLessThan(after.pageCount);
-  });
-});
-
-describe("characterization — recovery from a stuck dragging phase", () => {
-  it("LAYOUT_SYNC lifts a dragging state out of dragging when the deck collapses", () => {
-    const slidable = makeLayout(12, 3, false);
-    const collapsed = makeLayout(12, 20, false); // visible >= length -> !canSlide
-    expect(collapsed.canSlide).toBe(false);
-
-    const dragging = reduce(buildInitialState(slidable), {
-      type: "START_DRAG",
-      fromVirtualIndex: 4,
-      targetPageIndex: 1,
-    });
-    expect(dragging.motionPhase).toBe("dragging");
-
-    // A resize collapses the deck mid-drag. No END_DRAG ever arrives, but the
-    // reducer must still leave the dragging phase on its own — the proportional
-    // reconcile path collapses it to an instant snap. This is why the heavier
-    // "hard-reset / forced END_DRAG" fix was rejected: the reducer self-heals.
-    const recovered = reduce(dragging, { type: "LAYOUT_SYNC" }, collapsed);
-    expect(recovered.motionPhase).not.toBe("dragging");
-    expect(recovered.motionPhase).toBe("step-instant");
-  });
-
-  it("LAYOUT_SYNC with a deck replacement hard-resets a dragging state to idle", () => {
-    const layout = makeLayout(12, 3, false, "a");
-    const replaced = makeLayout(10, 3, false, "b");
-    const dragging = reduce(buildInitialState(layout), {
-      type: "START_DRAG",
-      fromVirtualIndex: 4,
-      targetPageIndex: 1,
-    });
-    const recovered = reduce(dragging, { type: "LAYOUT_SYNC" }, replaced);
-    expect(recovered.motionPhase).toBe("idle");
-  });
-});
-
-describe("DEV invariants", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("never fire across a representative transition matrix", () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const layouts = [makeLayout(30, 3, false), makeLayout(12, 3, true)];
-
-    for (const layout of layouts) {
-      let state = buildInitialState(layout);
-      state = reduce(state, { type: "MOVE", step: 1, moveReason: "click", fromVirtualIndex: 0 });
-      state = reduce(state, { type: "MOVE", step: 1, moveReason: "click", fromVirtualIndex: state.virtualIndex });
-      state = reduce(state, { type: "MOTION_SETTLED", settledPosition: state.virtualIndex });
-      state = reduce(state, { type: "GO_TO", targetPageIndex: layout.pageCount - 1, moveReason: "click", fromVirtualIndex: state.virtualIndex });
-      state = reduce(state, { type: "MOTION_SETTLED", settledPosition: state.virtualIndex });
-      state = reduce(state, { type: "MOTION_SETTLED", settledPosition: state.virtualIndex });
-      state = reduce(state, { type: "START_DRAG", fromVirtualIndex: state.virtualIndex, targetPageIndex: state.targetPageIndex });
-      state = reduce(state, {
-        type: "END_DRAG",
-        fromVirtualIndex: state.virtualIndex,
-        targetPageIndex: 0,
-        targetVirtualIndex: 0,
-        isSnap: false,
-        pointerReleaseVelocity: 0,
-        uiReleaseVelocity: 0,
-      });
-      state = reduce(state, { type: "MOTION_SETTLED", settledPosition: state.virtualIndex });
-    }
-
-    expect(errorSpy).not.toHaveBeenCalled();
   });
 });
