@@ -54,7 +54,9 @@ const userEnvironment = useUserEnvironment(); // from "@/shared"
   intervalAutoplay={3000}
   userEnvironment={userEnvironment}
   onSlideClick={(slide) => openInNewTab(String(slide.content))}
-  onMotionIdleStatusChange={setIsIdle}
+  onCarouselStatusChange={({ currentPageIndex, pageCount }) =>
+    setLabel(`${currentPageIndex + 1} / ${pageCount}`)
+  }
 >
   {userEnvironment.touch ? <PaginationWidget /> : <Pagination />}
   <Controls />
@@ -123,7 +125,13 @@ referentially-stable object.
 | Prop                       | Type | Effect |
 | -------------------------- | ---- | ------ |
 | `onSlideClick`             | `(slide: Slide) => void` | Fires when an interactive slide is clicked. The slide is interactive only when `isInteractive`, the image (if any) loaded successfully, and this handler is provided. |
-| `onMotionIdleStatusChange` | `(isIdle: boolean) => void` | Fires when the carousel crosses the idle ↔ running boundary. **Observation-only**: it never drives carousel semantics. Intended for consumers that need to coordinate non-critical work around motion. The callback never receives the reducer state, the visual position stream, or any internal detail. |
+| `onCarouselStatusChange`   | `(snapshot: CarouselStatusSnapshot) => void` | Low-frequency, **observation-only** status. `CarouselStatusSnapshot = { isIdle, currentPageIndex, pageCount }` — two numbers (which page, of how many) plus the idle flag. Fires on mount and whenever one of those changes; `currentPageIndex` is the *target* page, so it reflects intent immediately on click/gesture. Carries no per-frame data (position, velocity) and no reducer internals. Deduplicated by a shallow snapshot compare. |
+
+#### Imperative handle
+
+| Prop  | Type | Effect |
+| ----- | ---- | ------ |
+| `ref` | `Ref<CarouselHandle>` | `CarouselHandle = { prev(): void; next(): void }`. Single-step navigation for external buttons elsewhere on the page or programmatic control. Routes through the same navigation pipeline as `<Controls>` (no second control path) and is a safe no-op when the deck cannot slide. Page jumps (`GO_TO`) are deliberately not exposed — they stay internal, reached through the pagination slot. |
 
 #### Styling
 
@@ -217,10 +225,15 @@ These are the user-facing behaviours the implementation guarantees.
   whenever the carousel is in the eligible state described under
   `isAuto`. On the final page in finite mode, the next step loops back to
   page 0 via `GO_TO`.
-- **External motion-idle signal.** `onMotionIdleStatusChange` fires once on
-  each idle↔running crossing. Consumers may use it to schedule non-critical
-  work around motion. The signal remains observation-only; the carousel also
-  runs its own image preparation for nearby image slides while idle.
+- **External status signal.** `onCarouselStatusChange` fires on mount and on
+  every change of `{ isIdle, currentPageIndex, pageCount }` — a low-frequency,
+  observation-only snapshot. Consumers use it for a "page X of Y" label or to
+  schedule non-critical work around motion. It carries no per-frame data and
+  no reducer internals; the carousel still runs its own image preparation for
+  nearby slides while idle, independent of this signal.
+- **External imperative control.** A `ref` of type `CarouselHandle` exposes
+  `prev()` / `next()` for buttons outside the carousel subtree or programmatic
+  use. Both route through the same navigation pipeline as `<Controls>`.
 - **Image preparation.** When `isContentImg` is on, the slide layer warms
   image URLs around the idle viewport: the visible band plus a page-lookahead
   buffer on each side, nearest-first. The carousel steps a whole page
@@ -470,22 +483,30 @@ opposite-direction click, any interruption), the state change records the
 new intent immediately, but the controller retarget is deferred by a tiny
 frame-boundary window (`RETARGET_FRAME_DELAY`, currently two RAF ticks). The
 old segment keeps publishing during that window. At the deferred boundary the
-new segment starts from the live stream:
+new segment starts from a **single atomic handoff point**:
 
-- position comes from `controller.getSnapshot()` after the previous segment
-  has had time to publish additional frames;
-- velocity comes from `controller.read(retargetTimestamp)`;
-- `startedAt = retargetTimestamp`;
+- `controller.captureHandoff(retargetTimestamp)` returns one coherent
+  `{ position, velocity, strategy, timestamp }` — position and velocity are
+  read from the *same* sample of the old curve at the same instant;
+- `startedAt = handoff.timestamp`;
 - the controller publishes the initial sample synchronously.
 
-This keeps the first handoff emit equal to the already-published track
-position, so retargeting is a DOM no-op, while the velocity is sampled close
-to the actual transition frame. Using a fresh unemitted position can make the
-carousel jump to a position the user never saw; retargeting synchronously in
-the input/layout-effect turn can feel like a micro-stop. Any future change
-must preserve the invariant: "intent immediately, controller retarget on a
-frame boundary, position from emitted visual frame, velocity from current
-segment sample, time from new segment start".
+The controller exposes exactly one handoff API, so position and velocity can
+never be sourced from two different moments — the boundary makes that mistake
+unexpressible. `captureHandoff` does not emit, cancel, or notify subscribers;
+it is purely the math. `getSnapshot()` is a separate method for cold UI reads
+(the last *emitted* visual frame) and must not be used to assemble a handoff.
+
+The retarget is deferred to a frame boundary (not applied synchronously in the
+input/layout-effect turn, which can feel like a micro-stop). For a **cold
+start** from idle the split is different and intentional: the logical origin
+position is owned by the reducer (`state.fromVirtualIndex`, passed in at the
+dispatch site), and only the residual velocity is read from the controller —
+that is a deliberate cross-layer composition, not a mixed handoff.
+
+Any future change must preserve the invariant: "intent immediately, controller
+retarget on a frame boundary, the in-flight handoff taken as one atomic
+`captureHandoff` point".
 
 When the controller completes, the runner dispatches
 `MOTION_SETTLED { settledPosition }`. If a newer click already replaced the
@@ -604,6 +625,26 @@ parallel render-time reconcile. Because the dispatch is fired in the layout
 phase, React flushes the synced re-render before paint, so no frame ever
 shows state lagging the layout. `reconcileStateToLayout` must stay
 idempotent for this to hold — a DEV assertion in the reducer guards it.
+
+**ADR-001 pre-sync-commit invariant.** A layout change produces *two* commits
+before paint: commit N renders the new `layout` against the not-yet-synced
+reducer `state`, then the `LAYOUT_SYNC` layout-effect dispatches and commit
+N+1 renders the synced state. This is correct only because every layout-phase
+effect that runs in commit N is **either idempotent before paint, or a keyed
+no-op**:
+
+- the track binding writes a `transform` that commit N+1 immediately
+  overwrites — both before paint, no visible glitch;
+- the motion runner is keyed on `state` fields it has already processed, so
+  it does not act on the stale state in commit N;
+- the image-preload effect tolerates a window that is re-synced one commit
+  later (the store is robust to rapid window changes).
+
+This is a hard invariant: **any new layout-phase effect must preserve it** —
+it must not perform a non-idempotent or irreversible side effect off the
+pre-sync state. The one accepted, bounded cost is that commit N may mount a
+few slide `<img>` elements that commit N+1 unmounts (a handful of speculative
+requests on the rare layout-change event).
 
 ---
 
@@ -762,6 +803,8 @@ src/components/Carousel/
 │   └── useFocusRecovery.ts
 ├── navigation/
 │   └── useCarouselNavigation.ts   public click handlers
+├── status/
+│   └── statusSnapshot.ts          onCarouselStatusChange snapshot equality
 ├── slides/
 │   ├── SlideItem.tsx
 │   ├── SlideItem.types.ts
@@ -850,10 +893,17 @@ dependencies, the architecture has held.
   trade-off is that the carousel will visibly misbehave when fed invalid
   inputs (NaN propagation, impossible geometry, malformed transforms) —
   which is the intended signal that the input must be fixed.
-- **`onMotionIdleStatusChange` is observation-only.** It never drives
-  carousel semantics and never receives reducer state. Internal image
-  preparation uses the carousel's own idle status directly; external consumers
-  can still use the callback for application-owned non-critical work.
+- **`onCarouselStatusChange` is observation-only.** It never drives carousel
+  semantics and never receives reducer state or per-frame motion data — only a
+  `{ isIdle, currentPageIndex, pageCount }` snapshot. Internal image
+  preparation uses the carousel's own idle status directly; the callback is
+  purely for application-owned, low-frequency consumers (a page label,
+  non-critical work scheduling).
+- **The imperative `ref` handle is command-only.** `prev()` / `next()` express
+  intent; the carousel still decides admissibility (boundaries, finite/cyclic,
+  reduced motion, repeated-click). The handle exposes no state and no `goTo`,
+  so external code never learns reducer / controller / virtual-index internals
+  and there is exactly one navigation pipeline.
 
 ---
 
