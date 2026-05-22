@@ -4,9 +4,6 @@ import styles from "./Carousel.module.scss";
 import {
   mergeStyleMaps,
   resolveSlots,
-  useDataSaver,
-  useIsReducedMotion,
-  useIsTouchDevice,
   useViewportVisibility,
 } from "../../shared";
 import { CAROUSEL_DEFAULTS, useCarouselConfig } from "./config";
@@ -57,19 +54,21 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     isFinite: isFiniteProp = CAROUSEL_DEFAULTS.isFinite,
     isControlsOn = CAROUSEL_DEFAULTS.isControlsOn,
     className,
-    isInstantMotion,
-    isTouchDevice,
+    userEnvironment,
     onSlideClick,
     onMotionIdleStatusChange,
     children,
   } = props;
 
-  // --- environment & overrides ----------------------------------------------
-  const prefersReducedMotion = useIsReducedMotion();
-  const detectedTouchDevice = useIsTouchDevice();
-  const isDataSaverEnabled = useDataSaver(isContentImg);
-  const isInstantMode = isInstantMotion ?? prefersReducedMotion;
-  const isTouch = isTouchDevice ?? detectedTouchDevice;
+  // --- environment (injected, never self-detected) --------------------------
+  // The carousel is a pure function of its props: it does not read matchMedia
+  // / navigator itself. The host supplies the environment via `userEnvironment`
+  // (see `useUserEnvironment` in `shared`). An unset signal resolves to `false`
+  // — full motion, desktop behaviour, warm-up enabled — and the omission is
+  // surfaced by the Diagnostic slot rather than silently repaired.
+  const isInstantMode = userEnvironment?.reducedMotion ?? false;
+  const isTouch = userEnvironment?.touch ?? false;
+  const isDataSaverEnabled = userEnvironment?.dataSaver ?? false;
 
   // --- slots ----------------------------------------------------------------
   const slots = useMemo(() => resolveSlots(children, CAROUSEL_SLOTS), [children]);
@@ -255,6 +254,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
       jumpSpeedMultiplier,
       intervalAutoplay,
       errAltPlaceholder,
+      userEnvironment,
     }),
     [
       durationAutoplay,
@@ -262,6 +262,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
       errAltPlaceholder,
       intervalAutoplay,
       jumpSpeedMultiplier,
+      userEnvironment,
       visibleSlidesNr,
     ],
   );

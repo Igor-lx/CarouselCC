@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import appStyles from "./App.module.scss";
 import { CAROUSEL_SOURCES, CAROUSEL_SOURCES2 } from "./carouselData";
 import { useCompactLandscape } from "./useCompactLandscape";
-import { useBreakpoint, useIsTouchDevice } from "../shared";
+import { useBreakpoint, useUserEnvironment } from "../shared";
 import Carousel, { type Slide } from "../components/Carousel";
 import { Controls } from "../components/Carousel/modules/Controls";
 import { Pagination } from "../components/Carousel/modules/Pagination";
@@ -33,7 +33,11 @@ const openSlide = (slide: Slide) => {
 
 export default function App() {
   const { toggleTheme, theme } = useTheme();
-  const isTouch = useIsTouchDevice();
+  // One read of the user environment at the app boundary: used here for the
+  // responsive layout and forwarded whole into <Carousel> (which never detects
+  // the environment itself). The hook returns a memoised, stable object.
+  const userEnvironment = useUserEnvironment();
+  const isTouch = userEnvironment.touch;
   const isCompactLandscape = useCompactLandscape();
 
   const [isAutoplay, setIsAutoplay] = useState(false);
@@ -86,12 +90,12 @@ export default function App() {
             isAuto={isAutoplay}
             isPaginationOn
             isInteractive={isInteractive}
-            durationAutoplay={5000}
-            durationStep={6000}
-            jumpSpeedMultiplier={8}
+            durationAutoplay={4000}
+            durationStep={4000}
+            jumpSpeedMultiplier={12}
             intervalAutoplay={3000}
             isPagePaddingOn
-            isTouchDevice={isTouch}
+            userEnvironment={userEnvironment}
             onSlideClick={openSlide}
           >
             {isTouch ? <PaginationWidget /> : <Pagination />}

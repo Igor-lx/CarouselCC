@@ -60,6 +60,20 @@ const OnMotionIdleStatusChangeSchema = z.function({
 });
 
 /**
+ * Injected user-environment signals. The carousel does not detect these
+ * itself — the host reads them once (see `useUserEnvironment` in `shared`)
+ * and passes them in. Every field is optional; an unset field resolves to
+ * `false` and is surfaced by the `Diagnostic` slot.
+ */
+const UserEnvironmentSchema = z
+  .object({
+    reducedMotion: z.boolean(),
+    touch: z.boolean(),
+    dataSaver: z.boolean(),
+  })
+  .partial();
+
+/**
  * Public Zod schema for `CarouselProps`, exposed for the **host application**
  * to validate inputs from external sources (API responses, CMS, user config)
  * before passing them into the component.
@@ -86,8 +100,7 @@ export const CarouselPropsSchema = z.object({
   isFinite: z.boolean().optional(),
   isControlsOn: z.boolean().optional(),
   className: ClassMapSchema.optional(),
-  isInstantMotion: z.boolean().optional(),
-  isTouchDevice: z.boolean().optional(),
+  userEnvironment: UserEnvironmentSchema.optional(),
   onSlideClick: OnSlideClickSchema.optional(),
   onMotionIdleStatusChange: OnMotionIdleStatusChangeSchema.optional(),
 });
