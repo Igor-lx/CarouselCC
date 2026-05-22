@@ -1,7 +1,12 @@
 import type { CarouselLayout } from "../domain";
 import type { CarouselRuntimeConfig } from "../config";
 
-export type MoveReason = "click" | "gesture" | "autoplay" | "unknown";
+/**
+ * What initiated the current motion. A real reason is always carried by the
+ * command that starts a step; `null` is the pre-action initial state, before
+ * the carousel has moved for any reason.
+ */
+export type MoveReason = "click" | "gesture" | "autoplay";
 
 export type MotionPhase =
   | "idle"
@@ -48,7 +53,8 @@ export interface CarouselState {
    */
   isRepeatedClickAdvance: boolean;
   motionPhase: MotionPhase;
-  moveReason: MoveReason;
+  /** `null` until the carousel first moves; a concrete reason thereafter. */
+  moveReason: MoveReason | null;
   gesture: GestureRelease;
 }
 
@@ -100,12 +106,25 @@ export interface MotionSettledCommand {
   settledPosition: number;
 }
 
+/**
+ * Propagates a layout change (resize, slidesData replace, isFinite toggle)
+ * into reducer state. Carries no payload of its own — the new layout rides in
+ * on the reducer `context`, and the transition is exactly the layout
+ * reconciliation that runs at the top of every reducer turn. See ADR-001 in
+ * `reducer.ts` for why layout changes flow through an explicit command rather
+ * than a parallel render-time reconcile.
+ */
+export interface LayoutSyncCommand {
+  type: "LAYOUT_SYNC";
+}
+
 export type CarouselCommand =
   | MoveCommand
   | GoToCommand
   | StartDragCommand
   | EndDragCommand
-  | MotionSettledCommand;
+  | MotionSettledCommand
+  | LayoutSyncCommand;
 
 export interface ReducerContext {
   layout: CarouselLayout;

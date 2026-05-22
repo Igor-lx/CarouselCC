@@ -1,4 +1,5 @@
 import { clamp, normalizePageIndex } from "../domain";
+import type { CarouselLayout } from "../domain";
 import { resolveGoToApproachDistance } from "../motion/timing";
 import { reconcileStateToLayout } from "./reconcile";
 import {
@@ -14,6 +15,28 @@ import {
   type ReducerEnvelope,
 } from "./types";
 
+/**
+ * ADR-001 — Layout synchronization is a single physical reconcile path.
+ *
+ * `CarouselLayout` is derived from props that change in the render phase
+ * without any dispatch (viewport resize, `slidesData` replace, `isFinite`
+ * toggle). Reducer state must stay consistent with the live layout, but the
+ * reducer only runs on dispatch.
+ *
+ * The design: layout changes are turned into an explicit `LAYOUT_SYNC`
+ * dispatch fired from a layout-phase effect in `useCarouselState`. The
+ * reconciliation itself happens — as for every other command — in
+ * `reconcileStateToLayout` at the top of this reducer. There is exactly ONE
+ * physical reconcile, and it lives here; no parallel render-time reconcile
+ * exists, and `useCarouselState` returns the raw reducer state directly.
+ *
+ * Because the `LAYOUT_SYNC` dispatch is fired in the layout phase, React
+ * flushes the resulting re-render before paint, so consumers never observe a
+ * frame with state lagging the layout. `reconcileStateToLayout` must stay
+ * idempotent for this to hold — `assertReconcileIdempotent` below guards that
+ * in DEV builds.
+ */
+
 const dragReleasePhase = (
   command: EndDragCommand,
   isInstantMode: boolean,
@@ -22,7 +45,7 @@ const dragReleasePhase = (
   return command.isSnap ? "step-snap" : "step-normal";
 };
 
-export function carouselReducer(
+function carouselReducerImpl(
   state: CarouselState,
   envelope: ReducerEnvelope,
 ): CarouselState {
@@ -125,6 +148,19 @@ export function carouselReducer(
 
       if (isNoop) {
         if (command.moveReason === "gesture") {
+          // A gesture-initiated MOVE/GO_TO that resolves to no page change —
+          // it snaps back rather than holding the current phase. Gesture
+          // currently only ever dispatches START_DRAG / END_DRAG, so this
+          // branch is unreachable today; it is kept as the correct snap-back
+          // handling should a gesture-driven step command ever be added. The
+          // DEV warning makes that future reachability loud rather than silent.
+          if (import.meta.env.DEV) {
+            console.warn(
+              "[Carousel] reducer hit the gesture-initiated noop MOVE/GO_TO " +
+                "branch. Gesture is documented to dispatch only START_DRAG / " +
+                "END_DRAG — review the gesture dispatch path.",
+            );
+          }
           return {
             ...synced,
             fromVirtualIndex: nextFromVirtualIndex,
@@ -236,7 +272,87 @@ export function carouselReducer(
       };
     }
 
+    case "LAYOUT_SYNC":
+      // The whole transition is the layout reconciliation already performed
+      // by `reconcileStateToLayout` above. See ADR-001.
+      return synced;
+
     default:
       return synced;
   }
+}
+
+/**
+ * DEV-only guard for ADR-001: re-reconciling a freshly transitioned state
+ * against a structurally equivalent layout must not move it. If this fires,
+ * `reconcileStateToLayout`'s `sameLayout` fast-path has regressed and the
+ * `LAYOUT_SYNC` design no longer holds (a layout change could oscillate).
+ */
+const assertReconcileIdempotent = (
+  result: CarouselState,
+  layout: CarouselLayout,
+): void => {
+  const reSynced = reconcileStateToLayout(result, { ...layout });
+  if (
+    reSynced.targetPageIndex !== result.targetPageIndex ||
+    reSynced.virtualIndex !== result.virtualIndex ||
+    reSynced.fromVirtualIndex !== result.fromVirtualIndex ||
+    reSynced.motionPhase !== result.motionPhase
+  ) {
+    console.error(
+      "[Carousel] reconcileStateToLayout is not idempotent — " +
+        "re-reconciling a settled state against an equivalent layout changed it.",
+      { result, reSynced },
+    );
+  }
+};
+
+/**
+ * DEV-only structural invariants on reducer output. None of these should ever
+ * fire for a correct transition; they catch regressions in transition math
+ * before they reach the motion layer.
+ */
+const assertStateInvariants = (
+  result: CarouselState,
+  layout: CarouselLayout,
+): void => {
+  if (
+    layout.pageCount > 0 &&
+    (result.targetPageIndex < 0 || result.targetPageIndex >= layout.pageCount)
+  ) {
+    console.error(
+      "[Carousel] reducer produced an out-of-bounds targetPageIndex.",
+      { targetPageIndex: result.targetPageIndex, pageCount: layout.pageCount },
+    );
+  }
+  if (result.teleportVirtualIndex !== null && result.motionPhase !== "step-jump") {
+    console.error(
+      "[Carousel] teleportVirtualIndex is set outside the step-jump phase.",
+      { motionPhase: result.motionPhase },
+    );
+  }
+  if (result.isTeleportApproach && result.motionPhase !== "step-jump") {
+    console.error(
+      "[Carousel] isTeleportApproach is set outside the step-jump phase.",
+      { motionPhase: result.motionPhase },
+    );
+  }
+};
+
+/**
+ * The carousel reducer. Pure: every transition is a function of
+ * `(state, command, context)`. In DEV builds the result is checked against
+ * the ADR-001 idempotency contract and a set of structural invariants; in
+ * production the checks are stripped and this is a direct passthrough.
+ */
+export function carouselReducer(
+  state: CarouselState,
+  envelope: ReducerEnvelope,
+): CarouselState {
+  const result = carouselReducerImpl(state, envelope);
+  if (import.meta.env.DEV) {
+    assertReconcileIdempotent(result, envelope.context.layout);
+    assertStateInvariants(result, envelope.context.layout);
+  }
+  return result;
 }
