@@ -10,6 +10,7 @@ import {
   windowContains,
   type CarouselLayout,
   type CarouselSlideRecord,
+  type RenderWindow,
   type VirtualSlide,
 } from "../domain";
 
@@ -35,9 +36,12 @@ export function useSlideRenderModel({
   records,
   renderWindowBufferMultiplier,
 }: UseSlideRenderModelInput): UseSlideRenderModelResult {
-  const persistedWindowRef = useRef(
-    buildRenderWindow(previous, current, layout, renderWindowBufferMultiplier),
-  );
+  // The expanded render window persists across renders so a slide is never
+  // unmounted mid-flight (it shrinks back only when motion settles). The ref
+  // starts null and is seeded by the idle branch of the memo below on the
+  // first render — the carousel always mounts idle — so `buildRenderWindow`
+  // is computed only inside the memo, never on every render.
+  const persistedWindowRef = useRef<RenderWindow | null>(null);
 
   const renderWindow = useMemo(() => {
     const next = buildRenderWindow(previous, current, layout, renderWindowBufferMultiplier);
@@ -47,7 +51,10 @@ export function useSlideRenderModel({
       return next;
     }
 
-    const previousWindow = persistedWindowRef.current;
+    // Non-null here: the idle branch above seeds the ref on the first render.
+    // `next` is a defensive fallback for a hypothetical first-render-while-
+    // moving, which the mount-idle invariant rules out.
+    const previousWindow = persistedWindowRef.current ?? next;
     const segmentWindow = buildSegmentWindow(previous, current, layout);
 
     if (windowContains(previousWindow, segmentWindow)) return previousWindow;
