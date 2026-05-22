@@ -114,4 +114,18 @@ describe("reconcileStateToLayout — recovery from a stuck phase", () => {
     expect(recovered.motionPhase).not.toBe("dragging");
     expect(recovered.motionPhase).toBe("step-instant");
   });
+
+  it("hard-resets a dragging state to idle when the deck is replaced", () => {
+    const layout = makeLayout(12, 3, false, "a");
+    const replaced = makeLayout(10, 3, false, "b");
+    const dragging: CarouselState = {
+      ...buildInitialState(layout),
+      motionPhase: "dragging",
+      moveReason: "gesture",
+    };
+    const recovered = reconcileStateToLayout(dragging, replaced);
+    expect(recovered.motionPhase).toBe("idle");
+    expect(recovered.targetPageIndex).toBe(0);
+    expect(recovered.layout).toBe(replaced);
+  });
 });

@@ -598,11 +598,6 @@ union:
   — pagination click / autoplay loop-back / external jump.
 - `MOTION_SETTLED { settledPosition }` — fired by the motion runner when the
   controller completes.
-- `LAYOUT_SYNC {}` — fired by `useCarouselState` from a layout-phase effect
-  when the `layout` prop changes (resize, slidesData replace, isFinite
-  toggle). Carries no payload; the new layout rides in on the `context`
-  envelope and the transition is exactly the layout reconciliation. See
-  ADR-001 below.
 
 `motionPhase` is a discriminated union:
 `"idle" | "step-normal" | "step-jump" | "step-snap" | "step-instant" | "dragging"`.
@@ -615,36 +610,16 @@ The reducer is pure. Layout / config / instant-mode flow in as a
 (`reconcileStateToLayout`) runs at the top of every transition so a layout
 change collapses cleanly to an instant snap.
 
-**ADR-001 — single physical reconcile.** `CarouselLayout` is derived from
-props that change in the render phase without any dispatch. Rather than
-reconcile in two places (a render-time memo *and* the reducer), layout
-changes are turned into an explicit `LAYOUT_SYNC` dispatch fired from a
-layout-phase effect. The reconciliation itself happens only inside the
-reducer; `useCarouselState` returns the raw reducer state directly with no
-parallel render-time reconcile. Because the dispatch is fired in the layout
-phase, React flushes the synced re-render before paint, so no frame ever
-shows state lagging the layout. `reconcileStateToLayout` must stay
-idempotent for this to hold — a DEV assertion in the reducer guards it.
-
-**ADR-001 pre-sync-commit invariant.** A layout change produces *two* commits
-before paint: commit N renders the new `layout` against the not-yet-synced
-reducer `state`, then the `LAYOUT_SYNC` layout-effect dispatches and commit
-N+1 renders the synced state. This is correct only because every layout-phase
-effect that runs in commit N is **either idempotent before paint, or a keyed
-no-op**:
-
-- the track binding writes a `transform` that commit N+1 immediately
-  overwrites — both before paint, no visible glitch;
-- the motion runner is keyed on `state` fields it has already processed, so
-  it does not act on the stale state in commit N;
-- the image-preload effect tolerates a window that is re-synced one commit
-  later (the store is robust to rapid window changes).
-
-This is a hard invariant: **any new layout-phase effect must preserve it** —
-it must not perform a non-idempotent or irreversible side effect off the
-pre-sync state. The one accepted, bounded cost is that commit N may mount a
-few slide `<img>` elements that commit N+1 unmounts (a handful of speculative
-requests on the rare layout-change event).
+**ADR-001 — one pure reconcile rule, two boundaries.** `CarouselLayout` is
+derived from props that can change without a reducer command. `useCarouselState`
+therefore keeps a physical `committedState` from `useReducer`, then projects it
+through `reconcileStateToLayout(committedState, layout)` during render and
+returns that effective state to all runtime consumers. A resize, data
+replacement, or `isFinite` toggle is reconciled immediately even when no user
+command fires. The reducer applies the same pure reconciler at the top of every
+command, so the physical transition also starts from the live layout. There is
+no layout-effect catch-up command and no transient render that exposes a
+new-layout / old-state pair to layout effects.
 
 ---
 
@@ -922,7 +897,7 @@ dependencies, the architecture has held.
 - **React safety.** Per-frame work never touches React state. State
   machine dispatches are batched by React. Effects are pure; cleanup is
   explicit. `useIsomorphicLayoutEffect` is used for DOM measurement,
-  subscription wiring, and the ADR-001 `LAYOUT_SYNC` dispatch.
+  subscription wiring, and synchronous visual coordination.
 - **Strict Mode.** The motion controller cleanups handle remount; the
   visual position subscription returns a cleanup that disconnects from
   the controller.
