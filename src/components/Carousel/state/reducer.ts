@@ -147,31 +147,10 @@ function carouselReducerImpl(
         nextVirtualIndex === synced.virtualIndex;
 
       if (isNoop) {
-        if (command.moveReason === "gesture") {
-          // A gesture-initiated MOVE/GO_TO that resolves to no page change —
-          // it snaps back rather than holding the current phase. Gesture
-          // currently only ever dispatches START_DRAG / END_DRAG, so this
-          // branch is unreachable today; it is kept as the correct snap-back
-          // handling should a gesture-driven step command ever be added. The
-          // DEV warning makes that future reachability loud rather than silent.
-          if (import.meta.env.DEV) {
-            console.warn(
-              "[Carousel] reducer hit the gesture-initiated noop MOVE/GO_TO " +
-                "branch. Gesture is documented to dispatch only START_DRAG / " +
-                "END_DRAG — review the gesture dispatch path.",
-            );
-          }
-          return {
-            ...synced,
-            fromVirtualIndex: nextFromVirtualIndex,
-            teleportVirtualIndex: null,
-            isTeleportApproach: false,
-            isRepeatedClickAdvance: false,
-            motionPhase: "step-snap",
-            moveReason: "gesture",
-            gesture: ZERO_GESTURE_RELEASE,
-          };
-        }
+        // MOVE / GO_TO are dispatched only by clicks, controls, and autoplay
+        // (gesture dispatches START_DRAG / END_DRAG exclusively). A no-op step
+        // therefore just holds the current phase — or collapses to an instant
+        // snap when instant mode is on.
         return {
           ...synced,
           fromVirtualIndex: nextFromVirtualIndex,
