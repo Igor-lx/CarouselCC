@@ -39,9 +39,11 @@ folders and attach via the `slot` static convention (see §3).
 </Carousel>
 ```
 
-With overrides:
+With overrides and an injected environment:
 
 ```tsx
+const userEnvironment = useUserEnvironment(); // from "@/shared"
+
 <Carousel
   slidesData={slides}
   visibleSlidesNr={3}
@@ -50,10 +52,11 @@ With overrides:
   durationStep={2000}
   jumpSpeedMultiplier={8}
   intervalAutoplay={3000}
+  userEnvironment={userEnvironment}
   onSlideClick={(slide) => openInNewTab(String(slide.content))}
   onMotionIdleStatusChange={setIsIdle}
 >
-  {isTouch ? <PaginationWidget /> : <Pagination />}
+  {userEnvironment.touch ? <PaginationWidget /> : <Pagination />}
   <Controls />
   <Diagnostic />
 </Carousel>
@@ -84,8 +87,18 @@ runtime exception: profile math normalizes acceleration/deceleration zones to
 | Prop            | Type      | Default | Effect |
 | --------------- | --------- | ------- | ------ |
 | `isFinite`      | `boolean` | `false` | When on, the track stops at the boundaries (no wrap, `isAtStart`/`isAtEnd` flag the edges). When off, the track loops cyclically and `GO_TO` always travels the shortest cyclic distance. |
-| `isInstantMotion` | `boolean` | — *(reads `prefers-reduced-motion`)* | Explicit override for the OS-level reduced-motion preference. When set or detected: every transition snaps instantly, gesture is disabled, the PaginationWidget runs in static (non-motion-bound) mode. |
-| `isTouchDevice` | `boolean` | — *(detects via `(pointer:coarse)`)* | Explicit override for touch detection. Controls: gesture eligibility, `data-touch` outer attribute, hover-pause exemption for autoplay. |
+
+#### User environment
+
+The carousel does **not** detect the device/OS environment itself — it is a
+pure function of its props. The host injects the environment via a single
+optional object prop. The recommended source is the `useUserEnvironment` hook
+in `shared`, which composes the individual detection hooks and returns a
+referentially-stable object.
+
+| Prop              | Type             | Effect |
+| ----------------- | ---------------- | ------ |
+| `userEnvironment` | `{ reducedMotion?: boolean; touch?: boolean; dataSaver?: boolean }` | All fields optional. `reducedMotion`: every transition snaps instantly, gesture is disabled, the PaginationWidget runs static. `touch`: gesture eligibility, `data-touch` attribute, autoplay hover-pause exemption. `dataSaver`: speculative image warm-up is skipped. An unset field resolves to `false`; the omission is reported by the `Diagnostic` slot (DEV-only) — never silently repaired. |
 
 #### Motion timing
 
@@ -154,8 +167,8 @@ Stable hooks for external code:
 - `[data-carousel-root]` — the outermost region.
 - `[data-carousel-viewport]` — the clipping container.
 - `[data-carousel-track]` — the element whose `transform` is animated.
-- `data-touch="true|false"` — touch override / detection result.
-- `data-reduced-motion="true|false"` — reduced-motion override / detection.
+- `data-touch="true|false"` — mirrors `userEnvironment.touch`.
+- `data-reduced-motion="true|false"` — mirrors `userEnvironment.reducedMotion`.
 - `[inert]` on slides outside the active visual band.
 
 ### 1.6 Functional semantics
@@ -227,20 +240,21 @@ These are the user-facing behaviours the implementation guarantees.
   navigation, layout, motion state, or slide rendering semantics.
 
   Warm-up is purely speculative, so it is skipped — on every device — when
-  the user has opted into reduced data usage (`prefers-reduced-data` or the
-  Network Information API `saveData` flag, observed via `useDataSaver`). The
-  image-resource store, its render SSOT, and image error handling / retry are
-  unaffected: those are correctness, not optimization, and always run.
+  the host reports reduced data usage via `userEnvironment.dataSaver` (the
+  host derives it from `prefers-reduced-data` / the Network Information API
+  `saveData` flag, e.g. through `useUserEnvironment`). The image-resource
+  store, its render SSOT, and image error handling / retry are unaffected:
+  those are correctness, not optimization, and always run.
 - **Image errors and retry.** A slide whose image fails to load renders a
   text placeholder (`alt`, or `errAltPlaceholder`) and is not interactive.
   While such a slide sits in the active band, the image-resource store
   retries the URL on an exponential backoff (capped attempts); a successful
   retry remounts the slide's `<img>` and restores it. Error and retry are a
   single store-owned mechanism — slides hold no private error state.
-- **Reduced motion.** When `isInstantMotion` is set or
-  `prefers-reduced-motion` is detected, every transition snaps instantly,
-  the gesture adapter is disabled, and pagination dot transitions are
-  killed (`[data-reduced-motion="true"] .dot { transition: none }`).
+- **Reduced motion.** When `userEnvironment.reducedMotion` is `true`, every
+  transition snaps instantly, the gesture adapter is disabled, and pagination
+  dot transitions are killed
+  (`[data-reduced-motion="true"] .dot { transition: none }`).
 - **Pagination (`Pagination`).** One dot per page. The active dot reflects
   the `targetPageIndex` immediately on click and gesture. During
   *autoplay*, the dot switch is delayed by
@@ -329,6 +343,7 @@ Every responsibility has exactly one owner. The orchestrator
 | Concern | Owner | Notes |
 | --- | --- | --- |
 | Public props | `Carousel.tsx` | Frozen contract, declared in `types.ts`. |
+| User environment | host application | Injected via the `userEnvironment` prop. The carousel never detects `prefers-reduced-motion` / touch / data-saver itself; the host reads them (recommended: `useUserEnvironment` in `shared`) and passes a stable object in. |
 | Resolved runtime config | `useCarouselConfig` | One memo. Substitutes defaults only for `undefined` props; never normalises explicit values. Motion-profile share normalization happens later inside the profile builder, not in config. |
 | Slide records | `useCarouselSlideDeck` | Builds slide records, optionally extends to fill perfect pages. |
 | Layout facts | `useCarouselSlideDeck` | `length`, `visibleSlidesCount`, `pageCount`, `virtualLength`, `canSlide`, `isFinite`, `dataKey`. |
@@ -794,6 +809,18 @@ dependencies, the architecture has held.
 
 ## 10. Trade-offs
 
+- **Environment is injected, not self-detected.** The carousel never reads
+  `matchMedia` / `navigator` itself; `reducedMotion` / `touch` / `dataSaver`
+  arrive through the `userEnvironment` prop. This keeps the component a pure
+  function of its props — trivially SSR-safe and testable without mocking
+  globals — and gives the host one environment source. The trade-off is the
+  loss of zero-config behaviour: a host that fails to wire `useUserEnvironment`
+  gets full motion (no `prefers-reduced-motion` respect), desktop behaviour,
+  and no data-saver skip. That omission is made loud by the Diagnostic slot
+  rather than silently repaired — consistent with the observe-only philosophy.
+  If the carousel is ever extracted into a standalone library consumed by
+  unknown hosts, reinstate an internal `prefers-reduced-motion` fallback for
+  the accessibility-critical signal.
 - **Per-frame mutation in track binding and PaginationWidget.**
   Deliberately bypasses React rendering. The trade-off is that DOM
   manipulation lives outside React's reconciler; the alternative (state
