@@ -1,6 +1,7 @@
 import type {
   MotionCompletionMode,
   MotionController,
+  MotionHandoff,
   MotionSample,
   MotionSegmentBase,
   MotionSegmentSampler,
@@ -138,11 +139,18 @@ export function createMotionController<Strategy extends string = string>(
   };
 
   return {
-    read(timestamp = now()) {
-      if (!active) return sample;
-      const next = sampleActive(timestamp);
-      sample = next;
-      return next;
+    captureHandoff(timestamp = now()): MotionHandoff<Strategy> {
+      // One coherent point: position and velocity from the SAME sample of the
+      // active curve (or the resting sample when idle). No emit, no cancel, no
+      // subscriber notification — just the math.
+      const point = active ? sampleActive(timestamp) : sample;
+      if (active) sample = point;
+      return {
+        position: point.value,
+        velocity: point.velocity,
+        strategy: point.strategy,
+        timestamp,
+      };
     },
 
     getSnapshot() {
@@ -240,6 +248,12 @@ export function createMotionController<Strategy extends string = string>(
       });
     },
 
+    /**
+     * Soft, idempotent teardown: cancels any active motion and clears
+     * subscribers. The controller stays usable afterwards — `start`,
+     * `subscribe`, `captureHandoff` all work — so a React StrictMode
+     * unmount/remount can reuse the same instance. Call on real unmount.
+     */
     destroy() {
       this.cancel();
       subscribers.clear();

@@ -4,5 +4,6 @@ export type {
   MotionController,
   MotionSample,
   MotionSampleData,
+  MotionHandoff,
   MotionPhase,
 } from "./types";

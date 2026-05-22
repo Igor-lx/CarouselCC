@@ -32,20 +32,10 @@ interface UseMotionRunnerInput {
 /**
  * Number of RAF ticks the runner waits before swapping the active segment for
  * a click that lands during motion. The old segment keeps painting during the
- * window. At the deferred boundary we read the last emitted visual position
- * and the instantaneous velocity of the old curve, then start the successor
- * from there.
+ * window. At the deferred boundary the successor segment starts from one
+ * atomic `captureHandoff` point of the old curve.
  */
 const RETARGET_FRAME_DELAY = 2;
-
-const buildStartFromVisualHandoff = (
-  visualSample: MotionSample<CarouselMotionStrategy>,
-  velocitySample: MotionSample<CarouselMotionStrategy>,
-): MotionStart => ({
-  position: visualSample.value,
-  velocity: velocitySample.velocity,
-  strategy: visualSample.strategy,
-});
 
 /**
  * Origin of a post-drag release segment. Drag writes are published into the
@@ -73,13 +63,12 @@ const buildStartFromState = (
  * controller.
  *
  * Mid-flight retargets keep the old segment painting for a tiny frame-boundary
- * window. At the boundary, the successor segment uses:
- * - position from the last emitted visual frame (`controller.getSnapshot()`),
- * - velocity from a fresh sample of the active curve,
- * - time from the successor segment's own start frame.
+ * window. At the boundary, the successor segment starts from a single atomic
+ * `controller.captureHandoff(t)` — a coherent `(position, velocity)` taken
+ * from the *same* sample of the old curve. Position and velocity can no longer
+ * be sourced from two different moments (see motion §4.2).
  *
- * That preserves the painted position while retaining the in-flight velocity.
- * Every segment - first click, repeated click, gesture release - now drives
+ * Every segment - first click, repeated click, gesture release - drives
  * directly to `state.virtualIndex`. There is no intermediate destination and
  * no chained follow-up segment.
  */
@@ -194,7 +183,7 @@ export function useMotionRunner({
 
     const startedNow = performance.now();
     const isActive = controller.isActive();
-    const currentSample = isActive ? null : controller.read(startedNow);
+    const coldHandoff = isActive ? null : controller.captureHandoff(startedNow);
 
     const startResolvedMotion = (
       resolvedStart: MotionStart,
@@ -241,13 +230,16 @@ export function useMotionRunner({
 
     if (isActive) {
       scheduleDeferredRetarget((retargetTimestamp) => {
-        const retargetVisualSample = controller.getSnapshot();
-        const retargetVelocitySample = controller.read(retargetTimestamp);
-        const retargetStart = buildStartFromVisualHandoff(
-          retargetVisualSample,
-          retargetVelocitySample,
+        // One atomic point: position + velocity + time from the same sample.
+        const handoff = controller.captureHandoff(retargetTimestamp);
+        startResolvedMotion(
+          {
+            position: handoff.position,
+            velocity: handoff.velocity,
+            strategy: handoff.strategy,
+          },
+          handoff.timestamp,
         );
-        startResolvedMotion(retargetStart, retargetTimestamp);
       });
       return;
     }
@@ -259,8 +251,11 @@ export function useMotionRunner({
       return;
     }
 
+    // Cold start from idle: the logical origin is owned by the reducer
+    // (`state.fromVirtualIndex`); only the residual velocity comes from the
+    // controller. That cross-layer split is intentional — not a mixed handoff.
     startResolvedMotion(
-      buildStartFromState(state, currentSample?.velocity ?? 0),
+      buildStartFromState(state, coldHandoff?.velocity ?? 0),
       startedNow,
     );
   }, [
