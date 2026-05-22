@@ -8,6 +8,9 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --pretty",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },
@@ -22,9 +25,12 @@
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "@vitest/coverage-v8": "^3.2.4",
     "gh-pages": "^6.3.0",
+    "jsdom": "^25.0.1",
     "sass-embedded": "^1.89.2",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^3.2.4"
   }
 }
