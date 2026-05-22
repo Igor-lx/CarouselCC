@@ -195,3 +195,31 @@ describe("prune", () => {
     expect(store.getSnapshot("owned").status).toBe("loaded");
   });
 });
+
+describe("soft lifecycle / reuse after dispose", () => {
+  it("stays usable after dispose() — render status still records", () => {
+    store.dispose();
+    store.reportLoaded("u");
+    expect(store.getSnapshot("u").status).toBe("loaded");
+  });
+
+  it("stays usable after dispose() — warm-up still opens", () => {
+    store.dispose();
+    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
+    expect(FakeImage.instances).toHaveLength(1);
+  });
+
+  it("stays usable after dispose() — retry is still scheduled", () => {
+    vi.useFakeTimers();
+    store.dispose();
+    store.reportError("u");
+    store.requestRetry("u");
+    vi.advanceTimersByTime(IMAGE_RETRY_BASE_DELAY_MS);
+    expect(store.getSnapshot("u").status).toBe("loading");
+  });
+
+  it("dispose() is idempotent", () => {
+    store.dispose();
+    expect(() => store.dispose()).not.toThrow();
+  });
+});

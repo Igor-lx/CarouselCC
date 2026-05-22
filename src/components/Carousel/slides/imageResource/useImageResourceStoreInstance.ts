@@ -10,8 +10,13 @@ import type { ImageResourceStore } from "./types";
  * carousel renders image content (`isContentImg`). While `enabled` is false
  * nothing is allocated and `null` is returned: no store, no maps, no timers,
  * no fetches, no decodes. Once created the store is kept (a later
- * `isContentImg` toggle does not churn it) and disposed on unmount, which
- * releases every offscreen image, retry timer, and idle callback.
+ * `isContentImg` toggle does not churn it).
+ *
+ * The cleanup `dispose()`s the store. `dispose()` is a *soft* reset — it frees
+ * every heavyweight resource but the instance stays usable — so the ref is
+ * deliberately NOT nulled: a React StrictMode unmount/remount reuses the same
+ * store (re-populated by the re-run preload/observe effects) instead of
+ * swapping in a fresh one, which would lose accumulated render status.
  */
 export function useImageResourceStoreInstance(
   enabled: boolean,

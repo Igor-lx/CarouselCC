@@ -5,17 +5,17 @@ import type { MotionController } from "./types";
 /**
  * Owns one `MotionController` for the lifetime of the host component.
  *
- * The lazy-ref + null-on-cleanup pattern is deliberate, and is *not* a
- * `useState` initializer:
- *  - `useRef(null)` + a guarded assignment creates the controller exactly
- *    once per mount with no per-render allocation;
- *  - the cleanup `destroy()`s the controller AND nulls the ref, so a
- *    Strict Mode unmount/remount (or any genuine remount) re-creates a fresh
- *    controller on the next render instead of handing back a destroyed one.
+ * Lazy-ref pattern: `useRef(null)` + a guarded assignment creates the
+ * controller exactly once per component instance, with no per-render
+ * allocation. The cleanup `destroy()`s it but does NOT null the ref —
+ * `destroy()` is a *soft* reset (cancels motion, clears subscribers; the
+ * instance stays usable). So a React StrictMode unmount/remount reuses the
+ * same controller — re-subscribed by the re-run consumer effects — instead of
+ * swapping in a fresh one. A genuine remount is a new component instance with
+ * a fresh ref, so it gets its own controller naturally.
  *
- * A `useState(() => create())` initializer cannot do the second part — it
- * runs once and would keep returning the destroyed instance after the Strict
- * Mode cleanup. Keep this shape.
+ * This mirrors `useImageResourceStoreInstance`: both own a soft-disposable
+ * resource under the same lifecycle contract.
  */
 export function useMotionController<Strategy extends string = string>(
   initialValue = 0,
@@ -27,13 +27,7 @@ export function useMotionController<Strategy extends string = string>(
     ref.current = createMotionController(initialValue, initialStrategy);
   }
 
-  useEffect(
-    () => () => {
-      ref.current?.destroy();
-      ref.current = null;
-    },
-    [],
-  );
+  useEffect(() => () => ref.current?.destroy(), []);
 
   return ref.current;
 }

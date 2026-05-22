@@ -110,7 +110,6 @@ export function createImageResourceStore(): ImageResourceStore {
   let idleTimer: number | null = null;
   let nextPreparationSessionId = 0;
   let activePreparationSession: PreparationSession | null = null;
-  let disposed = false;
 
   const notify = (url: string): void => {
     const set = listeners.get(url);
@@ -300,7 +299,7 @@ export function createImageResourceStore(): ImageResourceStore {
 
   function pumpDecodeQueue(): void {
     const session = activePreparationSession;
-    if (!canUseDom || disposed || session === null) return;
+    if (!canUseDom || session === null) return;
     if (idleHandle !== null || idleTimer !== null) return;
     if (decodeQueue.length === 0) return;
 
@@ -390,14 +389,11 @@ export function createImageResourceStore(): ImageResourceStore {
     element.decoding = "async";
     element.fetchPriority = PRELOAD_FETCH_PRIORITY;
 
-    element.onload = () => {
-      if (disposed) return;
-      handleWarmupLoaded(entry, url, sessionId);
-    };
-    element.onerror = () => {
-      if (disposed) return;
-      handleWarmupError(entry, sessionId);
-    };
+    // `dispose()` detaches these handlers via `releaseWarmupElement` and the
+    // session-id check below guards a late callback, so no disposed-flag gate
+    // is needed here.
+    element.onload = () => handleWarmupLoaded(entry, url, sessionId);
+    element.onerror = () => handleWarmupError(entry, sessionId);
 
     element.src = url;
 
@@ -506,7 +502,7 @@ export function createImageResourceStore(): ImageResourceStore {
     },
 
     syncPreparationWindow(preparationWindow: ImagePreparationWindow) {
-      if (!canUseDom || disposed) return;
+      if (!canUseDom) return;
 
       if (!preparationWindow.enabled || preparationWindow.urls.length === 0) {
         closePreparationSession();
@@ -532,7 +528,7 @@ export function createImageResourceStore(): ImageResourceStore {
     },
 
     requestRetry(url) {
-      if (!canUseDom || disposed) return;
+      if (!canUseDom) return;
       const entry = entries.get(url);
       if (!entry || entry.status !== "error") return;
       if (entry.retryTimer !== null) return; // a retry is already scheduled
@@ -545,7 +541,9 @@ export function createImageResourceStore(): ImageResourceStore {
 
       entry.retryTimer = window.setTimeout(() => {
         entry.retryTimer = null;
-        if (disposed || entry.status !== "error") return;
+        // `dispose()` clears this timer via `releaseEntry`, so a fired
+        // callback always belongs to a live store.
+        if (entry.status !== "error") return;
         // Flip to `loading` and bump the generation: the subscribed slide
         // remounts its `<img>` (new `key`) and the fresh element re-fetches.
         // Its `onLoad`/`onError` then report the real outcome back here.
@@ -570,7 +568,14 @@ export function createImageResourceStore(): ImageResourceStore {
     },
 
     dispose() {
-      disposed = true;
+      // Soft, idempotent teardown: releases every heavyweight resource
+      // (retry timers, warm-up `Image` handles, the idle-decode callback) and
+      // empties the maps — but the store stays usable. A subsequent call to
+      // `observe` / `syncPreparationWindow` / `requestRetry` simply
+      // re-populates it. This mirrors `MotionController.destroy()` and is what
+      // lets a React StrictMode unmount/remount reuse the same instance
+      // without stranding a dead store. Call on real unmount; harmless on the
+      // StrictMode fake unmount.
       cancelScheduledDecode();
       entries.forEach(releaseEntry);
       entries.clear();

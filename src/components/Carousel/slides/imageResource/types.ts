@@ -72,6 +72,11 @@ export interface ImageResourceStore {
   requestRetry(url: string): void;
   /** Drop every tracked URL outside `allowed`, releasing its heavy resources. */
   prune(allowed: readonly string[]): void;
-  /** Release every timer, idle callback, and DOM element. Call on unmount. */
+  /**
+   * Release every timer, idle callback, and DOM element. A *soft*, idempotent
+   * reset — the store stays usable afterwards and re-populates on next use, so
+   * a React StrictMode unmount/remount reuses the same instance. Call on real
+   * unmount.
+   */
   dispose(): void;
 }
