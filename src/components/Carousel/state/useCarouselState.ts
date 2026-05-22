@@ -35,7 +35,7 @@ export function useCarouselState({
     layout,
     buildInitialState,
   );
-  const state = useMemo(
+  const effectiveState = useMemo(
     () => reconcileStateToLayout(committedState, layout),
     [committedState, layout],
   );
@@ -65,9 +65,9 @@ export function useCarouselState({
   }, []);
 
   const status = useMemo(
-    () => motionStatus(state.motionPhase),
-    [state.motionPhase],
+    () => motionStatus(effectiveState.motionPhase),
+    [effectiveState.motionPhase],
   );
 
-  return { state, status, dispatch };
+  return { state: effectiveState, status, dispatch };
 }
