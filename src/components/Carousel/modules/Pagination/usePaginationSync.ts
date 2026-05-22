@@ -1,11 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 
+import type { MoveReason } from "../../state";
+
 interface UsePaginationSyncInput {
   targetPageIndex: number;
   autoplayMotionDuration: number;
   shouldSyncInstantly: boolean;
   autoplayPaginationFactor: number;
 }
+
+/**
+ * Whether the pagination dot should jump straight to the target page instead
+ * of waiting out the autoplay delay.
+ *
+ * Instant for every non-autoplay move — clicks, gestures, the initial state —
+ * and whenever reduced motion is on. An autoplay move always observes the
+ * delay, *including a finite-mode loop-back* (which travels via `GO_TO`): the
+ * dot-rolling semantics are the same for an ordinary autoplay step and the
+ * loop-back jump. A user-initiated `GO_TO` is non-autoplay, so it is already
+ * covered by the first clause and needs no separate jump term.
+ */
+export const resolvePaginationInstantSync = (
+  moveReason: MoveReason | null,
+  isReducedMotion: boolean,
+): boolean => moveReason !== "autoplay" || isReducedMotion;
 
 const resolveDelay = (autoplayMotionDuration: number, factor: number) => {
   if (!Number.isFinite(autoplayMotionDuration) || autoplayMotionDuration <= 0) {

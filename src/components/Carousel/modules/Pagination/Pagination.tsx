@@ -5,14 +5,13 @@ import { useCarouselModuleContext } from "../../context";
 import type { CarouselSlotComponent } from "../../slots";
 import { PaginationDot } from "./PaginationDot";
 import styles from "./Pagination.module.scss";
-import { usePaginationSync } from "./usePaginationSync";
+import { resolvePaginationInstantSync, usePaginationSync } from "./usePaginationSync";
 import type { PaginationProps } from "./types";
 
 const PaginationBase = memo(function Pagination({ className }: PaginationProps) {
   const {
     intent,
     layout,
-    status,
     navigation,
   } = useCarouselModuleContext();
 
@@ -21,8 +20,10 @@ const PaginationBase = memo(function Pagination({ className }: PaginationProps) 
     [className],
   );
 
-  const shouldSyncInstantly =
-    intent.moveReason !== "autoplay" || status.isJumping || layout.isReducedMotion;
+  const shouldSyncInstantly = resolvePaginationInstantSync(
+    intent.moveReason,
+    layout.isReducedMotion,
+  );
 
   const displayedPageIndex = usePaginationSync({
     targetPageIndex: intent.targetPageIndex,
