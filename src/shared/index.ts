@@ -2,6 +2,8 @@ export { useIsomorphicLayoutEffect } from "./hooks/useIsomorphicLayoutEffect";
 export { useIsTouchDevice } from "./hooks/useIsTouchDevice";
 export { useIsReducedMotion } from "./hooks/useIsReducedMotion";
 export { useDataSaver } from "./hooks/useDataSaver";
+export { useUserEnvironment } from "./hooks/useUserEnvironment";
+export type { UserEnvironment } from "./hooks/useUserEnvironment";
 export { useBreakpoint } from "./hooks/useBreakpoint";
 export type { Breakpoint } from "./hooks/useBreakpoint";
 export { useViewportVisibility } from "./hooks/useViewportVisibility";
