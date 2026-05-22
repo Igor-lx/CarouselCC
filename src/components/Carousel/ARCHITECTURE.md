@@ -562,16 +562,33 @@ union:
   — pagination click / autoplay loop-back / external jump.
 - `MOTION_SETTLED { settledPosition }` — fired by the motion runner when the
   controller completes.
+- `LAYOUT_SYNC {}` — fired by `useCarouselState` from a layout-phase effect
+  when the `layout` prop changes (resize, slidesData replace, isFinite
+  toggle). Carries no payload; the new layout rides in on the `context`
+  envelope and the transition is exactly the layout reconciliation. See
+  ADR-001 below.
 
 `motionPhase` is a discriminated union:
 `"idle" | "step-normal" | "step-jump" | "step-snap" | "step-instant" | "dragging"`.
 
-`moveReason` is `"click" | "gesture" | "autoplay" | "unknown"`.
+`moveReason` is `"click" | "gesture" | "autoplay" | null` — `null` is the
+pre-action initial state, before the carousel has moved for any reason.
 
 The reducer is pure. Layout / config / instant-mode flow in as a
-`context` envelope on every dispatch. Layout reconciliation runs at the
-top of every transition so a layout change (resize, slidesData replace)
-collapses cleanly to an instant snap.
+`context` envelope on every dispatch. Layout reconciliation
+(`reconcileStateToLayout`) runs at the top of every transition so a layout
+change collapses cleanly to an instant snap.
+
+**ADR-001 — single physical reconcile.** `CarouselLayout` is derived from
+props that change in the render phase without any dispatch. Rather than
+reconcile in two places (a render-time memo *and* the reducer), layout
+changes are turned into an explicit `LAYOUT_SYNC` dispatch fired from a
+layout-phase effect. The reconciliation itself happens only inside the
+reducer; `useCarouselState` returns the raw reducer state directly with no
+parallel render-time reconcile. Because the dispatch is fired in the layout
+phase, React flushes the synced re-render before paint, so no frame ever
+shows state lagging the layout. `reconcileStateToLayout` must stay
+idempotent for this to hold — a DEV assertion in the reducer guards it.
 
 ---
 
@@ -618,6 +635,13 @@ context. During autoplay, dot switching is delayed by
 `autoplayMotionDuration * autoplayPaginationFactor` via `usePaginationSync`. On
 click, `navigation.handlePageSelect(pageIndex)` is dispatched as `GO_TO`.
 
+The pagination wrapper carries `aria-hidden="true"`; the dots are pointer
+click-targets but are not exposed to assistive tech. Page indication for
+screen readers is delivered on the slides themselves via `aria-current="step"`
+on the visible band. The slot renders only when the deck can slide
+(`shouldRenderPagination` gates on `canSlide`), so a single-page deck shows no
+dots — the component carries no internal `pageCount <= 1` guard of its own.
+
 ### 8.2 `<PaginationWidget />`
 
 Touch dot pagination. A fixed-width odd-count strip (5 dots default) with
@@ -646,7 +670,18 @@ and runs check sets under `modules/Diagnostic/checks/`:
   `canSlide`/`pageCount` invariants).
 - `widgetChecks` — PaginationWidget prop sanity.
 
-Output format: `[Carousel Diagnostic][CRITICAL|LOGICAL] <description> — <consequence>`.
+Output format (one line per warning, built by `formatter.ts`):
+
+```
+[Carousel Diagnostic][SEVERITY] <Layer> -> <field> has value <actual>. \
+[Runtime normalizes it to <normalizedTo>.] <Expected …>. <Consequence>. \
+Diagnostics is observe-only and does not apply runtime changes.
+```
+
+`SEVERITY` is `CRITICAL` or `LOGICAL`. The `normalizedTo` clause appears only
+when runtime applies an explicit normalization (the overallocated
+acceleration/deceleration profile share). Warnings are deduplicated by
+signature across renders.
 
 ---
 
@@ -799,12 +834,18 @@ dependencies, the architecture has held.
 
 - **TypeScript.** Discriminated unions for `CarouselCommand`,
   `MotionPhase`, `MoveReason`, `CarouselSegment`, `CarouselMotionIntent`.
-  No `any`. Public props validated via Zod at module load (`zod.function`
-  signatures for callbacks).
+  No `any`.
+- **Public Zod schemas.** `CarouselPropsSchema` and `CarouselSlidesDataSchema`
+  are exported (see `index.ts`) for the **host application** to validate data
+  from external sources — API responses, CMS, user config — before passing it
+  as `slidesData`. The component itself does **not** runtime-validate its own
+  props: invalid input propagates and is surfaced by the `Diagnostic` slot as
+  DEV-only warnings, keeping the failure mode visible at the source. The
+  schemas are a tool for the host, intentionally unused inside the component.
 - **React safety.** Per-frame work never touches React state. State
   machine dispatches are batched by React. Effects are pure; cleanup is
-  explicit. `useIsomorphicLayoutEffect` is used only for DOM measurement
-  and subscription wiring.
+  explicit. `useIsomorphicLayoutEffect` is used for DOM measurement,
+  subscription wiring, and the ADR-001 `LAYOUT_SYNC` dispatch.
 - **Strict Mode.** The motion controller cleanups handle remount; the
   visual position subscription returns a cleanup that disconnects from
   the controller.
