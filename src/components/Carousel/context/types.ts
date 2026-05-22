@@ -57,6 +57,7 @@ export interface CarouselDiagnosticContextValue {
     jumpSpeedMultiplier: unknown;
     intervalAutoplay: unknown;
     errAltPlaceholder: unknown;
+    userEnvironment: unknown;
   };
   layout: {
     rawLength: number;

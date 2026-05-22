@@ -122,5 +122,61 @@ export const collectPropWarnings = (
     });
   }
 
+  out.push(...collectEnvironmentWarnings(props.userEnvironment));
+
+  return out;
+};
+
+const ENVIRONMENT_LAYER = "Environment";
+
+/** Read one field of the untyped `userEnvironment` prop. */
+const readEnvironmentField = (environment: unknown, field: string): unknown =>
+  typeof environment === "object" && environment !== null
+    ? (environment as Record<string, unknown>)[field]
+    : undefined;
+
+const ENVIRONMENT_FIELDS: ReadonlyArray<{ field: string; consequence: string }> = [
+  {
+    field: "reducedMotion",
+    consequence:
+      "Transitions will not respect the user's prefers-reduced-motion setting (accessibility regression)",
+  },
+  {
+    field: "touch",
+    consequence:
+      "Gesture eligibility and touch-only control visibility fall back to desktop behaviour",
+  },
+  {
+    field: "dataSaver",
+    consequence:
+      "Speculative image warm-up is not skipped for users who opted into reduced data usage",
+  },
+];
+
+/**
+ * The carousel does not detect the environment itself — the host must inject
+ * it via the `userEnvironment` prop (see `useUserEnvironment` in `shared`).
+ * A missing object, or a missing field, is reported here rather than silently
+ * defaulted, so the wiring gap is visible.
+ */
+const collectEnvironmentWarnings = (
+  environment: unknown,
+): CarouselDiagnosticWarning[] => {
+  const out: CarouselDiagnosticWarning[] = [];
+
+  for (const { field, consequence } of ENVIRONMENT_FIELDS) {
+    const value = readEnvironmentField(environment, field);
+    if (typeof value === "boolean") continue;
+    out.push({
+      severity: "LOGICAL",
+      layer: ENVIRONMENT_LAYER,
+      field: `userEnvironment.${field}`,
+      actual: value,
+      expected:
+        "Expected a boolean — wire shared/useUserEnvironment in the host and pass its result as the userEnvironment prop",
+      consequence: `${consequence}; the carousel treats the missing signal as false`,
+    });
+  }
+
   return out;
 };
