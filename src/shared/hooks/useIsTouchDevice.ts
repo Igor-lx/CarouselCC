@@ -43,6 +43,10 @@ const subscribe = (callback: () => void) => {
       mediaQuery.removeEventListener("change", onMediaChange);
       window.removeEventListener("pointerdown", onPointerDown);
       mediaQuery = null;
+      // Reset to the declared initial state so a later re-subscribe starts
+      // clean, mirroring `useDataSaver`'s teardown. The next `subscribe` re-
+      // reads `matchMedia`, so this only governs the no-listener gap.
+      isTouch = false;
     }
   };
 };

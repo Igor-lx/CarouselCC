@@ -4,7 +4,6 @@ export interface CarouselLayout {
   length: number;
   visibleSlidesCount: number;
   virtualLength: number;
-  totalVirtual: number;
   pageCount: number;
   canSlide: boolean;
   isFinite: boolean;

@@ -13,7 +13,7 @@ const BEZIER_REGEX =
 
 export const carouselEasingString = (
   motionPhase: MotionPhase,
-  moveReason: MoveReason,
+  moveReason: MoveReason | null,
 ): string => {
   if (motionPhase === "step-snap") return SNAP_BACK_BEZIER;
 

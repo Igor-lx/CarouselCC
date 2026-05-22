@@ -6,9 +6,11 @@ import {
 import { buildInitialState } from "./initial";
 import { ZERO_GESTURE_RELEASE, type CarouselState } from "./types";
 
+// `dataKey` identifies the record sequence (so it pins `length`), and with
+// `visibleSlidesCount` it fully determines `canSlide` and `virtualLength`.
+// Comparing these four fields is therefore a complete layout-equivalence check.
 const sameLayout = (a: CarouselLayout, b: CarouselLayout) =>
   a.dataKey === b.dataKey &&
-  a.totalVirtual === b.totalVirtual &&
   a.visibleSlidesCount === b.visibleSlidesCount &&
   a.isFinite === b.isFinite &&
   a.pageCount === b.pageCount;

@@ -11,8 +11,8 @@ interface UseCarouselNavigationInput {
 }
 
 export interface CarouselNavigation {
-  move: (step: number, reason?: MoveReason) => void;
-  goTo: (pageIndex: number, reason?: MoveReason) => void;
+  move: (step: number, reason: MoveReason) => void;
+  goTo: (pageIndex: number, reason: MoveReason) => void;
   handlePrev: () => void;
   handleNext: () => void;
   handlePageSelect: (pageIndex: number) => void;
@@ -26,7 +26,7 @@ export function useCarouselNavigation({
   onSlideClick,
 }: UseCarouselNavigationInput): CarouselNavigation {
   const move = useCallback(
-    (step: number, reason: MoveReason = "unknown") => {
+    (step: number, reason: MoveReason) => {
       if (!enabled) return;
       dispatch({
         type: "MOVE",
@@ -39,7 +39,7 @@ export function useCarouselNavigation({
   );
 
   const goTo = useCallback(
-    (pageIndex: number, reason: MoveReason = "unknown") => {
+    (pageIndex: number, reason: MoveReason) => {
       if (!enabled) return;
       dispatch({
         type: "GO_TO",

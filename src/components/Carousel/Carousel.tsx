@@ -33,7 +33,7 @@ import {
   useSlideRenderModel,
 } from "./slides";
 import { CAROUSEL_SLOTS } from "./slots";
-import { motionStatus, useCarouselState } from "./state";
+import { useCarouselState } from "./state";
 import {
   SLIDE_CLASS_KEYS,
   type CarouselProps,
@@ -148,12 +148,11 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   const trackRef = useRef<HTMLDivElement>(null);
 
   // --- track DOM bridge -----------------------------------------------------
-  const { applyTrackPosition, readCurrentPosition, getSlotSize } = useTrackBinding({
+  const { readCurrentPosition, getSlotSize } = useTrackBinding({
     trackRef,
     renderWindowStart,
     visibleSlidesCount: layout.visibleSlidesCount,
     visualPosition,
-    applyVisualPosition: applyImmediatePosition,
   });
 
   // --- motion execution: state -> controller, autoplay duration signal -----
@@ -182,7 +181,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     layout,
     dispatch,
     readCurrentPosition,
-    applyTrackPosition,
+    applyTrackPosition: applyImmediatePosition,
     getSlotSize,
     config,
   });
@@ -230,7 +229,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
 
   const moduleContextValue = useModuleContextValue({
     state,
-    status: useMemo(() => motionStatus(state.motionPhase), [state.motionPhase]),
+    status,
     config,
     navigation,
     isTouch,
@@ -245,50 +244,69 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // --- diagnostic context ---------------------------------------------------
   // Carries raw props + observable layout/slot state. The carousel uses the
   // resolved runtime config regardless of this context — diagnostics never
-  // feeds back into runtime.
-  const diagnosticContextValue = useMemo(
+  // feeds back into runtime. The three sub-views are memoised independently so
+  // a change in one (e.g. a slot toggle) leaves the others referentially
+  // stable.
+  const diagnosticPropsView = useMemo(
     () => ({
-      props: {
-        visibleSlidesNr,
-        durationAutoplay,
-        durationStep,
-        jumpSpeedMultiplier,
-        intervalAutoplay,
-        errAltPlaceholder,
-      },
-      layout: {
-        rawLength: perfectPageLayoutInfo.rawLength,
-        extendedLength: perfectPageLayoutInfo.extendedLength,
-        didExtendLayout: perfectPageLayoutInfo.didExtendLayout,
-        hasPerfectPageLayout: perfectPageLayoutInfo.hasPerfectPageLayout,
-        visibleSlidesCount: layout.visibleSlidesCount,
-        canSlide: layout.canSlide,
-      },
-      slots: {
-        isControlsOn,
-        hasControlsSlot: renderPolicy.hasControlsSlot,
-        isPaginationOn,
-        hasPaginationSlot: renderPolicy.hasPaginationSlot,
-      },
+      visibleSlidesNr,
+      durationAutoplay,
+      durationStep,
+      jumpSpeedMultiplier,
+      intervalAutoplay,
+      errAltPlaceholder,
     }),
     [
       durationAutoplay,
-      jumpSpeedMultiplier,
       durationStep,
       errAltPlaceholder,
       intervalAutoplay,
-      isControlsOn,
-      isPaginationOn,
+      jumpSpeedMultiplier,
+      visibleSlidesNr,
+    ],
+  );
+
+  const diagnosticLayoutView = useMemo(
+    () => ({
+      rawLength: perfectPageLayoutInfo.rawLength,
+      extendedLength: perfectPageLayoutInfo.extendedLength,
+      didExtendLayout: perfectPageLayoutInfo.didExtendLayout,
+      hasPerfectPageLayout: perfectPageLayoutInfo.hasPerfectPageLayout,
+      visibleSlidesCount: layout.visibleSlidesCount,
+      canSlide: layout.canSlide,
+    }),
+    [
       layout.canSlide,
       layout.visibleSlidesCount,
       perfectPageLayoutInfo.didExtendLayout,
       perfectPageLayoutInfo.extendedLength,
       perfectPageLayoutInfo.hasPerfectPageLayout,
       perfectPageLayoutInfo.rawLength,
+    ],
+  );
+
+  const diagnosticSlotsView = useMemo(
+    () => ({
+      isControlsOn,
+      hasControlsSlot: renderPolicy.hasControlsSlot,
+      isPaginationOn,
+      hasPaginationSlot: renderPolicy.hasPaginationSlot,
+    }),
+    [
+      isControlsOn,
+      isPaginationOn,
       renderPolicy.hasControlsSlot,
       renderPolicy.hasPaginationSlot,
-      visibleSlidesNr,
     ],
+  );
+
+  const diagnosticContextValue = useMemo(
+    () => ({
+      props: diagnosticPropsView,
+      layout: diagnosticLayoutView,
+      slots: diagnosticSlotsView,
+    }),
+    [diagnosticLayoutView, diagnosticPropsView, diagnosticSlotsView],
   );
 
   // --- style mapping --------------------------------------------------------

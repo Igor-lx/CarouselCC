@@ -18,9 +18,7 @@ export const buildCarouselLayout = (
   const effectiveVisible = clampedVisibleSlidesCount(length, visibleSlidesCount);
   const canSlide = length > effectiveVisible;
   const pageCount = effectiveVisible > 0 ? Math.ceil(length / effectiveVisible) : 0;
-  const cloneCount = canSlide && !isFinite ? effectiveVisible : 0;
   const virtualLength = canSlide && !isFinite ? pageCount * effectiveVisible : length;
-  const totalVirtual = canSlide && !isFinite ? virtualLength + cloneCount * 2 : length;
   const dataKey = records
     .map((record) => `${record.slideKey}-${slideContentKey(record.slideData)}`)
     .join("|");
@@ -29,7 +27,6 @@ export const buildCarouselLayout = (
     length,
     visibleSlidesCount: effectiveVisible,
     virtualLength,
-    totalVirtual,
     pageCount,
     canSlide,
     isFinite,

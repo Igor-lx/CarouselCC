@@ -10,7 +10,7 @@ export const buildInitialState = (layout: CarouselLayout): CarouselState => ({
   isTeleportApproach: false,
   isRepeatedClickAdvance: false,
   motionPhase: "idle",
-  moveReason: "unknown",
+  moveReason: null,
   gesture: ZERO_GESTURE_RELEASE,
 });
 
@@ -19,10 +19,4 @@ export const motionStatus = (phase: CarouselState["motionPhase"]) => ({
   isMoving: phase !== "idle" && phase !== "dragging",
   isDragging: phase === "dragging",
   isJumping: phase === "step-jump",
-  isSnapping: phase === "step-snap",
-  isInstant: phase === "step-instant",
-  isAnimating:
-    phase === "step-normal" ||
-    phase === "step-jump" ||
-    phase === "step-snap",
 });

@@ -55,10 +55,14 @@ interface BuildSegmentInput {
 }
 
 export interface BuildSegmentResult {
+  /** The segment to hand to the controller. */
   segment: CarouselSegment;
-  intent: CarouselMotionIntent;
+  /**
+   * The segment's duration. Published by the runner as the autoplay-motion
+   * duration for the pagination dot delay; the controller derives its own
+   * timing from the segment.
+   */
   duration: number;
-  isInertialRelease: boolean;
 }
 
 const buildEasing = (
@@ -261,12 +265,7 @@ export function buildCarouselSegment({
       config.repeatedClick,
       moveSpeed,
     );
-    return {
-      intent,
-      duration: segment.duration,
-      isInertialRelease: false,
-      segment,
-    };
+    return { segment, duration: segment.duration };
   }
 
   if (
@@ -283,12 +282,7 @@ export function buildCarouselSegment({
       resolveJumpPeakSpeed(stepSize, config.stepDuration, config.jumpSpeedMultiplier),
       goToProfilePhase(intent),
     );
-    return {
-      intent,
-      duration: segment.duration,
-      isInertialRelease: false,
-      segment,
-    };
+    return { segment, duration: segment.duration };
   }
 
   if (intent === "gesture-release" && baseRelease?.isInertialRelease) {
@@ -299,12 +293,7 @@ export function buildCarouselSegment({
       config.releaseConfig,
       baseRelease.effectiveReleaseSpeed,
     );
-    return {
-      intent,
-      duration: segment.duration,
-      isInertialRelease: true,
-      segment,
-    };
+    return { segment, duration: segment.duration };
   }
 
   const duration = resolveEasingDuration({
@@ -322,17 +311,13 @@ export function buildCarouselSegment({
 
   if (intent === "gesture-release") {
     return {
-      intent,
-      duration,
-      isInertialRelease: false,
       segment: buildEasing(state, start, duration, startedAt, true),
+      duration,
     };
   }
 
   return {
-    intent,
-    duration,
-    isInertialRelease: false,
     segment: buildEasing(state, start, duration, startedAt, false),
+    duration,
   };
 }

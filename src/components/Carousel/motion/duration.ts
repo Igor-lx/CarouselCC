@@ -20,7 +20,7 @@ export const durationByVirtualSpan = ({
 
 interface ResolveEasingDurationInput {
   motionPhase: MotionPhase;
-  moveReason: MoveReason;
+  moveReason: MoveReason | null;
   isInstant: boolean;
   isDragging: boolean;
   segmentStartVirtualIndex: number;

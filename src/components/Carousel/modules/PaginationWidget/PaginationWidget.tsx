@@ -81,8 +81,6 @@ const PaginationWidgetBase = memo(function PaginationWidget({
     });
   }, [geometry, intent.targetPageIndex, isMotionBound, slotCount]);
 
-  if (layout.pageCount <= 1) return null;
-
   return (
     <div
       className={classNames.container_PW}

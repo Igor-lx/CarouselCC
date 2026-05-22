@@ -36,8 +36,6 @@ const PaginationBase = memo(function Pagination({ className }: PaginationProps) 
     [layout.pageCount],
   );
 
-  if (layout.pageCount <= 1) return null;
-
   return (
     <div className={classNames.paginationWrapper} aria-hidden="true">
       {pageIndexes.map((pageIndex) => (

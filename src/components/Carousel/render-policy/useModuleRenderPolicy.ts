@@ -25,12 +25,17 @@ export function useModuleRenderPolicy({
   const hasControlsSlot = Boolean(controlsSlot);
   const hasPaginationSlot = Boolean(paginationSlot);
 
+  // Controls and pagination follow one symmetric rule: a module renders only
+  // when its flag is on, its slot is attached, AND the deck can actually slide
+  // (`!canSlide` means a single page — neither edge controls nor dots have a
+  // destination). Gating both here means the slot modules never mount in a
+  // no-op state and need no internal `pageCount <= 1` guard of their own.
   return useMemo(
     () => ({
       hasControlsSlot,
       hasPaginationSlot,
       shouldRenderControls: isControlsOn && canSlide && hasControlsSlot,
-      shouldRenderPagination: isPaginationOn && hasPaginationSlot,
+      shouldRenderPagination: isPaginationOn && canSlide && hasPaginationSlot,
     }),
     [canSlide, hasControlsSlot, hasPaginationSlot, isControlsOn, isPaginationOn],
   );

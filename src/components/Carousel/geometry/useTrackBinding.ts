@@ -15,11 +15,9 @@ interface UseTrackBindingInput {
   renderWindowStart: number;
   visibleSlidesCount: number;
   visualPosition: VisualPositionSource;
-  applyVisualPosition: (position: number) => void;
 }
 
 export interface TrackBindingApi {
-  applyTrackPosition: (position: number) => void;
   readCurrentPosition: () => number;
   getSlotSize: () => number;
 }
@@ -29,22 +27,18 @@ export interface TrackBindingApi {
  * measurement (ResizeObserver + window resize) and the transform write
  * (subscribes to the visual position and mutates `transform` directly).
  * Returns a small imperative API used by the gesture adapter and the
- * navigation controller. Imperative gesture writes are published back into
- * the visual position stream so track, widgets, and motion handoff share one
- * source of truth.
+ * navigation controller.
  */
 export function useTrackBinding({
   trackRef,
   renderWindowStart,
   visibleSlidesCount,
   visualPosition,
-  applyVisualPosition,
 }: UseTrackBindingInput): TrackBindingApi {
   const renderWindowStartRef = useRef(renderWindowStart);
   const visibleSlidesCountRef = useRef(visibleSlidesCount);
   const slotSizeRef = useRef<number | null>(null);
   const lastTransformRef = useRef<string | null>(null);
-  const lastTransitionRef = useRef<string | null>(null);
   const lastMeasuredWidthRef = useRef<number | null>(null);
 
   renderWindowStartRef.current = renderWindowStart;
@@ -86,11 +80,6 @@ export function useTrackBinding({
       if (!track) return;
       const transform = resolveTransform(position);
 
-      if (lastTransitionRef.current !== "none") {
-        track.style.transition = "none";
-        lastTransitionRef.current = "none";
-      }
-
       if (lastTransformRef.current !== transform) {
         track.style.transform = transform;
         lastTransformRef.current = transform;
@@ -106,6 +95,15 @@ export function useTrackBinding({
     },
     [measure, visualPosition, writePosition],
   );
+
+  // The track is animated solely by the JS motion controller writing
+  // `transform` per RAF tick — a CSS `transition` would double-animate and
+  // fight the controller. Disable it once on mount; the track element is
+  // stable for the carousel's lifetime, so it never needs re-applying.
+  useIsomorphicLayoutEffect(() => {
+    const track = trackRef.current;
+    if (track) track.style.transition = "none";
+  }, [trackRef]);
 
   useIsomorphicLayoutEffect(() => {
     syncGeometry();
@@ -153,13 +151,6 @@ export function useTrackBinding({
     [visualPosition, writePosition],
   );
 
-  const applyTrackPosition = useCallback(
-    (position: number) => {
-      applyVisualPosition(position);
-    },
-    [applyVisualPosition],
-  );
-
   const readCurrentPosition = useCallback(
     () => visualPosition.getSnapshot().position,
     [visualPosition],
@@ -167,5 +158,5 @@ export function useTrackBinding({
 
   const getSlotSize = useCallback(() => slotSizeRef.current ?? 0, []);
 
-  return { applyTrackPosition, readCurrentPosition, getSlotSize };
+  return { readCurrentPosition, getSlotSize };
 }
