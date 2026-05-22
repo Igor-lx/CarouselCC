@@ -4,12 +4,5 @@ export type {
   MotionController,
   MotionSample,
   MotionSampleData,
-  MotionSegmentBase,
-  MotionSegmentSampler,
-  MotionSubscriber,
-  MotionCompletionMode,
   MotionPhase,
-  MotionStartOptions,
-  MotionSetOptions,
-  MotionSnapOptions,
 } from "./types";

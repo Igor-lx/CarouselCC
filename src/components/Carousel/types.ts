@@ -59,6 +59,17 @@ const OnMotionIdleStatusChangeSchema = z.function({
   output: z.void(),
 });
 
+/**
+ * Public Zod schema for `CarouselProps`, exposed for the **host application**
+ * to validate inputs from external sources (API responses, CMS, user config)
+ * before passing them into the component.
+ *
+ * The carousel itself does NOT runtime-validate its own props — invalid input
+ * propagates and is surfaced by the `Diagnostic` slot as DEV-only warnings,
+ * keeping the failure mode visible at the source rather than silently
+ * repaired. This schema is the tool a host app uses to reject bad data up
+ * front; it is intentionally unused inside the component.
+ */
 export const CarouselPropsSchema = z.object({
   slidesData: z.array(SlideSchema),
   visibleSlidesNr: z.number().optional(),
@@ -85,4 +96,9 @@ export interface CarouselProps extends z.infer<typeof CarouselPropsSchema> {
   children?: ReactNode;
 }
 
+/**
+ * Public Zod schema for the `slidesData` array alone — the most common thing
+ * a host application needs to validate (e.g. an API response) before handing
+ * it to the carousel. See {@link CarouselPropsSchema} for the rationale.
+ */
 export const CarouselSlidesDataSchema = CarouselPropsSchema.shape.slidesData;

@@ -1,5 +1,4 @@
 export { useCarouselMotionExecution } from "./useCarouselMotionExecution";
-export { buildCarouselSegment } from "./segmentFactory";
 export type {
   CarouselMotionStrategy,
   CarouselMotionIntent,

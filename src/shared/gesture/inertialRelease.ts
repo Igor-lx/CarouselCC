@@ -8,11 +8,6 @@ export interface InertialReleaseConfig {
   decelerationDistanceShare: number;
 }
 
-export const DEFAULT_INERTIAL_RELEASE_CONFIG: InertialReleaseConfig = {
-  inertiaBoost: 1,
-  decelerationDistanceShare: 0.65,
-};
-
 export interface InertialReleaseResult {
   effectiveReleaseSpeed: number;
   isInertialRelease: boolean;
