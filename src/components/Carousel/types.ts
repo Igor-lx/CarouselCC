@@ -1,4 +1,4 @@
-import type { ReactElement, ReactNode } from "react";
+import type { ReactElement, ReactNode, Ref } from "react";
 import { z } from "zod";
 
 const ReactElementSchema = z.custom<ReactElement>((value) => {
@@ -54,8 +54,27 @@ const OnSlideClickSchema = z.function({
   output: z.void(),
 });
 
-const OnMotionIdleStatusChangeSchema = z.function({
-  input: [z.boolean()],
+/**
+ * Low-frequency, read-only status handed to `onCarouselStatusChange`. Two
+ * numbers — which page, out of how many — plus the idle flag. Deliberately
+ * carries no per-frame data (position, velocity) and no reducer internals:
+ * it is a status snapshot, not an animation feed.
+ */
+export interface CarouselStatusSnapshot {
+  readonly isIdle: boolean;
+  /** 0-based index of the page the carousel is on / heading to. */
+  readonly currentPageIndex: number;
+  readonly pageCount: number;
+}
+
+const CarouselStatusSnapshotSchema = z.object({
+  isIdle: z.boolean(),
+  currentPageIndex: z.number(),
+  pageCount: z.number(),
+});
+
+const OnCarouselStatusChangeSchema = z.function({
+  input: [CarouselStatusSnapshotSchema],
   output: z.void(),
 });
 
@@ -102,11 +121,28 @@ export const CarouselPropsSchema = z.object({
   className: ClassMapSchema.optional(),
   userEnvironment: UserEnvironmentSchema.optional(),
   onSlideClick: OnSlideClickSchema.optional(),
-  onMotionIdleStatusChange: OnMotionIdleStatusChangeSchema.optional(),
+  onCarouselStatusChange: OnCarouselStatusChangeSchema.optional(),
 });
+
+/**
+ * Imperative handle for driving the carousel from outside its subtree —
+ * external buttons elsewhere on the page, or programmatic control. Minimal by
+ * design: only single-step navigation. Page jumps (`GO_TO`) stay internal,
+ * reached through the pagination slot. Both methods route through the same
+ * navigation pipeline as the built-in `<Controls>` — there is no second
+ * control path — and are safe no-ops when the deck cannot slide.
+ */
+export interface CarouselHandle {
+  /** Step one page towards the start. */
+  prev(): void;
+  /** Step one page towards the end. */
+  next(): void;
+}
 
 export interface CarouselProps extends z.infer<typeof CarouselPropsSchema> {
   children?: ReactNode;
+  /** Imperative handle — see {@link CarouselHandle}. */
+  ref?: Ref<CarouselHandle>;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef } from "react";
+import { memo, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 
 import styles from "./Carousel.module.scss";
 import {
@@ -31,9 +31,11 @@ import {
 } from "./slides";
 import { CAROUSEL_SLOTS } from "./slots";
 import { useCarouselState } from "./state";
+import { areStatusSnapshotsEqual } from "./status/statusSnapshot";
 import {
   SLIDE_CLASS_KEYS,
   type CarouselProps,
+  type CarouselStatusSnapshot,
   type SlideClassMap,
 } from "./types";
 
@@ -56,8 +58,9 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     className,
     userEnvironment,
     onSlideClick,
-    onMotionIdleStatusChange,
+    onCarouselStatusChange,
     children,
+    ref,
   } = props;
 
   // --- environment (injected, never self-detected) --------------------------
@@ -98,7 +101,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     config,
     isInstantMode,
   });
-  const lastReportedMotionIdleRef = useRef<boolean | null>(null);
+  const lastStatusSnapshotRef = useRef<CarouselStatusSnapshot | null>(null);
 
   // --- image-resource SSOT --------------------------------------------------
   // The store exists only when the carousel renders image content; with
@@ -116,12 +119,22 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     store: imageResourceStore,
   });
 
+  // Read-only, low-frequency status reported to the host. Fires on mount and
+  // whenever the idle flag, target page, or page count changes — never on a
+  // per-frame motion sample. The target page (not the settled page) is
+  // reported, so the snapshot reflects intent immediately on click/gesture.
   useEffect(() => {
-    if (!onMotionIdleStatusChange) return;
-    if (lastReportedMotionIdleRef.current === status.isIdle) return;
-    lastReportedMotionIdleRef.current = status.isIdle;
-    onMotionIdleStatusChange(status.isIdle);
-  }, [onMotionIdleStatusChange, status.isIdle]);
+    if (!onCarouselStatusChange) return;
+    const snapshot: CarouselStatusSnapshot = {
+      isIdle: status.isIdle,
+      currentPageIndex: state.targetPageIndex,
+      pageCount: layout.pageCount,
+    };
+    const previous = lastStatusSnapshotRef.current;
+    if (previous && areStatusSnapshotsEqual(previous, snapshot)) return;
+    lastStatusSnapshotRef.current = snapshot;
+    onCarouselStatusChange(snapshot);
+  }, [onCarouselStatusChange, status.isIdle, state.targetPageIndex, layout.pageCount]);
 
   // --- visual position SSOT -------------------------------------------------
   const {
@@ -172,6 +185,18 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     readCurrentPosition,
     onSlideClick,
   });
+
+  // --- imperative handle ----------------------------------------------------
+  // External prev/next control routes through the very same navigation
+  // pipeline as the built-in <Controls> — no second control path.
+  useImperativeHandle(
+    ref,
+    () => ({
+      prev: navigation.handlePrev,
+      next: navigation.handleNext,
+    }),
+    [navigation.handlePrev, navigation.handleNext],
+  );
 
   // --- gesture --------------------------------------------------------------
   const { listeners: dragListeners } = useCarouselGesture({
