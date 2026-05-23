@@ -7,6 +7,7 @@ import {
   collectLayoutWarnings,
   collectPropWarnings,
   collectSlotWarnings,
+  collectStateWarnings,
 } from "./checks";
 import type { CarouselDiagnosticWarning } from "./types";
 import { useGroupedWarnings } from "./useGroupedWarnings";
@@ -15,7 +16,7 @@ const BANNER =
   "[Carousel Diagnostic] enabled. Observe-only: diagnostics reports runtime values and explicit runtime normalizations.";
 
 const DiagnosticBase = memo(function CarouselDiagnostic() {
-  const { props, layout, slots } = useCarouselDiagnosticContext();
+  const { state, props, layout, slots } = useCarouselDiagnosticContext();
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -28,8 +29,9 @@ const DiagnosticBase = memo(function CarouselDiagnostic() {
       ...collectConstantWarnings(),
       ...collectLayoutWarnings(layout),
       ...collectSlotWarnings(slots),
+      ...collectStateWarnings(state),
     ],
-    [layout, props, slots],
+    [layout, props, slots, state],
   );
 
   useGroupedWarnings(warnings);

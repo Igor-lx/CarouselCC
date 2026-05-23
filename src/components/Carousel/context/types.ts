@@ -1,5 +1,5 @@
 import type { CarouselNavigation } from "../navigation";
-import type { MotionPhase, MoveReason } from "../state";
+import type { CarouselState, MotionPhase, MoveReason } from "../state";
 import type { VisualPositionSource } from "../position";
 
 export interface CarouselStatusView {
@@ -50,6 +50,7 @@ export interface CarouselModuleContextValue {
  * or filtered copies, otherwise its observations would diverge from reality.
  */
 export interface CarouselDiagnosticContextValue {
+  state: CarouselState;
   props: {
     visibleSlidesNr: unknown;
     durationAutoplay: unknown;
