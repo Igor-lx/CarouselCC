@@ -859,6 +859,19 @@ dependencies, the architecture has held.
   The window only shrinks back when motion settles. This avoids
   unmounting a slide mid-flight if the window edges shift; it costs at
   most one extra rendered slide pair during fast direction switches.
+- **ADR-002 - trusted runtime inputs, external validation boundary.** Public
+  props, injected environment signals, slide IDs, numeric config values, slot
+  attachment, and CSS/class overrides are treated as caller-owned runtime
+  values. The carousel applies documented defaults only for `undefined` public
+  props; it does not validate, coerce, repair, deduplicate, or enforce these
+  values during production runtime. The host application owns data hygiene
+  before render (for example with the exported Zod schemas when data comes
+  from an API, CMS, or user config). When observability is needed in
+  development, the host mounts the Diagnostic slot: it reports missing or
+  invalid inputs and invariant risks, but never feeds corrected values back
+  into the carousel. The trade-off is deliberate: invalid input should fail
+  visibly at the integration boundary, while the production component stays
+  small, predictable, and free of defensive validation branches.
 - **Diagnostic is strictly observe-only.** The runtime values the
   carousel uses do not depend on whether the Diagnostic slot is attached.
   Diagnostic never normalises, validates, repairs, or substitutes any
