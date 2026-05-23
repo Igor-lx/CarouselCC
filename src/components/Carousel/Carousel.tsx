@@ -75,7 +75,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
 
   // --- slots ----------------------------------------------------------------
   const slots = useMemo(() => resolveSlots(children, CAROUSEL_SLOTS), [children]);
-  const isDiagnosticActive = Boolean(slots.diagnostic);
 
   // --- resolved runtime config (no diagnostic dependency) ------------------
   const config = useCarouselConfig({
@@ -246,6 +245,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   const renderPolicy = useModuleRenderPolicy({
     controlsSlot: slots.controls,
     paginationSlot: slots.pagination,
+    diagnosticSlot: slots.diagnostic,
     isControlsOn,
     isPaginationOn,
     canSlide: layout.canSlide,
@@ -262,7 +262,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     visualPosition: isInstantMode ? null : visualPosition,
     isAtStart,
     isAtEnd,
-    isDiagnosticActive,
+    isDiagnosticActive: renderPolicy.shouldRenderDiagnostic,
   });
 
   // --- diagnostic context ---------------------------------------------------
@@ -425,7 +425,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
               {renderPolicy.shouldRenderControls ? slots.controls : null}
             </div>
             {renderPolicy.shouldRenderPagination ? slots.pagination : null}
-            {slots.diagnostic}
+            {renderPolicy.shouldRenderDiagnostic ? slots.diagnostic : null}
           </div>
         </CarouselImageResourceContext.Provider>
       </CarouselDiagnosticContext.Provider>
