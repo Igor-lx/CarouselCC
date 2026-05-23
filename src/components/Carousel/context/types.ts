@@ -62,6 +62,7 @@ export interface CarouselDiagnosticContextValue {
   layout: {
     rawLength: number;
     visibleSlidesCount: number;
+    pageCount: number;
     extendedLength: number;
     didExtendLayout: boolean;
     hasPerfectPageLayout: boolean;
@@ -72,5 +73,16 @@ export interface CarouselDiagnosticContextValue {
     hasControlsSlot: boolean;
     isPaginationOn: boolean;
     hasPaginationSlot: boolean;
+  };
+  /**
+   * Live reducer-state fields needed for structural-invariant checks (see
+   * `state/validateState.ts`). Diagnostic is the single emission point for
+   * these warnings; the reducer stays pure.
+   */
+  state: {
+    targetPageIndex: number;
+    motionPhase: MotionPhase;
+    teleportVirtualIndex: number | null;
+    isTeleportApproach: boolean;
   };
 }

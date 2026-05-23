@@ -1,0 +1,142 @@
+import { describe, expect, it } from "vitest";
+
+import { buildCarouselLayout, buildSlideRecords } from "../domain";
+import type { CarouselLayout } from "../domain";
+import type { Slide } from "../types";
+import { buildInitialState } from "./initial";
+import type { CarouselState } from "./types";
+import {
+  type CarouselStateIssue,
+  validateCarouselState,
+} from "./validateState";
+
+const makeLayout = (
+  slideCount: number,
+  visibleSlidesCount: number,
+  isFinite: boolean,
+): CarouselLayout => {
+  const slides: Slide[] = Array.from({ length: slideCount }, (_, i) => ({
+    id: i,
+    content: `slide-${i}`,
+  }));
+  return buildCarouselLayout(buildSlideRecords(slides), visibleSlidesCount, isFinite);
+};
+
+const layout = makeLayout(12, 3, false); // pageCount 4
+const baseState: CarouselState = buildInitialState(layout);
+
+const kinds = (issues: CarouselStateIssue[]): string[] =>
+  issues.map((issue) => issue.kind).sort();
+
+describe("validateCarouselState — valid states", () => {
+  it("returns no issues for a freshly built initial state", () => {
+    expect(validateCarouselState(baseState, layout)).toEqual([]);
+  });
+
+  it("returns no issues for a step-jump with teleportVirtualIndex set", () => {
+    const state: CarouselState = {
+      ...baseState,
+      motionPhase: "step-jump",
+      teleportVirtualIndex: 15,
+      targetPageIndex: 2,
+      virtualIndex: 6,
+    };
+    expect(validateCarouselState(state, layout)).toEqual([]);
+  });
+
+  it("returns no issues for an in-flight teleport-approach in step-jump", () => {
+    const state: CarouselState = {
+      ...baseState,
+      motionPhase: "step-jump",
+      isTeleportApproach: true,
+      targetPageIndex: 3,
+    };
+    expect(validateCarouselState(state, layout)).toEqual([]);
+  });
+});
+
+describe("validateCarouselState — out-of-bounds targetPageIndex", () => {
+  it("flags a negative targetPageIndex", () => {
+    const issues = validateCarouselState(
+      { ...baseState, targetPageIndex: -1 },
+      layout,
+    );
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.kind).toBe("out-of-bounds-target-page-index");
+    expect(issues[0]!.field).toBe("targetPageIndex");
+  });
+
+  it("flags a targetPageIndex equal to pageCount", () => {
+    const issues = validateCarouselState(
+      { ...baseState, targetPageIndex: layout.pageCount },
+      layout,
+    );
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.kind).toBe("out-of-bounds-target-page-index");
+  });
+
+  it("does not flag when pageCount is zero (empty deck — vacuously valid)", () => {
+    const emptyLayout = makeLayout(0, 3, false);
+    expect(emptyLayout.pageCount).toBe(0);
+    expect(validateCarouselState(baseState, emptyLayout)).toEqual([]);
+  });
+});
+
+describe("validateCarouselState — teleportVirtualIndex phase consistency", () => {
+  it("flags teleportVirtualIndex set in the idle phase", () => {
+    const issues = validateCarouselState(
+      { ...baseState, teleportVirtualIndex: 12 },
+      layout,
+    );
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.kind).toBe("teleport-virtual-index-outside-step-jump");
+  });
+
+  it("flags teleportVirtualIndex set during a step-normal segment", () => {
+    const issues = validateCarouselState(
+      { ...baseState, teleportVirtualIndex: 12, motionPhase: "step-normal" },
+      layout,
+    );
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.kind).toBe("teleport-virtual-index-outside-step-jump");
+  });
+});
+
+describe("validateCarouselState — isTeleportApproach phase consistency", () => {
+  it("flags isTeleportApproach set in the idle phase", () => {
+    const issues = validateCarouselState(
+      { ...baseState, isTeleportApproach: true },
+      layout,
+    );
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.kind).toBe("teleport-approach-outside-step-jump");
+  });
+
+  it("flags isTeleportApproach set during a step-snap segment", () => {
+    const issues = validateCarouselState(
+      { ...baseState, isTeleportApproach: true, motionPhase: "step-snap" },
+      layout,
+    );
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.kind).toBe("teleport-approach-outside-step-jump");
+  });
+});
+
+describe("validateCarouselState — multiple issues", () => {
+  it("collects every independent violation", () => {
+    const issues = validateCarouselState(
+      {
+        ...baseState,
+        targetPageIndex: -1,
+        teleportVirtualIndex: 12,
+        isTeleportApproach: true,
+      },
+      layout,
+    );
+    expect(kinds(issues)).toEqual([
+      "out-of-bounds-target-page-index",
+      "teleport-approach-outside-step-jump",
+      "teleport-virtual-index-outside-step-jump",
+    ]);
+  });
+});

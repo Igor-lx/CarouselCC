@@ -1,5 +1,4 @@
 import { clamp, normalizePageIndex } from "../domain";
-import type { CarouselLayout } from "../domain";
 import { resolveGoToApproachDistance } from "../motion/timing";
 import { reconcileStateToLayout } from "./reconcile";
 import {
@@ -36,7 +35,7 @@ const dragReleasePhase = (
   return command.isSnap ? "step-snap" : "step-normal";
 };
 
-function carouselReducerImpl(
+export function carouselReducer(
   state: CarouselState,
   envelope: ReducerEnvelope,
 ): CarouselState {
@@ -243,49 +242,4 @@ function carouselReducerImpl(
     default:
       return synced;
   }
-}
-
-/**
- * DEV-only structural invariants on reducer output. They guard reducer-internal
- * transition math (out-of-bounds page index, teleport-phase consistency),
- * independent of how the layout is reconciled. None should ever fire for a
- * correct transition; in production the asserts are stripped and
- * `carouselReducer` is a direct pass-through to `carouselReducerImpl`.
- */
-const assertStateInvariants = (
-  result: CarouselState,
-  layout: CarouselLayout,
-): void => {
-  if (
-    layout.pageCount > 0 &&
-    (result.targetPageIndex < 0 || result.targetPageIndex >= layout.pageCount)
-  ) {
-    console.error(
-      "[Carousel] reducer produced an out-of-bounds targetPageIndex.",
-      { targetPageIndex: result.targetPageIndex, pageCount: layout.pageCount },
-    );
-  }
-  if (result.teleportVirtualIndex !== null && result.motionPhase !== "step-jump") {
-    console.error(
-      "[Carousel] teleportVirtualIndex is set outside the step-jump phase.",
-      { motionPhase: result.motionPhase },
-    );
-  }
-  if (result.isTeleportApproach && result.motionPhase !== "step-jump") {
-    console.error(
-      "[Carousel] isTeleportApproach is set outside the step-jump phase.",
-      { motionPhase: result.motionPhase },
-    );
-  }
-};
-
-export function carouselReducer(
-  state: CarouselState,
-  envelope: ReducerEnvelope,
-): CarouselState {
-  const result = carouselReducerImpl(state, envelope);
-  if (import.meta.env.DEV) {
-    assertStateInvariants(result, envelope.context.layout);
-  }
-  return result;
 }

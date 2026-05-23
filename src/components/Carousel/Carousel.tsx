@@ -299,10 +299,12 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
       didExtendLayout: perfectPageLayoutInfo.didExtendLayout,
       hasPerfectPageLayout: perfectPageLayoutInfo.hasPerfectPageLayout,
       visibleSlidesCount: layout.visibleSlidesCount,
+      pageCount: layout.pageCount,
       canSlide: layout.canSlide,
     }),
     [
       layout.canSlide,
+      layout.pageCount,
       layout.visibleSlidesCount,
       perfectPageLayoutInfo.didExtendLayout,
       perfectPageLayoutInfo.extendedLength,
@@ -326,13 +328,37 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     ],
   );
 
+  // State sub-view for Diagnostic structural-invariant checks
+  // (validateCarouselState). Carries only the four fields the validator reads,
+  // so unrelated state changes never invalidate the diagnostic context.
+  const diagnosticStateView = useMemo(
+    () => ({
+      targetPageIndex: state.targetPageIndex,
+      motionPhase: state.motionPhase,
+      teleportVirtualIndex: state.teleportVirtualIndex,
+      isTeleportApproach: state.isTeleportApproach,
+    }),
+    [
+      state.isTeleportApproach,
+      state.motionPhase,
+      state.targetPageIndex,
+      state.teleportVirtualIndex,
+    ],
+  );
+
   const diagnosticContextValue = useMemo(
     () => ({
       props: diagnosticPropsView,
       layout: diagnosticLayoutView,
       slots: diagnosticSlotsView,
+      state: diagnosticStateView,
     }),
-    [diagnosticLayoutView, diagnosticPropsView, diagnosticSlotsView],
+    [
+      diagnosticLayoutView,
+      diagnosticPropsView,
+      diagnosticSlotsView,
+      diagnosticStateView,
+    ],
   );
 
   // --- style mapping --------------------------------------------------------

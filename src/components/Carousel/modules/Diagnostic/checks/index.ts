@@ -4,6 +4,7 @@ export {
   collectLayoutWarnings,
   collectSlotWarnings,
 } from "./layoutChecks";
+export { collectStateWarnings } from "./stateChecks";
 export {
   collectWidgetWarnings,
   type WidgetDiagnosticInput,
