@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildRawCarouselConfig } from "../config";
 import type { CarouselRuntimeConfig } from "../config";
@@ -345,5 +345,70 @@ describe("instant mode", () => {
       true,
     );
     expect(next.motionPhase).toBe("step-instant");
+  });
+});
+
+describe("DEV invariants", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("never fire across a representative transition matrix", () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const layouts = [makeLayout(30, 3, false), makeLayout(12, 3, true)];
+
+    for (const layout of layouts) {
+      let state = buildInitialState(layout);
+      state = reduce(state, {
+        type: "MOVE",
+        step: 1,
+        moveReason: "click",
+        fromVirtualIndex: 0,
+      });
+      state = reduce(state, {
+        type: "MOVE",
+        step: 1,
+        moveReason: "click",
+        fromVirtualIndex: state.virtualIndex,
+      });
+      state = reduce(state, {
+        type: "MOTION_SETTLED",
+        settledPosition: state.virtualIndex,
+      });
+      state = reduce(state, {
+        type: "GO_TO",
+        targetPageIndex: layout.pageCount - 1,
+        moveReason: "click",
+        fromVirtualIndex: state.virtualIndex,
+      });
+      state = reduce(state, {
+        type: "MOTION_SETTLED",
+        settledPosition: state.virtualIndex,
+      });
+      state = reduce(state, {
+        type: "MOTION_SETTLED",
+        settledPosition: state.virtualIndex,
+      });
+      state = reduce(state, {
+        type: "START_DRAG",
+        fromVirtualIndex: state.virtualIndex,
+        targetPageIndex: state.targetPageIndex,
+      });
+      state = reduce(state, {
+        type: "END_DRAG",
+        fromVirtualIndex: state.virtualIndex,
+        targetPageIndex: 0,
+        targetVirtualIndex: 0,
+        isSnap: false,
+        pointerReleaseVelocity: 0,
+        uiReleaseVelocity: 0,
+      });
+      state = reduce(state, {
+        type: "MOTION_SETTLED",
+        settledPosition: state.virtualIndex,
+      });
+    }
+
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 });
