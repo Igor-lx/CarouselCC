@@ -16,7 +16,7 @@ const BANNER =
   "[Carousel Diagnostic] enabled. Observe-only: diagnostics reports runtime values and explicit runtime normalizations.";
 
 const DiagnosticBase = memo(function CarouselDiagnostic() {
-  const { props, layout, slots, state } = useCarouselDiagnosticContext();
+  const { state, props, layout, slots } = useCarouselDiagnosticContext();
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
