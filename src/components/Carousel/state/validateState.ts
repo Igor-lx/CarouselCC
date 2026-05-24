@@ -1,37 +1,32 @@
-import type { MotionPhase } from "./types";
+import type { CarouselLayout } from "../domain";
+import type { CarouselState } from "./types";
 
 /**
- * Structural-invariant violations on a `(state, layout)` pair. The reducer
- * is a pure function and does not consult this validator; the `Diagnostic`
- * slot does, surfacing each violation as a DEV-only warning.
+ * Structural-invariant violations on a reducer-output / effective-state
+ * snapshot. The reducer is a pure function and does not consult this
+ * validator; the `<Diagnostic />` slot does, surfacing each violation as a
+ * DEV-only warning through the shared warning pipeline.
  *
- * `kind` is the machine-readable tag (tests assert against it). The other
- * fields carry human-readable context for the diagnostic line.
+ * `kind` is the machine-readable discriminator (tests assert against it);
+ * `field` names the single state field at fault; the remaining strings carry
+ * human-readable context for the diagnostic line.
  */
 export type CarouselStateIssueKind =
   | "out-of-bounds-target-page-index"
   | "teleport-virtual-index-outside-step-jump"
   | "teleport-approach-outside-step-jump";
 
+export type CarouselStateIssueField =
+  | "targetPageIndex"
+  | "teleportVirtualIndex"
+  | "isTeleportApproach";
+
 export interface CarouselStateIssue {
   readonly kind: CarouselStateIssueKind;
-  readonly field: string;
+  readonly field: CarouselStateIssueField;
   readonly actual: unknown;
   readonly expected: string;
   readonly consequence: string;
-}
-
-/** Minimum-surface inputs the validator reads — every full `CarouselState`
- *  / `CarouselLayout` is structurally assignable to these.                    */
-interface ValidatableState {
-  readonly targetPageIndex: number;
-  readonly motionPhase: MotionPhase;
-  readonly teleportVirtualIndex: number | null;
-  readonly isTeleportApproach: boolean;
-}
-
-interface ValidatableLayout {
-  readonly pageCount: number;
 }
 
 /**
@@ -46,8 +41,8 @@ interface ValidatableLayout {
  * - `isTeleportApproach` is true only inside the `step-jump` phase.
  */
 export const validateCarouselState = (
-  state: ValidatableState,
-  layout: ValidatableLayout,
+  state: CarouselState,
+  layout: CarouselLayout,
 ): CarouselStateIssue[] => {
   const issues: CarouselStateIssue[] = [];
 
@@ -58,10 +53,7 @@ export const validateCarouselState = (
     issues.push({
       kind: "out-of-bounds-target-page-index",
       field: "targetPageIndex",
-      actual: {
-        targetPageIndex: state.targetPageIndex,
-        pageCount: layout.pageCount,
-      },
+      actual: state.targetPageIndex,
       expected: `Expected 0 <= targetPageIndex < pageCount (${layout.pageCount})`,
       consequence:
         "Pagination indexing, render-window math, and onCarouselStatusChange will operate on an invalid page",

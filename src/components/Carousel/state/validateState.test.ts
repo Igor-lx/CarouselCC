@@ -62,8 +62,11 @@ describe("validateCarouselState — out-of-bounds targetPageIndex", () => {
       layout,
     );
     expect(issues).toHaveLength(1);
-    expect(issues[0]!.kind).toBe("out-of-bounds-target-page-index");
-    expect(issues[0]!.field).toBe("targetPageIndex");
+    expect(issues[0]).toMatchObject({
+      kind: "out-of-bounds-target-page-index",
+      field: "targetPageIndex",
+      actual: -1,
+    });
   });
 
   it("flags a targetPageIndex equal to pageCount", () => {
@@ -72,7 +75,11 @@ describe("validateCarouselState — out-of-bounds targetPageIndex", () => {
       layout,
     );
     expect(issues).toHaveLength(1);
-    expect(issues[0]!.kind).toBe("out-of-bounds-target-page-index");
+    expect(issues[0]).toMatchObject({
+      kind: "out-of-bounds-target-page-index",
+      field: "targetPageIndex",
+      actual: layout.pageCount,
+    });
   });
 
   it("does not flag when pageCount is zero (empty deck — vacuously valid)", () => {

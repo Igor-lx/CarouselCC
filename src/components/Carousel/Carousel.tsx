@@ -299,12 +299,10 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
       didExtendLayout: perfectPageLayoutInfo.didExtendLayout,
       hasPerfectPageLayout: perfectPageLayoutInfo.hasPerfectPageLayout,
       visibleSlidesCount: layout.visibleSlidesCount,
-      pageCount: layout.pageCount,
       canSlide: layout.canSlide,
     }),
     [
       layout.canSlide,
-      layout.pageCount,
       layout.visibleSlidesCount,
       perfectPageLayoutInfo.didExtendLayout,
       perfectPageLayoutInfo.extendedLength,
@@ -328,37 +326,19 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     ],
   );
 
-  // State sub-view for Diagnostic structural-invariant checks
-  // (validateCarouselState). Carries only the four fields the validator reads,
-  // so unrelated state changes never invalidate the diagnostic context.
-  const diagnosticStateView = useMemo(
-    () => ({
-      targetPageIndex: state.targetPageIndex,
-      motionPhase: state.motionPhase,
-      teleportVirtualIndex: state.teleportVirtualIndex,
-      isTeleportApproach: state.isTeleportApproach,
-    }),
-    [
-      state.isTeleportApproach,
-      state.motionPhase,
-      state.targetPageIndex,
-      state.teleportVirtualIndex,
-    ],
-  );
-
+  // Full effective `state` is forwarded as-is. It carries its own `layout`
+  // (CarouselState.layout), so the structural-invariant validator inside
+  // `<Diagnostic />` reads `(state, state.layout)` without a duplicate
+  // sub-view. The other diagnostic sub-views (props/layout/slots) stay
+  // independently memoised so unrelated changes do not invalidate them.
   const diagnosticContextValue = useMemo(
     () => ({
+      state,
       props: diagnosticPropsView,
       layout: diagnosticLayoutView,
       slots: diagnosticSlotsView,
-      state: diagnosticStateView,
     }),
-    [
-      diagnosticLayoutView,
-      diagnosticPropsView,
-      diagnosticSlotsView,
-      diagnosticStateView,
-    ],
+    [diagnosticLayoutView, diagnosticPropsView, diagnosticSlotsView, state],
   );
 
   // --- style mapping --------------------------------------------------------

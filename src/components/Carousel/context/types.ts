@@ -1,5 +1,5 @@
 import type { CarouselNavigation } from "../navigation";
-import type { MotionPhase, MoveReason } from "../state";
+import type { CarouselState, MotionPhase, MoveReason } from "../state";
 import type { VisualPositionSource } from "../position";
 
 export interface CarouselStatusView {
@@ -48,8 +48,14 @@ export interface CarouselModuleContextValue {
  * Inputs the Diagnostic slot reads to produce dev-only warnings. The values
  * mirror what the runtime sees; the Diagnostic layer must never read mutated
  * or filtered copies, otherwise its observations would diverge from reality.
+ *
+ * `state` is the full effective `CarouselState` (carrying its own `layout`),
+ * so the structural-invariant validator can consume it directly without an
+ * extra sub-view; `layout` exposes only the layout-shape metrics the
+ * Diagnostic layer presents on top.
  */
 export interface CarouselDiagnosticContextValue {
+  state: CarouselState;
   props: {
     visibleSlidesNr: unknown;
     durationAutoplay: unknown;
@@ -62,7 +68,6 @@ export interface CarouselDiagnosticContextValue {
   layout: {
     rawLength: number;
     visibleSlidesCount: number;
-    pageCount: number;
     extendedLength: number;
     didExtendLayout: boolean;
     hasPerfectPageLayout: boolean;
@@ -73,16 +78,5 @@ export interface CarouselDiagnosticContextValue {
     hasControlsSlot: boolean;
     isPaginationOn: boolean;
     hasPaginationSlot: boolean;
-  };
-  /**
-   * Live reducer-state fields needed for structural-invariant checks (see
-   * `state/validateState.ts`). Diagnostic is the single emission point for
-   * these warnings; the reducer stays pure.
-   */
-  state: {
-    targetPageIndex: number;
-    motionPhase: MotionPhase;
-    teleportVirtualIndex: number | null;
-    isTeleportApproach: boolean;
   };
 }

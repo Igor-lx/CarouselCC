@@ -24,10 +24,11 @@ const issueToWarning = (issue: CarouselStateIssue): CarouselDiagnosticWarning =>
 /**
  * Adapter between the pure `validateCarouselState` and the diagnostic warning
  * pipeline. Runs only when a `<Diagnostic />` slot is attached — the reducer
- * itself stays pure across every environment.
+ * itself stays pure across every environment. The full effective state
+ * already carries its own `layout`, so the validator gets `(state, state.layout)`
+ * here rather than threading a second sub-view through context.
  */
 export const collectStateWarnings = (
   state: CarouselDiagnosticContextValue["state"],
-  layout: CarouselDiagnosticContextValue["layout"],
 ): CarouselDiagnosticWarning[] =>
-  validateCarouselState(state, layout).map(issueToWarning);
+  validateCarouselState(state, state.layout).map(issueToWarning);

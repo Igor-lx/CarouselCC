@@ -29,7 +29,7 @@ const DiagnosticBase = memo(function CarouselDiagnostic() {
       ...collectConstantWarnings(),
       ...collectLayoutWarnings(layout),
       ...collectSlotWarnings(slots),
-      ...collectStateWarnings(state, layout),
+      ...collectStateWarnings(state),
     ],
     [layout, props, slots, state],
   );
