@@ -347,4 +347,3 @@ describe("instant mode", () => {
     expect(next.motionPhase).toBe("step-instant");
   });
 });
-

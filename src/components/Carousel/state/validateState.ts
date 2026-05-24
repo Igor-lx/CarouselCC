@@ -76,7 +76,7 @@ export const validateCarouselState = (
       expected:
         'Expected teleportVirtualIndex to be non-null only when motionPhase === "step-jump"',
       consequence:
-        "MOTION_SETTLED may interpret this as a pending far-GO_TO teleport in the wrong context",
+        "The next motion-settled transition may interpret this as a pending far-GO_TO teleport in the wrong context",
     });
   }
 
@@ -91,7 +91,7 @@ export const validateCarouselState = (
       expected:
         'Expected isTeleportApproach to be true only when motionPhase === "step-jump"',
       consequence:
-        "segmentFactory builds a teleport-approach profile in the wrong phase",
+        "Motion segment planning builds a teleport-approach profile in the wrong phase",
     });
   }
 
