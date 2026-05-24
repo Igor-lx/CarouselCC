@@ -25,39 +25,44 @@ const makeLayout = (
 const layout = makeLayout(12, 3, false); // pageCount 4
 const baseState: CarouselState = buildInitialState(layout);
 
+const validate = (
+  overrides: Partial<CarouselState> = {},
+  state: CarouselState = baseState,
+): CarouselStateIssue[] => validateCarouselState({ ...state, ...overrides });
+
 const kinds = (issues: CarouselStateIssue[]): string[] =>
   issues.map((issue) => issue.kind).sort();
 
 describe("validateCarouselState — valid states", () => {
   it("returns no issues for a freshly built initial state", () => {
-    expect(validateCarouselState(baseState)).toEqual([]);
+    expect(validate()).toEqual([]);
   });
 
   it("returns no issues for a step-jump with teleportVirtualIndex set", () => {
-    const state: CarouselState = {
-      ...baseState,
-      motionPhase: "step-jump",
-      teleportVirtualIndex: 15,
-      targetPageIndex: 2,
-      virtualIndex: 6,
-    };
-    expect(validateCarouselState(state)).toEqual([]);
+    expect(
+      validate({
+        motionPhase: "step-jump",
+        teleportVirtualIndex: 15,
+        targetPageIndex: 2,
+        virtualIndex: 6,
+      }),
+    ).toEqual([]);
   });
 
   it("returns no issues for an in-flight teleport-approach in step-jump", () => {
-    const state: CarouselState = {
-      ...baseState,
-      motionPhase: "step-jump",
-      isTeleportApproach: true,
-      targetPageIndex: 3,
-    };
-    expect(validateCarouselState(state)).toEqual([]);
+    expect(
+      validate({
+        motionPhase: "step-jump",
+        isTeleportApproach: true,
+        targetPageIndex: 3,
+      }),
+    ).toEqual([]);
   });
 });
 
 describe("validateCarouselState — out-of-bounds targetPageIndex", () => {
   it("flags a negative targetPageIndex", () => {
-    const issues = validateCarouselState({ ...baseState, targetPageIndex: -1 });
+    const issues = validate({ targetPageIndex: -1 });
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
       kind: "out-of-bounds-target-page-index",
@@ -67,10 +72,7 @@ describe("validateCarouselState — out-of-bounds targetPageIndex", () => {
   });
 
   it("flags a targetPageIndex equal to pageCount", () => {
-    const issues = validateCarouselState({
-      ...baseState,
-      targetPageIndex: layout.pageCount,
-    });
+    const issues = validate({ targetPageIndex: layout.pageCount });
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
       kind: "out-of-bounds-target-page-index",
@@ -90,17 +92,13 @@ describe("validateCarouselState — out-of-bounds targetPageIndex", () => {
 
 describe("validateCarouselState — teleportVirtualIndex phase consistency", () => {
   it("flags teleportVirtualIndex set in the idle phase", () => {
-    const issues = validateCarouselState({
-      ...baseState,
-      teleportVirtualIndex: 12,
-    });
+    const issues = validate({ teleportVirtualIndex: 12 });
     expect(issues).toHaveLength(1);
     expect(issues[0]!.kind).toBe("teleport-virtual-index-outside-step-jump");
   });
 
   it("flags teleportVirtualIndex set during a step-normal segment", () => {
-    const issues = validateCarouselState({
-      ...baseState,
+    const issues = validate({
       teleportVirtualIndex: 12,
       motionPhase: "step-normal",
     });
@@ -111,17 +109,13 @@ describe("validateCarouselState — teleportVirtualIndex phase consistency", () 
 
 describe("validateCarouselState — isTeleportApproach phase consistency", () => {
   it("flags isTeleportApproach set in the idle phase", () => {
-    const issues = validateCarouselState({
-      ...baseState,
-      isTeleportApproach: true,
-    });
+    const issues = validate({ isTeleportApproach: true });
     expect(issues).toHaveLength(1);
     expect(issues[0]!.kind).toBe("teleport-approach-outside-step-jump");
   });
 
   it("flags isTeleportApproach set during a step-snap segment", () => {
-    const issues = validateCarouselState({
-      ...baseState,
+    const issues = validate({
       isTeleportApproach: true,
       motionPhase: "step-snap",
     });
@@ -132,8 +126,7 @@ describe("validateCarouselState — isTeleportApproach phase consistency", () =>
 
 describe("validateCarouselState — multiple issues", () => {
   it("collects every independent violation", () => {
-    const issues = validateCarouselState({
-      ...baseState,
+    const issues = validate({
       targetPageIndex: -1,
       teleportVirtualIndex: 12,
       isTeleportApproach: true,
