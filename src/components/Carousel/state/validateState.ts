@@ -1,4 +1,3 @@
-import type { CarouselLayout } from "../domain";
 import type { CarouselState } from "./types";
 
 /**
@@ -35,6 +34,12 @@ export interface CarouselStateIssue {
  * side effects — the reducer can stay pure across every environment. The
  * Diagnostic slot maps these issues to warnings.
  *
+ * The single-argument shape is intentional: the effective `CarouselState`
+ * already owns the `layout` it was reconciled against, so `state.layout` is
+ * the only correct frame of reference. A second `layout` parameter would
+ * invite a `state.layout !== layout` mismatch (the validator silently judging
+ * state against a layout it never agreed with) and is removed.
+ *
  * The invariants guarded here are:
  * - `targetPageIndex` is inside `[0, pageCount)`;
  * - `teleportVirtualIndex` is non-null only inside the `step-jump` phase;
@@ -42,8 +47,8 @@ export interface CarouselStateIssue {
  */
 export const validateCarouselState = (
   state: CarouselState,
-  layout: CarouselLayout,
 ): CarouselStateIssue[] => {
+  const { layout } = state;
   const issues: CarouselStateIssue[] = [];
 
   if (
