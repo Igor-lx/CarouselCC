@@ -266,11 +266,11 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   });
 
   // --- diagnostic context ---------------------------------------------------
-  // Carries raw props + observable runtime / layout / slot state. The carousel
-  // uses the resolved runtime config regardless of this context — diagnostic
-  // data never feeds back into runtime. The three sub-views are memoised
-  // independently so a change in one (e.g. a slot toggle) leaves the others
-  // referentially stable.
+  // Carries raw props + observable layout/slot state. The carousel uses the
+  // resolved runtime config regardless of this context — diagnostic data never
+  // feeds back into runtime. The three sub-views are memoised independently so
+  // a change in one (e.g. a slot toggle) leaves the others referentially
+  // stable.
   const diagnosticPropsView = useMemo(
     () => ({
       visibleSlidesNr,
@@ -326,6 +326,11 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     ],
   );
 
+  // Full effective `state` is forwarded as-is. It carries its own `layout`
+  // (CarouselState.layout), so the structural-invariant validator inside
+  // `<Diagnostic />` cannot receive a state/layout pair from different
+  // render turns. The other diagnostic sub-views (props/layout/slots) stay
+  // independently memoised so unrelated changes do not invalidate them.
   const diagnosticContextValue = useMemo(
     () => ({
       state,

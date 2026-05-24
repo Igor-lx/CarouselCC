@@ -372,7 +372,7 @@ Every responsibility has exactly one owner. The orchestrator
 | Autoplay lifecycle | `useAutoplay` | Owns the interval timer, hover/visibility/dragging pause. |
 | Focus shift | `useFocusRecovery` | Triggers when the state settles. |
 | Module API | `useModuleContextValue` | Builds the value once, memoised. |
-| Module render policy | `useModuleRenderPolicy` | Decides whether controls / pagination render. |
+| Module render policy | `useModuleRenderPolicy` | Decides controls / pagination / diagnostic rendering and centralizes slot-presence checks. |
 | Diagnostic warnings | `Diagnostic` module | Observe-only DEV warnings; never owns or replaces runtime values. |
 
 Each hook returns exactly the shape it owns. No hook reads another hook's

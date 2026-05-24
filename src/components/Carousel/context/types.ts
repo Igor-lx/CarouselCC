@@ -48,6 +48,11 @@ export interface CarouselModuleContextValue {
  * Inputs the Diagnostic slot reads to produce dev-only warnings. The values
  * mirror what the runtime sees; the Diagnostic layer must never read mutated
  * or filtered copies, otherwise its observations would diverge from reality.
+ *
+ * `state` is the full effective `CarouselState` (carrying its own `layout`),
+ * so the structural-invariant validator can consume it directly without an
+ * extra sub-view; `layout` exposes only the layout-shape metrics the
+ * Diagnostic layer presents on top.
  */
 export interface CarouselDiagnosticContextValue {
   state: CarouselState;
