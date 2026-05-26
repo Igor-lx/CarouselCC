@@ -37,29 +37,33 @@ export function useSlideRenderModel({
   renderWindowBufferMultiplier,
 }: UseSlideRenderModelInput): UseSlideRenderModelResult {
   // The expanded render window persists across renders so a slide is never
-  // unmounted mid-flight (it shrinks back only when motion settles). The ref
-  // starts null and is seeded by the idle branch of the memo below on the
-  // first render — the carousel always mounts idle — so `buildRenderWindow`
-  // is computed only inside the memo, never on every render.
+  // unmounted mid-flight (it shrinks back only when motion settles). Idle
+  // states keep a buffered window; moving states expand only to the strict
+  // segment window so retargets do not mount extra buffer images mid-motion.
   const persistedWindowRef = useRef<RenderWindow | null>(null);
 
   const renderWindow = useMemo(() => {
-    const next = buildRenderWindow(previous, current, layout, renderWindowBufferMultiplier);
+    const idleWindow = buildRenderWindow(
+      previous,
+      current,
+      layout,
+      renderWindowBufferMultiplier,
+    );
 
     if (!layout.canSlide || !isMoving) {
-      persistedWindowRef.current = next;
-      return next;
+      persistedWindowRef.current = idleWindow;
+      return idleWindow;
     }
 
     // Non-null here: the idle branch above seeds the ref on the first render.
-    // `next` is a defensive fallback for a hypothetical first-render-while-
+    // `idleWindow` is a defensive fallback for a hypothetical first-render-while-
     // moving, which the mount-idle invariant rules out.
-    const previousWindow = persistedWindowRef.current ?? next;
+    const previousWindow = persistedWindowRef.current ?? idleWindow;
     const segmentWindow = buildSegmentWindow(previous, current, layout);
 
     if (windowContains(previousWindow, segmentWindow)) return previousWindow;
 
-    const expanded = expandWindow(previousWindow, next);
+    const expanded = expandWindow(previousWindow, segmentWindow);
     persistedWindowRef.current = expanded;
     return expanded;
   }, [current, isMoving, layout, previous, renderWindowBufferMultiplier]);

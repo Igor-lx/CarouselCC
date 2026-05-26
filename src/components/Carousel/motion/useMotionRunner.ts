@@ -32,16 +32,6 @@ interface UseMotionRunnerInput {
 }
 
 /**
- * Number of rAF ticks the runner waits before starting a continuous segment.
- *
- * Cold starts wait so the commit that expanded the render window can reach
- * the compositor before the segment clock starts ticking. Hot retargets wait
- * the same amount while the old segment keeps painting, then continue from one
- * atomic `captureHandoff` point of the old curve.
- */
-const COLD_START_FRAME_DELAY = 2;
-const RETARGET_FRAME_DELAY = 2;
-/**
  * Long carousel segments make hidden frame drops visible as catch-up jumps.
  * Cap only clearly missed frames, and leave very short motions on pure
  * wall-clock sampling where the extra policy would be more noticeable than
@@ -51,6 +41,9 @@ const MOTION_CATCH_UP_CLAMP: MotionFrameDeltaClamp = {
   maxFrameDeltaMs: 50,
   minSegmentDurationMs: 500,
 };
+
+const readNow = () =>
+  typeof performance !== "undefined" ? performance.now() : Date.now();
 
 /**
  * Origin of a post-drag release segment. Drag writes are published into the
@@ -77,12 +70,11 @@ const buildStartFromState = (
  * The motion runner is the only bridge between logical state and the motion
  * controller.
  *
- * Continuous segments are started after a tiny frame-boundary window. For a
- * cold start this gives the commit's first paint room to finish; for a
- * mid-flight retarget the old segment keeps painting until the successor can
- * start from a single atomic `controller.captureHandoff(t)` point. Position
- * and velocity can no longer be sourced from two different moments (see
- * motion section 4.2).
+ * Continuous segments start in the layout-effect turn that observes the
+ * logical state. Cold starts rely on the controller's `after-initial-frame`
+ * clock arming, while retargets restart from the last emitted visual sample so
+ * a click never inherits a mathematically sampled position the user has not
+ * seen yet.
  *
  * Every segment - first click, repeated click, gesture release - drives
  * directly to `state.virtualIndex`. There is no intermediate destination and
@@ -100,46 +92,6 @@ export function useMotionRunner({
   onAutoplayDurationChange,
 }: UseMotionRunnerInput): void {
   const lastKeyRef = useRef<string>("");
-  const startFrameRef = useRef<number | null>(null);
-  const startTokenRef = useRef(0);
-
-  const cancelDeferredStart = useCallback(() => {
-    startTokenRef.current += 1;
-    if (startFrameRef.current !== null && typeof window !== "undefined") {
-      window.cancelAnimationFrame(startFrameRef.current);
-    }
-    startFrameRef.current = null;
-  }, []);
-
-  const scheduleDeferredStart = useCallback(
-    (frameDelay: number, callback: (timestamp: number) => void) => {
-      cancelDeferredStart();
-
-      if (typeof window === "undefined") {
-        callback(performance.now());
-        return;
-      }
-
-      const token = startTokenRef.current;
-      let framesLeft = Math.max(1, frameDelay);
-
-      const tick: FrameRequestCallback = (timestamp) => {
-        if (startTokenRef.current !== token) return;
-
-        framesLeft -= 1;
-        if (framesLeft > 0) {
-          startFrameRef.current = window.requestAnimationFrame(tick);
-          return;
-        }
-
-        startFrameRef.current = null;
-        callback(timestamp);
-      };
-
-      startFrameRef.current = window.requestAnimationFrame(tick);
-    },
-    [cancelDeferredStart],
-  );
 
   const settle = useCallback(
     (sample: MotionSample<CarouselMotionStrategy>) => {
@@ -168,27 +120,23 @@ export function useMotionRunner({
     lastKeyRef.current = key;
 
     if (!enabled) {
-      cancelDeferredStart();
       onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, { strategy: "idle" });
       return;
     }
 
     if (state.motionPhase === "idle") {
-      cancelDeferredStart();
       onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, { strategy: "idle" });
       return;
     }
 
     if (state.motionPhase === "dragging") {
-      cancelDeferredStart();
       onAutoplayDurationCancel?.();
       return;
     }
 
     if (state.motionPhase === "step-instant") {
-      cancelDeferredStart();
       onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, {
         strategy: "idle",
@@ -246,47 +194,39 @@ export function useMotionRunner({
     };
 
     if (isActive) {
-      scheduleDeferredStart(RETARGET_FRAME_DELAY, (retargetTimestamp) => {
-        // One atomic point: position + velocity + time from the same sample.
-        // The old segment is already visible, so retargets keep the immediate
-        // clock and avoid a frozen handoff frame.
-        const handoff = controller.captureHandoff(retargetTimestamp);
-        startResolvedMotion(
-          {
-            position: handoff.position,
-            velocity: handoff.velocity,
-            strategy: handoff.strategy,
-          },
-          handoff.timestamp,
-          "immediate",
-        );
-      });
+      const snapshot = controller.getSnapshot();
+      startResolvedMotion(
+        {
+          position: snapshot.value,
+          velocity: snapshot.velocity,
+          strategy: snapshot.strategy,
+        },
+        readNow(),
+        "immediate",
+      );
       return;
     }
 
-    scheduleDeferredStart(COLD_START_FRAME_DELAY, (startedAt) => {
-      if (state.moveReason === "gesture") {
-        startResolvedMotion(
-          buildStartFromGesture(state),
-          startedAt,
-          "after-initial-frame",
-        );
-        return;
-      }
-
-      // Cold start from idle: the logical origin is owned by the reducer
-      // (`state.fromVirtualIndex`); only residual velocity comes from the
-      // controller. The segment timestamp is the deferred rAF timestamp, so
-      // the clock does not advance while the commit's first paint is blocked.
-      const handoff = controller.captureHandoff(startedAt);
+    const startedAt = readNow();
+    if (state.moveReason === "gesture") {
       startResolvedMotion(
-        buildStartFromState(state, handoff.velocity),
+        buildStartFromGesture(state),
         startedAt,
         "after-initial-frame",
       );
-    });
+      return;
+    }
+
+    // Cold start from idle: the logical origin is owned by the reducer
+    // (`state.fromVirtualIndex`); only residual velocity comes from the
+    // controller. The after-initial-frame clock absorbs the first paint delay.
+    const handoff = controller.captureHandoff(startedAt);
+    startResolvedMotion(
+      buildStartFromState(state, handoff.velocity),
+      startedAt,
+      "after-initial-frame",
+    );
   }, [
-    cancelDeferredStart,
     config,
     controller,
     enabled,
@@ -294,7 +234,6 @@ export function useMotionRunner({
     isInstantMode,
     onAutoplayDurationCancel,
     onAutoplayDurationChange,
-    scheduleDeferredStart,
     settle,
     state.fromVirtualIndex,
     state.gesture.pointerVelocity,
@@ -309,9 +248,8 @@ export function useMotionRunner({
 
   useEffect(
     () => () => {
-      cancelDeferredStart();
       controller.cancel();
     },
-    [cancelDeferredStart, controller],
+    [controller],
   );
 }
