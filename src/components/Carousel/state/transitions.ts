@@ -93,6 +93,13 @@ export const resolveStepTransition = (
   const stepSize = layout.visibleSlidesCount;
   const nextFromVirtualIndex = command.fromVirtualIndex ?? state.virtualIndex;
   const step = command.type === "MOVE" ? command.step : 0;
+  // A same-direction MOVE click during in-flight motion does not accelerate
+  // toward the page the deck is already heading for — it skips it. The
+  // effective step is doubled so the new target lands one page past the
+  // in-flight one, anchored on the live visual page (see `stepOrigin`). This
+  // is what makes rapid clicks visibly extend the run instead of bunching
+  // up on the first segment.
+  const effectiveMoveStep = isSameDirectionRepeat ? step * 2 : step;
   const { currentPageIndex, currentVirtualIndex } = stepOrigin(
     state,
     nextFromVirtualIndex,
@@ -104,11 +111,13 @@ export const resolveStepTransition = (
   let pageDelta = 0;
 
   if (command.type === "MOVE") {
-    const raw = currentPageIndex + command.step;
+    const raw = currentPageIndex + effectiveMoveStep;
     nextTargetPageIndex = layout.isFinite
       ? clamp(raw, 0, layout.pageCount - 1)
       : normalizePageIndex(raw, layout.pageCount);
-    pageDelta = layout.isFinite ? nextTargetPageIndex - currentPageIndex : command.step;
+    pageDelta = layout.isFinite
+      ? nextTargetPageIndex - currentPageIndex
+      : effectiveMoveStep;
   } else {
     const resolved = layout.isFinite
       ? clamp(command.targetPageIndex, 0, layout.pageCount - 1)

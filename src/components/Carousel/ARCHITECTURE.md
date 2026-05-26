@@ -202,24 +202,28 @@ These are the user-facing behaviours the implementation guarantees.
   last emitted visual sample, not from where the previous segment was
   supposed to start.
 - **Repeated click (same direction during motion).** The destination
-  tracks **one page ahead of the live visual position**, never further.
-  Each same-direction MOVE click during motion is resolved against
-  `floor(fromVirtualIndex / stepSize)` (for `+1`) or
-  `ceil(fromVirtualIndex / stepSize)` (for `-1`) — the page just behind
-  the direction of travel — instead of against `state.targetPageIndex`.
-  While visual is still inside the current page, repeat clicks resolve to
-  the page the deck is already heading to: `targetPageIndex` does not
-  change. As soon as visual crosses into the next page, the next rapid
-  click advances `targetPageIndex` by one more page, and the motion
-  runner observes the change and rebuilds the active segment with the
-  fast-repeat profile (peak speed `REPEATED_CLICK_SPEED_MULTIPLIER` of a
-  normal MOVE). Rapid clicks therefore "pick each other up" — the deck
-  keeps moving continuously through pages while the spam continues — but
-  the destination can never get more than one page ahead of what the
+  tracks **two pages ahead of the live visual page**, never further. A
+  same-direction MOVE click during motion does not just speed up the
+  active segment — it **skips past** the page the deck is already heading
+  to. The cursor is anchored on the live visual page
+  (`floor(fromVirtualIndex / stepSize)` for `+1`,
+  `ceil(fromVirtualIndex / stepSize)` for `-1`) instead of on
+  `state.targetPageIndex`, and the effective step is doubled, so
+  `nextTargetPageIndex = visualPage + 2 * direction`. While visual is
+  still inside the current page, repeat clicks resolve to the same target
+  and no segment rebuild is needed beyond the live `fromVirtualIndex`
+  refresh; as soon as visual crosses into the next page, the next rapid
+  click advances `targetPageIndex` by one more page. The motion runner
+  observes any of those changes through its dependency key and rebuilds
+  the active segment with the fast-repeat profile (peak speed
+  `REPEATED_CLICK_SPEED_MULTIPLIER` of a normal MOVE). The deck therefore
+  keeps moving continuously through pages while the spam continues, but
+  the destination can never get more than two pages ahead of what the
   user actually sees. When clicks stop, motion finishes the in-flight
-  page boundary and settles there. There is no separate admission buffer
-  and no special path through `useCarouselNavigation`; the rule lives
-  entirely inside `stepOrigin` in `state/transitions.ts`.
+  segment and settles. There is no separate admission buffer and no
+  special path through `useCarouselNavigation`; the rule lives entirely
+  inside `stepOrigin` + the `effectiveMoveStep` doubling in
+  `state/transitions.ts`.
 - **Drag / swipe.** Touch only (pointer events with `pointerType === "touch"`).
   EMA-smoothed velocity, edge resistance with a configurable curvature.
   Release resolves to a swipe direction via either a quick-flick (raw
