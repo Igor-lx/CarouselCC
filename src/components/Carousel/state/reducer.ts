@@ -113,6 +113,28 @@ export function carouselReducer(
     case "GO_TO": {
       const isInstant = Boolean(envelope.isInstant || context.isInstantMode);
       const command = { ...envelope, isInstant };
+
+      // Bounded repeated click: a same-direction MOVE click that arrives while
+      // the deck is already animating only flags the active segment for the
+      // fast-repeat profile — it does not push the destination further. The
+      // pending `targetPageIndex` already names the next page in this
+      // direction, so rapid clicks cannot get the deck more than one page
+      // ahead of where it is animating right now. Reverse-direction clicks
+      // and clicks from idle fall through to the normal advance path below.
+      if (
+        command.type === "MOVE" &&
+        command.moveReason === "click" &&
+        !isInstant &&
+        isSameDirectionRepeat(synced, command.step)
+      ) {
+        if (synced.isRepeatedClickAdvance) return synced;
+        return {
+          ...synced,
+          isRepeatedClickAdvance: true,
+          gesture: ZERO_GESTURE_RELEASE,
+        };
+      }
+
       const {
         nextFromVirtualIndex,
         nextTargetPageIndex,
@@ -125,12 +147,6 @@ export function carouselReducer(
         context.isInstantMode,
         context.config.motion,
       );
-
-      const isRepeatedClickAdvance =
-        command.type === "MOVE" &&
-        command.moveReason === "click" &&
-        !isInstant &&
-        isSameDirectionRepeat(synced, command.step);
 
       const isNoop =
         nextTargetPageIndex === synced.targetPageIndex &&
@@ -159,7 +175,7 @@ export function carouselReducer(
         virtualIndex: nextVirtualIndex,
         teleportVirtualIndex: nextTeleportVirtualIndex,
         isTeleportApproach: false,
-        isRepeatedClickAdvance,
+        isRepeatedClickAdvance: false,
         motionPhase: phase,
         moveReason: command.moveReason,
         gesture: ZERO_GESTURE_RELEASE,

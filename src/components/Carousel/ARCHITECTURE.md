@@ -201,11 +201,18 @@ These are the user-facing behaviours the implementation guarantees.
   restarting from the logical origin: the new segment continues from the
   last emitted visual sample, not from where the previous segment was
   supposed to start.
-- **Repeated click (same direction during motion).** Does not restart from
-  scratch. The reducer still resolves the next page boundary directly; it
-  only flags the segment so the motion layer selects the fast profile. The
-  fast segment's peak speed is `REPEATED_CLICK_SPEED_MULTIPLIER` of a normal
-  MOVE and it settles at the same page boundary as any other click.
+- **Repeated click (same direction during motion).** The destination is
+  bounded: a same-direction MOVE click that arrives while motion is in flight
+  does **not** advance `targetPageIndex` further. The pending target already
+  names the next page in this direction, so the reducer short-circuits the
+  command, flips `isRepeatedClickAdvance` on, and returns. The motion runner
+  observes the flag and rebuilds the active segment with the fast-repeat
+  profile (peak speed `REPEATED_CLICK_SPEED_MULTIPLIER` of a normal MOVE);
+  it still settles at the same page boundary as the first click. This is
+  the only place rapid same-direction clicks are filtered — there is no
+  separate admission buffer, and 50 quick clicks on `<Controls>` or the
+  imperative handle's `next()` cannot run the deck 50 pages forward. Once
+  motion settles, the next click resumes normal advancement.
 - **Drag / swipe.** Touch only (pointer events with `pointerType === "touch"`).
   EMA-smoothed velocity, edge resistance with a configurable curvature.
   Release resolves to a swipe direction via either a quick-flick (raw

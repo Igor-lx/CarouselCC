@@ -300,24 +300,51 @@ describe("START_DRAG / END_DRAG", () => {
 describe("repeated vs. opposite click", () => {
   const layout = makeLayout(12, 3, false);
 
-  it("flags a same-direction click during motion as a repeated advance", () => {
+  it("flags a same-direction click during motion as a repeated advance, but keeps the destination bounded to the in-flight target", () => {
     const first = reduce(buildInitialState(layout), {
       type: "MOVE",
       step: 1,
       moveReason: "click",
       fromVirtualIndex: 0,
     });
+    expect(first.targetPageIndex).toBe(1);
+
     const second = reduce(first, {
       type: "MOVE",
       step: 1,
       moveReason: "click",
-      fromVirtualIndex: 3,
+      fromVirtualIndex: 0.2,
     });
     expect(second.isRepeatedClickAdvance).toBe(true);
-    expect(second.targetPageIndex).toBe(2);
+    // The repeat click only switches the motion profile to fast-repeat; it
+    // does not push the destination past the already-pending next page.
+    expect(second.targetPageIndex).toBe(1);
+    expect(second.virtualIndex).toBe(first.virtualIndex);
+    expect(second.motionPhase).toBe(first.motionPhase);
   });
 
-  it("does not flag an opposite-direction click as a repeated advance", () => {
+  it("stays bounded across many rapid same-direction clicks", () => {
+    let next = reduce(buildInitialState(layout), {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 0,
+    });
+    expect(next.targetPageIndex).toBe(1);
+
+    for (let i = 0; i < 49; i += 1) {
+      next = reduce(next, {
+        type: "MOVE",
+        step: 1,
+        moveReason: "click",
+        fromVirtualIndex: 0.5,
+      });
+    }
+    expect(next.targetPageIndex).toBe(1);
+    expect(next.isRepeatedClickAdvance).toBe(true);
+  });
+
+  it("does not flag an opposite-direction click as a repeated advance and routes through the normal advance path", () => {
     const first = reduce(buildInitialState(layout), {
       type: "MOVE",
       step: 1,
@@ -332,6 +359,55 @@ describe("repeated vs. opposite click", () => {
     });
     expect(reversed.isRepeatedClickAdvance).toBe(false);
     expect(reversed.targetPageIndex).toBe(0);
+  });
+
+  it("does not short-circuit autoplay MOVEs during in-flight motion", () => {
+    const first = reduce(buildInitialState(layout), {
+      type: "MOVE",
+      step: 1,
+      moveReason: "autoplay",
+      fromVirtualIndex: 0,
+    });
+    const second = reduce(first, {
+      type: "MOVE",
+      step: 1,
+      moveReason: "autoplay",
+      fromVirtualIndex: 0.2,
+    });
+    // Autoplay cadence is paced externally; the reducer should still advance
+    // the destination, since rapid-click bounding is a click-only concern.
+    expect(second.targetPageIndex).toBe(2);
+    expect(second.isRepeatedClickAdvance).toBe(false);
+  });
+
+  it("lets the first click after settle resume normal advancement", () => {
+    const first = reduce(buildInitialState(layout), {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 0,
+    });
+    const burst = reduce(first, {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 0.5,
+    });
+    expect(burst.targetPageIndex).toBe(1);
+
+    const settled = reduce(burst, {
+      type: "MOTION_SETTLED",
+      settledPosition: 3,
+    });
+    expect(settled.motionPhase).toBe("idle");
+
+    const afterSettle = reduce(settled, {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 3,
+    });
+    expect(afterSettle.targetPageIndex).toBe(2);
   });
 });
 
