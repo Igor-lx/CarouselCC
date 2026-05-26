@@ -83,8 +83,9 @@ const buildEasing = (
 /**
  * Fast acceleration profile for a repeated click - a same-direction click
  * that arrives while the carousel is already moving. The segment drives
- * straight to the page boundary (`state.virtualIndex`) and decays to zero
- * speed; there is no intermediate target and no chained follow-up.
+ * straight to the reducer's bounded visual-lookahead target
+ * (`state.virtualIndex`) and decays to zero speed; there is no intermediate
+ * target and no chained follow-up.
  */
 const buildRepeatedProfile = (
   state: CarouselState,

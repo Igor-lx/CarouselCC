@@ -22,6 +22,7 @@ import type { ImageResourceStore } from "./types";
  */
 class FakeImage {
   static instances: FakeImage[] = [];
+  static decodedSrcs: string[] = [];
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
   decoding = "";
@@ -39,6 +40,7 @@ class FakeImage {
   }
 
   decode(): Promise<void> {
+    FakeImage.decodedSrcs.push(this.#src);
     return Promise.resolve();
   }
   removeAttribute(): void {
@@ -50,6 +52,7 @@ let store: ImageResourceStore;
 
 beforeEach(() => {
   FakeImage.instances = [];
+  FakeImage.decodedSrcs = [];
   vi.stubGlobal("Image", FakeImage);
   store = createImageResourceStore();
 });
@@ -177,6 +180,28 @@ describe("speculative warm-up", () => {
     // session is closed -> a late warm-up callback must not publish anything
     expect(store.getSnapshot("w").status).toBe("loading");
   });
+
+  it("releases ready warm-up elements when the window closes", () => {
+    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
+    const element = FakeImage.instances[0]!;
+    element.onload?.();
+
+    store.syncPreparationWindow({ enabled: false, urls: [] });
+
+    expect(element.src).toBe("");
+  });
+
+  it("deduplicates decode work for an already-ready URL", () => {
+    vi.useFakeTimers();
+    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
+    FakeImage.instances[0]!.onload?.();
+
+    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
+    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
+    vi.runOnlyPendingTimers();
+
+    expect(FakeImage.decodedSrcs).toEqual(["w"]);
+  });
 });
 
 describe("prune", () => {
@@ -193,6 +218,17 @@ describe("prune", () => {
     store.observe("owned");
     store.prune([]); // allow nothing
     expect(store.getSnapshot("owned").status).toBe("loaded");
+  });
+
+  it("removes pruned URLs from the pending decode queue", () => {
+    vi.useFakeTimers();
+    store.syncPreparationWindow({ enabled: true, urls: ["drop"] });
+    FakeImage.instances[0]!.onload?.();
+
+    store.prune([]);
+    vi.runOnlyPendingTimers();
+
+    expect(FakeImage.decodedSrcs).toEqual([]);
   });
 });
 

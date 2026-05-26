@@ -102,6 +102,15 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   });
   const lastStatusSnapshotRef = useRef<CarouselStatusSnapshot | null>(null);
 
+  // --- boundary state -------------------------------------------------------
+  // One computed boundary state feeds both the module context and the public
+  // status snapshot, so external ref-buttons observe the same rule that the
+  // built-in <Controls> slot uses internally.
+  const { isAtStart, isAtEnd } = useMemo(
+    () => carouselBoundaryState(state.targetPageIndex, layout),
+    [layout, state.targetPageIndex],
+  );
+
   // --- image-resource SSOT --------------------------------------------------
   // The store exists only when the carousel renders image content; with
   // `isContentImg` off it is `null` and no image machinery runs. Preload
@@ -128,12 +137,21 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
       isIdle: status.isIdle,
       currentPageIndex: state.targetPageIndex,
       pageCount: layout.pageCount,
+      isAtStart,
+      isAtEnd,
     };
     const previous = lastStatusSnapshotRef.current;
     if (previous && areStatusSnapshotsEqual(previous, snapshot)) return;
     lastStatusSnapshotRef.current = snapshot;
     onCarouselStatusChange(snapshot);
-  }, [onCarouselStatusChange, status.isIdle, state.targetPageIndex, layout.pageCount]);
+  }, [
+    onCarouselStatusChange,
+    status.isIdle,
+    state.targetPageIndex,
+    layout.pageCount,
+    isAtStart,
+    isAtEnd,
+  ]);
 
   // --- visual position SSOT -------------------------------------------------
   const {
@@ -214,12 +232,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     elementRef: viewportRef,
     threshold: config.interaction.visibilityThreshold,
   });
-
-  // --- boundary state -------------------------------------------------------
-  const { isAtStart, isAtEnd } = useMemo(
-    () => carouselBoundaryState(state.targetPageIndex, layout),
-    [layout, state.targetPageIndex],
-  );
 
   // --- autoplay -------------------------------------------------------------
   const autoplayPaused = !visible || status.isDragging || status.isMoving;

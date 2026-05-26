@@ -300,7 +300,7 @@ describe("START_DRAG / END_DRAG", () => {
 describe("repeated vs. opposite click", () => {
   const layout = makeLayout(12, 3, false);
 
-  it("flags a same-direction click during motion as a repeated advance", () => {
+  it("retargets two pages past the live visual page on a same-direction repeat click", () => {
     const first = reduce(buildInitialState(layout), {
       type: "MOVE",
       step: 1,
@@ -311,10 +311,121 @@ describe("repeated vs. opposite click", () => {
       type: "MOVE",
       step: 1,
       moveReason: "click",
-      fromVirtualIndex: 3,
+      fromVirtualIndex: 0.2,
     });
     expect(second.isRepeatedClickAdvance).toBe(true);
     expect(second.targetPageIndex).toBe(2);
+    expect(second.virtualIndex).toBe(6);
+  });
+
+  it("keeps the +2 target while visual remains inside the same page during a burst", () => {
+    let next = reduce(buildInitialState(layout), {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 0,
+    });
+
+    next = reduce(next, {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 0.2,
+    });
+    expect(next.targetPageIndex).toBe(2);
+
+    next = reduce(next, {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 1.2,
+    });
+    expect(next.targetPageIndex).toBe(2);
+    expect(next.isRepeatedClickAdvance).toBe(true);
+
+    next = reduce(next, {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 2.5,
+    });
+    expect(next.targetPageIndex).toBe(2);
+    expect(next.isRepeatedClickAdvance).toBe(true);
+  });
+
+  it("retargets two pages ahead as visual crosses page boundaries mid-burst", () => {
+    let next = reduce(buildInitialState(layout), {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 0,
+    });
+
+    next = reduce(next, {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 1.5,
+    });
+    expect(next.targetPageIndex).toBe(2);
+    expect(next.isRepeatedClickAdvance).toBe(true);
+
+    next = reduce(next, {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 3.4,
+    });
+    expect(next.targetPageIndex).toBe(3);
+    expect(next.isRepeatedClickAdvance).toBe(true);
+  });
+
+  it("retargets two pages behind the live visual page in reverse", () => {
+    let next = reduce(buildInitialState(layout), {
+      type: "MOVE",
+      step: -1,
+      moveReason: "click",
+      fromVirtualIndex: 0,
+    });
+    expect(next.targetPageIndex).toBe(3);
+
+    next = reduce(next, {
+      type: "MOVE",
+      step: -1,
+      moveReason: "click",
+      fromVirtualIndex: -0.4,
+    });
+    expect(next.targetPageIndex).toBe(2);
+    expect(next.isRepeatedClickAdvance).toBe(true);
+
+    next = reduce(next, {
+      type: "MOVE",
+      step: -1,
+      moveReason: "click",
+      fromVirtualIndex: -3.2,
+    });
+    expect(next.targetPageIndex).toBe(1);
+    expect(next.isRepeatedClickAdvance).toBe(true);
+  });
+
+  it("does not accumulate beyond the bounded visual lookahead during a click burst", () => {
+    let next = reduce(buildInitialState(layout), {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 0,
+    });
+
+    for (let i = 0; i < 50; i += 1) {
+      next = reduce(next, {
+        type: "MOVE",
+        step: 1,
+        moveReason: "click",
+        fromVirtualIndex: 0.2 + i * 0.03,
+      });
+    }
+    expect(next.targetPageIndex).toBe(2);
+    expect(next.isRepeatedClickAdvance).toBe(true);
   });
 
   it("does not flag an opposite-direction click as a repeated advance", () => {
@@ -332,6 +443,53 @@ describe("repeated vs. opposite click", () => {
     });
     expect(reversed.isRepeatedClickAdvance).toBe(false);
     expect(reversed.targetPageIndex).toBe(0);
+  });
+
+  it("keeps autoplay MOVEs on the normal queued cursor path", () => {
+    const first = reduce(buildInitialState(layout), {
+      type: "MOVE",
+      step: 1,
+      moveReason: "autoplay",
+      fromVirtualIndex: 0,
+    });
+    const second = reduce(first, {
+      type: "MOVE",
+      step: 1,
+      moveReason: "autoplay",
+      fromVirtualIndex: 0.2,
+    });
+    expect(second.targetPageIndex).toBe(2);
+    expect(second.isRepeatedClickAdvance).toBe(false);
+  });
+
+  it("lets the first click after settle resume normal one-page advancement", () => {
+    const first = reduce(buildInitialState(layout), {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 0,
+    });
+    const burst = reduce(first, {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 0.5,
+    });
+    expect(burst.targetPageIndex).toBe(2);
+
+    const settled = reduce(burst, {
+      type: "MOTION_SETTLED",
+      settledPosition: 6,
+    });
+    expect(settled.motionPhase).toBe("idle");
+
+    const afterSettle = reduce(settled, {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 6,
+    });
+    expect(afterSettle.targetPageIndex).toBe(3);
   });
 });
 

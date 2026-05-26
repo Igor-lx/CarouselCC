@@ -121,15 +121,19 @@ export default function App() {
           <button
             className={appStyles.button}
             onClick={() => carouselRef.current?.prev()}
+            disabled={status?.isAtStart ?? false}
           >
             ‹
           </button>
           <span className={appStyles.button} style={{ cursor: "default" }}>
-            {status ? `${status.currentPageIndex + 1} / ${status.pageCount}` : "—"}
+            {status
+              ? `${status.currentPageIndex + 1} / ${status.pageCount}`
+              : "—"}
           </span>
           <button
             className={appStyles.button}
             onClick={() => carouselRef.current?.next()}
+            disabled={status?.isAtEnd ?? false}
           >
             ›
           </button>

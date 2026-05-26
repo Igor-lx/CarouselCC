@@ -125,7 +125,7 @@ referentially-stable object.
 | Prop                       | Type | Effect |
 | -------------------------- | ---- | ------ |
 | `onSlideClick`             | `(slide: Slide) => void` | Fires when an interactive slide is clicked. The slide is interactive only when `isInteractive`, the image (if any) loaded successfully, and this handler is provided. |
-| `onCarouselStatusChange`   | `(snapshot: CarouselStatusSnapshot) => void` | Low-frequency, **observation-only** status. `CarouselStatusSnapshot = { isIdle, currentPageIndex, pageCount }` — two numbers (which page, of how many) plus the idle flag. Fires on mount and whenever one of those changes; `currentPageIndex` is the *target* page, so it reflects intent immediately on click/gesture. Carries no per-frame data (position, velocity) and no reducer internals. Deduplicated by a shallow snapshot compare. |
+| `onCarouselStatusChange`   | `(snapshot: CarouselStatusSnapshot) => void` | Low-frequency, **observation-only** status. `CarouselStatusSnapshot = { isIdle, currentPageIndex, pageCount, isAtStart, isAtEnd }` — two numbers (which page, of how many), the idle flag, and finite-mode boundary flags (always `false` in cyclic mode). Fires on mount and whenever one of those changes; `currentPageIndex` is the *target* page, so it reflects intent immediately on click/gesture. External ref-buttons can wire `isAtStart` / `isAtEnd` to `disabled` without duplicating layout logic. Carries no per-frame data (position, velocity) and no reducer internals. Deduplicated by a shallow snapshot compare. |
 
 #### Imperative handle
 
@@ -202,10 +202,15 @@ These are the user-facing behaviours the implementation guarantees.
   last emitted visual sample, not from where the previous segment was
   supposed to start.
 - **Repeated click (same direction during motion).** Does not restart from
-  scratch. The reducer still resolves the next page boundary directly; it
-  only flags the segment so the motion layer selects the fast profile. The
-  fast segment's peak speed is `REPEATED_CLICK_SPEED_MULTIPLIER` of a normal
-  MOVE and it settles at the same page boundary as any other click.
+  scratch and does not accumulate an unbounded command queue. The reducer
+  anchors the cursor on the live visual page
+  (`floor(fromVirtualIndex / stepSize)` for forward motion,
+  `ceil(fromVirtualIndex / stepSize)` for reverse motion), then resolves the
+  target two pages ahead in that direction. While the visual sample stays
+  inside the same page, more clicks refresh the live origin and fast profile
+  without extending the target; after the visual crosses a page boundary, the
+  next rapid click advances the target one more page. The fast segment's peak
+  speed is `REPEATED_CLICK_SPEED_MULTIPLIER` of a normal MOVE.
 - **Drag / swipe.** Touch only (pointer events with `pointerType === "touch"`).
   EMA-smoothed velocity, edge resistance with a configurable curvature.
   Release resolves to a swipe direction via either a quick-flick (raw
@@ -226,11 +231,13 @@ These are the user-facing behaviours the implementation guarantees.
   `isAuto`. On the final page in finite mode, the next step loops back to
   page 0 via `GO_TO`.
 - **External status signal.** `onCarouselStatusChange` fires on mount and on
-  every change of `{ isIdle, currentPageIndex, pageCount }` — a low-frequency,
-  observation-only snapshot. Consumers use it for a "page X of Y" label or to
-  schedule non-critical work around motion. It carries no per-frame data and
-  no reducer internals; the carousel still runs its own image preparation for
-  nearby slides while idle, independent of this signal.
+  every change of `{ isIdle, currentPageIndex, pageCount, isAtStart, isAtEnd }`
+  — a low-frequency, observation-only snapshot. Consumers use it for a
+  "page X of Y" label, to schedule non-critical work around motion, and to
+  mirror finite-mode boundary state on external prev / next buttons. It
+  carries no per-frame data and no reducer internals; the carousel still runs
+  its own image preparation for nearby slides while idle, independent of this
+  signal.
 - **External imperative control.** A `ref` of type `CarouselHandle` exposes
   `prev()` / `next()` for buttons outside the carousel subtree or programmatic
   use. Both route through the same navigation pipeline as `<Controls>`.
@@ -467,8 +474,9 @@ A `Segment` is one of:
     with local first-screen acceleration and local final-screen deceleration;
     a far jump uses a preflight segment, a position teleport, and a fixed
     one-page approach (§4.4);
-  - **repeated-click fast advance** - one segment directly to the next page
-    boundary, peak speed `REPEATED_CLICK_SPEED_MULTIPLIER × normalMoveSpeed`;
+  - **repeated-click fast advance** - one segment directly to the bounded
+    visual-lookahead target, peak speed
+    `REPEATED_CLICK_SPEED_MULTIPLIER × normalMoveSpeed`;
   - **inertial gesture release** - peak speed derived from EMA-smoothed
     release velocity × `inertiaBoost`.
 
@@ -883,10 +891,10 @@ dependencies, the architecture has held.
   which is the intended signal that the input must be fixed.
 - **`onCarouselStatusChange` is observation-only.** It never drives carousel
   semantics and never receives reducer state or per-frame motion data — only a
-  `{ isIdle, currentPageIndex, pageCount }` snapshot. Internal image
-  preparation uses the carousel's own idle status directly; the callback is
-  purely for application-owned, low-frequency consumers (a page label,
-  non-critical work scheduling).
+  `{ isIdle, currentPageIndex, pageCount, isAtStart, isAtEnd }` snapshot.
+  Internal image preparation uses the carousel's own idle status directly; the
+  callback is purely for application-owned, low-frequency consumers (a page
+  label, non-critical work scheduling, external prev / next button state).
 - **The imperative `ref` handle is command-only.** `prev()` / `next()` express
   intent; the carousel still decides admissibility (boundaries, finite/cyclic,
   reduced motion, repeated-click). The handle exposes no state and no `goTo`,

@@ -11,4 +11,6 @@ export const areStatusSnapshotsEqual = (
 ): boolean =>
   a.isIdle === b.isIdle &&
   a.currentPageIndex === b.currentPageIndex &&
-  a.pageCount === b.pageCount;
+  a.pageCount === b.pageCount &&
+  a.isAtStart === b.isAtStart &&
+  a.isAtEnd === b.isAtEnd;

@@ -113,6 +113,12 @@ export function carouselReducer(
     case "GO_TO": {
       const isInstant = Boolean(envelope.isInstant || context.isInstantMode);
       const command = { ...envelope, isInstant };
+      const isRepeatedClickAdvance =
+        command.type === "MOVE" &&
+        command.moveReason === "click" &&
+        !isInstant &&
+        isSameDirectionRepeat(synced, command.step);
+
       const {
         nextFromVirtualIndex,
         nextTargetPageIndex,
@@ -124,28 +130,24 @@ export function carouselReducer(
         command,
         context.isInstantMode,
         context.config.motion,
+        isRepeatedClickAdvance,
       );
-
-      const isRepeatedClickAdvance =
-        command.type === "MOVE" &&
-        command.moveReason === "click" &&
-        !isInstant &&
-        isSameDirectionRepeat(synced, command.step);
 
       const isNoop =
         nextTargetPageIndex === synced.targetPageIndex &&
         nextVirtualIndex === synced.virtualIndex;
 
       if (isNoop) {
-        // Boundary no-ops hold the current phase, or collapse to an instant
-        // snap when instant mode is on.
+        // Boundary no-ops hold the current phase. Same-direction repeat no-ops
+        // can still refresh the live origin and fast profile while the visual
+        // has not crossed into the next page yet.
         return {
           ...synced,
           fromVirtualIndex: nextFromVirtualIndex,
           virtualIndex: nextVirtualIndex,
           teleportVirtualIndex: null,
           isTeleportApproach: false,
-          isRepeatedClickAdvance: false,
+          isRepeatedClickAdvance,
           motionPhase: isInstant ? "step-instant" : synced.motionPhase,
           moveReason: command.moveReason,
           gesture: ZERO_GESTURE_RELEASE,

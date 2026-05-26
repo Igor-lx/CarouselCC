@@ -56,21 +56,33 @@ const OnSlideClickSchema = z.function({
 
 /**
  * Low-frequency, read-only status handed to `onCarouselStatusChange`. Two
- * numbers — which page, out of how many — plus the idle flag. Deliberately
- * carries no per-frame data (position, velocity) and no reducer internals:
+ * numbers — which page, out of how many — plus the idle flag and finite-mode
+ * boundary flags. Deliberately carries no per-frame data (position, velocity)
+ * and no reducer internals:
  * it is a status snapshot, not an animation feed.
+ *
+ * `isAtStart` / `isAtEnd` mirror the same boundary rule used by the built-in
+ * `<Controls>` slot. Hosts that drive the carousel through `CarouselHandle`
+ * can wire those flags to external prev / next buttons without duplicating
+ * finite-vs-cyclic layout logic.
  */
 export interface CarouselStatusSnapshot {
   readonly isIdle: boolean;
   /** 0-based index of the page the carousel is on / heading to. */
   readonly currentPageIndex: number;
   readonly pageCount: number;
+  /** Finite mode only. Always `false` in cyclic mode. */
+  readonly isAtStart: boolean;
+  /** Finite mode only. Always `false` in cyclic mode. */
+  readonly isAtEnd: boolean;
 }
 
 const CarouselStatusSnapshotSchema = z.object({
   isIdle: z.boolean(),
   currentPageIndex: z.number(),
   pageCount: z.number(),
+  isAtStart: z.boolean(),
+  isAtEnd: z.boolean(),
 });
 
 const OnCarouselStatusChangeSchema = z.function({

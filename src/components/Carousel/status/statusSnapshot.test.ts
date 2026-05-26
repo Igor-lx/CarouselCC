@@ -9,6 +9,8 @@ const snapshot = (
   isIdle: true,
   currentPageIndex: 0,
   pageCount: 5,
+  isAtStart: true,
+  isAtEnd: false,
   ...overrides,
 });
 
@@ -32,6 +34,18 @@ describe("areStatusSnapshotsEqual", () => {
   it("is false when the page count differs", () => {
     expect(
       areStatusSnapshotsEqual(snapshot(), snapshot({ pageCount: 4 })),
+    ).toBe(false);
+  });
+
+  it("is false when the start boundary flag differs", () => {
+    expect(
+      areStatusSnapshotsEqual(snapshot(), snapshot({ isAtStart: false })),
+    ).toBe(false);
+  });
+
+  it("is false when the end boundary flag differs", () => {
+    expect(
+      areStatusSnapshotsEqual(snapshot(), snapshot({ isAtEnd: true })),
     ).toBe(false);
   });
 });

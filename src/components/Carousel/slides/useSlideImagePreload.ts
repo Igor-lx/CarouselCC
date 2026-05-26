@@ -86,23 +86,24 @@ const collectPreloadWindowUrls = ({
   const first = current - radius;
   const last = current + layout.visibleSlidesCount - 1 + radius;
 
-  const windowIndices: number[] = [];
-  for (let virtualIndex = first; virtualIndex <= last; virtualIndex += 1) {
-    windowIndices.push(virtualIndex);
-  }
-  windowIndices.sort(
-    (a, b) => Math.abs(a - current) - Math.abs(b - current),
-  );
-
   const urls = new Set<string>();
-  for (const virtualIndex of windowIndices) {
+  const visit = (virtualIndex: number): void => {
+    if (virtualIndex < first || virtualIndex > last) return;
     const recordIndex = layout.isFinite
       ? finiteWindowIndex(virtualIndex, recordCount)
       : loopedSlideIndex(virtualIndex, recordCount);
-    if (recordIndex === null) continue;
+    if (recordIndex === null) return;
     const src = slideImageSource(records[recordIndex]!);
     if (src) urls.add(src);
+  };
+
+  const maxDistance = Math.max(current - first, last - current);
+  visit(current);
+  for (let distance = 1; distance <= maxDistance; distance += 1) {
+    visit(current - distance);
+    visit(current + distance);
   }
+
   return [...urls];
 };
 

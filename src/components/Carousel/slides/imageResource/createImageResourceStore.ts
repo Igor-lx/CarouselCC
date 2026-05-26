@@ -96,16 +96,19 @@ interface PreparationSession {
  * preparation window: once a URL leaves the window its `Image` handle is
  * released, so warming nearby content never turns the store into a hidden
  * cache for an entire large deck. Lightweight per-URL render entries persist
- * for the live deck; the decode queue only ever holds the current window, so
- * a plain array is the right structure for it.
+ * for the live deck; the decode queue only ever holds the current window and
+ * is backed by a Set so enqueue/dequeue/removal stay O(1) amortized.
  */
 export function createImageResourceStore(): ImageResourceStore {
   const entries = new Map<string, ImageEntry>();
   const listeners = new Map<string, Set<() => void>>();
   /** Pending idle-decode work — bounded by one preparation window. */
   const decodeQueue: string[] = [];
+  const queuedDecodeUrls = new Set<string>();
+  const readyWarmupUrls = new Set<string>();
   const canUseDom = typeof window !== "undefined";
 
+  let decodeQueueHead = 0;
   let idleHandle: number | null = null;
   let idleTimer: number | null = null;
   let nextPreparationSessionId = 0;
@@ -170,9 +173,10 @@ export function createImageResourceStore(): ImageResourceStore {
   };
 
   /** Release every heavyweight resource owned by one entry. */
-  const releaseEntry = (entry: ImageEntry): void => {
+  const releaseEntry = (entry: ImageEntry, url: string): void => {
     clearRetryTimer(entry);
     releaseWarmupElement(entry);
+    readyWarmupUrls.delete(url);
     entry.warmup.sessionId = null;
   };
 
@@ -206,6 +210,36 @@ export function createImageResourceStore(): ImageResourceStore {
 
   const clearDecodeQueue = (): void => {
     decodeQueue.length = 0;
+    queuedDecodeUrls.clear();
+    decodeQueueHead = 0;
+  };
+
+  const compactDecodeQueue = (): void => {
+    if (decodeQueueHead === 0) return;
+    if (decodeQueueHead >= decodeQueue.length) {
+      decodeQueue.length = 0;
+      decodeQueueHead = 0;
+      return;
+    }
+    if (decodeQueueHead > 32 && decodeQueueHead * 2 >= decodeQueue.length) {
+      decodeQueue.splice(0, decodeQueueHead);
+      decodeQueueHead = 0;
+    }
+  };
+
+  const dequeueDecode = (): string | null => {
+    while (decodeQueueHead < decodeQueue.length) {
+      const url = decodeQueue[decodeQueueHead++]!;
+      if (!queuedDecodeUrls.delete(url)) {
+        compactDecodeQueue();
+        continue;
+      }
+      compactDecodeQueue();
+      return url;
+    }
+
+    compactDecodeQueue();
+    return null;
   };
 
   const cancelScheduledDecode = (): void => {
@@ -227,10 +261,19 @@ export function createImageResourceStore(): ImageResourceStore {
   const releaseWarmupsOutsideWindow = (
     retainedWindow: ReadonlySet<string> | null,
   ): void => {
-    entries.forEach((entry, url) => {
+    readyWarmupUrls.forEach((url) => {
       if (retainedWindow?.has(url)) return;
-      if (entry.warmup.status !== "ready") return;
+      const entry = entries.get(url);
+      if (!entry) {
+        readyWarmupUrls.delete(url);
+        return;
+      }
+      if (entry.warmup.status !== "ready") {
+        readyWarmupUrls.delete(url);
+        return;
+      }
       releaseWarmupElement(entry);
+      readyWarmupUrls.delete(url);
       entry.warmup.status = "unattempted";
       entry.warmup.sessionId = null;
       entry.warmup.decodeRequested = false;
@@ -246,7 +289,9 @@ export function createImageResourceStore(): ImageResourceStore {
     clearDecodeQueue();
 
     if (session) {
-      entries.forEach((entry) => {
+      session.urls.forEach((url) => {
+        const entry = entries.get(url);
+        if (!entry) return;
         if (
           entry.warmup.status === "fetching" &&
           entry.warmup.sessionId === session.id
@@ -291,17 +336,19 @@ export function createImageResourceStore(): ImageResourceStore {
     idleHandle = null;
     idleTimer = null;
     if (!isActiveSession(sessionId)) return;
-    while (decodeQueue.length > 0 && hasBudget()) {
-      decodeOne(decodeQueue.shift()!, sessionId);
+    while (queuedDecodeUrls.size > 0 && hasBudget()) {
+      const url = dequeueDecode();
+      if (url === null) break;
+      decodeOne(url, sessionId);
     }
-    if (decodeQueue.length > 0) pumpDecodeQueue();
+    if (queuedDecodeUrls.size > 0) pumpDecodeQueue();
   };
 
   function pumpDecodeQueue(): void {
     const session = activePreparationSession;
     if (!canUseDom || session === null) return;
     if (idleHandle !== null || idleTimer !== null) return;
-    if (decodeQueue.length === 0) return;
+    if (queuedDecodeUrls.size === 0) return;
 
     if (typeof window.requestIdleCallback === "function") {
       idleHandle = window.requestIdleCallback((deadline) => {
@@ -330,7 +377,8 @@ export function createImageResourceStore(): ImageResourceStore {
     ) {
       return;
     }
-    if (decodeQueue.includes(url)) return;
+    if (queuedDecodeUrls.has(url)) return;
+    queuedDecodeUrls.add(url);
     decodeQueue.push(url);
     pumpDecodeQueue();
   };
@@ -352,6 +400,7 @@ export function createImageResourceStore(): ImageResourceStore {
 
     entry.warmup.status = "ready";
     entry.warmup.sessionId = null;
+    readyWarmupUrls.add(url);
 
     // Warm-up may promote an untouched resource to loaded, but it must never
     // override a real visible failure or reset its retry history.
@@ -559,12 +608,12 @@ export function createImageResourceStore(): ImageResourceStore {
         if (keep.has(url)) return;
         // A live rendered owner is still on screen — never drop it.
         if (entry.visibleOwnerCount > 0) return;
-        releaseEntry(entry);
+        releaseEntry(entry, url);
         entries.delete(url);
-        const queued = decodeQueue.indexOf(url);
-        if (queued !== -1) decodeQueue.splice(queued, 1);
+        queuedDecodeUrls.delete(url);
         session?.urls.delete(url);
       });
+      if (queuedDecodeUrls.size === 0) cancelScheduledDecode();
     },
 
     dispose() {
@@ -577,10 +626,11 @@ export function createImageResourceStore(): ImageResourceStore {
       // without stranding a dead store. Call on real unmount; harmless on the
       // StrictMode fake unmount.
       cancelScheduledDecode();
-      entries.forEach(releaseEntry);
+      entries.forEach((entry, url) => releaseEntry(entry, url));
       entries.clear();
       listeners.clear();
       clearDecodeQueue();
+      readyWarmupUrls.clear();
       activePreparationSession = null;
     },
   };
