@@ -4,6 +4,7 @@ import {
   useIsomorphicLayoutEffect,
   type MotionClockStart,
   type MotionController,
+  type MotionFrameDeltaClamp,
   type MotionSample,
 } from "../../../shared";
 import type { CarouselRuntimeConfig } from "../config";
@@ -40,6 +41,16 @@ interface UseMotionRunnerInput {
  */
 const COLD_START_FRAME_DELAY = 2;
 const RETARGET_FRAME_DELAY = 2;
+/**
+ * Long carousel segments make hidden frame drops visible as catch-up jumps.
+ * Cap only clearly missed frames, and leave very short motions on pure
+ * wall-clock sampling where the extra policy would be more noticeable than
+ * useful.
+ */
+const MOTION_CATCH_UP_CLAMP: MotionFrameDeltaClamp = {
+  maxFrameDeltaMs: 50,
+  minSegmentDurationMs: 500,
+};
 
 /**
  * Origin of a post-drag release segment. Drag writes are published into the
@@ -230,6 +241,7 @@ export function useMotionRunner({
         sampler: sampleCarouselSegment,
         onComplete: settle,
         clockStart,
+        frameDeltaClamp: MOTION_CATCH_UP_CLAMP,
       });
     };
 

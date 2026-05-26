@@ -199,6 +199,80 @@ describe("clock start", () => {
   });
 });
 
+describe("frame delta clamp", () => {
+  it("caps emitted catch-up after a long frame gap", () => {
+    withMockedRaf(({ flushFrame }) => {
+      const controller = createMotionController<string>(0, "idle");
+      const activeSegment = segment();
+      const values: number[] = [];
+      controller.subscribe((sample) => values.push(sample.value), {
+        emitCurrent: false,
+      });
+
+      controller.start({
+        segment: activeSegment,
+        sampler: linearSampler,
+        frameDeltaClamp: {
+          maxFrameDeltaMs: 50,
+          minSegmentDurationMs: 500,
+        },
+      });
+
+      flushFrame(16);
+      expect(values.at(-1)).toBeCloseTo(1.6);
+
+      flushFrame(116);
+      expect(values.at(-1)).toBeCloseTo(6.6);
+      expect(activeSegment.startedAt).toBe(0);
+    });
+  });
+
+  it("applies the same catch-up policy to captureHandoff", () => {
+    withMockedRaf(({ flushFrame }) => {
+      const controller = createMotionController<string>(0, "idle");
+
+      controller.start({
+        segment: segment(),
+        sampler: linearSampler,
+        frameDeltaClamp: {
+          maxFrameDeltaMs: 50,
+          minSegmentDurationMs: 500,
+        },
+      });
+
+      flushFrame(16);
+
+      const handoff = controller.captureHandoff(116);
+      expect(handoff.position).toBeCloseTo(6.6);
+      expect(handoff.velocity).toBeCloseTo(0.1);
+      expect(handoff.timestamp).toBe(116);
+
+      flushFrame(132);
+      expect(controller.getSnapshot().value).toBeCloseTo(8.2);
+    });
+  });
+
+  it("does not clamp segments shorter than the configured duration threshold", () => {
+    withMockedRaf(({ flushFrame }) => {
+      const controller = createMotionController<string>(0, "idle");
+
+      controller.start({
+        segment: segment({ duration: 400 }),
+        sampler: linearSampler,
+        frameDeltaClamp: {
+          maxFrameDeltaMs: 50,
+          minSegmentDurationMs: 500,
+        },
+      });
+
+      flushFrame(16);
+      flushFrame(116);
+
+      expect(controller.getSnapshot().value).toBeCloseTo(29);
+    });
+  });
+});
+
 describe("soft lifecycle", () => {
   it("remains fully usable after destroy() (StrictMode-safe reuse)", () => {
     const controller = createMotionController<string>(0, "idle");

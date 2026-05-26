@@ -1,6 +1,7 @@
 import type {
   MotionCompletionMode,
   MotionController,
+  MotionFrameDeltaClamp,
   MotionHandoff,
   MotionSample,
   MotionSegmentBase,
@@ -46,6 +47,13 @@ interface ActiveSegment<Strategy extends string> {
    * `null` means the after-initial-frame clock is still on its `from` plateau.
    */
   clockArmedAt: number | null;
+  /**
+   * Latest timestamp that was allowed to advance the active timeline. This is
+   * updated for both emitted ticks and captureHandoff reads, so a retarget that
+   * happens after a browser pause cannot inherit an unseen catch-up position.
+   */
+  lastSampledAt: number | null;
+  frameDeltaClamp?: MotionFrameDeltaClamp;
 }
 
 export function createMotionController<Strategy extends string = string>(
@@ -98,6 +106,38 @@ export function createMotionController<Strategy extends string = string>(
     };
   };
 
+  const applyFrameDeltaClamp = (timestamp: number) => {
+    if (!active || active.clockArmedAt === null) return;
+
+    const lastSampledAt = active.lastSampledAt;
+    if (lastSampledAt === null) {
+      active.lastSampledAt = timestamp;
+      return;
+    }
+
+    const frameDelta = timestamp - lastSampledAt;
+    if (frameDelta <= 0) return;
+
+    const clamp = active.frameDeltaClamp;
+    if (
+      clamp &&
+      clamp.maxFrameDeltaMs > 0 &&
+      active.segment.duration >= (clamp.minSegmentDurationMs ?? 0) &&
+      frameDelta > clamp.maxFrameDeltaMs
+    ) {
+      active.clockArmedAt += frameDelta - clamp.maxFrameDeltaMs;
+    }
+
+    active.lastSampledAt = timestamp;
+  };
+
+  const sampleActiveWithFramePolicy = (
+    timestamp: number,
+  ): MotionSample<Strategy> => {
+    applyFrameDeltaClamp(timestamp);
+    return sampleActive(timestamp);
+  };
+
   const scheduleCompletion = (
     callback: (sample: MotionSample<Strategy>) => void,
     settled: MotionSample<Strategy>,
@@ -147,12 +187,13 @@ export function createMotionController<Strategy extends string = string>(
 
     if (active.clockArmedAt === null) {
       active.clockArmedAt = timestamp;
+      active.lastSampledAt = timestamp;
       emit(sampleActive(timestamp));
       frameId = requestFrame(tick);
       return;
     }
 
-    const next = sampleActive(timestamp);
+    const next = sampleActiveWithFramePolicy(timestamp);
     emit(next);
 
     if (next.progress >= 1) {
@@ -168,7 +209,7 @@ export function createMotionController<Strategy extends string = string>(
       // One coherent point: position and velocity from the SAME sample of the
       // active curve (or the resting sample when idle). No emit, no cancel, no
       // subscriber notification — just the math.
-      const point = active ? sampleActive(timestamp) : sample;
+      const point = active ? sampleActiveWithFramePolicy(timestamp) : sample;
       if (active) sample = point;
       return {
         position: point.value,
@@ -205,6 +246,7 @@ export function createMotionController<Strategy extends string = string>(
         onComplete,
         completion = "next-frame",
         clockStart = "immediate",
+        frameDeltaClamp,
       } = options;
 
       const nextActive: ActiveSegment<Strategy> = {
@@ -216,6 +258,8 @@ export function createMotionController<Strategy extends string = string>(
         onComplete,
         completion,
         clockArmedAt: clockStart === "immediate" ? segment.startedAt : null,
+        lastSampledAt: clockStart === "immediate" ? segment.startedAt : null,
+        frameDeltaClamp,
       };
       active = nextActive;
 
@@ -269,14 +313,15 @@ export function createMotionController<Strategy extends string = string>(
     },
 
     cancel() {
-      const latest = active ? sampleActive(now()) : sample;
+      const latestTimestamp = now();
+      const latest = active ? sampleActiveWithFramePolicy(latestTimestamp) : sample;
       cancelTick();
       cancelCompletion();
       active = null;
       emit({
         ...latest,
         progress: 1,
-        timestamp: now(),
+        timestamp: latestTimestamp,
         phase: "idle",
       });
     },

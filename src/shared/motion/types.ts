@@ -59,6 +59,20 @@ export type MotionCompletionMode = "immediate" | "next-frame";
  */
 export type MotionClockStart = "immediate" | "after-initial-frame";
 
+/**
+ * Optional catch-up protection for visual timelines. When the browser misses
+ * frames, wall-clock sampling would normally consume the full pause on the
+ * next tick and visibly jump forward. This policy caps how much elapsed time a
+ * single sampled frame may consume; any excess is absorbed by shifting the
+ * active clock origin forward, stretching the segment instead of catching up.
+ */
+export interface MotionFrameDeltaClamp {
+  /** Maximum elapsed time one sampled frame may advance by. */
+  maxFrameDeltaMs: number;
+  /** Optional opt-in threshold for very short segments. Defaults to 0. */
+  minSegmentDurationMs?: number;
+}
+
 export interface MotionStartOptions<
   Segment extends MotionSegmentBase<Strategy>,
   Strategy extends string = string,
@@ -68,6 +82,7 @@ export interface MotionStartOptions<
   onComplete?: (sample: MotionSample<Strategy>) => void;
   completion?: MotionCompletionMode;
   clockStart?: MotionClockStart;
+  frameDeltaClamp?: MotionFrameDeltaClamp;
 }
 
 export interface MotionSetOptions<Strategy extends string = string> {

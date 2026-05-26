@@ -519,6 +519,14 @@ controller arms a separate after-initial-frame clock
 (`clockStart: "after-initial-frame"`). That prevents the segment clock from
 advancing while the first visible frame is still blocked.
 
+Continuous Carousel segments also pass a frame-delta clamp to the controller.
+When a long segment loses frames mid-motion (GC, image decode, or paint
+cascade), the controller caps the next sampled frame's elapsed advance and
+absorbs the excess into its internal clock origin. The segment may settle a
+few milliseconds later, but the track does not visibly catch up in one jump.
+The clamp is applied to both RAF ticks and `captureHandoff`, so a retarget
+after a pause cannot inherit an unseen wall-clock position.
+
 Any future change must preserve the invariant: "intent immediately, controller
 retarget on a frame boundary, the in-flight handoff taken as one atomic
 `captureHandoff` point".
@@ -950,5 +958,6 @@ dependencies, the architecture has held.
   controller emits only on actual sample change (per RAF tick of an
   active segment; cold starts publish their initial sample first and arm the
   clock one frame later; active retargets publish their first successor sample
-  after the deferred frame-boundary handoff; no emits while idle). Image
-  preload/decode is scoped to the slide layer and starts only from idle states.
+  after the deferred frame-boundary handoff; long-segment frame gaps are
+  clamped in the controller timeline; no emits while idle). Image preload/decode
+  is scoped to the slide layer and starts only from idle states.
