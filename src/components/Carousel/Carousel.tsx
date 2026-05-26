@@ -32,12 +32,12 @@ import {
 import { CAROUSEL_SLOTS } from "./slots";
 import { useCarouselState } from "./state";
 import { areStatusSnapshotsEqual } from "./status/statusSnapshot";
-import { SLIDE_CLASS_KEYS } from "./classKeys";
+import { SLIDE_CLASS_KEYS } from "./contract/classKeys";
 import type {
   CarouselProps,
   CarouselStatusSnapshot,
   SlideClassMap,
-} from "./types";
+} from "./contract/types";
 
 const Carousel = memo(function Carousel(props: CarouselProps) {
   const {

@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { Slide, SlideClassMap } from "../types";
+import type { Slide, SlideClassMap } from "../contract/types";
 import type { SlideAriaProps } from "../domain";
 
 export interface SlideItemProps extends SlideAriaProps {

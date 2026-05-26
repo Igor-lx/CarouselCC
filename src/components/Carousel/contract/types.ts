@@ -2,8 +2,6 @@ import type { ReactElement, ReactNode, Ref } from "react";
 
 import type { CLASS_NAME_KEYS, SLIDE_CLASS_KEYS } from "./classKeys";
 
-export { SLIDE_CLASS_KEYS } from "./classKeys";
-
 export type ClassNameKey = (typeof CLASS_NAME_KEYS)[number];
 export type SlideClassKey = (typeof SLIDE_CLASS_KEYS)[number];
 

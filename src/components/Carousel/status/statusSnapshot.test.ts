@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { CarouselStatusSnapshot } from "../types";
+import type { CarouselStatusSnapshot } from "../contract/types";
 import { areStatusSnapshotsEqual } from "./statusSnapshot";
 
 const snapshot = (

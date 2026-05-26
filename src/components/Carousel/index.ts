@@ -7,8 +7,8 @@ export type {
   ClassNameMap,
   SlideClassMap,
   UserEnvironment,
-} from "./types";
-export { SLIDE_CLASS_KEYS } from "./classKeys";
+} from "./contract";
+export { SLIDE_CLASS_KEYS } from "./contract";
 // Host-side opt-in Zod schemas. Imported separately from
-// "@/components/Carousel/schemas" so Zod is not pulled into the
-// component's runtime bundle.
+// "@/components/Carousel/contract/schemas" so Zod is not pulled into
+// the component's runtime bundle.

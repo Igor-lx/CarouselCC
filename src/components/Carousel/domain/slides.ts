@@ -1,4 +1,4 @@
-import type { Slide } from "../types";
+import type { Slide } from "../contract/types";
 import type { CarouselSlideRecord } from "./types";
 
 const clampedVisibleSlidesCount = (length: number, visibleSlidesCount: number) =>
