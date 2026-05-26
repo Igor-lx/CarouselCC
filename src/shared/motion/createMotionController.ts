@@ -1,4 +1,5 @@
 import type {
+  MotionClockStart,
   MotionCompletionMode,
   MotionController,
   MotionHandoff,
@@ -41,6 +42,8 @@ interface ActiveSegment<Strategy extends string> {
   sampler: MotionSegmentSampler<MotionSegmentBase<Strategy>, Strategy>;
   onComplete?: (sample: MotionSample<Strategy>) => void;
   completion: MotionCompletionMode;
+  clockStart: MotionClockStart;
+  clockArmed: boolean;
 }
 
 export function createMotionController<Strategy extends string = string>(
@@ -70,14 +73,29 @@ export function createMotionController<Strategy extends string = string>(
     subscribers.forEach((listener) => listener(next));
   };
 
-  const sampleActive = (timestamp: number): MotionSample<Strategy> => {
-    if (!active) return sample;
-    const data = active.sampler(active.segment, timestamp);
+  const sampleActiveSegment = (
+    activeSegment: ActiveSegment<Strategy>,
+    timestamp: number,
+  ): MotionSample<Strategy> => {
+    const data = activeSegment.sampler(activeSegment.segment, timestamp);
     return {
       ...data,
       timestamp,
       phase: data.progress >= 1 ? "settled" : "running",
     };
+  };
+
+  const sampleActive = (timestamp: number): MotionSample<Strategy> => {
+    if (!active) return sample;
+    if (active.clockStart === "after-initial-frame" && !active.clockArmed) {
+      return {
+        ...sample,
+        velocity: 0,
+        timestamp,
+        phase: "running",
+      };
+    }
+    return sampleActiveSegment(active, timestamp);
   };
 
   const scheduleCompletion = (
@@ -127,6 +145,22 @@ export function createMotionController<Strategy extends string = string>(
       return;
     }
 
+    if (active.clockStart === "after-initial-frame" && !active.clockArmed) {
+      active.segment = { ...active.segment, startedAt: timestamp };
+      active.clockArmed = true;
+
+      const initial = sampleActive(timestamp);
+      emit(initial);
+
+      if (initial.progress >= 1) {
+        finalize(initial);
+        return;
+      }
+
+      frameId = requestFrame(tick);
+      return;
+    }
+
     const next = sampleActive(timestamp);
     emit(next);
 
@@ -143,6 +177,14 @@ export function createMotionController<Strategy extends string = string>(
       // One coherent point: position and velocity from the SAME sample of the
       // active curve (or the resting sample when idle). No emit, no cancel, no
       // subscriber notification — just the math.
+      if (active?.clockStart === "after-initial-frame" && !active.clockArmed) {
+        return {
+          position: sample.value,
+          velocity: 0,
+          strategy: sample.strategy,
+          timestamp,
+        };
+      }
       const point = active ? sampleActive(timestamp) : sample;
       if (active) sample = point;
       return {
@@ -174,9 +216,15 @@ export function createMotionController<Strategy extends string = string>(
     ) {
       cancelTick();
       cancelCompletion();
-      const { segment, sampler, onComplete, completion = "next-frame" } = options;
+      const {
+        segment,
+        sampler,
+        onComplete,
+        completion = "next-frame",
+        clockStart = "immediate",
+      } = options;
 
-      active = {
+      const nextActive: ActiveSegment<Strategy> = {
         segment,
         sampler: sampler as MotionSegmentSampler<
           MotionSegmentBase<Strategy>,
@@ -184,9 +232,12 @@ export function createMotionController<Strategy extends string = string>(
         >,
         onComplete,
         completion,
+        clockStart,
+        clockArmed: clockStart === "immediate",
       };
+      active = nextActive;
 
-      const initial = sampleActive(segment.startedAt);
+      const initial = sampleActiveSegment(nextActive, segment.startedAt);
       emit(initial);
 
       if (initial.progress >= 1) {

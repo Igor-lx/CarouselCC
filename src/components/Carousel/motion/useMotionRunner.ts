@@ -227,6 +227,7 @@ export function useMotionRunner({
         segment,
         sampler: sampleCarouselSegment,
         onComplete: settle,
+        clockStart: "after-initial-frame",
       });
     };
 

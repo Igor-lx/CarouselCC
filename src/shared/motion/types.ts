@@ -46,6 +46,7 @@ export type MotionSegmentSampler<
 > = (segment: Segment, timestamp: number) => MotionSampleData<Strategy>;
 
 export type MotionCompletionMode = "immediate" | "next-frame";
+export type MotionClockStart = "immediate" | "after-initial-frame";
 
 export interface MotionStartOptions<
   Segment extends MotionSegmentBase<Strategy>,
@@ -55,6 +56,7 @@ export interface MotionStartOptions<
   sampler: MotionSegmentSampler<Segment, Strategy>;
   onComplete?: (sample: MotionSample<Strategy>) => void;
   completion?: MotionCompletionMode;
+  clockStart?: MotionClockStart;
 }
 
 export interface MotionSetOptions<Strategy extends string = string> {
