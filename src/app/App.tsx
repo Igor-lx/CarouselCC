@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import appStyles from "./App.module.scss";
-import { CAROUSEL_SOURCES, CAROUSEL_SOURCES2 } from "./carouselData";
+import { loadCarouselSources, type CarouselSourceRecord } from "./carouselData";
 import { useCompactLandscape } from "./useCompactLandscape";
 import { useBreakpoint, useUserEnvironment } from "../shared";
 import Carousel, {
@@ -23,13 +23,6 @@ const VISIBLE_BY_BREAKPOINT = {
 } as const;
 
 const COMPACT_LANDSCAPE_VISIBLE_SLIDES = 2;
-
-const CAROUSEL_SOURCE_SETS = {
-  CAROUSEL_SOURCES,
-  CAROUSEL_SOURCES2,
-} as const;
-
-const ACTIVE_CAROUSEL_SOURCES = CAROUSEL_SOURCE_SETS.CAROUSEL_SOURCES;
 
 const openSlide = (slide: Slide) => {
   window.open(String(slide.content), "_blank");
@@ -59,13 +52,31 @@ export default function App() {
     isTouch && isCompactLandscape ? COMPACT_LANDSCAPE_VISIBLE_SLIDES : device;
   const isMobileImagery = isTouch || device === VISIBLE_BY_BREAKPOINT.MOBILE;
 
+  // Async load the desktop or mobile image chunk only — never both — so the
+  // initial app bundle stays free of the 12 WebP URLs the user will not see.
+  const [sourceRecords, setSourceRecords] = useState<
+    readonly CarouselSourceRecord[]
+  >([]);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    void loadCarouselSources(isMobileImagery).then((records) => {
+      if (isCurrent) setSourceRecords(records);
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [isMobileImagery]);
+
   const slidesData = useMemo(
     () =>
-      ACTIVE_CAROUSEL_SOURCES.map((entry) => ({
+      sourceRecords.map((entry) => ({
         id: entry.id,
-        content: isMobileImagery ? entry.mobile : entry.desktop,
+        content: entry.content,
       })),
-    [isMobileImagery],
+    [sourceRecords],
   );
 
   return (
@@ -94,26 +105,28 @@ export default function App() {
         </div>
 
         <div className={appStyles.component}>
-          <Carousel
-            ref={carouselRef}
-            visibleSlidesNr={visibleSlidesNr}
-            slidesData={slidesData}
-            isAuto={isAutoplay}
-            isPaginationOn
-            isInteractive={isInteractive}
-            durationAutoplay={4000}
-            durationStep={4000}
-            jumpSpeedMultiplier={12}
-            intervalAutoplay={3000}
-            isPagePaddingOn
-            userEnvironment={userEnvironment}
-            onSlideClick={openSlide}
-            onCarouselStatusChange={(snapshot) => setStatus(snapshot)}
-          >
-            {isTouch ? <PaginationWidget /> : <Pagination />}
-            <Controls />
-            <Diagnostic />
-          </Carousel>
+          {sourceRecords.length > 0 ? (
+            <Carousel
+              ref={carouselRef}
+              visibleSlidesNr={visibleSlidesNr}
+              slidesData={slidesData}
+              isAuto={isAutoplay}
+              isPaginationOn
+              isInteractive={isInteractive}
+              durationAutoplay={4000}
+              durationStep={4000}
+              jumpSpeedMultiplier={12}
+              intervalAutoplay={3000}
+              isPagePaddingOn
+              userEnvironment={userEnvironment}
+              onSlideClick={openSlide}
+              onCarouselStatusChange={(snapshot) => setStatus(snapshot)}
+            >
+              {isTouch ? <PaginationWidget /> : <Pagination />}
+              <Controls />
+              <Diagnostic />
+            </Carousel>
+          ) : null}
         </div>
       </section>
       <section className={appStyles.page}>
