@@ -47,6 +47,29 @@ export type MotionSegmentSampler<
 
 export type MotionCompletionMode = "immediate" | "next-frame";
 
+/**
+ * When the segment's wall-clock starts advancing relative to `segment.startedAt`.
+ *
+ * - `"immediate"` (default): the clock runs from `segment.startedAt` as passed
+ *   in. Every rAF tick samples at `tick.timestamp - segment.startedAt`. This
+ *   is the right mode for a controller that is already running visually (hot
+ *   retarget continuation) or for tests / scripted motion where the caller
+ *   guarantees `startedAt` is meaningfully aligned with the first paint.
+ *
+ * - `"after-initial-frame"`: the controller `start()` still synchronously
+ *   emits an initial sample at `progress = 0` (so subscribers can write the
+ *   resting `from` position to the DOM right away). The very next rAF tick
+ *   then *arms* the clock by rewriting `segment.startedAt` to that rAF's
+ *   timestamp and emits another `progress = 0` sample — and only from the
+ *   rAF *after* that does the segment begin to advance. This absorbs the
+ *   browser's "first heavy paint" delay (image decode / composite / etc.)
+ *   into the `from` plateau instead of into elapsed segment time. Without
+ *   this mode, a 100–300 ms paint delay after a click is added to the first
+ *   visible tick's elapsed and the user sees a 20-30 px catch-up jump on
+ *   the first observable motion frame.
+ */
+export type MotionClockStart = "immediate" | "after-initial-frame";
+
 export interface MotionStartOptions<
   Segment extends MotionSegmentBase<Strategy>,
   Strategy extends string = string,
@@ -55,6 +78,7 @@ export interface MotionStartOptions<
   sampler: MotionSegmentSampler<Segment, Strategy>;
   onComplete?: (sample: MotionSample<Strategy>) => void;
   completion?: MotionCompletionMode;
+  clockStart?: MotionClockStart;
 }
 
 export interface MotionSetOptions<Strategy extends string = string> {

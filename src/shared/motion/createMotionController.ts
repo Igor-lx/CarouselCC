@@ -1,4 +1,5 @@
 import type {
+  MotionClockStart,
   MotionCompletionMode,
   MotionController,
   MotionHandoff,
@@ -41,6 +42,23 @@ interface ActiveSegment<Strategy extends string> {
   sampler: MotionSegmentSampler<MotionSegmentBase<Strategy>, Strategy>;
   onComplete?: (sample: MotionSample<Strategy>) => void;
   completion: MotionCompletionMode;
+  clockStart: MotionClockStart;
+  /**
+   * The wall-clock timestamp the segment's elapsed counter should be measured
+   * from. The segment object itself is treated as immutable input; this field
+   * is the only place "when did the clock actually arm" lives.
+   *
+   * - `clockStart === "immediate"`: set to `segment.startedAt` at `start()`;
+   *   the segment ticks normally from the first rAF.
+   * - `clockStart === "after-initial-frame"`: `null` at `start()`; the first
+   *   rAF tick after `start()` sets it to that rAF's `timestamp`, re-emits a
+   *   `progress = 0` sample, and only the *next* rAF begins to advance. Any
+   *   delay between `start()` and that first tick — the heavy commit-paint
+   *   window — is absorbed into the `from` plateau instead of into elapsed
+   *   segment time, so the user never sees a catch-up jump on the first
+   *   observable motion frame.
+   */
+  clockArmedAt: number | null;
 }
 
 export function createMotionController<Strategy extends string = string>(
@@ -72,7 +90,31 @@ export function createMotionController<Strategy extends string = string>(
 
   const sampleActive = (timestamp: number): MotionSample<Strategy> => {
     if (!active) return sample;
-    const data = active.sampler(active.segment, timestamp);
+
+    // Before the clock is armed (`after-initial-frame` mode, first tick has
+    // not yet fired) the segment has not actually started moving — every
+    // observer sees a `progress = 0`/`from` plateau. This is what makes
+    // `captureHandoff()` return zero velocity and the `from` position during
+    // the unarmed window, and what lets the very first tick re-emit cleanly
+    // before advancing on the next one.
+    if (active.clockArmedAt === null) {
+      return {
+        progress: 0,
+        value: active.segment.from,
+        velocity: 0,
+        target: active.segment.to,
+        strategy: active.segment.strategy,
+        timestamp,
+        phase: "running",
+      };
+    }
+
+    // The sampler reads `segment.startedAt` for its arithmetic, but the real
+    // clock origin is `clockArmedAt`. We offset the timestamp we hand it so
+    // the sampler sees `elapsed = timestamp - clockArmedAt` without ever
+    // having to learn about arming — the segment object stays immutable.
+    const startOffset = active.clockArmedAt - active.segment.startedAt;
+    const data = active.sampler(active.segment, timestamp - startOffset);
     return {
       ...data,
       timestamp,
@@ -127,6 +169,17 @@ export function createMotionController<Strategy extends string = string>(
       return;
     }
 
+    // First tick of an `after-initial-frame` segment: arm the clock at this
+    // rAF's timestamp and re-emit a `progress = 0` sample. The heavy paint
+    // window between `start()` and now is absorbed into the `from` plateau.
+    // Real motion does not begin until the *next* tick.
+    if (active.clockArmedAt === null) {
+      active.clockArmedAt = timestamp;
+      emit(sampleActive(timestamp));
+      frameId = requestFrame(tick);
+      return;
+    }
+
     const next = sampleActive(timestamp);
     emit(next);
 
@@ -174,7 +227,13 @@ export function createMotionController<Strategy extends string = string>(
     ) {
       cancelTick();
       cancelCompletion();
-      const { segment, sampler, onComplete, completion = "next-frame" } = options;
+      const {
+        segment,
+        sampler,
+        onComplete,
+        completion = "next-frame",
+        clockStart = "immediate",
+      } = options;
 
       active = {
         segment,
@@ -184,6 +243,11 @@ export function createMotionController<Strategy extends string = string>(
         >,
         onComplete,
         completion,
+        clockStart,
+        // `immediate`: the clock runs from `segment.startedAt` as given.
+        // `after-initial-frame`: the first rAF tick arms it; sampleActive
+        // returns the `from` plateau until then.
+        clockArmedAt: clockStart === "immediate" ? segment.startedAt : null,
       };
 
       const initial = sampleActive(segment.startedAt);

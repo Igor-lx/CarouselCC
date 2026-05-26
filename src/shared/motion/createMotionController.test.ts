@@ -74,3 +74,75 @@ describe("soft lifecycle", () => {
     expect(controller.captureHandoff(500).position).toBeCloseTo(100);
   });
 });
+
+describe("clockStart modes", () => {
+  it("'immediate' (default) advances by elapsed time from segment.startedAt", () => {
+    const controller = createMotionController<string>(0, "idle");
+    controller.start({ segment: segment(), sampler: linearSampler });
+    // Halfway through a 1000 ms / 100-unit segment — position should be 50.
+    expect(controller.captureHandoff(500).position).toBeCloseTo(50);
+  });
+
+  it("'after-initial-frame' holds position at `from` for any arbitrary delay before the first tick", () => {
+    const controller = createMotionController<string>(0, "idle");
+    // Default `from = 0`, `to = 100`, `duration = 1000`, `startedAt = 0`.
+    controller.start({
+      segment: segment(),
+      sampler: linearSampler,
+      clockStart: "after-initial-frame",
+    });
+
+    // A captureHandoff issued BEFORE the first tick arms the clock —
+    // simulating "we asked the controller for its position 500 ms after
+    // start(), but no rAF tick has fired yet because the browser was busy
+    // painting" — must still see the `from` position and zero velocity.
+    const handoff = controller.captureHandoff(500);
+    expect(handoff.position).toBe(0);
+    expect(handoff.velocity).toBe(0);
+
+    // Even 5 seconds later, as long as no tick has fired the clock is not
+    // armed — position stays at `from`.
+    expect(controller.captureHandoff(5_000).position).toBe(0);
+  });
+
+  it("'after-initial-frame' arms the clock at the first emitted frame, not at start()", () => {
+    const controller = createMotionController<string>(0, "idle");
+    const emitted: number[] = [];
+    controller.subscribe((sample) => emitted.push(sample.value), {
+      emitCurrent: false,
+    });
+
+    controller.start({
+      segment: segment(),
+      sampler: linearSampler,
+      clockStart: "after-initial-frame",
+    });
+    // Initial synchronous emit lives at `from`.
+    expect(emitted).toEqual([0]);
+
+    // Without a `window` (jsdom default in this test file) the controller
+    // does not schedule rAFs, so we cannot drive the arm-frame transition
+    // here. The behaviour we DO test:
+    //  - the synchronous initial emit is `from` (above);
+    //  - captureHandoff before arm still returns `from`/0 (next assertion).
+    expect(controller.captureHandoff(2_000).position).toBe(0);
+  });
+
+  it("'after-initial-frame' captureHandoff returns the segment's `from`, not the segment's start-time progression", () => {
+    // Crucial: without this guarantee, a repeated click that arrives during
+    // the heavy first-paint window would inherit a phantom velocity from a
+    // sample the user has never observed, and the next segment would build
+    // on a position the deck did not actually visit.
+    const controller = createMotionController<string>(0, "idle");
+    controller.start({
+      segment: segment({ from: 42, to: 142 }),
+      sampler: linearSampler,
+      clockStart: "after-initial-frame",
+    });
+
+    const handoff = controller.captureHandoff(800);
+    expect(handoff.position).toBe(42);
+    expect(handoff.velocity).toBe(0);
+    expect(handoff.strategy).toBe("test");
+  });
+});

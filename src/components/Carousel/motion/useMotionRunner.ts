@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 
 import {
   useIsomorphicLayoutEffect,
+  type MotionClockStart,
   type MotionController,
   type MotionSample,
 } from "../../../shared";
@@ -217,11 +218,14 @@ export function useMotionRunner({
     // (position is owned by the reducer's `state.fromVirtualIndex`). The
     // handoff's timestamp is unused — the segment's `startedAt` comes from
     // the deferred rAF callback below.
-    const coldHandoff = isActive ? null : controller.captureHandoff(performance.now());
+    const coldHandoff = isActive
+      ? null
+      : controller.captureHandoff(performance.now());
 
     const startResolvedMotion = (
       resolvedStart: MotionStart,
       resolvedStartedAt: number,
+      clockStart: MotionClockStart,
     ) => {
       const distance = state.virtualIndex - resolvedStart.position;
 
@@ -259,12 +263,16 @@ export function useMotionRunner({
         segment,
         sampler: sampleCarouselSegment,
         onComplete: settle,
+        clockStart,
       });
     };
 
     if (isActive) {
-      // Hot retarget: the old segment keeps painting through the defer
-      // window, then hands off at one atomic `captureHandoff` point.
+      // Hot retarget. The old segment was already publishing presentation-
+      // aligned frames; the handoff position is what the user already sees,
+      // so the new segment can start ticking from `handoff.timestamp`
+      // immediately — `after-initial-frame` would only add an unnecessary
+      // 16 ms "frozen at handoff" frame before the direction change.
       scheduleDeferredStart((retargetTimestamp) => {
         const handoff = controller.captureHandoff(retargetTimestamp);
         startResolvedMotion(
@@ -274,6 +282,7 @@ export function useMotionRunner({
             strategy: handoff.strategy,
           },
           handoff.timestamp,
+          "immediate",
         );
       });
       return;
@@ -282,11 +291,20 @@ export function useMotionRunner({
     // Cold start from idle. Defer through the same window so the React
     // commit's paint pipeline (which often mounts new SlideItems and
     // triggers fresh image decodes — the dominant cost on mobile) reaches
-    // the compositor BEFORE the segment clock starts ticking. See the
-    // `MOTION_START_FRAME_DELAY` docblock for the failure mode.
+    // the compositor BEFORE the segment clock starts ticking. `clockStart:
+    // "after-initial-frame"` then absorbs any leftover first-paint delay
+    // (async WebP decode racing the initial sample's compositor commit)
+    // into the `from` plateau instead of into the first visible elapsed —
+    // without it, the user sees a catch-up jump of 20-30 px on the first
+    // observable frame. See `MOTION_START_FRAME_DELAY` and `MotionClockStart`
+    // docblocks for the full failure-mode walk-through.
     scheduleDeferredStart((startedAt) => {
       if (state.moveReason === "gesture") {
-        startResolvedMotion(buildStartFromGesture(state), startedAt);
+        startResolvedMotion(
+          buildStartFromGesture(state),
+          startedAt,
+          "after-initial-frame",
+        );
         return;
       }
       // The logical origin is owned by the reducer
@@ -295,6 +313,7 @@ export function useMotionRunner({
       startResolvedMotion(
         buildStartFromState(state, coldHandoff?.velocity ?? 0),
         startedAt,
+        "after-initial-frame",
       );
     });
   }, [
