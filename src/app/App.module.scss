@@ -40,11 +40,16 @@
   width: auto;
   min-width: 120px;
   min-height: 40px;
-  border: 1px solid gray;
+  border: 2px solid gray;
   border-radius: 4px;
   line-height: 0;
   transition: border-color 0.3s ease;
   cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .component {

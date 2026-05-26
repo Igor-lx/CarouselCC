@@ -106,7 +106,6 @@ export default function App() {
             jumpSpeedMultiplier={12}
             intervalAutoplay={3000}
             isPagePaddingOn
-            isFinite ={false}
             userEnvironment={userEnvironment}
             onSlideClick={openSlide}
             onCarouselStatusChange={(snapshot) => setStatus(snapshot)}
@@ -127,7 +126,9 @@ export default function App() {
             ‹
           </button>
           <span className={appStyles.button} style={{ cursor: "default" }}>
-            {status ? `${status.currentPageIndex + 1} / ${status.pageCount}` : "—"}
+            {status
+              ? `${status.currentPageIndex + 1} / ${status.pageCount}`
+              : "—"}
           </span>
           <button
             className={appStyles.button}
