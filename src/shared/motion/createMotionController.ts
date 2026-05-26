@@ -53,6 +53,7 @@ interface ActiveSegment<Strategy extends string> {
    * happens after a browser pause cannot inherit an unseen catch-up position.
    */
   lastSampledAt: number | null;
+  hasAdvancedFrame: boolean;
   frameDeltaClamp?: MotionFrameDeltaClamp;
 }
 
@@ -122,12 +123,21 @@ export function createMotionController<Strategy extends string = string>(
     if (
       clamp &&
       clamp.maxFrameDeltaMs > 0 &&
-      active.segment.duration >= (clamp.minSegmentDurationMs ?? 0) &&
-      frameDelta > clamp.maxFrameDeltaMs
+      active.segment.duration >= (clamp.minSegmentDurationMs ?? 0)
     ) {
-      active.clockArmedAt += frameDelta - clamp.maxFrameDeltaMs;
+      const maxFrameDelta =
+        !active.hasAdvancedFrame &&
+        clamp.firstFrameDeltaMs !== undefined &&
+        clamp.firstFrameDeltaMs > 0
+          ? Math.min(clamp.maxFrameDeltaMs, clamp.firstFrameDeltaMs)
+          : clamp.maxFrameDeltaMs;
+
+      if (frameDelta > maxFrameDelta) {
+        active.clockArmedAt += frameDelta - maxFrameDelta;
+      }
     }
 
+    active.hasAdvancedFrame = true;
     active.lastSampledAt = timestamp;
   };
 
@@ -259,6 +269,7 @@ export function createMotionController<Strategy extends string = string>(
         completion,
         clockArmedAt: clockStart === "immediate" ? segment.startedAt : null,
         lastSampledAt: clockStart === "immediate" ? segment.startedAt : null,
+        hasAdvancedFrame: false,
         frameDeltaClamp,
       };
       active = nextActive;

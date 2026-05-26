@@ -252,6 +252,36 @@ describe("frame delta clamp", () => {
     });
   });
 
+  it("can use a tighter cap for the first advancing frame", () => {
+    withMockedRaf(({ flushFrame }) => {
+      const controller = createMotionController<string>(0, "idle");
+      const values: number[] = [];
+      controller.subscribe((sample) => values.push(sample.value), {
+        emitCurrent: false,
+      });
+
+      controller.start({
+        segment: segment(),
+        sampler: linearSampler,
+        clockStart: "after-initial-frame",
+        frameDeltaClamp: {
+          firstFrameDeltaMs: 16,
+          maxFrameDeltaMs: 50,
+          minSegmentDurationMs: 500,
+        },
+      });
+
+      flushFrame(200);
+      expect(values).toEqual([0, 0]);
+
+      flushFrame(300);
+      expect(values.at(-1)).toBeCloseTo(1.6);
+
+      flushFrame(400);
+      expect(values.at(-1)).toBeCloseTo(6.6);
+    });
+  });
+
   it("does not clamp segments shorter than the configured duration threshold", () => {
     withMockedRaf(({ flushFrame }) => {
       const controller = createMotionController<string>(0, "idle");

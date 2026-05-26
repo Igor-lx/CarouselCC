@@ -69,6 +69,12 @@ export type MotionClockStart = "immediate" | "after-initial-frame";
 export interface MotionFrameDeltaClamp {
   /** Maximum elapsed time one sampled frame may advance by. */
   maxFrameDeltaMs: number;
+  /**
+   * Optional, tighter cap for the first advancing frame of a segment. Useful
+   * when an initial plateau is used: the first visible movement should not
+   * consume a multi-frame browser pause and read as a launch-speed burst.
+   */
+  firstFrameDeltaMs?: number;
   /** Optional opt-in threshold for very short segments. Defaults to 0. */
   minSegmentDurationMs?: number;
 }

@@ -41,6 +41,7 @@ interface UseMotionRunnerInput {
  */
 const COLD_START_FRAME_DELAY = 2;
 const RETARGET_FRAME_DELAY = 2;
+const MOTION_FIRST_FRAME_DELTA_MS = 1000 / 60;
 /**
  * Long carousel segments make hidden frame drops visible as catch-up jumps.
  * Cap only clearly missed frames, and leave very short motions on pure
@@ -48,6 +49,7 @@ const RETARGET_FRAME_DELAY = 2;
  * useful.
  */
 const MOTION_CATCH_UP_CLAMP: MotionFrameDeltaClamp = {
+  firstFrameDeltaMs: MOTION_FIRST_FRAME_DELTA_MS,
   maxFrameDeltaMs: 50,
   minSegmentDurationMs: 500,
 };
