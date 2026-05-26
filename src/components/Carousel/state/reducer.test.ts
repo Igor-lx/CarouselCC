@@ -300,7 +300,7 @@ describe("START_DRAG / END_DRAG", () => {
 describe("repeated vs. opposite click", () => {
   const layout = makeLayout(12, 3, false);
 
-  it("flags a same-direction click during motion as a repeated advance, but keeps the destination bounded to the in-flight target", () => {
+  it("flags a same-direction click during motion as a repeated advance, and holds the target while visual is still inside the current page", () => {
     const first = reduce(buildInitialState(layout), {
       type: "MOVE",
       step: 1,
@@ -309,6 +309,11 @@ describe("repeated vs. opposite click", () => {
     });
     expect(first.targetPageIndex).toBe(1);
 
+    // Visual is at 0.2 — still inside page 0 (floor(0.2 / 3) === 0), so the
+    // repeat click resolves to "one page ahead of page 0" === 1, which is
+    // already the pending target. No change to target/virtualIndex; the
+    // motion runner just observes the flag and rebuilds the active segment
+    // with the fast-repeat profile.
     const second = reduce(first, {
       type: "MOVE",
       step: 1,
@@ -316,14 +321,13 @@ describe("repeated vs. opposite click", () => {
       fromVirtualIndex: 0.2,
     });
     expect(second.isRepeatedClickAdvance).toBe(true);
-    // The repeat click only switches the motion profile to fast-repeat; it
-    // does not push the destination past the already-pending next page.
     expect(second.targetPageIndex).toBe(1);
     expect(second.virtualIndex).toBe(first.virtualIndex);
     expect(second.motionPhase).toBe(first.motionPhase);
   });
 
-  it("stays bounded across many rapid same-direction clicks", () => {
+  it("retargets one page ahead as visual progresses past a page boundary mid-burst", () => {
+    // Click 1 from idle: start motion toward page 1.
     let next = reduce(buildInitialState(layout), {
       type: "MOVE",
       step: 1,
@@ -332,12 +336,90 @@ describe("repeated vs. opposite click", () => {
     });
     expect(next.targetPageIndex).toBe(1);
 
+    // Click 2 with visual still inside page 0 — destination already names
+    // the next page, no change.
+    next = reduce(next, {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 1.5,
+    });
+    expect(next.targetPageIndex).toBe(1);
+    expect(next.isRepeatedClickAdvance).toBe(true);
+
+    // Click 3 after visual crossed into page 1 — repeat click picks up,
+    // retargets to "one page ahead of page 1" === page 2.
+    next = reduce(next, {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 3.4,
+    });
+    expect(next.targetPageIndex).toBe(2);
+    expect(next.isRepeatedClickAdvance).toBe(true);
+
+    // Click 4 with visual now inside page 2 — retarget to page 3.
+    next = reduce(next, {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 6.1,
+    });
+    expect(next.targetPageIndex).toBe(3);
+    expect(next.isRepeatedClickAdvance).toBe(true);
+  });
+
+  it("retargets backwards as visual progresses past a page boundary in reverse", () => {
+    // From idle at page 0, click backwards: cyclic wrap to page 3.
+    let next = reduce(buildInitialState(layout), {
+      type: "MOVE",
+      step: -1,
+      moveReason: "click",
+      fromVirtualIndex: 0,
+    });
+    expect(next.targetPageIndex).toBe(3);
+
+    // Visual still inside page 0 going backwards (ceil(-0.4 / 3) === 0),
+    // target stays at 3.
+    next = reduce(next, {
+      type: "MOVE",
+      step: -1,
+      moveReason: "click",
+      fromVirtualIndex: -0.4,
+    });
+    expect(next.targetPageIndex).toBe(3);
+    expect(next.isRepeatedClickAdvance).toBe(true);
+
+    // Visual crossed into the previous page (ceil(-3.2 / 3) === -1), so
+    // the next rapid click retargets one page further back: cyclic 2.
+    next = reduce(next, {
+      type: "MOVE",
+      step: -1,
+      moveReason: "click",
+      fromVirtualIndex: -3.2,
+    });
+    expect(next.targetPageIndex).toBe(2);
+    expect(next.isRepeatedClickAdvance).toBe(true);
+  });
+
+  it("never gets the deck more than one page ahead of live visual across a 50-click burst", () => {
+    // Simulate 50 spam clicks while visual creeps forward, never accumulating
+    // beyond "current visual page + 1". Visual stays inside page 0 the whole
+    // time, so the destination is page 1 from start to end — even after the
+    // last click.
+    let next = reduce(buildInitialState(layout), {
+      type: "MOVE",
+      step: 1,
+      moveReason: "click",
+      fromVirtualIndex: 0,
+    });
     for (let i = 0; i < 49; i += 1) {
+      const visual = 0.01 * i; // creep slowly, never past page 0 (< 3.0)
       next = reduce(next, {
         type: "MOVE",
         step: 1,
         moveReason: "click",
-        fromVirtualIndex: 0.5,
+        fromVirtualIndex: visual,
       });
     }
     expect(next.targetPageIndex).toBe(1);

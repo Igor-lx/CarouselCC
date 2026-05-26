@@ -15,17 +15,46 @@ import type {
 } from "./types";
 
 /**
- * Picks the "from" position for the next step. `targetPageIndex` is the
- * reducer's single logical page cursor: while motion is queued it already
- * names the pending destination, and while idle it names the settled page.
- * The caller-provided origin is used only as the lane reference for a fresh
- * visual handoff.
+ * Picks the "from" page for the next step.
+ *
+ * - Default (`isSameDirectionRepeat === false`): `state.targetPageIndex` is
+ *   the reducer's logical page cursor — while motion is queued it already
+ *   names the pending destination, and while idle it names the settled page.
+ *   The caller-provided origin is used only as the lane reference for a
+ *   fresh visual handoff.
+ * - Same-direction repeat click during motion: the cursor is the *live
+ *   visual page* (the page just behind the direction of travel), so a
+ *   rapid-click MOVE resolves to "one page ahead of where the deck is right
+ *   now". rapid clicks pick each other up while visual progresses, but they
+ *   can never get the deck more than a single page ahead of what the user
+ *   actually sees.
  */
-const stepOrigin = (state: CarouselState, fromVirtualIndex: number) => {
+const stepOrigin = (
+  state: CarouselState,
+  fromVirtualIndex: number,
+  step: number,
+  isSameDirectionRepeat: boolean,
+) => {
   const stepSize = state.layout.visibleSlidesCount;
   const isQueued = state.layout.canSlide && state.motionPhase !== "idle";
-  const currentPageIndex = state.targetPageIndex;
-  const laneReference = isQueued ? state.virtualIndex : fromVirtualIndex;
+
+  let currentPageIndex: number;
+  let laneReference: number;
+  if (isSameDirectionRepeat) {
+    const direction = Math.sign(step);
+    const visualPage =
+      direction > 0
+        ? Math.floor(fromVirtualIndex / stepSize)
+        : Math.ceil(fromVirtualIndex / stepSize);
+    currentPageIndex = state.layout.isFinite
+      ? clamp(visualPage, 0, state.layout.pageCount - 1)
+      : normalizePageIndex(visualPage, state.layout.pageCount);
+    laneReference = fromVirtualIndex;
+  } else {
+    currentPageIndex = state.targetPageIndex;
+    laneReference = isQueued ? state.virtualIndex : fromVirtualIndex;
+  }
+
   const currentVirtualIndex = state.layout.isFinite
     ? pageStart(currentPageIndex, stepSize)
     : alignedVirtualIndex(currentPageIndex, laneReference, state.layout);
@@ -58,11 +87,18 @@ export const resolveStepTransition = (
   command: MoveCommand | GoToCommand,
   isInstantMode: boolean,
   motion: MotionSettings,
+  isSameDirectionRepeat: boolean = false,
 ): StepResolution => {
   const { layout } = state;
   const stepSize = layout.visibleSlidesCount;
   const nextFromVirtualIndex = command.fromVirtualIndex ?? state.virtualIndex;
-  const { currentPageIndex, currentVirtualIndex } = stepOrigin(state, nextFromVirtualIndex);
+  const step = command.type === "MOVE" ? command.step : 0;
+  const { currentPageIndex, currentVirtualIndex } = stepOrigin(
+    state,
+    nextFromVirtualIndex,
+    step,
+    isSameDirectionRepeat,
+  );
 
   let nextTargetPageIndex = currentPageIndex;
   let pageDelta = 0;

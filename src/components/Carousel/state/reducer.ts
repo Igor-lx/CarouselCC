@@ -114,26 +114,17 @@ export function carouselReducer(
       const isInstant = Boolean(envelope.isInstant || context.isInstantMode);
       const command = { ...envelope, isInstant };
 
-      // Bounded repeated click: a same-direction MOVE click that arrives while
-      // the deck is already animating only flags the active segment for the
-      // fast-repeat profile — it does not push the destination further. The
-      // pending `targetPageIndex` already names the next page in this
-      // direction, so rapid clicks cannot get the deck more than one page
-      // ahead of where it is animating right now. Reverse-direction clicks
-      // and clicks from idle fall through to the normal advance path below.
-      if (
+      // A repeated same-direction MOVE click during in-flight motion. The
+      // reducer keeps processing it (so rapid clicks "pick each other up"
+      // as visual progresses past page boundaries), but `stepOrigin` will
+      // anchor the cursor on the live visual page instead of the pending
+      // target — so the destination tracks one page ahead of what the user
+      // sees and never accumulates beyond that.
+      const isRepeatedClickAdvance =
         command.type === "MOVE" &&
         command.moveReason === "click" &&
         !isInstant &&
-        isSameDirectionRepeat(synced, command.step)
-      ) {
-        if (synced.isRepeatedClickAdvance) return synced;
-        return {
-          ...synced,
-          isRepeatedClickAdvance: true,
-          gesture: ZERO_GESTURE_RELEASE,
-        };
-      }
+        isSameDirectionRepeat(synced, command.step);
 
       const {
         nextFromVirtualIndex,
@@ -146,6 +137,7 @@ export function carouselReducer(
         command,
         context.isInstantMode,
         context.config.motion,
+        isRepeatedClickAdvance,
       );
 
       const isNoop =
@@ -153,15 +145,19 @@ export function carouselReducer(
         nextVirtualIndex === synced.virtualIndex;
 
       if (isNoop) {
-        // Boundary no-ops hold the current phase, or collapse to an instant
-        // snap when instant mode is on.
+        // Two no-op cases land here: a finite-mode boundary press (target
+        // and virtual unchanged, no fast profile to flag), and a repeated
+        // click while visual is still inside the current page (target is
+        // already where the new click would aim — keep the fast profile
+        // flag on so the motion runner rebuilds the active segment with
+        // the repeated-click peak speed and the live `fromVirtualIndex`).
         return {
           ...synced,
           fromVirtualIndex: nextFromVirtualIndex,
           virtualIndex: nextVirtualIndex,
           teleportVirtualIndex: null,
           isTeleportApproach: false,
-          isRepeatedClickAdvance: false,
+          isRepeatedClickAdvance,
           motionPhase: isInstant ? "step-instant" : synced.motionPhase,
           moveReason: command.moveReason,
           gesture: ZERO_GESTURE_RELEASE,
@@ -175,7 +171,7 @@ export function carouselReducer(
         virtualIndex: nextVirtualIndex,
         teleportVirtualIndex: nextTeleportVirtualIndex,
         isTeleportApproach: false,
-        isRepeatedClickAdvance: false,
+        isRepeatedClickAdvance,
         motionPhase: phase,
         moveReason: command.moveReason,
         gesture: ZERO_GESTURE_RELEASE,
