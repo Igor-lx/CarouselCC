@@ -181,9 +181,12 @@ export function useMotionRunner({
       return;
     }
 
-    const startedNow = performance.now();
     const isActive = controller.isActive();
-    const coldHandoff = isActive ? null : controller.captureHandoff(startedNow);
+    // For a cold start the handoff is consulted only for residual velocity
+    // (position comes from the reducer's `state.fromVirtualIndex`). The
+    // segment's `startedAt` MUST be captured close to `controller.start`
+    // instead — see the cold-start branch below for why.
+    const coldHandoff = isActive ? null : controller.captureHandoff(performance.now());
 
     const startResolvedMotion = (
       resolvedStart: MotionStart,
@@ -246,8 +249,20 @@ export function useMotionRunner({
 
     cancelDeferredRetarget();
 
+    // Capture `startedAt` as close to `controller.start` as possible. The
+    // layout effect runs synchronously during commit, and the gap between
+    // its first line and this call is filled with cancelDeferred / handoff
+    // capture / `buildCarouselSegment` work that can add tens of
+    // milliseconds on a heavy commit. If the segment's clock were started
+    // at the top of the effect, the first rAF tick would already see
+    // `elapsed > 16 ms` and sample 20–30 px into the segment — visible as
+    // a "jump forward, then normal speed" jerk at the start of motion,
+    // especially with the linear easing curve. Pinning `startedAt` here
+    // makes the first tick's elapsed = one frame, like every later tick.
+    const startedAt = performance.now();
+
     if (state.moveReason === "gesture") {
-      startResolvedMotion(buildStartFromGesture(state), startedNow);
+      startResolvedMotion(buildStartFromGesture(state), startedAt);
       return;
     }
 
@@ -256,7 +271,7 @@ export function useMotionRunner({
     // controller. That cross-layer split is intentional — not a mixed handoff.
     startResolvedMotion(
       buildStartFromState(state, coldHandoff?.velocity ?? 0),
-      startedNow,
+      startedAt,
     );
   }, [
     cancelDeferredRetarget,
