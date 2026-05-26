@@ -42,7 +42,7 @@ export const GO_TO_ACCELERATION_DISTANCE_SHARE = 0.5;
 export const GO_TO_DECELERATION_DISTANCE_SHARE = 0.5;
 
 /** Cubic-bezier curves expressed as CSS strings. */
-export const MOVE_BEZIER = "cubic-bezier(0.32, 0.2, 0.28, 1)";
+export const MOVE_BEZIER = "linear";
 export const AUTO_BEZIER = "cubic-bezier(0.28, 0.72, 0.38, 1)";
 export const SNAP_BACK_BEZIER = "cubic-bezier(0.18, 0.82, 0.28, 1)";
 

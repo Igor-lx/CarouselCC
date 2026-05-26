@@ -119,7 +119,7 @@ export default function App() {
               onSlideClick={openSlide}
               onCarouselStatusChange={(snapshot) => setStatus(snapshot)}
             >
-              {isTouch ? <PaginationWidget /> : <Pagination />}
+              {!isTouch ? <PaginationWidget /> : <Pagination />}
               <Controls />
               <Diagnostic />
             </Carousel>
