@@ -48,16 +48,8 @@
     width: 100%;
     height: 100%;
     gap: var(--slides-gap);
-    min-width: 0;
-  }
-
-  // `will-change: transform` keeps the track on its own GPU layer, which
-  // costs memory. Gating it on the JS-set `data-carousel-track-active`
-  // attribute means the GPU layer is only allocated while motion or drag
-  // is actually in progress — every idle carousel on the page releases
-  // its layer.
-  .slideContainer[data-carousel-track-active="true"] {
     will-change: transform;
+    min-width: 0;
   }
 
   .slide {
