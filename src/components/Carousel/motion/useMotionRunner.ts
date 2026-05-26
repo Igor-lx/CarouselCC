@@ -30,12 +30,37 @@ interface UseMotionRunnerInput {
 }
 
 /**
- * Number of RAF ticks the runner waits before swapping the active segment for
- * a click that lands during motion. The old segment keeps painting during the
- * window. At the deferred boundary the successor segment starts from one
- * atomic `captureHandoff` point of the old curve.
+ * Number of rAF ticks the runner waits before actually starting a new motion
+ * segment — applied symmetrically to both a fresh cold start (from idle) and
+ * a hot retarget (when a click lands during in-flight motion).
+ *
+ * Why the defer matters for both paths:
+ *
+ * - **Cold start.** The same React commit that flips `motionPhase` from
+ *   "idle" to "step-normal" can mount many new SlideItems into the expanded
+ *   render window. Each new `<img>` triggers a fresh decode and a heavy
+ *   paint pass that on mobile can stall the browser for 100–300 ms. If the
+ *   segment clock starts inside that layout effect, the controller's first
+ *   rAF tick lands AFTER the heavy paint with `elapsed ≈ commit-paint
+ *   duration`, and the user sees the track snap forward 20–30 px before
+ *   motion continues at normal speed. Deferring the start to a rAF that
+ *   fires AFTER the commit's paint pipeline has reached the compositor
+ *   makes the segment's first observable frame be `progress = 0` (the
+ *   resting `from` position), and every subsequent tick is one frame
+ *   apart — no catch-up jump on the first visible frame.
+ *
+ * - **Hot retarget.** The old segment keeps painting during the defer
+ *   window; at the boundary, the successor segment starts from one atomic
+ *   `captureHandoff` point of the old curve, so position and velocity are
+ *   read from the same sample at the same instant.
+ *
+ * Two rAFs is a defensive choice: a single rAF strictly suffices to "wait
+ * until the previous commit's paint is on the compositor", but two also
+ * give async image decode a frame of headroom — which matters on mobile,
+ * where the heavy commit-driven paint also kicks off WebP decodes that
+ * complete asynchronously.
  */
-const RETARGET_FRAME_DELAY = 2;
+const MOTION_START_FRAME_DELAY = 2;
 
 /**
  * Origin of a post-drag release segment. Drag writes are published into the
@@ -62,13 +87,19 @@ const buildStartFromState = (
  * The motion runner is the only bridge between logical state and the motion
  * controller.
  *
- * Mid-flight retargets keep the old segment painting for a tiny frame-boundary
- * window. At the boundary, the successor segment starts from a single atomic
- * `controller.captureHandoff(t)` — a coherent `(position, velocity)` taken
- * from the *same* sample of the old curve. Position and velocity can no longer
- * be sourced from two different moments (see motion §4.2).
+ * Every transition from a non-motion phase (idle / dragging / step-instant)
+ * into a continuous-motion phase (step-normal / step-snap / step-jump) is
+ * deferred by `MOTION_START_FRAME_DELAY` rAF ticks before the segment is
+ * actually started — both for a cold start from idle and for a hot retarget
+ * over an in-flight segment. See the constant's docblock for why.
  *
- * Every segment - first click, repeated click, gesture release - drives
+ * Hot retargets keep the old segment painting through the defer window. At
+ * the boundary, the successor segment starts from a single atomic
+ * `controller.captureHandoff(t)` — a coherent `(position, velocity)` taken
+ * from the *same* sample of the old curve. Position and velocity can no
+ * longer be sourced from two different moments (see motion §4.2).
+ *
+ * Every segment — first click, repeated click, gesture release — drives
  * directly to `state.virtualIndex`. There is no intermediate destination and
  * no chained follow-up segment.
  */
@@ -84,45 +115,45 @@ export function useMotionRunner({
   onAutoplayDurationChange,
 }: UseMotionRunnerInput): void {
   const lastKeyRef = useRef<string>("");
-  const retargetFrameRef = useRef<number | null>(null);
-  const retargetTokenRef = useRef(0);
+  const startFrameRef = useRef<number | null>(null);
+  const startTokenRef = useRef(0);
 
-  const cancelDeferredRetarget = useCallback(() => {
-    retargetTokenRef.current += 1;
-    if (retargetFrameRef.current !== null && typeof window !== "undefined") {
-      window.cancelAnimationFrame(retargetFrameRef.current);
+  const cancelDeferredStart = useCallback(() => {
+    startTokenRef.current += 1;
+    if (startFrameRef.current !== null && typeof window !== "undefined") {
+      window.cancelAnimationFrame(startFrameRef.current);
     }
-    retargetFrameRef.current = null;
+    startFrameRef.current = null;
   }, []);
 
-  const scheduleDeferredRetarget = useCallback(
+  const scheduleDeferredStart = useCallback(
     (callback: (timestamp: number) => void) => {
-      cancelDeferredRetarget();
+      cancelDeferredStart();
 
       if (typeof window === "undefined") {
         callback(performance.now());
         return;
       }
 
-      const token = retargetTokenRef.current;
-      let framesLeft = RETARGET_FRAME_DELAY;
+      const token = startTokenRef.current;
+      let framesLeft = MOTION_START_FRAME_DELAY;
 
       const tick: FrameRequestCallback = (timestamp) => {
-        if (retargetTokenRef.current !== token) return;
+        if (startTokenRef.current !== token) return;
 
         framesLeft -= 1;
         if (framesLeft > 0) {
-          retargetFrameRef.current = window.requestAnimationFrame(tick);
+          startFrameRef.current = window.requestAnimationFrame(tick);
           return;
         }
 
-        retargetFrameRef.current = null;
+        startFrameRef.current = null;
         callback(timestamp);
       };
 
-      retargetFrameRef.current = window.requestAnimationFrame(tick);
+      startFrameRef.current = window.requestAnimationFrame(tick);
     },
-    [cancelDeferredRetarget],
+    [cancelDeferredStart],
   );
 
   const settle = useCallback(
@@ -152,27 +183,27 @@ export function useMotionRunner({
     lastKeyRef.current = key;
 
     if (!enabled) {
-      cancelDeferredRetarget();
+      cancelDeferredStart();
       onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, { strategy: "idle" });
       return;
     }
 
     if (state.motionPhase === "idle") {
-      cancelDeferredRetarget();
+      cancelDeferredStart();
       onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, { strategy: "idle" });
       return;
     }
 
     if (state.motionPhase === "dragging") {
-      cancelDeferredRetarget();
+      cancelDeferredStart();
       onAutoplayDurationCancel?.();
       return;
     }
 
     if (state.motionPhase === "step-instant") {
-      cancelDeferredRetarget();
+      cancelDeferredStart();
       onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, {
         strategy: "idle",
@@ -183,9 +214,9 @@ export function useMotionRunner({
 
     const isActive = controller.isActive();
     // For a cold start the handoff is consulted only for residual velocity
-    // (position comes from the reducer's `state.fromVirtualIndex`). The
-    // segment's `startedAt` MUST be captured close to `controller.start`
-    // instead — see the cold-start branch below for why.
+    // (position is owned by the reducer's `state.fromVirtualIndex`). The
+    // handoff's timestamp is unused — the segment's `startedAt` comes from
+    // the deferred rAF callback below.
     const coldHandoff = isActive ? null : controller.captureHandoff(performance.now());
 
     const startResolvedMotion = (
@@ -232,8 +263,9 @@ export function useMotionRunner({
     };
 
     if (isActive) {
-      scheduleDeferredRetarget((retargetTimestamp) => {
-        // One atomic point: position + velocity + time from the same sample.
+      // Hot retarget: the old segment keeps painting through the defer
+      // window, then hands off at one atomic `captureHandoff` point.
+      scheduleDeferredStart((retargetTimestamp) => {
         const handoff = controller.captureHandoff(retargetTimestamp);
         startResolvedMotion(
           {
@@ -247,34 +279,26 @@ export function useMotionRunner({
       return;
     }
 
-    cancelDeferredRetarget();
-
-    // Capture `startedAt` as close to `controller.start` as possible. The
-    // layout effect runs synchronously during commit, and the gap between
-    // its first line and this call is filled with cancelDeferred / handoff
-    // capture / `buildCarouselSegment` work that can add tens of
-    // milliseconds on a heavy commit. If the segment's clock were started
-    // at the top of the effect, the first rAF tick would already see
-    // `elapsed > 16 ms` and sample 20–30 px into the segment — visible as
-    // a "jump forward, then normal speed" jerk at the start of motion,
-    // especially with the linear easing curve. Pinning `startedAt` here
-    // makes the first tick's elapsed = one frame, like every later tick.
-    const startedAt = performance.now();
-
-    if (state.moveReason === "gesture") {
-      startResolvedMotion(buildStartFromGesture(state), startedAt);
-      return;
-    }
-
-    // Cold start from idle: the logical origin is owned by the reducer
-    // (`state.fromVirtualIndex`); only the residual velocity comes from the
-    // controller. That cross-layer split is intentional — not a mixed handoff.
-    startResolvedMotion(
-      buildStartFromState(state, coldHandoff?.velocity ?? 0),
-      startedAt,
-    );
+    // Cold start from idle. Defer through the same window so the React
+    // commit's paint pipeline (which often mounts new SlideItems and
+    // triggers fresh image decodes — the dominant cost on mobile) reaches
+    // the compositor BEFORE the segment clock starts ticking. See the
+    // `MOTION_START_FRAME_DELAY` docblock for the failure mode.
+    scheduleDeferredStart((startedAt) => {
+      if (state.moveReason === "gesture") {
+        startResolvedMotion(buildStartFromGesture(state), startedAt);
+        return;
+      }
+      // The logical origin is owned by the reducer
+      // (`state.fromVirtualIndex`); only the residual velocity comes from the
+      // controller. That cross-layer split is intentional — not a mixed handoff.
+      startResolvedMotion(
+        buildStartFromState(state, coldHandoff?.velocity ?? 0),
+        startedAt,
+      );
+    });
   }, [
-    cancelDeferredRetarget,
+    cancelDeferredStart,
     config,
     controller,
     enabled,
@@ -282,7 +306,7 @@ export function useMotionRunner({
     isInstantMode,
     onAutoplayDurationCancel,
     onAutoplayDurationChange,
-    scheduleDeferredRetarget,
+    scheduleDeferredStart,
     settle,
     state.fromVirtualIndex,
     state.gesture.pointerVelocity,
@@ -297,9 +321,9 @@ export function useMotionRunner({
 
   useEffect(
     () => () => {
-      cancelDeferredRetarget();
+      cancelDeferredStart();
       controller.cancel();
     },
-    [cancelDeferredRetarget, controller],
+    [cancelDeferredStart, controller],
   );
 }

@@ -4,10 +4,10 @@
  * A repeated click drives straight to the next page boundary and decays to
  * zero speed - there is no intermediate target.
  */
-export const REPEATED_CLICK_SPEED_MULTIPLIER = 5;
+export const REPEATED_CLICK_SPEED_MULTIPLIER = 7;
 
 /** Fraction of the fast segment distance dedicated to ramp-up. */
-export const REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE = 0.35;
+export const REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE = 0.3;
 
 /** Fraction of the fast segment distance dedicated to ramp-down. */
 export const REPEATED_CLICK_DECELERATION_DISTANCE_SHARE = 0.35;
@@ -42,7 +42,9 @@ export const GO_TO_ACCELERATION_DISTANCE_SHARE = 0.5;
 export const GO_TO_DECELERATION_DISTANCE_SHARE = 0.5;
 
 /** Cubic-bezier curves expressed as CSS strings. */
-export const MOVE_BEZIER = "cubic-bezier(0.32, 0.2, 0.28, 1)";
+
+//export const MOVE_BEZIER = "cubic-bezier(0.32, 0.2, 0.28, 1)";
+export const MOVE_BEZIER = "linear";
 export const AUTO_BEZIER = "cubic-bezier(0.28, 0.72, 0.38, 1)";
 export const SNAP_BACK_BEZIER = "cubic-bezier(0.18, 0.82, 0.28, 1)";
 
