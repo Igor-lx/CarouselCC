@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 
 import {
   useIsomorphicLayoutEffect,
+  type MotionClockStart,
   type MotionController,
   type MotionSample,
 } from "../../../shared";
@@ -190,6 +191,7 @@ export function useMotionRunner({
     const startResolvedMotion = (
       resolvedStart: MotionStart,
       resolvedStartedAt: number,
+      clockStart: MotionClockStart,
     ) => {
       const distance = state.virtualIndex - resolvedStart.position;
 
@@ -227,13 +229,15 @@ export function useMotionRunner({
         segment,
         sampler: sampleCarouselSegment,
         onComplete: settle,
-        clockStart: "after-initial-frame",
+        clockStart,
       });
     };
 
     if (isActive) {
       scheduleDeferredStart(RETARGET_FRAME_DELAY, (retargetTimestamp) => {
         // One atomic point: position + velocity + time from the same sample.
+        // The old segment is already visible, so retargets keep the immediate
+        // clock and avoid a frozen handoff frame.
         const handoff = controller.captureHandoff(retargetTimestamp);
         startResolvedMotion(
           {
@@ -242,6 +246,7 @@ export function useMotionRunner({
             strategy: handoff.strategy,
           },
           handoff.timestamp,
+          "immediate",
         );
       });
       return;
@@ -249,7 +254,11 @@ export function useMotionRunner({
 
     scheduleDeferredStart(COLD_START_FRAME_DELAY, (startedAt) => {
       if (state.moveReason === "gesture") {
-        startResolvedMotion(buildStartFromGesture(state), startedAt);
+        startResolvedMotion(
+          buildStartFromGesture(state),
+          startedAt,
+          "after-initial-frame",
+        );
         return;
       }
 
@@ -261,6 +270,7 @@ export function useMotionRunner({
       startResolvedMotion(
         buildStartFromState(state, handoff.velocity),
         startedAt,
+        "after-initial-frame",
       );
     });
   }, [

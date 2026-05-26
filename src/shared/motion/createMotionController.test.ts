@@ -133,13 +133,14 @@ describe("clock start", () => {
   it("arms an after-initial-frame clock without catch-up elapsed", () => {
     withMockedRaf(({ flushFrame }) => {
       const controller = createMotionController<string>(0, "idle");
+      const activeSegment = segment();
       const values: number[] = [];
       controller.subscribe((sample) => values.push(sample.value), {
         emitCurrent: false,
       });
 
       controller.start({
-        segment: segment(),
+        segment: activeSegment,
         sampler: linearSampler,
         clockStart: "after-initial-frame",
       });
@@ -151,6 +152,7 @@ describe("clock start", () => {
 
       flushFrame(216);
       expect(values.at(-1)).toBeCloseTo(1.6);
+      expect(activeSegment.startedAt).toBe(0);
     });
   });
 

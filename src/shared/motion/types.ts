@@ -46,6 +46,17 @@ export type MotionSegmentSampler<
 > = (segment: Segment, timestamp: number) => MotionSampleData<Strategy>;
 
 export type MotionCompletionMode = "immediate" | "next-frame";
+
+/**
+ * When the segment's wall-clock starts advancing relative to `startedAt`.
+ *
+ * - `"immediate"` keeps the legacy behavior: every rAF samples elapsed time
+ *   from the `startedAt` provided by the caller.
+ * - `"after-initial-frame"` still emits the initial sample synchronously, then
+ *   arms the clock on the next rAF and starts advancing only after that. This
+ *   absorbs a heavy first paint into the `from` plateau instead of into hidden
+ *   elapsed time.
+ */
 export type MotionClockStart = "immediate" | "after-initial-frame";
 
 export interface MotionStartOptions<

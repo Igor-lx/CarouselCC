@@ -500,10 +500,10 @@ new segment starts from a **single atomic handoff point**:
   `{ position, velocity, strategy, timestamp }` — position and velocity are
   read from the *same* sample of the old curve at the same instant;
 - `startedAt = handoff.timestamp`;
-- the controller publishes the initial sample synchronously, then arms the
-  segment clock on the next frame boundary (`clockStart:
-  "after-initial-frame"`), so a delayed first paint cannot accumulate hidden
-  elapsed time.
+- the controller publishes the initial sample synchronously and starts this
+  retarget segment immediately (`clockStart: "immediate"`), because the old
+  segment has already been presenting frames and an extra frozen handoff frame
+  would make a direction change feel sticky.
 
 The controller exposes exactly one handoff API, so position and velocity can
 never be sourced from two different moments — the boundary makes that mistake
@@ -515,9 +515,9 @@ The defer is not applied synchronously in the input/layout-effect turn. For a
 **cold start** from idle the split is different and intentional: the logical
 origin position is owned by the reducer (`state.fromVirtualIndex`, passed in at
 the dispatch site), only residual velocity is read from the controller, and the
-controller re-pins `startedAt` when the after-initial-frame clock is armed.
-That prevents the segment clock from advancing while the first visible frame is
-still blocked.
+controller arms a separate after-initial-frame clock
+(`clockStart: "after-initial-frame"`). That prevents the segment clock from
+advancing while the first visible frame is still blocked.
 
 Any future change must preserve the invariant: "intent immediately, controller
 retarget on a frame boundary, the in-flight handoff taken as one atomic
@@ -948,7 +948,7 @@ dependencies, the architecture has held.
   binding short-circuits writes that would re-apply the same transform.
   The PaginationWidget binding short-circuits writes per dot. The motion
   controller emits only on actual sample change (per RAF tick of an
-  active segment; continuous segments publish their initial sample first and
-  arm the clock one frame later; active retargets publish their first successor
-  sample after the deferred frame-boundary handoff; no emits while idle). Image
+  active segment; cold starts publish their initial sample first and arm the
+  clock one frame later; active retargets publish their first successor sample
+  after the deferred frame-boundary handoff; no emits while idle). Image
   preload/decode is scoped to the slide layer and starts only from idle states.
