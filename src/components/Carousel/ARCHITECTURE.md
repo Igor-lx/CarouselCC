@@ -125,7 +125,7 @@ referentially-stable object.
 | Prop                       | Type | Effect |
 | -------------------------- | ---- | ------ |
 | `onSlideClick`             | `(slide: Slide) => void` | Fires when an interactive slide is clicked. The slide is interactive only when `isInteractive`, the image (if any) loaded successfully, and this handler is provided. |
-| `onCarouselStatusChange`   | `(snapshot: CarouselStatusSnapshot) => void` | Low-frequency, **observation-only** status. `CarouselStatusSnapshot = { isIdle, currentPageIndex, pageCount }` — two numbers (which page, of how many) plus the idle flag. Fires on mount and whenever one of those changes; `currentPageIndex` is the *target* page, so it reflects intent immediately on click/gesture. Carries no per-frame data (position, velocity) and no reducer internals. Deduplicated by a shallow snapshot compare. |
+| `onCarouselStatusChange`   | `(snapshot: CarouselStatusSnapshot) => void` | Low-frequency, **observation-only** status. `CarouselStatusSnapshot = { isIdle, currentPageIndex, pageCount, isAtStart, isAtEnd }` — two numbers (which page, of how many), the idle flag, and the two boundary flags (always `false` in cyclic mode). Fires on mount and whenever one of those changes; `currentPageIndex` is the *target* page, so it reflects intent immediately on click/gesture. `isAtStart` / `isAtEnd` are the same boundary flags the internal `<Controls>` slot uses to hide its zones — hosts driving the carousel through the imperative handle can wire them to `disabled` on external prev/next buttons. Carries no per-frame data (position, velocity) and no reducer internals. Deduplicated by a shallow snapshot compare. |
 
 #### Imperative handle
 
@@ -244,14 +244,21 @@ These are the user-facing behaviours the implementation guarantees.
   `isAuto`. On the final page in finite mode, the next step loops back to
   page 0 via `GO_TO`.
 - **External status signal.** `onCarouselStatusChange` fires on mount and on
-  every change of `{ isIdle, currentPageIndex, pageCount }` — a low-frequency,
-  observation-only snapshot. Consumers use it for a "page X of Y" label or to
-  schedule non-critical work around motion. It carries no per-frame data and
-  no reducer internals; the carousel still runs its own image preparation for
-  nearby slides while idle, independent of this signal.
+  every change of `{ isIdle, currentPageIndex, pageCount, isAtStart, isAtEnd }`
+  — a low-frequency, observation-only snapshot. Consumers use it for a
+  "page X of Y" label, to schedule non-critical work around motion, and to
+  reflect the boundary state on external prev / next buttons (`isAtStart` /
+  `isAtEnd` are the same flags the internal `<Controls>` uses to hide its
+  zones; in cyclic mode both are always `false`). It carries no per-frame
+  data and no reducer internals; the carousel still runs its own image
+  preparation for nearby slides while idle, independent of this signal.
 - **External imperative control.** A `ref` of type `CarouselHandle` exposes
   `prev()` / `next()` for buttons outside the carousel subtree or programmatic
-  use. Both route through the same navigation pipeline as `<Controls>`.
+  use. Both route through the same navigation pipeline as `<Controls>` —
+  there is no second control path. In finite mode the handle's `prev` / `next`
+  are safe no-ops at the edges; hosts can also surface that state on the
+  button itself by wiring `disabled` to the matching `isAtStart` / `isAtEnd`
+  flag from the status snapshot.
 - **Image preparation.** When `isContentImg` is on, the slide layer warms
   image URLs around the idle viewport: the visible band plus a page-lookahead
   buffer on each side, nearest-first. The carousel steps a whole page

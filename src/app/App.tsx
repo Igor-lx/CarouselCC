@@ -106,6 +106,7 @@ export default function App() {
             jumpSpeedMultiplier={12}
             intervalAutoplay={3000}
             isPagePaddingOn
+            isFinite ={false}
             userEnvironment={userEnvironment}
             onSlideClick={openSlide}
             onCarouselStatusChange={(snapshot) => setStatus(snapshot)}
@@ -121,6 +122,7 @@ export default function App() {
           <button
             className={appStyles.button}
             onClick={() => carouselRef.current?.prev()}
+            disabled={status?.isAtStart ?? false}
           >
             ‹
           </button>
@@ -130,6 +132,7 @@ export default function App() {
           <button
             className={appStyles.button}
             onClick={() => carouselRef.current?.next()}
+            disabled={status?.isAtEnd ?? false}
           >
             ›
           </button>
