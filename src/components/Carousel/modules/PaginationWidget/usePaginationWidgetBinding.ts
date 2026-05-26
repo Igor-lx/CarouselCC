@@ -121,19 +121,22 @@ export function usePaginationWidgetBinding({
 
   const writeActiveProjection = useCallback(
     (visualOffset: number) => {
-      const candidateIds = [Math.floor(visualOffset), Math.ceil(visualOffset)];
+      // Two scalar locals instead of a per-frame `[floor, ceil]` array
+      // allocation — the active-projection write runs on every motion
+      // frame so this drops one short-lived array per RAF tick.
+      const floorId = Math.floor(visualOffset);
+      const ceilId = Math.ceil(visualOffset);
       const cache = activeDotCacheRef.current;
 
       for (let index = 0; index < ACTIVE_DOT_COUNT; index += 1) {
         const dot = activeDotRefs.current[index];
         if (!dot) continue;
 
-        const id = candidateIds[index];
-        const isDuplicate = index > 0 && id === candidateIds[0];
-        const state =
-          typeof id === "number" && !isDuplicate
-            ? writeDotProjection(activeProjectionRef.current, id, visualOffset, geometry)
-            : null;
+        const id = index === 0 ? floorId : ceilId;
+        const isDuplicate = index > 0 && id === floorId;
+        const state = !isDuplicate
+          ? writeDotProjection(activeProjectionRef.current, id, visualOffset, geometry)
+          : null;
         const x = state?.x ?? 0;
         const scale = state?.scale ?? 0;
         const opacity = state?.activeStrength ?? 0;

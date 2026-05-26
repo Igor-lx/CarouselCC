@@ -15,6 +15,18 @@ import type {
 } from "./types";
 
 /**
+ * How many pages a same-direction repeat click skips past the live visual
+ * page. `2` means each rapid click resolves to "one page past the page the
+ * deck is already heading to", which is the historical behaviour: clicks
+ * pick each other up and the deck keeps moving continuously while the
+ * spam holds, then settles one page after the burst ends.
+ */
+const REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES = 2;
+
+const repeatedClickStep = (step: number): number =>
+  Math.sign(step) * REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES;
+
+/**
  * Picks the "from" page for the next step.
  *
  * - Default (`isSameDirectionRepeat === false`): `state.targetPageIndex` is
@@ -95,11 +107,13 @@ export const resolveStepTransition = (
   const step = command.type === "MOVE" ? command.step : 0;
   // A same-direction MOVE click during in-flight motion does not accelerate
   // toward the page the deck is already heading for — it skips it. The
-  // effective step is doubled so the new target lands one page past the
-  // in-flight one, anchored on the live visual page (see `stepOrigin`). This
-  // is what makes rapid clicks visibly extend the run instead of bunching
-  // up on the first segment.
-  const effectiveMoveStep = isSameDirectionRepeat ? step * 2 : step;
+  // effective step lands `REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES` ahead of
+  // the live visual page (see `stepOrigin`), which is what makes rapid
+  // clicks visibly extend the run instead of bunching up on the first
+  // segment.
+  const effectiveMoveStep = isSameDirectionRepeat
+    ? repeatedClickStep(step)
+    : step;
   const { currentPageIndex, currentVirtualIndex } = stepOrigin(
     state,
     nextFromVirtualIndex,
