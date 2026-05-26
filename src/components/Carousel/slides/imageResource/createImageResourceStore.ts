@@ -553,7 +553,16 @@ export function createImageResourceStore(): ImageResourceStore {
     syncPreparationWindow(preparationWindow: ImagePreparationWindow) {
       if (!canUseDom) return;
 
-      if (!preparationWindow.enabled || preparationWindow.urls.length === 0) {
+      if (!preparationWindow.enabled) {
+        closePreparationSession(
+          preparationWindow.urls.length > 0
+            ? new Set(preparationWindow.urls)
+            : null,
+        );
+        return;
+      }
+
+      if (preparationWindow.urls.length === 0) {
         closePreparationSession();
         return;
       }

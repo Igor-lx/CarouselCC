@@ -59,7 +59,9 @@ export interface ImageResourceStore {
   /**
    * Atomically replace the active idle preparation window. Disabling the
    * window closes the session, cancels queued decode work, and invalidates
-   * stale warm-up callbacks before motion starts.
+   * stale warm-up callbacks. Any URLs carried with a disabled window retain
+   * their already-ready warm-up elements, so motion can stop new background
+   * work without discarding decoded neighbours.
    */
   syncPreparationWindow(preparationWindow: ImagePreparationWindow): void;
   /** Record the outcome of a real, on-screen `<img>`. */
