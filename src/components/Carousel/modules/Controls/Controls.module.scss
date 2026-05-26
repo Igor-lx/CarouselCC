@@ -117,9 +117,9 @@
     }
   }
 
-  // Desktop: reveal the 8%-wide strip on viewport hover or focus-visible.
-  [data-touch="false"]:has(*:focus-visible) .navZone,
-  [data-touch="false"]:has([data-carousel-viewport]:hover) .navZone {
+  // Desktop: reveal the 8%-wide strip on viewport hover or focus-within.
+  [data-touch="false"] [data-carousel-viewport]:focus-within .navZone,
+  [data-touch="false"] [data-carousel-viewport]:hover .navZone {
     opacity: 1;
     pointer-events: auto;
   }

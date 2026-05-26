@@ -6,6 +6,18 @@ import type { CarouselLayout, CarouselSlideRecord, PageBoundaryState } from "./t
 const slideContentKey = (slide: Slide) =>
   `${slide.id}-${typeof slide.content === "string" ? slide.content : "obj"}`;
 
+const buildDataKey = (records: CarouselSlideRecord[]): string => {
+  let key = "";
+
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index]!;
+    if (index > 0) key += "|";
+    key += `${record.slideKey}-${slideContentKey(record.slideData)}`;
+  }
+
+  return key;
+};
+
 export const pageStart = (pageIndex: number, visibleSlidesCount: number) =>
   pageIndex * visibleSlidesCount;
 
@@ -19,9 +31,7 @@ export const buildCarouselLayout = (
   const canSlide = length > effectiveVisible;
   const pageCount = effectiveVisible > 0 ? Math.ceil(length / effectiveVisible) : 0;
   const virtualLength = canSlide && !isFinite ? pageCount * effectiveVisible : length;
-  const dataKey = records
-    .map((record) => `${record.slideKey}-${slideContentKey(record.slideData)}`)
-    .join("|");
+  const dataKey = buildDataKey(records);
 
   return {
     length,

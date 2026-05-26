@@ -121,15 +121,16 @@ export function usePaginationWidgetBinding({
 
   const writeActiveProjection = useCallback(
     (visualOffset: number) => {
-      const candidateIds = [Math.floor(visualOffset), Math.ceil(visualOffset)];
+      const floorId = Math.floor(visualOffset);
+      const ceilId = Math.ceil(visualOffset);
       const cache = activeDotCacheRef.current;
 
       for (let index = 0; index < ACTIVE_DOT_COUNT; index += 1) {
         const dot = activeDotRefs.current[index];
         if (!dot) continue;
 
-        const id = candidateIds[index];
-        const isDuplicate = index > 0 && id === candidateIds[0];
+        const id = index === 0 ? floorId : ceilId;
+        const isDuplicate = index > 0 && id === floorId;
         const state =
           typeof id === "number" && !isDuplicate
             ? writeDotProjection(activeProjectionRef.current, id, visualOffset, geometry)

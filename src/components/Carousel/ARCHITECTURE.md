@@ -298,9 +298,9 @@ These are the user-facing behaviours the implementation guarantees.
   to the first focusable target inside the new active band via
   `manageFocusShift`. No-op when nothing is focused inside the deck.
 - **Controls.** `<Controls />` renders one zone on each edge of the
-  viewport. On desktop they are hidden by default and revealed on viewport
-  hover or focus (`:has([data-carousel-viewport]:hover)`,
-  `:has(*:focus-visible)`). On touch they are visible by default.
+  viewport. On desktop they are hidden by default and revealed by direct
+  viewport `:hover` / `:focus-within` selectors. On touch they are visible
+  by default.
   `canMovePrev` / `canMoveNext` reflect the finite-boundary state, so the
   edge zones are not rendered when there is no destination.
 - **Diagnostic.** Observation-only. When attached, raw inputs and
@@ -915,6 +915,10 @@ dependencies, the architecture has held.
   props: invalid input propagates and is surfaced by the `Diagnostic` slot as
   DEV-only warnings, keeping the failure mode visible at the source. The
   schemas are a tool for the host, intentionally unused inside the component.
+- **Schema/runtime boundary.** The Zod schemas live in `schemas.ts`; importing
+  the carousel component does not import `zod`. Hosts that import the schemas
+  for production runtime validation intentionally pay that bundle cost and own
+  any fallback substitution before props reach the carousel.
 - **React safety.** Per-frame work never touches React state. State
   machine dispatches are batched by React. Effects are pure; cleanup is
   explicit. `useIsomorphicLayoutEffect` is used for DOM measurement,

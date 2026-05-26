@@ -7,7 +7,7 @@ export type {
   ClassNameMap,
   SlideClassMap,
 } from "./types";
-export { SLIDE_CLASS_KEYS } from "./types";
-// Public Zod schemas for host-side validation of external data — see the
-// schema docblocks in `types.ts`. The component does not use them itself.
-export { CarouselPropsSchema, CarouselSlidesDataSchema } from "./types";
+export { SLIDE_CLASS_KEYS } from "./classKeys";
+// Public Zod schemas for host-side runtime validation of external data.
+// The Carousel component itself never imports them.
+export { CarouselPropsSchema, CarouselSlidesDataSchema } from "./schemas";

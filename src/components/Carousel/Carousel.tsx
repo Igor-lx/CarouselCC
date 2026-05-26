@@ -32,11 +32,11 @@ import {
 import { CAROUSEL_SLOTS } from "./slots";
 import { useCarouselState } from "./state";
 import { areStatusSnapshotsEqual } from "./status/statusSnapshot";
-import {
-  SLIDE_CLASS_KEYS,
-  type CarouselProps,
-  type CarouselStatusSnapshot,
-  type SlideClassMap,
+import { SLIDE_CLASS_KEYS } from "./classKeys";
+import type {
+  CarouselProps,
+  CarouselStatusSnapshot,
+  SlideClassMap,
 } from "./types";
 
 const Carousel = memo(function Carousel(props: CarouselProps) {
@@ -397,6 +397,9 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
                 ref={trackRef}
                 className={classNames.slideContainer}
                 data-carousel-track=""
+                data-carousel-track-active={
+                  status.isMoving || status.isDragging ? true : undefined
+                }
               >
                 {virtualSlides.map((slide) => (
                   <SlideItem

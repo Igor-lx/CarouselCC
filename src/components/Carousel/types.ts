@@ -1,62 +1,22 @@
 import type { ReactElement, ReactNode, Ref } from "react";
-import { z } from "zod";
 
-const ReactElementSchema = z.custom<ReactElement>((value) => {
-  if (typeof value !== "object" || value === null) return false;
-  const sigil = (value as { $$typeof?: unknown }).$$typeof;
-  return (
-    sigil === Symbol.for("react.element") ||
-    sigil === Symbol.for("react.transitional.element")
-  );
-});
+import type { CLASS_NAME_KEYS, SLIDE_CLASS_KEYS } from "./classKeys";
 
-const ContentSchema = z.union([
-  z.string().trim().min(1),
-  z.number(),
-  ReactElementSchema,
-]);
+export type ClassNameKey = (typeof CLASS_NAME_KEYS)[number];
+export type SlideClassKey = (typeof SLIDE_CLASS_KEYS)[number];
 
-const DeckClassMapSchema = z.object({
-  outerContainer: z.string(),
-  innerContainer: z.string(),
-  slideContainer: z.string(),
-});
+export type ClassNameMap = Partial<Record<ClassNameKey, string>>;
+export type SlideClassMap = Pick<ClassNameMap, SlideClassKey>;
 
-const SlideClassMapSchema = z.object({
-  slide: z.string(),
-  slideInteractive: z.string(),
-  slideError: z.string(),
-  slideText: z.string(),
-});
-
-export const SLIDE_CLASS_KEYS = SlideClassMapSchema.keyof().options;
-
-const ClassMapSchema = z
-  .object({
-    ...DeckClassMapSchema.shape,
-    ...SlideClassMapSchema.shape,
-  })
-  .partial();
-
-export type ClassNameMap = z.infer<typeof ClassMapSchema>;
-export type SlideClassMap = Pick<ClassNameMap, (typeof SLIDE_CLASS_KEYS)[number]>;
-
-const SlideSchema = z.object({
-  id: z.union([z.string(), z.number()]),
-  content: ContentSchema,
-  alt: z.string().optional(),
-});
-
-export type Slide = z.infer<typeof SlideSchema>;
-
-const OnSlideClickSchema = z.function({
-  input: [SlideSchema],
-  output: z.void(),
-});
+export interface Slide {
+  id: string | number;
+  content: string | number | ReactElement;
+  alt?: string;
+}
 
 /**
  * Low-frequency, read-only status handed to `onCarouselStatusChange`. Two
- * numbers — which page, out of how many — plus the idle flag and finite-mode
+ * numbers - which page, out of how many - plus the idle flag and finite-mode
  * boundary flags. Deliberately carries no per-frame data (position, velocity)
  * and no reducer internals:
  * it is a status snapshot, not an animation feed.
@@ -77,72 +37,25 @@ export interface CarouselStatusSnapshot {
   readonly isAtEnd: boolean;
 }
 
-const CarouselStatusSnapshotSchema = z.object({
-  isIdle: z.boolean(),
-  currentPageIndex: z.number(),
-  pageCount: z.number(),
-  isAtStart: z.boolean(),
-  isAtEnd: z.boolean(),
-});
-
-const OnCarouselStatusChangeSchema = z.function({
-  input: [CarouselStatusSnapshotSchema],
-  output: z.void(),
-});
-
 /**
  * Injected user-environment signals. The carousel does not detect these
- * itself — the host reads them once (see `useUserEnvironment` in `shared`)
+ * itself - the host reads them once (see `useUserEnvironment` in `shared`)
  * and passes them in. Every field is optional; an unset field resolves to
  * `false` and is surfaced by the `Diagnostic` slot.
  */
-const UserEnvironmentSchema = z
-  .object({
-    reducedMotion: z.boolean(),
-    touch: z.boolean(),
-    dataSaver: z.boolean(),
-  })
-  .partial();
+export interface CarouselUserEnvironment {
+  reducedMotion?: boolean;
+  touch?: boolean;
+  dataSaver?: boolean;
+}
 
 /**
- * Public Zod schema for `CarouselProps`, exposed for the **host application**
- * to validate inputs from external sources (API responses, CMS, user config)
- * before passing them into the component.
- *
- * The carousel itself does NOT runtime-validate its own props — invalid input
- * propagates and is surfaced by the `Diagnostic` slot as DEV-only warnings,
- * keeping the failure mode visible at the source rather than silently
- * repaired. This schema is the tool a host app uses to reject bad data up
- * front; it is intentionally unused inside the component.
- */
-export const CarouselPropsSchema = z.object({
-  slidesData: z.array(SlideSchema),
-  visibleSlidesNr: z.number().optional(),
-  isPagePaddingOn: z.boolean().optional(),
-  durationAutoplay: z.number().optional(),
-  intervalAutoplay: z.number().optional(),
-  durationStep: z.number().optional(),
-  jumpSpeedMultiplier: z.number().optional(),
-  isContentImg: z.boolean().optional(),
-  errAltPlaceholder: z.string().optional(),
-  isAuto: z.boolean().optional(),
-  isPaginationOn: z.boolean().optional(),
-  isInteractive: z.boolean().optional(),
-  isFinite: z.boolean().optional(),
-  isControlsOn: z.boolean().optional(),
-  className: ClassMapSchema.optional(),
-  userEnvironment: UserEnvironmentSchema.optional(),
-  onSlideClick: OnSlideClickSchema.optional(),
-  onCarouselStatusChange: OnCarouselStatusChangeSchema.optional(),
-});
-
-/**
- * Imperative handle for driving the carousel from outside its subtree —
+ * Imperative handle for driving the carousel from outside its subtree -
  * external buttons elsewhere on the page, or programmatic control. Minimal by
  * design: only single-step navigation. Page jumps (`GO_TO`) stay internal,
  * reached through the pagination slot. Both methods route through the same
- * navigation pipeline as the built-in `<Controls>` — there is no second
- * control path — and are safe no-ops when the deck cannot slide.
+ * navigation pipeline as the built-in `<Controls>` - there is no second
+ * control path - and are safe no-ops when the deck cannot slide.
  */
 export interface CarouselHandle {
   /** Step one page towards the start. */
@@ -151,15 +64,28 @@ export interface CarouselHandle {
   next(): void;
 }
 
-export interface CarouselProps extends z.infer<typeof CarouselPropsSchema> {
+export interface CarouselProps {
+  slidesData: Slide[];
+  visibleSlidesNr?: number;
+  isPagePaddingOn?: boolean;
+  durationAutoplay?: number;
+  intervalAutoplay?: number;
+  durationStep?: number;
+  jumpSpeedMultiplier?: number;
+  isContentImg?: boolean;
+  errAltPlaceholder?: string;
+  isAuto?: boolean;
+  isPaginationOn?: boolean;
+  isInteractive?: boolean;
+  isFinite?: boolean;
+  isControlsOn?: boolean;
+  className?: ClassNameMap;
+  userEnvironment?: CarouselUserEnvironment;
+  onSlideClick?: (slide: Slide) => void;
+  onCarouselStatusChange?: (snapshot: CarouselStatusSnapshot) => void;
   children?: ReactNode;
-  /** Imperative handle — see {@link CarouselHandle}. */
+  /** Imperative handle - see {@link CarouselHandle}. */
   ref?: Ref<CarouselHandle>;
 }
 
-/**
- * Public Zod schema for the `slidesData` array alone — the most common thing
- * a host application needs to validate (e.g. an API response) before handing
- * it to the carousel. See {@link CarouselPropsSchema} for the rationale.
- */
-export const CarouselSlidesDataSchema = CarouselPropsSchema.shape.slidesData;
+export { CarouselPropsSchema, CarouselSlidesDataSchema } from "./schemas";

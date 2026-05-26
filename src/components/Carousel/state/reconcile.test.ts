@@ -59,6 +59,26 @@ describe("reconcileStateToLayout — hard reset", () => {
     expect(next.targetPageIndex).toBe(0);
   });
 
+  it("resets when string content changes under the same ids and length", () => {
+    const beforeSlides: Slide[] = [
+      { id: "same-1", content: "old-1" },
+      { id: "same-2", content: "old-2" },
+      { id: "same-3", content: "old-3" },
+      { id: "same-4", content: "old-4" },
+    ];
+    const afterSlides: Slide[] = [
+      { id: "same-1", content: "new-1" },
+      { id: "same-2", content: "new-2" },
+      { id: "same-3", content: "new-3" },
+      { id: "same-4", content: "new-4" },
+    ];
+    const layout = buildCarouselLayout(buildSlideRecords(beforeSlides), 2, false);
+    const replaced = buildCarouselLayout(buildSlideRecords(afterSlides), 2, false);
+    const next = reconcileStateToLayout(movedState(layout, 1), replaced);
+
+    expect(next).toEqual(buildInitialState(replaced));
+  });
+
   it("resets to the initial state on an isFinite change", () => {
     const cyclic = makeLayout(12, 3, false);
     const finite = makeLayout(12, 3, true);
