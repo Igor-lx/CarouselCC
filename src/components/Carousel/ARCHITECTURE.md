@@ -362,7 +362,7 @@ Every responsibility has exactly one owner. The orchestrator
 
 | Concern | Owner | Notes |
 | --- | --- | --- |
-| Public props | `Carousel.tsx` | Frozen contract, declared in `types.ts`. |
+| Public props | `Carousel.tsx` | Frozen contract, declared in `contract/`. |
 | User environment | host application | Injected via the `userEnvironment` prop. The carousel never detects `prefers-reduced-motion` / touch / data-saver itself; the host reads them (recommended: `useUserEnvironment` in `shared`) and passes a stable object in. |
 | Resolved runtime config | `useCarouselConfig` | One memo. Substitutes defaults only for `undefined` props; never normalises explicit values. Motion-profile share normalization happens later inside the profile builder, not in config. |
 | Slide records | `useCarouselSlideDeck` | Builds slide records, optionally extends to fill perfect pages. |
@@ -732,7 +732,7 @@ src/components/Carousel/
 ├── Carousel.tsx                   composition root, no business logic
 ├── Carousel.module.scss
 ├── index.ts                       public re-exports
-├── types.ts                       public CarouselProps, Slide, ClassNameMap
+├── contract/                      public schemas, inferred types, class keys
 ├── config/                        config resolution
 │   ├── defaults.ts                public-prop defaults
 │   ├── constants.ts               tunable runtime constants (epsilons, buffers)
@@ -813,7 +813,7 @@ src/components/Carousel/
 
 Reading order for someone new:
 
-1. `types.ts` — public surface.
+1. `contract/` — public surface: schemas, inferred types, class-key constants.
 2. `Carousel.tsx` — top-down composition.
 3. `state/types.ts` and `state/reducer.ts` — what the carousel knows
    about itself.
@@ -915,10 +915,13 @@ dependencies, the architecture has held.
   props: invalid input propagates and is surfaced by the `Diagnostic` slot as
   DEV-only warnings, keeping the failure mode visible at the source. The
   schemas are a tool for the host, intentionally unused inside the component.
-- **Schema/runtime boundary.** The Zod schemas live in `schemas.ts`; importing
-  the carousel component does not import `zod`. Hosts that import the schemas
-  for production runtime validation intentionally pay that bundle cost and own
-  any fallback substitution before props reach the carousel.
+- **Schema/runtime boundary.** The public contract lives under `contract/`.
+  Zod schemas in `contract/schemas.ts` are the source of truth for runtime
+  shapes; `contract/types.ts` derives TypeScript types from them with
+  type-only imports. Importing the carousel component does not import `zod`.
+  Hosts that import the schemas for production runtime validation intentionally
+  pay that bundle cost and own any fallback substitution before props reach
+  the carousel.
 - **React safety.** Per-frame work never touches React state. State
   machine dispatches are batched by React. Effects are pure; cleanup is
   explicit. `useIsomorphicLayoutEffect` is used for DOM measurement,

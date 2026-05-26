@@ -1,4 +1,4 @@
-import type { Slide } from "../types";
+import type { Slide } from "../contract/types";
 import { clamp, mod, normalizePageIndex } from "./math";
 import { clampedVisibleSlidesCount } from "./slides";
 import type { CarouselLayout, CarouselSlideRecord, PageBoundaryState } from "./types";

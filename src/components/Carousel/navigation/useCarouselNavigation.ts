@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 
 import type { CarouselDispatch, MoveReason } from "../state";
-import type { Slide } from "../types";
+import type { Slide } from "../contract/types";
 
 interface UseCarouselNavigationInput {
   enabled: boolean;

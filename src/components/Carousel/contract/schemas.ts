@@ -1,6 +1,8 @@
 import type { ReactElement } from "react";
 import { z } from "zod";
 
+import { CLASS_NAME_KEYS } from "./classKeys";
+
 /**
  * Public Zod schemas for host-side runtime validation of external data
  * (API responses, CMS payloads, user config) before it is handed to the
@@ -17,7 +19,8 @@ const createReactElementSchema = () =>
     );
   });
 
-const ReactElementSchema = /* @__PURE__ */ createReactElementSchema();
+export const ReactElementSchema =
+  /* @__PURE__ */ createReactElementSchema();
 
 const createContentSchema = () =>
   z.union([
@@ -26,22 +29,25 @@ const createContentSchema = () =>
     ReactElementSchema,
   ]);
 
-const ContentSchema = /* @__PURE__ */ createContentSchema();
+export const ContentSchema = /* @__PURE__ */ createContentSchema();
+
+const createClassMapShape = () => {
+  const shape = {} as Record<
+    (typeof CLASS_NAME_KEYS)[number],
+    ReturnType<typeof z.string>
+  >;
+
+  for (const key of CLASS_NAME_KEYS) {
+    shape[key] = z.string();
+  }
+
+  return shape;
+};
 
 const createClassMapSchema = () =>
-  z
-    .object({
-      outerContainer: z.string(),
-      innerContainer: z.string(),
-      slideContainer: z.string(),
-      slide: z.string(),
-      slideInteractive: z.string(),
-      slideError: z.string(),
-      slideText: z.string(),
-    })
-    .partial();
+  z.object(createClassMapShape()).partial();
 
-const ClassMapSchema = /* @__PURE__ */ createClassMapSchema();
+export const ClassMapSchema = /* @__PURE__ */ createClassMapSchema();
 
 const createSlideSchema = () =>
   z.object({
@@ -50,15 +56,7 @@ const createSlideSchema = () =>
     alt: z.string().optional(),
   });
 
-const SlideSchema = /* @__PURE__ */ createSlideSchema();
-
-const createOnSlideClickSchema = () =>
-  z.function({
-    input: [SlideSchema],
-    output: z.void(),
-  });
-
-const OnSlideClickSchema = /* @__PURE__ */ createOnSlideClickSchema();
+export const SlideSchema = /* @__PURE__ */ createSlideSchema();
 
 const createCarouselStatusSnapshotSchema = () =>
   z.object({
@@ -69,8 +67,16 @@ const createCarouselStatusSnapshotSchema = () =>
     isAtEnd: z.boolean(),
   });
 
-const CarouselStatusSnapshotSchema =
+export const CarouselStatusSnapshotSchema =
   /* @__PURE__ */ createCarouselStatusSnapshotSchema();
+
+const createOnSlideClickSchema = () =>
+  z.function({
+    input: [SlideSchema],
+    output: z.void(),
+  });
+
+const OnSlideClickSchema = /* @__PURE__ */ createOnSlideClickSchema();
 
 const createOnCarouselStatusChangeSchema = () =>
   z.function({
@@ -90,7 +96,8 @@ const createUserEnvironmentSchema = () =>
     })
     .partial();
 
-const UserEnvironmentSchema = /* @__PURE__ */ createUserEnvironmentSchema();
+export const UserEnvironmentSchema =
+  /* @__PURE__ */ createUserEnvironmentSchema();
 
 const createCarouselPropsSchema = () =>
   z.object({
