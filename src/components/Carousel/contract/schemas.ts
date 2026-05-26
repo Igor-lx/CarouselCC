@@ -1,6 +1,8 @@
 import type { ReactElement } from "react";
 import { z } from "zod";
 
+import { CLASS_NAME_KEYS } from "./classKeys";
+
 /**
  * Public Zod schemas for host-side runtime validation of external data
  * (API responses, CMS payloads, user config) before it reaches the carousel.
@@ -30,6 +32,12 @@ const ContentSchema = z.union([
   ReactElementSchema,
 ]);
 
+// `satisfies` ties the schema's shape to `CLASS_NAME_KEYS` at compile time:
+// the inner object must define exactly one `z.ZodString` field per key in
+// the array, no more and no less. If the two ever drift (a key is added
+// to one source and not the other), TypeScript fails before the schema
+// is built — restoring single-source-of-truth between the runtime key
+// list and the Zod schema without pulling Zod into the runtime path.
 const ClassMapSchema = z
   .object({
     outerContainer: z.string(),
@@ -39,7 +47,7 @@ const ClassMapSchema = z
     slideInteractive: z.string(),
     slideError: z.string(),
     slideText: z.string(),
-  })
+  } satisfies Record<(typeof CLASS_NAME_KEYS)[number], z.ZodString>)
   .partial();
 
 const SlideSchema = z.object({
