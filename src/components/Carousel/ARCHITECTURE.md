@@ -487,39 +487,49 @@ A `Segment` is one of:
 state changes: when `motionPhase` becomes a non-idle value, it samples the
 motion origin and builds the segment.
 
-Continuous segment start is synchronous in the layout-effect turn that observes
-the logical state. Cold starts rely on the controller's
-`clockStart: "after-initial-frame"` mode: the logical origin position is owned
-by the reducer (`state.fromVirtualIndex`, passed in at the dispatch site), only
-residual velocity is read from the controller, and the controller arms the
-segment clock on the next RAF. That prevents the segment clock from advancing
-while the first visible frame is still blocked.
+Continuous segment start is deferred by a tiny frame-boundary window. Cold
+starts wait `COLD_START_FRAME_DELAY` RAF ticks so the commit that expanded the
+render window can reach the compositor before the segment clock starts. When a
+previous segment is still running (repeated click, opposite-direction click,
+any interruption), the state change records the new intent immediately, but
+the controller retarget is deferred by `RETARGET_FRAME_DELAY` RAF ticks. The
+old segment keeps publishing during that window. At the deferred boundary the
+new segment starts from a **single atomic handoff point**:
 
-When a previous segment is still running (repeated click, opposite-direction
-click, any interruption), the state change records the new intent immediately
-and the runner retargets immediately from the controller's last emitted visual
-sample (`getSnapshot()`). This deliberately favours "what subscribers have
-already written to the DOM" over a mathematically fresh `captureHandoff(now)`
-position that may never have been painted. The successor segment starts with
-`clockStart: "immediate"` from the current layout-effect timestamp, so there is
-no extra frozen handoff frame.
+- `controller.captureHandoff(retargetTimestamp)` returns one coherent
+  `{ position, velocity, strategy, timestamp }` — position and velocity are
+  read from the *same* sample of the old curve at the same instant;
+- `startedAt = handoff.timestamp`;
+- the controller publishes the initial sample synchronously and starts this
+  retarget segment immediately (`clockStart: "immediate"`), because the old
+  segment has already been presenting frames and an extra frozen handoff frame
+  would make a direction change feel sticky.
 
-`captureHandoff()` remains the controller's pure mathematical continuation API
-for callers that need a sampled curve point. Carousel retargeting uses
-`getSnapshot()` instead because its product contract is visual continuity: a
-new click must continue from the last emitted frame, not from hidden elapsed
-time.
+The controller exposes exactly one handoff API, so position and velocity can
+never be sourced from two different moments — the boundary makes that mistake
+unexpressible. `captureHandoff` does not emit, cancel, or notify subscribers;
+it is purely the math. `getSnapshot()` is a separate method for cold UI reads
+(the last *emitted* visual frame) and must not be used to assemble a handoff.
+
+The defer is not applied synchronously in the input/layout-effect turn. For a
+**cold start** from idle the split is different and intentional: the logical
+origin position is owned by the reducer (`state.fromVirtualIndex`, passed in at
+the dispatch site), only residual velocity is read from the controller, and the
+controller arms a separate after-initial-frame clock
+(`clockStart: "after-initial-frame"`). That prevents the segment clock from
+advancing while the first visible frame is still blocked.
 
 Continuous Carousel segments also pass a frame-delta clamp to the controller.
 When a long segment loses frames mid-motion (GC, image decode, or paint
 cascade), the controller caps the next sampled frame's elapsed advance and
 absorbs the excess into its internal clock origin. The segment may settle a
 few milliseconds later, but the track does not visibly catch up in one jump.
-The clamp is applied to both RAF ticks and `captureHandoff`; Carousel retargets
-use `getSnapshot()` and therefore avoid unseen wall-clock positions entirely.
+The clamp is applied to both RAF ticks and `captureHandoff`, so a retarget
+after a pause cannot inherit an unseen wall-clock position.
 
-Any future change must preserve the invariant: "intent immediately, retarget
-from a visual frame the DOM subscribers have already received".
+Any future change must preserve the invariant: "intent immediately, controller
+retarget on a frame boundary, the in-flight handoff taken as one atomic
+`captureHandoff` point".
 
 When the controller completes, the runner dispatches
 `MOTION_SETTLED { settledPosition }`. If a newer click already replaced the
@@ -948,7 +958,6 @@ dependencies, the architecture has held.
   controller emits only on actual sample change (per RAF tick of an
   active segment; cold starts publish their initial sample first and arm the
   clock one frame later; active retargets publish their first successor sample
-  immediately from the last emitted visual frame; long-segment frame gaps are
+  after the deferred frame-boundary handoff; long-segment frame gaps are
   clamped in the controller timeline; no emits while idle). Image preload/decode
-  is scoped to the slide layer, starts only from idle states, and retains
-  already-ready warm-up elements through motion.
+  is scoped to the slide layer and starts only from idle states.

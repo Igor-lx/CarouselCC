@@ -191,16 +191,6 @@ describe("speculative warm-up", () => {
     expect(element.src).toBe("");
   });
 
-  it("retains ready warm-up elements when a disabled window provides retained URLs", () => {
-    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
-    const element = FakeImage.instances[0]!;
-    element.onload?.();
-
-    store.syncPreparationWindow({ enabled: false, urls: ["w"] });
-
-    expect(element.src).toBe("w");
-  });
-
   it("deduplicates decode work for an already-ready URL", () => {
     vi.useFakeTimers();
     store.syncPreparationWindow({ enabled: true, urls: ["w"] });

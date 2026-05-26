@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 
 import { useIsomorphicLayoutEffect } from "../../../shared";
 import {
@@ -132,10 +132,10 @@ const collectPreloadWindowUrls = ({
  *  - it runs after every `SlideItem` child's `observe` layout effect (React
  *    fires child layout effects before the parent's), so `visibleOwnerCount`
  *    is already accurate when the session opens;
- *  - it runs synchronously before paint. A transition into motion aborts
- *    in-flight warm-up fetches and queued decodes, but retains already-ready
- *    warm-up elements from the last idle window so decoded neighbours are not
- *    discarded right before they may enter the render window.
+ *  - it runs synchronously before paint, and `syncPreparationWindow` aborts
+ *    in-flight warm-up fetches and queued decodes synchronously, so a
+ *    transition into motion frees the network/main thread within the same
+ *    commit regardless of when the motion runner's own layout effect runs.
  *
  * When `isContentImg` is off, `store` is `null` and the URL sets stay the
  * frozen empty list: no traversal of `records`, no effects firing, no fetch,
@@ -156,7 +156,6 @@ export function useSlideImagePreload({
   // Speculative warm-up is skipped entirely when the user opted into reduced
   // data usage. This never touches the store or its render SSOT.
   const isWarmupEnabled = isContentImg && !isDataSaverEnabled;
-  const retainedPreloadUrlsRef = useRef<readonly string[]>(EMPTY_URLS);
 
   const deckUrls = useMemo(
     () => (isContentImg ? collectDeckImageUrls(records) : EMPTY_URLS),
@@ -184,21 +183,10 @@ export function useSlideImagePreload({
   // assumption against the motion runner.
   useIsomorphicLayoutEffect(() => {
     if (!store) return;
-
-    if (isWarmupEnabled && isIdle) {
-      retainedPreloadUrlsRef.current = preloadUrls;
-      store.syncPreparationWindow({ enabled: true, urls: preloadUrls });
-      return;
-    }
-
-    const retainedUrls = isWarmupEnabled
-      ? retainedPreloadUrlsRef.current
-      : EMPTY_URLS;
-
-    store.syncPreparationWindow({ enabled: false, urls: retainedUrls });
-
-    if (!isWarmupEnabled) {
-      retainedPreloadUrlsRef.current = EMPTY_URLS;
-    }
+    store.syncPreparationWindow(
+      isWarmupEnabled && isIdle
+        ? { enabled: true, urls: preloadUrls }
+        : { enabled: false, urls: EMPTY_URLS },
+    );
   }, [store, isWarmupEnabled, isIdle, preloadUrls]);
 }
