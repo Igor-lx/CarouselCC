@@ -299,8 +299,9 @@ These are the user-facing behaviours the implementation guarantees.
   `manageFocusShift`. No-op when nothing is focused inside the deck.
 - **Controls.** `<Controls />` renders one zone on each edge of the
   viewport. On desktop they are hidden by default and revealed by direct
-  viewport `:hover` / `:focus-within` selectors. On touch they are visible
-  by default.
+  viewport `:hover` and descendant `:focus-visible` selectors. Mouse focus
+  alone does not reveal the zones after hover leaves. On touch they are
+  visible by default.
   `canMovePrev` / `canMoveNext` reflect the finite-boundary state, so the
   edge zones are not rendered when there is no destination.
 - **Diagnostic.** Observation-only. When attached, raw inputs and
@@ -486,10 +487,12 @@ A `Segment` is one of:
 state changes: when `motionPhase` becomes a non-idle value, it samples the
 motion origin and builds the segment.
 
-When a previous segment is still running (repeated click,
-opposite-direction click, any interruption), the state change records the
-new intent immediately, but the controller retarget is deferred by a tiny
-frame-boundary window (`RETARGET_FRAME_DELAY`, currently two RAF ticks). The
+Continuous segment start is deferred by a tiny frame-boundary window. Cold
+starts wait `COLD_START_FRAME_DELAY` RAF ticks so the commit that expanded the
+render window can reach the compositor before the segment clock starts. When a
+previous segment is still running (repeated click, opposite-direction click,
+any interruption), the state change records the new intent immediately, but
+the controller retarget is deferred by `RETARGET_FRAME_DELAY` RAF ticks. The
 old segment keeps publishing during that window. At the deferred boundary the
 new segment starts from a **single atomic handoff point**:
 
@@ -505,12 +508,12 @@ unexpressible. `captureHandoff` does not emit, cancel, or notify subscribers;
 it is purely the math. `getSnapshot()` is a separate method for cold UI reads
 (the last *emitted* visual frame) and must not be used to assemble a handoff.
 
-The retarget is deferred to a frame boundary (not applied synchronously in the
-input/layout-effect turn, which can feel like a micro-stop). For a **cold
-start** from idle the split is different and intentional: the logical origin
-position is owned by the reducer (`state.fromVirtualIndex`, passed in at the
-dispatch site), and only the residual velocity is read from the controller —
-that is a deliberate cross-layer composition, not a mixed handoff.
+The defer is not applied synchronously in the input/layout-effect turn. For a
+**cold start** from idle the split is different and intentional: the logical
+origin position is owned by the reducer (`state.fromVirtualIndex`, passed in at
+the dispatch site), only residual velocity is read from the controller, and
+`startedAt` comes from the deferred RAF timestamp. That prevents the segment
+clock from advancing while the commit's first paint is blocked.
 
 Any future change must preserve the invariant: "intent immediately, controller
 retarget on a frame boundary, the in-flight handoff taken as one atomic
@@ -941,7 +944,7 @@ dependencies, the architecture has held.
   binding short-circuits writes that would re-apply the same transform.
   The PaginationWidget binding short-circuits writes per dot. The motion
   controller emits only on actual sample change (per RAF tick of an
-  active segment; one synchronous emit on cold segment start; active
-  retargets publish their first successor sample after the deferred
-  frame-boundary handoff; no emits while idle). Image preload/decode is scoped
-  to the slide layer and starts only from idle states.
+  active segment; cold starts publish their first sample after the deferred
+  start boundary; active retargets publish their first successor sample after
+  the deferred frame-boundary handoff; no emits while idle). Image preload/decode
+  is scoped to the slide layer and starts only from idle states.
