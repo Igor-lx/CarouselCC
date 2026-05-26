@@ -117,8 +117,13 @@
     }
   }
 
-  // Desktop: reveal the 8%-wide strip on viewport hover or focus-within.
-  [data-touch="false"] [data-carousel-viewport]:focus-within .navZone,
+  // Desktop: reveal the 8%-wide strip on viewport hover or keyboard focus.
+  // `:focus-visible` (not `:focus-within`) is deliberate — `:focus-within`
+  // matches the focus that lands on a `<button>` zone after a mouse click,
+  // so the zones would stay opaque/clickable until the user clicked outside
+  // the carousel. `:focus-visible` only matches keyboard / programmatic
+  // focus, which is what the reveal should track on desktop.
+  [data-touch="false"] [data-carousel-viewport]:has(*:focus-visible) .navZone,
   [data-touch="false"] [data-carousel-viewport]:hover .navZone {
     opacity: 1;
     pointer-events: auto;
