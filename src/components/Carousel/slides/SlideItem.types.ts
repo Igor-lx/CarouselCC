@@ -7,6 +7,7 @@ export interface SlideItemProps extends SlideAriaProps {
   className: SlideClassMap;
   style: CSSProperties;
   isContentImg: boolean;
+  isDataSaverEnabled: boolean;
   errAltPlaceholder: string;
   isInteractive: boolean;
   isActive: boolean;

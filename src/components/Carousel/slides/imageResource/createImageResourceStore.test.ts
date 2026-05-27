@@ -15,51 +15,14 @@ import {
 import { createImageResourceStore } from "./createImageResourceStore";
 import type { ImageResourceStore } from "./types";
 
-/**
- * Controllable `Image` stand-in: jsdom never fires load/error for a `src`
- * assignment, so tests drive the warm-up lifecycle by calling `onload` /
- * `onerror` on the recorded instances directly.
- */
-class FakeImage {
-  static instances: FakeImage[] = [];
-  static decodedSrcs: string[] = [];
-  onload: (() => void) | null = null;
-  onerror: (() => void) | null = null;
-  decoding = "";
-  fetchPriority = "";
-  complete = false;
-  naturalWidth = 0;
-  #src = "";
-
-  set src(value: string) {
-    this.#src = value;
-    FakeImage.instances.push(this);
-  }
-  get src(): string {
-    return this.#src;
-  }
-
-  decode(): Promise<void> {
-    FakeImage.decodedSrcs.push(this.#src);
-    return Promise.resolve();
-  }
-  removeAttribute(): void {
-    this.#src = "";
-  }
-}
-
 let store: ImageResourceStore;
 
 beforeEach(() => {
-  FakeImage.instances = [];
-  FakeImage.decodedSrcs = [];
-  vi.stubGlobal("Image", FakeImage);
   store = createImageResourceStore();
 });
 
 afterEach(() => {
   store.dispose();
-  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
@@ -70,12 +33,10 @@ describe("render-status SSOT", () => {
     expect(snapshot.generation).toBe(0);
   });
 
-  it("records a real visible load outcome", () => {
+  it("records real visible load and error outcomes", () => {
     store.reportLoaded("u");
     expect(store.getSnapshot("u").status).toBe("loaded");
-  });
 
-  it("records a real visible error outcome", () => {
     store.reportError("u");
     expect(store.getSnapshot("u").status).toBe("error");
   });
@@ -83,9 +44,10 @@ describe("render-status SSOT", () => {
   it("notifies per-URL subscribers only on a real change", () => {
     const listener = vi.fn();
     store.subscribe("u", listener);
+
     store.reportError("u");
-    expect(listener).toHaveBeenCalledTimes(1);
-    store.reportError("u"); // already error -> status unchanged, no new frame
+    store.reportError("u");
+
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
@@ -93,7 +55,9 @@ describe("render-status SSOT", () => {
     const listener = vi.fn();
     const unsubscribe = store.subscribe("u", listener);
     unsubscribe();
+
     store.reportError("u");
+
     expect(listener).not.toHaveBeenCalled();
   });
 });
@@ -106,7 +70,6 @@ describe("retry policy", () => {
   it("flips an errored URL back to loading with a bumped generation after backoff", () => {
     store.reportError("u");
     const before = store.getSnapshot("u");
-    expect(before.status).toBe("error");
 
     store.requestRetry("u");
     vi.advanceTimersByTime(IMAGE_RETRY_BASE_DELAY_MS);
@@ -126,142 +89,65 @@ describe("retry policy", () => {
     store.requestRetry("u");
     vi.advanceTimersByTime(IMAGE_RETRY_BASE_DELAY_MS);
 
-    expect(listener).toHaveBeenCalledTimes(1); // one loading frame, not two
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels a pending retry after a visible load succeeds", () => {
+    const listener = vi.fn();
+    store.subscribe("u", listener);
+    store.reportError("u");
+    store.requestRetry("u");
+    listener.mockClear();
+
+    store.reportLoaded("u");
+    vi.advanceTimersByTime(IMAGE_RETRY_BASE_DELAY_MS);
+
+    expect(store.getSnapshot("u").status).toBe("loaded");
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it("gives up after the capped number of attempts", () => {
     for (let i = 0; i < IMAGE_RETRY_MAX_ATTEMPTS; i += 1) {
       store.reportError("u");
     }
+
     store.requestRetry("u");
     vi.advanceTimersByTime(60_000);
+
     expect(store.getSnapshot("u").status).toBe("error");
   });
 });
 
-describe("speculative warm-up", () => {
-  it("opens an offscreen fetch for a URL in the preparation window", () => {
-    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
-    expect(FakeImage.instances).toHaveLength(1);
-    expect(FakeImage.instances[0]!.src).toBe("w");
-  });
-
-  it("promotes an untouched resource to loaded on warm-up success", () => {
-    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
-    FakeImage.instances[0]!.onload?.();
-    expect(store.getSnapshot("w").status).toBe("loaded");
-  });
-
-  it("keeps a warm-up failure non-authoritative — it never publishes error", () => {
-    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
-    FakeImage.instances[0]!.onerror?.();
-    expect(store.getSnapshot("w").status).toBe("loading");
-  });
-
-  it("never overrides a real visible error with a later warm-up success", () => {
-    store.reportError("w");
-    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
-    // a real DOM owner failed; warm-up must not be opened for it at all
-    expect(FakeImage.instances).toHaveLength(0);
-    expect(store.getSnapshot("w").status).toBe("error");
-  });
-
-  it("suspends an in-flight warm-up when a real visible owner appears", () => {
-    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
-    const element = FakeImage.instances[0]!;
-    store.observe("w"); // a SlideItem mounts and owns this URL
-    expect(element.src).toBe(""); // warm-up element released
-  });
-
-  it("closes the session and stops warming when the window is disabled", () => {
-    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
-    store.syncPreparationWindow({ enabled: false, urls: [] });
-    FakeImage.instances[0]!.onload?.();
-    // session is closed -> a late warm-up callback must not publish anything
-    expect(store.getSnapshot("w").status).toBe("loading");
-  });
-
-  it("releases ready warm-up elements when the window closes", () => {
-    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
-    const element = FakeImage.instances[0]!;
-    element.onload?.();
-
-    store.syncPreparationWindow({ enabled: false, urls: [] });
-
-    expect(element.src).toBe("");
-  });
-
-  it("retains ready warm-up elements when a disabled window provides retained URLs", () => {
-    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
-    const element = FakeImage.instances[0]!;
-    element.onload?.();
-
-    store.syncPreparationWindow({ enabled: false, urls: ["w"] });
-
-    expect(element.src).toBe("w");
-  });
-
-  it("deduplicates decode work for an already-ready URL", () => {
-    vi.useFakeTimers();
-    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
-    FakeImage.instances[0]!.onload?.();
-
-    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
-    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
-    vi.runOnlyPendingTimers();
-
-    expect(FakeImage.decodedSrcs).toEqual(["w"]);
-  });
-});
-
-describe("prune", () => {
+describe("prune / lifecycle", () => {
   it("drops tracked URLs outside the allowed set", () => {
     store.reportLoaded("keep");
     store.reportLoaded("drop");
+
     store.prune(["keep"]);
+
     expect(store.getSnapshot("keep").status).toBe("loaded");
-    expect(store.getSnapshot("drop").status).toBe("loading"); // back to untracked default
+    expect(store.getSnapshot("drop").status).toBe("loading");
   });
 
-  it("never drops a URL with a live visible owner", () => {
-    store.reportLoaded("owned");
-    store.observe("owned");
-    store.prune([]); // allow nothing
-    expect(store.getSnapshot("owned").status).toBe("loaded");
-  });
-
-  it("removes pruned URLs from the pending decode queue", () => {
+  it("clears retry timers for pruned URLs", () => {
     vi.useFakeTimers();
-    store.syncPreparationWindow({ enabled: true, urls: ["drop"] });
-    FakeImage.instances[0]!.onload?.();
+    const listener = vi.fn();
+    store.subscribe("drop", listener);
+    store.reportError("drop");
+    store.requestRetry("drop");
+    listener.mockClear();
 
     store.prune([]);
-    vi.runOnlyPendingTimers();
+    vi.advanceTimersByTime(IMAGE_RETRY_BASE_DELAY_MS);
 
-    expect(FakeImage.decodedSrcs).toEqual([]);
+    expect(listener).not.toHaveBeenCalled();
+    expect(store.getSnapshot("drop").status).toBe("loading");
   });
-});
 
-describe("soft lifecycle / reuse after dispose", () => {
-  it("stays usable after dispose() — render status still records", () => {
+  it("stays usable after dispose()", () => {
     store.dispose();
     store.reportLoaded("u");
     expect(store.getSnapshot("u").status).toBe("loaded");
-  });
-
-  it("stays usable after dispose() — warm-up still opens", () => {
-    store.dispose();
-    store.syncPreparationWindow({ enabled: true, urls: ["w"] });
-    expect(FakeImage.instances).toHaveLength(1);
-  });
-
-  it("stays usable after dispose() — retry is still scheduled", () => {
-    vi.useFakeTimers();
-    store.dispose();
-    store.reportError("u");
-    store.requestRetry("u");
-    vi.advanceTimersByTime(IMAGE_RETRY_BASE_DELAY_MS);
-    expect(store.getSnapshot("u").status).toBe("loading");
   });
 
   it("dispose() is idempotent", () => {

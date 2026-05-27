@@ -1,29 +1,16 @@
 import { useCallback, useContext, useMemo, useSyncExternalStore } from "react";
 
-import { useIsomorphicLayoutEffect } from "../../../../shared";
 import { CarouselImageResourceContext } from "./context";
 import type { ImageResourceSnapshot, ImageStatus } from "./types";
 
-/**
- * One slide's view of its image resource: the reactive snapshot plus the
- * bound callbacks it uses to report outcomes and request retries. The
- * callbacks are stable for a given URL.
- */
 export interface ImageResourceHandle {
   readonly status: ImageStatus;
   readonly generation: number;
-  /** Report a successful on-screen `<img>` load. */
   readonly reportLoaded: () => void;
-  /** Report a failed on-screen `<img>` load. */
   readonly reportError: () => void;
-  /** Ask the store to retry this URL (deduped + backed off internally). */
   readonly requestRetry: () => void;
 }
 
-/**
- * Snapshot for an untracked slide — a non-image slide, or any slide while
- * `isContentImg` is off (no store). Treated as permanently ready.
- */
 const READY_SNAPSHOT: ImageResourceSnapshot = Object.freeze({
   status: "loaded",
   generation: 0,
@@ -38,27 +25,12 @@ const STATIC_CALLBACKS = Object.freeze({
 });
 
 /**
- * Subscribes a slide to its image resource.
- *
- * Pass `null` for non-image slides. The store itself is also `null` for the
- * whole carousel when `isContentImg` is off. In either case the hook
- * short-circuits to `READY_SNAPSHOT` with no-op callbacks and never touches a
- * store — no subscription, no allocation, no work. The call stays
- * unconditional, so the Rules of Hooks hold whatever the slide content is.
- *
- * `url` is non-null only when `isContentImg` is on, which is exactly when a
- * store exists — so a tracked slide always resolves to a real store.
- *
- * When tracked, the hook is backed by `useSyncExternalStore`, so the slide
- * re-renders precisely when *its own* URL changes status.
+ * Per-slide bridge to the compact image-resource store. Non-image slides and
+ * `isContentImg={false}` short-circuit to a loaded snapshot with no
+ * subscription.
  */
 export function useImageResource(url: string | null): ImageResourceHandle {
   const store = useContext(CarouselImageResourceContext);
-
-  useIsomorphicLayoutEffect(() => {
-    if (store === null || url === null) return;
-    return store.observe(url);
-  }, [store, url]);
 
   const subscribe = useCallback(
     (onStoreChange: () => void) =>
@@ -78,8 +50,6 @@ export function useImageResource(url: string | null): ImageResourceHandle {
 
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
-  // Callbacks depend only on (store, url) — kept stable across status changes
-  // so a consumer effect keyed on `requestRetry` does not re-run on every load.
   const callbacks = useMemo(
     () =>
       store !== null && url !== null
@@ -98,6 +68,6 @@ export function useImageResource(url: string | null): ImageResourceHandle {
       generation: snapshot.generation,
       ...callbacks,
     }),
-    [snapshot, callbacks],
+    [callbacks, snapshot.generation, snapshot.status],
   );
 }

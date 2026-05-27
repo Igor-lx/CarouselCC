@@ -9,10 +9,9 @@ import type { SlideItemProps } from "./SlideItem.types";
  * Renders one slide. The active band is derived externally via
  * `isActive` / `isActual`.
  *
- * Image content is governed by the image-resource SSOT (`useImageResource`):
- * the slide does not keep its own load/error state. It renders the `<img>`
- * while the resource is `loading` or `loaded`, reports the element's real
- * outcome back to the store, and falls back to a text placeholder on `error`.
+ * Image content is governed by the compact image-resource SSOT
+ * (`useImageResource`): duplicate URLs / clones share load-error status and a
+ * capped retry policy, while actual fetching and decoding stay browser-owned.
  *
  * A slide is interactive only when it is configured interactive, a click
  * handler is provided, and — for image slides — the image has actually
@@ -24,6 +23,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
     className,
     style,
     isContentImg,
+    isDataSaverEnabled,
     errAltPlaceholder,
     isInteractive,
     isActive,
@@ -98,6 +98,8 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
             alt={slideData.alt || ""}
             draggable={false}
             decoding="async"
+            loading={isDataSaverEnabled && !isActual ? "lazy" : "eager"}
+            fetchPriority={isActual ? "high" : isDataSaverEnabled ? "low" : "auto"}
             onLoad={reportLoaded}
             onError={reportError}
           />

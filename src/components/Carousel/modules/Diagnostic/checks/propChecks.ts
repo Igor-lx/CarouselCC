@@ -149,7 +149,7 @@ const ENVIRONMENT_FIELDS: ReadonlyArray<{ field: string; consequence: string }> 
   {
     field: "dataSaver",
     consequence:
-      "Speculative image warm-up is not skipped for users who opted into reduced data usage",
+      "Buffered slide images are not downgraded to lazy / low-priority loading for users who opted into reduced data usage",
   },
 ];
 

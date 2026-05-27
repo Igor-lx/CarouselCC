@@ -3,11 +3,8 @@ import { createContext } from "react";
 import type { ImageResourceStore } from "./types";
 
 /**
- * Carries the per-carousel image-resource store to the slide subtree.
- *
- * The value is `null` when `isContentImg` is off: in that mode no store is
- * created and no image machinery runs at all. Each image slide reads the
- * store through `useImageResource`, subscribing only to its own URL.
+ * Carries the per-carousel image status/retry store to rendered slides.
+ * `null` means image content is disabled and slides short-circuit to ready.
  */
 export const CarouselImageResourceContext =
   createContext<ImageResourceStore | null>(null);

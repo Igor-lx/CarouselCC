@@ -28,7 +28,6 @@ import {
   SlideItem,
   useCarouselSlideDeck,
   useImageResourceStoreInstance,
-  useSlideImagePreload,
   useSlideRenderModel,
 } from "./slides";
 import { CAROUSEL_SLOTS } from "./slots";
@@ -40,6 +39,23 @@ import type {
   CarouselStatusSnapshot,
   SlideClassMap,
 } from "./contract/types";
+import type { CarouselSlideRecord } from "./domain";
+
+const EMPTY_IMAGE_URLS: readonly string[] = Object.freeze([]);
+
+const collectImageResourceUrls = (
+  records: readonly CarouselSlideRecord[],
+  isContentImg: boolean,
+): readonly string[] => {
+  if (!isContentImg) return EMPTY_IMAGE_URLS;
+
+  const urls = new Set<string>();
+  for (const record of records) {
+    const content = record.slideData.content;
+    if (typeof content === "string") urls.add(content);
+  }
+  return [...urls];
+};
 
 const Carousel = memo(function Carousel(props: CarouselProps) {
   const {
@@ -69,7 +85,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // The carousel is a pure function of its props: it does not read matchMedia
   // / navigator itself. The host supplies the environment via `userEnvironment`
   // (see `useUserEnvironment` in `shared`). An unset signal resolves to `false`
-  // — full motion, desktop behaviour, warm-up enabled — and the omission is
+  // — full motion, desktop behaviour, eager buffered-image loading — and the omission is
   // surfaced by the Diagnostic slot rather than silently repaired.
   const isInstantMode = userEnvironment?.reducedMotion ?? false;
   const isTouch = userEnvironment?.touch ?? false;
@@ -115,19 +131,18 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
 
   // --- image-resource SSOT --------------------------------------------------
   // The store exists only when the carousel renders image content; with
-  // `isContentImg` off it is `null` and no image machinery runs. Preload
-  // writes into it; every SlideItem subscribes to its own URL via context.
+  // `isContentImg` off it is `null` and no image machinery runs. It owns only
+  // per-URL render status and retry, while the browser owns loading/decode.
   const imageResourceStore = useImageResourceStoreInstance(isContentImg);
 
-  useSlideImagePreload({
-    records,
-    layout,
-    currentVirtualIndex: state.virtualIndex,
-    isIdle: status.isIdle,
-    isContentImg,
-    isDataSaverEnabled,
-    store: imageResourceStore,
-  });
+  const imageResourceUrls = useMemo(
+    () => collectImageResourceUrls(records, isContentImg),
+    [isContentImg, records],
+  );
+
+  useEffect(() => {
+    imageResourceStore?.prune(imageResourceUrls);
+  }, [imageResourceStore, imageResourceUrls]);
 
   // Read-only, low-frequency status reported to the host. Fires on mount and
   // whenever the idle flag, target page, or page count changes — never on a
@@ -428,6 +443,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
                     className={slideClassMap}
                     style={slideStyle}
                     isContentImg={isContentImg}
+                    isDataSaverEnabled={isDataSaverEnabled}
                     errAltPlaceholder={config.errorAltPlaceholder}
                     isInteractive={isInteractive}
                     isActive={slide.isActive}
