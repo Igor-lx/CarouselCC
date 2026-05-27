@@ -4,6 +4,11 @@ import { useIsomorphicLayoutEffect } from "../../../../shared";
 import { traceCarousel } from "../../debug/performanceTrace";
 import type { VisualPositionSource } from "../../position";
 import {
+  DOT_OPACITY_EPSILON,
+  DOT_POSITION_EPSILON_PX,
+  DOT_SCALE_EPSILON,
+} from "./defaults";
+import {
   widgetProjectionSide,
   widgetProjectionSlotCount,
 } from "./math/spatialField";
@@ -14,9 +19,6 @@ import type {
 } from "./types";
 
 const ACTIVE_DOT_COUNT = 2;
-const DOT_POSITION_EPSILON_PX = 0.25;
-const DOT_SCALE_EPSILON = 0.002;
-const DOT_OPACITY_EPSILON = 0.01;
 
 const emptyDotState = (): PaginationWidgetDotState => ({
   id: 0,
@@ -232,6 +234,8 @@ export function usePaginationWidgetBinding({
       }
 
       changedProperties += writeActiveProjection(visualOffset);
+      if (changedProperties === 0) return;
+
       traceCarousel("paginationWidget:write", {
         changedProperties,
         slotCount,

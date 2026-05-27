@@ -22,6 +22,7 @@ interface UseCarouselGestureInput {
   dispatch: CarouselDispatch;
   readCurrentPosition: () => number;
   applyTrackPosition: (position: number) => void;
+  cancelTrackMotion?: (position?: number) => void;
   getSlotSize: () => number;
   config: CarouselRuntimeConfig;
 }
@@ -37,6 +38,7 @@ export function useCarouselGesture({
   dispatch,
   readCurrentPosition,
   applyTrackPosition,
+  cancelTrackMotion,
   getSlotSize,
   config,
 }: UseCarouselGestureInput): CarouselGestureResult {
@@ -62,6 +64,7 @@ export function useCarouselGesture({
 
     slotSizeRef.current = getSlotSize();
     const origin = readCurrentPosition();
+    cancelTrackMotion?.(origin);
     applyTrackPosition(origin);
     const pageIndex = nearestPageIndex(origin, layout);
 
@@ -75,6 +78,7 @@ export function useCarouselGesture({
     });
   }, [
     applyTrackPosition,
+    cancelTrackMotion,
     dispatch,
     getSlotSize,
     layout,

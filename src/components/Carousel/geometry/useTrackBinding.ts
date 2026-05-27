@@ -11,6 +11,20 @@ import { traceCarousel } from "../debug/performanceTrace";
 
 const RESIZE_EPSILON_PX = 0.5;
 
+const transformTranslateX = (transform: string): number | null => {
+  if (!transform || transform === "none") return null;
+
+  const match = /matrix(3d)?\(([^)]+)\)/.exec(transform);
+  if (!match) return null;
+
+  const values = match[2]?.split(",").map((value) => Number.parseFloat(value));
+  if (!values) return null;
+
+  const translateIndex = match[1] ? 12 : 4;
+  const translateX = values[translateIndex];
+  return Number.isFinite(translateX) ? translateX : null;
+};
+
 interface UseTrackBindingInput {
   trackRef: RefObject<HTMLDivElement | null>;
   renderWindowStart: number;
@@ -85,30 +99,43 @@ export function useTrackBinding({
     );
   }, []);
 
+  const readCompositorPosition = useCallback((): number | null => {
+    const track = trackRef.current;
+    const slot = slotSizeRef.current;
+    if (
+      compositorAnimationRef.current === null ||
+      !track ||
+      slot === null ||
+      !(slot > 0) ||
+      typeof window === "undefined"
+    ) {
+      return null;
+    }
+
+    const translateX = transformTranslateX(window.getComputedStyle(track).transform);
+    return translateX === null ? null : renderWindowStartRef.current - translateX / slot;
+  }, [trackRef]);
+
   const writePosition = useCallback(
     (position: number, source: "frame" | "geometry" = "frame") => {
       const track = trackRef.current;
       if (!track) return;
+      if (source === "frame" && compositorAnimationRef.current !== null) return;
+
       const transform = resolveTransform(position);
       const changed = lastTransformRef.current !== transform;
-      const isCompositedFrame =
-        source === "frame" && compositorAnimationRef.current !== null;
+      if (!changed) return;
+
+      track.style.transform = transform;
+      lastTransformRef.current = transform;
 
       traceCarousel("track:write", {
-        changed,
-        composited: isCompositedFrame,
+        changed: true,
         position,
         renderWindowStart: renderWindowStartRef.current,
         slotSize: slotSizeRef.current,
         source,
       });
-
-      if (isCompositedFrame) return;
-
-      if (changed) {
-        track.style.transform = transform;
-        lastTransformRef.current = transform;
-      }
     },
     [resolveTransform, trackRef],
   );
@@ -170,14 +197,26 @@ export function useTrackBinding({
       track.style.transform = fromTransform;
       lastTransformRef.current = fromTransform;
 
-      const animation = track.animate(
-        [{ transform: fromTransform }, { transform: toTransform }],
-        {
+      let animation: Animation;
+      try {
+        animation = track.animate(
+          [{ transform: fromTransform }, { transform: toTransform }],
+          {
+            duration,
+            easing,
+            fill: "both",
+          },
+        );
+      } catch (error) {
+        traceCarousel("track:compositor-fallback", {
           duration,
           easing,
-          fill: "both",
-        },
-      );
+          error: error instanceof Error ? error.message : String(error),
+          from,
+          to,
+        });
+        return false;
+      }
 
       compositorAnimationRef.current = animation;
       animation.onfinish = () => {
@@ -212,15 +251,23 @@ export function useTrackBinding({
         renderWindowStart: renderWindowStartRef.current,
         width,
       });
-      cancelCompositorMotion(visualPosition.getSnapshot().position);
+      const currentPosition =
+        readCompositorPosition() ?? visualPosition.getSnapshot().position;
+      cancelCompositorMotion(currentPosition);
       measure(width);
-      writePosition(visualPosition.getSnapshot().position, "geometry");
+      writePosition(currentPosition, "geometry");
       traceCarousel("track:syncGeometry:end", {
         renderWindowStart: renderWindowStartRef.current,
         slotSize: slotSizeRef.current,
       });
     },
-    [cancelCompositorMotion, measure, visualPosition, writePosition],
+    [
+      cancelCompositorMotion,
+      measure,
+      readCompositorPosition,
+      visualPosition,
+      writePosition,
+    ],
   );
 
   // CSS transitions would double-animate both JS-sampled and WAAPI-driven
@@ -277,8 +324,8 @@ export function useTrackBinding({
   );
 
   const readCurrentPosition = useCallback(
-    () => visualPosition.getSnapshot().position,
-    [visualPosition],
+    () => readCompositorPosition() ?? visualPosition.getSnapshot().position,
+    [readCompositorPosition, visualPosition],
   );
 
   const getSlotSize = useCallback(() => slotSizeRef.current ?? 0, []);
