@@ -487,23 +487,17 @@ A `Segment` is one of:
 state changes: when `motionPhase` becomes a non-idle value, it samples the
 motion origin and builds the segment.
 
-Continuous segment start is deferred by a tiny frame-boundary window. Cold
-starts wait `COLD_START_FRAME_DELAY` RAF ticks so the commit that expanded the
-render window can reach the compositor before the segment clock starts. When a
-previous segment is still running (repeated click, opposite-direction click,
-any interruption), the state change records the new intent immediately, but
-the controller retarget is deferred by `RETARGET_FRAME_DELAY` RAF ticks. The
-old segment keeps publishing during that window. At the deferred boundary the
-new segment starts from a **single atomic handoff point**:
+Continuous segment starts are immediate. When a previous segment is still
+running (repeated click, opposite-direction click, any interruption), the state
+change records the new intent immediately and the successor segment starts from
+a **single atomic handoff point**:
 
-- `controller.captureHandoff(retargetTimestamp)` returns one coherent
+- `controller.captureHandoff(startedAt)` returns one coherent
   `{ position, velocity, strategy, timestamp }` — position and velocity are
   read from the *same* sample of the old curve at the same instant;
 - `startedAt = handoff.timestamp`;
-- the controller publishes the initial sample synchronously and starts this
-  retarget segment immediately (`clockStart: "immediate"`), because the old
-  segment has already been presenting frames and an extra frozen handoff frame
-  would make a direction change feel sticky.
+- the controller publishes the initial sample synchronously and samples future
+  RAF ticks directly against the segment wall-clock.
 
 The controller exposes exactly one handoff API, so position and velocity can
 never be sourced from two different moments — the boundary makes that mistake
@@ -511,25 +505,16 @@ unexpressible. `captureHandoff` does not emit, cancel, or notify subscribers;
 it is purely the math. `getSnapshot()` is a separate method for cold UI reads
 (the last *emitted* visual frame) and must not be used to assemble a handoff.
 
-The defer is not applied synchronously in the input/layout-effect turn. For a
-**cold start** from idle the split is different and intentional: the logical
-origin position is owned by the reducer (`state.fromVirtualIndex`, passed in at
-the dispatch site), only residual velocity is read from the controller, and the
-controller arms a separate after-initial-frame clock
-(`clockStart: "after-initial-frame"`). That prevents the segment clock from
-advancing while the first visible frame is still blocked.
+For a **cold start** from idle the split is different and intentional: the
+logical origin position is owned by the reducer (`state.fromVirtualIndex`,
+passed in at the dispatch site), while only residual velocity is read from the
+controller snapshot. The motion controller does not own presentation-delay
+policy: easing track movement may be presented by WAAPI on the compositor, and
+the controller continues publishing the numeric timeline for pagination,
+diagnostic, gesture/profile handoff, and settle.
 
-Continuous Carousel segments also pass a frame-delta clamp to the controller.
-When a long segment loses frames mid-motion (GC, image decode, or paint
-cascade), the controller caps the next sampled frame's elapsed advance and
-absorbs the excess into its internal clock origin. The segment may settle a
-few milliseconds later, but the track does not visibly catch up in one jump.
-The clamp is applied to both RAF ticks and `captureHandoff`, so a retarget
-after a pause cannot inherit an unseen wall-clock position.
-
-Any future change must preserve the invariant: "intent immediately, controller
-retarget on a frame boundary, the in-flight handoff taken as one atomic
-`captureHandoff` point".
+Any future change must preserve the invariant: "intent immediately, the
+in-flight handoff taken as one atomic `captureHandoff` point".
 
 When the controller completes, the runner dispatches
 `MOTION_SETTLED { settledPosition }`. If a newer click already replaced the
@@ -952,12 +937,11 @@ dependencies, the architecture has held.
   diagnostic layer surfaces violations separately, without ever feeding back
   into runtime.
 - **Performance.** Bezier and profile samplers cache their work where
-  the inputs are known (parsed beziers, computed strips). The track
-  binding short-circuits writes that would re-apply the same transform.
-  The PaginationWidget binding short-circuits writes per dot. The motion
-  controller emits only on actual sample change (per RAF tick of an
-  active segment; cold starts publish their initial sample first and arm the
-  clock one frame later; active retargets publish their first successor sample
-  after the deferred frame-boundary handoff; long-segment frame gaps are
-  clamped in the controller timeline; no emits while idle). Image preload/decode
-  is scoped to the slide layer and starts only from idle states.
+  the inputs are known (parsed beziers, computed strips). The track binding
+  short-circuits duplicate transforms and can hand plain easing movement to
+  WAAPI so the deck transform is presented by the compositor while the JS
+  controller keeps publishing the numeric timeline. The PaginationWidget
+  binding short-circuits writes per dot using visual thresholds. The motion
+  controller emits only on active-segment RAF ticks and never emits while idle.
+  Image preload/decode is scoped to the slide layer and starts only from idle
+  states.

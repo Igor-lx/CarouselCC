@@ -1,2 +1,2 @@
 export { useTrackBinding } from "./useTrackBinding";
-export type { TrackBindingApi } from "./useTrackBinding";
+export type { TrackBindingApi, TrackCompositorMotionOptions } from "./useTrackBinding";

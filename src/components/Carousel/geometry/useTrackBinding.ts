@@ -7,6 +7,7 @@ import {
 } from "../domain";
 import { useIsomorphicLayoutEffect } from "../../../shared";
 import type { VisualPositionSource } from "../position";
+import { traceCarousel } from "../debug/performanceTrace";
 
 const RESIZE_EPSILON_PX = 0.5;
 
@@ -17,9 +18,18 @@ interface UseTrackBindingInput {
   visualPosition: VisualPositionSource;
 }
 
+export interface TrackCompositorMotionOptions {
+  from: number;
+  to: number;
+  duration: number;
+  easing: string;
+}
+
 export interface TrackBindingApi {
   readCurrentPosition: () => number;
   getSlotSize: () => number;
+  startCompositorMotion: (options: TrackCompositorMotionOptions) => boolean;
+  cancelCompositorMotion: (position?: number) => void;
 }
 
 /**
@@ -40,6 +50,7 @@ export function useTrackBinding({
   const slotSizeRef = useRef<number | null>(null);
   const lastTransformRef = useRef<string | null>(null);
   const lastMeasuredWidthRef = useRef<number | null>(null);
+  const compositorAnimationRef = useRef<Animation | null>(null);
 
   renderWindowStartRef.current = renderWindowStart;
   visibleSlidesCountRef.current = visibleSlidesCount;
@@ -75,12 +86,26 @@ export function useTrackBinding({
   }, []);
 
   const writePosition = useCallback(
-    (position: number) => {
+    (position: number, source: "frame" | "geometry" = "frame") => {
       const track = trackRef.current;
       if (!track) return;
       const transform = resolveTransform(position);
+      const changed = lastTransformRef.current !== transform;
+      const isCompositedFrame =
+        source === "frame" && compositorAnimationRef.current !== null;
 
-      if (lastTransformRef.current !== transform) {
+      traceCarousel("track:write", {
+        changed,
+        composited: isCompositedFrame,
+        position,
+        renderWindowStart: renderWindowStartRef.current,
+        slotSize: slotSizeRef.current,
+        source,
+      });
+
+      if (isCompositedFrame) return;
+
+      if (changed) {
         track.style.transform = transform;
         lastTransformRef.current = transform;
       }
@@ -88,18 +113,118 @@ export function useTrackBinding({
     [resolveTransform, trackRef],
   );
 
-  const syncGeometry = useCallback(
-    (width?: number) => {
-      measure(width);
-      writePosition(visualPosition.getSnapshot().position);
+  const cancelCompositorMotion = useCallback(
+    (position?: number) => {
+      const animation = compositorAnimationRef.current;
+      if (!animation) return;
+      compositorAnimationRef.current = null;
+
+      const track = trackRef.current;
+      if (track) {
+        const transform =
+          typeof position === "number"
+            ? resolveTransform(position)
+            : typeof window !== "undefined"
+              ? window.getComputedStyle(track).transform
+              : null;
+        animation.cancel();
+        if (transform && transform !== "none") {
+          track.style.transform = transform;
+          lastTransformRef.current = transform;
+        }
+      } else {
+        animation.cancel();
+      }
     },
-    [measure, visualPosition, writePosition],
+    [resolveTransform, trackRef],
   );
 
-  // The track is animated solely by the JS motion controller writing
-  // `transform` per RAF tick — a CSS `transition` would double-animate and
-  // fight the controller. Disable it once on mount; the track element is
-  // stable for the carousel's lifetime, so it never needs re-applying.
+  const startCompositorMotion = useCallback(
+    ({ from, to, duration, easing }: TrackCompositorMotionOptions) => {
+      const track = trackRef.current;
+      const slot = slotSizeRef.current;
+      if (
+        !track ||
+        slot === null ||
+        !Number.isFinite(from) ||
+        !Number.isFinite(to) ||
+        !(duration > 0) ||
+        typeof track.animate !== "function"
+      ) {
+        return false;
+      }
+
+      cancelCompositorMotion(from);
+
+      const fromTransform = trackPixelTransform(
+        from,
+        renderWindowStartRef.current,
+        slot,
+      );
+      const toTransform = trackPixelTransform(
+        to,
+        renderWindowStartRef.current,
+        slot,
+      );
+
+      track.style.transform = fromTransform;
+      lastTransformRef.current = fromTransform;
+
+      const animation = track.animate(
+        [{ transform: fromTransform }, { transform: toTransform }],
+        {
+          duration,
+          easing,
+          fill: "both",
+        },
+      );
+
+      compositorAnimationRef.current = animation;
+      animation.onfinish = () => {
+        if (compositorAnimationRef.current !== animation) return;
+        compositorAnimationRef.current = null;
+        track.style.transform = toTransform;
+        lastTransformRef.current = toTransform;
+        animation.cancel();
+      };
+      animation.oncancel = () => {
+        if (compositorAnimationRef.current === animation) {
+          compositorAnimationRef.current = null;
+        }
+      };
+
+      traceCarousel("track:compositor-start", {
+        duration,
+        easing,
+        from,
+        renderWindowStart: renderWindowStartRef.current,
+        to,
+      });
+
+      return true;
+    },
+    [cancelCompositorMotion, trackRef],
+  );
+
+  const syncGeometry = useCallback(
+    (width?: number) => {
+      traceCarousel("track:syncGeometry:start", {
+        renderWindowStart: renderWindowStartRef.current,
+        width,
+      });
+      cancelCompositorMotion(visualPosition.getSnapshot().position);
+      measure(width);
+      writePosition(visualPosition.getSnapshot().position, "geometry");
+      traceCarousel("track:syncGeometry:end", {
+        renderWindowStart: renderWindowStartRef.current,
+        slotSize: slotSizeRef.current,
+      });
+    },
+    [cancelCompositorMotion, measure, visualPosition, writePosition],
+  );
+
+  // CSS transitions would double-animate both JS-sampled and WAAPI-driven
+  // transform writes. Disable them once; compositor motion is explicit.
   useIsomorphicLayoutEffect(() => {
     const track = trackRef.current;
     if (track) track.style.transition = "none";
@@ -145,7 +270,7 @@ export function useTrackBinding({
   useIsomorphicLayoutEffect(
     () =>
       visualPosition.subscribe(
-        (frame) => writePosition(frame.position),
+        (frame) => writePosition(frame.position, "frame"),
         { emitCurrent: true },
       ),
     [visualPosition, writePosition],
@@ -158,5 +283,10 @@ export function useTrackBinding({
 
   const getSlotSize = useCallback(() => slotSizeRef.current ?? 0, []);
 
-  return { readCurrentPosition, getSlotSize };
+  return {
+    readCurrentPosition,
+    getSlotSize,
+    startCompositorMotion,
+    cancelCompositorMotion,
+  };
 }

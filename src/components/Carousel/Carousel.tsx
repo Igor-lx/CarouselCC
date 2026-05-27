@@ -4,6 +4,7 @@ import styles from "./Carousel.module.scss";
 import {
   mergeStyleMaps,
   resolveSlots,
+  useIsomorphicLayoutEffect,
   useViewportVisibility,
 } from "../../shared";
 import { CAROUSEL_DEFAULTS, useCarouselConfig } from "./config";
@@ -21,6 +22,7 @@ import { useCarouselMotionExecution } from "./motion";
 import { useCarouselNavigation } from "./navigation";
 import { useVisualPosition } from "./position";
 import { useModuleRenderPolicy } from "./render-policy/useModuleRenderPolicy";
+import { traceCarousel } from "./debug/performanceTrace";
 import {
   CarouselImageResourceContext,
   SlideItem,
@@ -177,7 +179,12 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   const trackRef = useRef<HTMLDivElement>(null);
 
   // --- track DOM bridge -----------------------------------------------------
-  const { readCurrentPosition, getSlotSize } = useTrackBinding({
+  const {
+    readCurrentPosition,
+    getSlotSize,
+    startCompositorMotion,
+    cancelCompositorMotion,
+  } = useTrackBinding({
     trackRef,
     renderWindowStart,
     visibleSlidesCount: layout.visibleSlidesCount,
@@ -193,6 +200,8 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     isInstantMode,
     isDragging: status.isDragging,
     enabled: layout.canSlide,
+    startCompositorMotion,
+    cancelCompositorMotion,
   });
 
   // --- navigation -----------------------------------------------------------
@@ -371,6 +380,19 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     () => slideFlexStyle(layout.visibleSlidesCount),
     [layout.visibleSlidesCount],
   );
+
+  useIsomorphicLayoutEffect(() => {
+    traceCarousel("carousel:commit", {
+      fromVirtualIndex: state.fromVirtualIndex,
+      isMoving: status.isMoving,
+      motionPhase: state.motionPhase,
+      renderWindowStart,
+      targetPageIndex: state.targetPageIndex,
+      targetVirtualIndex: state.virtualIndex,
+      virtualSlideCount: virtualSlides.length,
+      visibleSlidesCount: layout.visibleSlidesCount,
+    });
+  });
 
   return (
     <CarouselModuleContext.Provider value={moduleContextValue}>

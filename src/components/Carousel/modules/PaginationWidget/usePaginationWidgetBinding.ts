@@ -1,6 +1,7 @@
 import { useCallback, useRef } from "react";
 
 import { useIsomorphicLayoutEffect } from "../../../../shared";
+import { traceCarousel } from "../../debug/performanceTrace";
 import type { VisualPositionSource } from "../../position";
 import {
   widgetProjectionSide,
@@ -13,6 +14,9 @@ import type {
 } from "./types";
 
 const ACTIVE_DOT_COUNT = 2;
+const DOT_POSITION_EPSILON_PX = 0.25;
+const DOT_SCALE_EPSILON = 0.002;
+const DOT_OPACITY_EPSILON = 0.01;
 
 const emptyDotState = (): PaginationWidgetDotState => ({
   id: 0,
@@ -27,14 +31,30 @@ const toTransform = (x: number, scale: number) =>
   `translate3d(${x}px, 0, 0) scale(${scale})`;
 
 interface DotWriteCache {
-  transform: string;
+  x: number;
+  scale: number;
   opacity: number;
 }
 
 interface ActiveDotWriteCache {
-  transform: string;
+  x: number;
+  scale: number;
   opacity: number;
 }
+
+const shouldWriteTransform = (
+  last: DotWriteCache | ActiveDotWriteCache | null,
+  x: number,
+  scale: number,
+) =>
+  last === null ||
+  Math.abs(last.x - x) >= DOT_POSITION_EPSILON_PX ||
+  Math.abs(last.scale - scale) >= DOT_SCALE_EPSILON;
+
+const shouldWriteOpacity = (
+  last: DotWriteCache | ActiveDotWriteCache | null,
+  opacity: number,
+) => last === null || Math.abs(last.opacity - opacity) >= DOT_OPACITY_EPSILON;
 
 interface UseBindingInput {
   visualPosition: VisualPositionSource | null;
@@ -124,6 +144,7 @@ export function usePaginationWidgetBinding({
       const floorId = Math.floor(visualOffset);
       const ceilId = Math.ceil(visualOffset);
       const cache = activeDotCacheRef.current;
+      let changedProperties = 0;
 
       for (let index = 0; index < ACTIVE_DOT_COUNT; index += 1) {
         const dot = activeDotRefs.current[index];
@@ -138,22 +159,32 @@ export function usePaginationWidgetBinding({
         const x = state?.x ?? 0;
         const scale = state?.scale ?? 0;
         const opacity = state?.activeStrength ?? 0;
-        const transform = toTransform(x, scale);
         const last = cache[index];
+        if (opacity === 0 && last !== null && last.opacity === 0) continue;
 
-        if (last === null || last.transform !== transform) {
-          dot.style.transform = transform;
+        const transformChanged = shouldWriteTransform(last, x, scale);
+        const opacityChanged = shouldWriteOpacity(last, opacity);
+
+        if (transformChanged) {
+          dot.style.transform = toTransform(x, scale);
+          changedProperties += 1;
         }
-        if (last === null || last.opacity !== opacity) {
+        if (opacityChanged) {
           dot.style.opacity = String(opacity);
+          changedProperties += 1;
         }
 
-        if (last === null) cache[index] = { transform, opacity };
+        if (last === null) cache[index] = { x, scale, opacity };
         else {
-          last.transform = transform;
-          last.opacity = opacity;
+          if (transformChanged) {
+            last.x = x;
+            last.scale = scale;
+          }
+          if (opacityChanged) last.opacity = opacity;
         }
       }
+
+      return changedProperties;
     },
     [geometry],
   );
@@ -162,6 +193,7 @@ export function usePaginationWidgetBinding({
     (visualOffset: number) => {
       const firstId = Math.round(visualOffset) - side;
       const cache = dotCacheRef.current;
+      let changedProperties = 0;
 
       for (let index = 0; index < slotCount; index += 1) {
         const dot = dotRefs.current[index];
@@ -169,24 +201,42 @@ export function usePaginationWidgetBinding({
 
         const id = firstId + index;
         const state = writeDotProjection(projectionRef.current, id, visualOffset, geometry);
-        const transform = toTransform(state.x, state.scale);
         const last = cache[index];
 
         if (state.opacity === 0 && last !== null && last.opacity === 0) continue;
-        if (last === null || last.transform !== transform) {
-          dot.style.transform = transform;
+        const transformChanged = shouldWriteTransform(last, state.x, state.scale);
+        const opacityChanged = shouldWriteOpacity(last, state.opacity);
+
+        if (transformChanged) {
+          dot.style.transform = toTransform(state.x, state.scale);
+          changedProperties += 1;
         }
-        if (last === null || last.opacity !== state.opacity) {
+        if (opacityChanged) {
           dot.style.opacity = String(state.opacity);
+          changedProperties += 1;
         }
-        if (last === null) cache[index] = { transform, opacity: state.opacity };
+        if (last === null) {
+          cache[index] = {
+            x: state.x,
+            scale: state.scale,
+            opacity: state.opacity,
+          };
+        }
         else {
-          last.transform = transform;
-          last.opacity = state.opacity;
+          if (transformChanged) {
+            last.x = state.x;
+            last.scale = state.scale;
+          }
+          if (opacityChanged) last.opacity = state.opacity;
         }
       }
 
-      writeActiveProjection(visualOffset);
+      changedProperties += writeActiveProjection(visualOffset);
+      traceCarousel("paginationWidget:write", {
+        changedProperties,
+        slotCount,
+        visualOffset,
+      });
     },
     [geometry, side, slotCount, writeActiveProjection],
   );

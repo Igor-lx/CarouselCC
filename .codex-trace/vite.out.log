@@ -1,0 +1,64 @@
+
+> test-claude@0.0.0 dev
+> vite --host 127.0.0.1 --port 5173
+
+
+  [32m[1mVITE[22m v7.3.3[39m  [2mready in [0m[1m492[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5173[22m/CarouselCC/[39m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/extension-detection.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/localFileSignInRedirection.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/sessionExpired.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/signInAdobeYolo.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/signInHandler.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/viewer.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/check-cookies.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/download-banner.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/express.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/failToast.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/frame.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/frameUI.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/legacy-options.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/local-fte.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/lsCopy.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/newAssistantPopup.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/options.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/popup.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/preference-page.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/progress.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/remote-executor-bridge.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/searchWidget.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/searchWidgetSkeleton.html[22m
+[2m00:38:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/successToast.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/resources/addWebpage/index.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/resources/chromeOS/handler.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/resources/express/expressContextualFTE.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/resources/express/expressHoverCTA.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/resources/express/expressSingleClickCTA.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/resources/express/imageToolsDropdown.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/resources/outlook/error-toast.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/resources/SidePanel/ActionableCoachmark.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/resources/SidePanel/FABIcon.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/resources/SidePanel/FABViewSettings.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/resources/SidePanel/index.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/resources/SidePanel/sidePanelButton.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/resources/SidePanel/sidePanelUpsellSuccess.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/resources/SidePanel/signInSuccess.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/resources/toast/toast.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/local-file/local-file-blocking-page.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/local-file/local-file-prompt.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/offscreen/offscreen.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/viewer/extension-detection.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/viewer/localFileSignInRedirection.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/viewer/sessionExpired.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/viewer/signInAdobeYolo.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/viewer/signInHandler.html[22m
+[2m00:38:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/efaidnbmnnnibpcajpcglclefindmkaj/26.5.1.0_0/browser/js/viewer/viewer.html[22m
+[2m00:38:23[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/nmmhkkegccagdldgiimedpiccmgmieda/1.0.0.6_0/html/craw_window.html[22m
+[2m00:38:23[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/Default/Extensions/ghbmnnjooekpmoecnnnilnnbdlolhkhi/1.106.1_0/offscreendocument.html[22m
+[2m00:39:16[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/App.tsx[22m
+[2m00:39:18[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/App.tsx[22m
+[2m00:39:19[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/App.tsx[22m
+[2m00:42:38[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/Carousel/modules/Diagnostic/Diagnostic.tsx[22m
+[2m00:44:30[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.codex-trace/chrome-profile/WasmTtsEngine/20260514.1/offscreen.html[22m
+[2m00:45:22[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/Carousel/Carousel.tsx, /src/components/Carousel/modules/PaginationWidget/PaginationWidget.tsx, /src/components/Carousel/slides/SlideItem.tsx, /src/components/Carousel/modules/Diagnostic/Diagnostic.tsx[22m

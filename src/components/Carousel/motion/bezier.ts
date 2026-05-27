@@ -63,6 +63,11 @@ export const isParsedBezierValid = (bezier: CubicBezier) =>
   Number.isFinite(bezier.x2) &&
   Number.isFinite(bezier.y2);
 
+export const bezierToCss = (bezier: CubicBezier): string =>
+  bezier.x1 === 0 && bezier.y1 === 0 && bezier.x2 === 1 && bezier.y2 === 1
+    ? "linear"
+    : `cubic-bezier(${bezier.x1}, ${bezier.y1}, ${bezier.x2}, ${bezier.y2})`;
+
 const bezierValue = (t: number, p1: number, p2: number) => {
   const inverse = 1 - t;
   return (

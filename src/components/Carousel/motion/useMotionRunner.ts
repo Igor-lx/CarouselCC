@@ -2,16 +2,28 @@ import { useCallback, useEffect, useRef } from "react";
 
 import {
   useIsomorphicLayoutEffect,
-  type MotionClockStart,
   type MotionController,
-  type MotionFrameDeltaClamp,
   type MotionSample,
 } from "../../../shared";
 import type { CarouselRuntimeConfig } from "../config";
+import { traceCarousel } from "../debug/performanceTrace";
 import type { CarouselState } from "../state";
+import { bezierToCss } from "./bezier";
 import { buildCarouselSegment } from "./segmentFactory";
 import { sampleCarouselSegment } from "./sampler";
-import type { CarouselMotionStrategy, MotionStart } from "./types";
+import type {
+  CarouselMotionStrategy,
+  CarouselSegment,
+  EasingSegment,
+  MotionStart,
+} from "./types";
+
+interface TrackCompositorMotionOptions {
+  from: number;
+  to: number;
+  duration: number;
+  easing: string;
+}
 
 interface UseMotionRunnerInput {
   state: CarouselState;
@@ -20,6 +32,8 @@ interface UseMotionRunnerInput {
   isInstantMode: boolean;
   isDragging: boolean;
   enabled: boolean;
+  startCompositorMotion?: (options: TrackCompositorMotionOptions) => boolean;
+  cancelCompositorMotion?: (position?: number) => void;
   /**
    * Called by the controller when a segment naturally settles. The argument
    * is the visual position where it settled, so the reducer can distinguish
@@ -31,28 +45,12 @@ interface UseMotionRunnerInput {
   onAutoplayDurationChange?: (duration: number) => void;
 }
 
-/**
- * Number of rAF ticks the runner waits before starting a continuous segment.
- *
- * Cold starts wait so the commit that expanded the render window can reach
- * the compositor before the segment clock starts ticking. Hot retargets wait
- * the same amount while the old segment keeps painting, then continue from one
- * atomic `captureHandoff` point of the old curve.
- */
-const COLD_START_FRAME_DELAY = 2;
-const RETARGET_FRAME_DELAY = 2;
-const MOTION_FIRST_FRAME_DELTA_MS = 1000 / 60;
-/**
- * Long carousel segments make hidden frame drops visible as catch-up jumps.
- * Cap only clearly missed frames, and leave very short motions on pure
- * wall-clock sampling where the extra policy would be more noticeable than
- * useful.
- */
-const MOTION_CATCH_UP_CLAMP: MotionFrameDeltaClamp = {
-  firstFrameDeltaMs: MOTION_FIRST_FRAME_DELTA_MS,
-  maxFrameDeltaMs: 50,
-  minSegmentDurationMs: 500,
-};
+const now = () =>
+  typeof performance !== "undefined" ? performance.now() : Date.now();
+
+const isCompositorTrackSegment = (
+  segment: CarouselSegment,
+): segment is EasingSegment => segment.strategy === "easing";
 
 /**
  * Origin of a post-drag release segment. Drag writes are published into the
@@ -79,12 +77,11 @@ const buildStartFromState = (
  * The motion runner is the only bridge between logical state and the motion
  * controller.
  *
- * Continuous segments are started after a tiny frame-boundary window. For a
- * cold start this gives the commit's first paint room to finish; for a
- * mid-flight retarget the old segment keeps painting until the successor can
- * start from a single atomic `controller.captureHandoff(t)` point. Position
- * and velocity can no longer be sourced from two different moments (see
- * motion section 4.2).
+ * The controller remains the visual-position SSOT for gesture/profile math,
+ * diagnostics, pagination, handoff, and settle. For plain easing movement the
+ * track DOM may also run the same transform through WAAPI, allowing the deck
+ * transform to stay on the compositor while the JS sampler keeps publishing
+ * the authoritative numeric timeline to non-track subscribers.
  *
  * Every segment - first click, repeated click, gesture release - drives
  * directly to `state.virtualIndex`. There is no intermediate destination and
@@ -97,51 +94,13 @@ export function useMotionRunner({
   isInstantMode,
   isDragging,
   enabled,
+  startCompositorMotion,
+  cancelCompositorMotion,
   onSettle,
   onAutoplayDurationCancel,
   onAutoplayDurationChange,
 }: UseMotionRunnerInput): void {
   const lastKeyRef = useRef<string>("");
-  const startFrameRef = useRef<number | null>(null);
-  const startTokenRef = useRef(0);
-
-  const cancelDeferredStart = useCallback(() => {
-    startTokenRef.current += 1;
-    if (startFrameRef.current !== null && typeof window !== "undefined") {
-      window.cancelAnimationFrame(startFrameRef.current);
-    }
-    startFrameRef.current = null;
-  }, []);
-
-  const scheduleDeferredStart = useCallback(
-    (frameDelay: number, callback: (timestamp: number) => void) => {
-      cancelDeferredStart();
-
-      if (typeof window === "undefined") {
-        callback(performance.now());
-        return;
-      }
-
-      const token = startTokenRef.current;
-      let framesLeft = Math.max(1, frameDelay);
-
-      const tick: FrameRequestCallback = (timestamp) => {
-        if (startTokenRef.current !== token) return;
-
-        framesLeft -= 1;
-        if (framesLeft > 0) {
-          startFrameRef.current = window.requestAnimationFrame(tick);
-          return;
-        }
-
-        startFrameRef.current = null;
-        callback(timestamp);
-      };
-
-      startFrameRef.current = window.requestAnimationFrame(tick);
-    },
-    [cancelDeferredStart],
-  );
 
   const settle = useCallback(
     (sample: MotionSample<CarouselMotionStrategy>) => {
@@ -151,6 +110,17 @@ export function useMotionRunner({
   );
 
   useIsomorphicLayoutEffect(() => {
+    traceCarousel("motion:layoutEffect", {
+      enabled,
+      fromVirtualIndex: state.fromVirtualIndex,
+      isDragging,
+      isInstantMode,
+      motionPhase: state.motionPhase,
+      moveReason: state.moveReason,
+      targetVirtualIndex: state.virtualIndex,
+      teleportVirtualIndex: state.teleportVirtualIndex,
+    });
+
     const key = [
       enabled,
       state.motionPhase,
@@ -170,27 +140,27 @@ export function useMotionRunner({
     lastKeyRef.current = key;
 
     if (!enabled) {
-      cancelDeferredStart();
+      cancelCompositorMotion?.(state.virtualIndex);
       onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, { strategy: "idle" });
       return;
     }
 
     if (state.motionPhase === "idle") {
-      cancelDeferredStart();
+      cancelCompositorMotion?.(state.virtualIndex);
       onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, { strategy: "idle" });
       return;
     }
 
     if (state.motionPhase === "dragging") {
-      cancelDeferredStart();
+      cancelCompositorMotion?.(controller.getSnapshot().value);
       onAutoplayDurationCancel?.();
       return;
     }
 
     if (state.motionPhase === "step-instant") {
-      cancelDeferredStart();
+      cancelCompositorMotion?.(state.virtualIndex);
       onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, {
         strategy: "idle",
@@ -199,16 +169,14 @@ export function useMotionRunner({
       return;
     }
 
-    const isActive = controller.isActive();
-
     const startResolvedMotion = (
       resolvedStart: MotionStart,
       resolvedStartedAt: number,
-      clockStart: MotionClockStart,
     ) => {
       const distance = state.virtualIndex - resolvedStart.position;
 
       if (Math.abs(distance) < config.motion.epsilon) {
+        cancelCompositorMotion?.(state.virtualIndex);
         controller.snap(state.virtualIndex, {
           strategy: resolvedStart.strategy,
           velocity: resolvedStart.velocity,
@@ -238,57 +206,70 @@ export function useMotionRunner({
         onAutoplayDurationCancel?.();
       }
 
+      const isComposited =
+        isCompositorTrackSegment(segment) &&
+        (startCompositorMotion?.({
+          from: segment.from,
+          to: segment.to,
+          duration: segment.duration,
+          easing: bezierToCss(segment.easing),
+        }) ??
+          false);
+
+      if (!isComposited) {
+        cancelCompositorMotion?.(resolvedStart.position);
+      }
+
+      traceCarousel("motion:start", {
+        composited: isComposited,
+        duration,
+        from: segment.from,
+        startedAt: segment.startedAt,
+        strategy: segment.strategy,
+        to: segment.to,
+      });
+
       controller.start({
         segment,
         sampler: sampleCarouselSegment,
         onComplete: settle,
-        clockStart,
-        frameDeltaClamp: MOTION_CATCH_UP_CLAMP,
       });
     };
 
-    if (isActive) {
-      scheduleDeferredStart(RETARGET_FRAME_DELAY, (retargetTimestamp) => {
-        // One atomic point: position + velocity + time from the same sample.
-        // The old segment is already visible, so retargets keep the immediate
-        // clock and avoid a frozen handoff frame.
-        const handoff = controller.captureHandoff(retargetTimestamp);
-        startResolvedMotion(
-          {
-            position: handoff.position,
-            velocity: handoff.velocity,
-            strategy: handoff.strategy,
-          },
-          handoff.timestamp,
-          "immediate",
-        );
+    const startedAt = now();
+
+    if (controller.isActive()) {
+      // One atomic point: position + velocity + time from the same sample.
+      const handoff = controller.captureHandoff(startedAt);
+      traceCarousel("motion:handoff", {
+        position: handoff.position,
+        strategy: handoff.strategy,
+        timestamp: handoff.timestamp,
+        velocity: handoff.velocity,
       });
+      startResolvedMotion(
+        {
+          position: handoff.position,
+          velocity: handoff.velocity,
+          strategy: handoff.strategy,
+        },
+        handoff.timestamp,
+      );
       return;
     }
 
-    scheduleDeferredStart(COLD_START_FRAME_DELAY, (startedAt) => {
-      if (state.moveReason === "gesture") {
-        startResolvedMotion(
-          buildStartFromGesture(state),
-          startedAt,
-          "after-initial-frame",
-        );
-        return;
-      }
+    if (state.moveReason === "gesture") {
+      startResolvedMotion(buildStartFromGesture(state), startedAt);
+      return;
+    }
 
-      // Cold start from idle: the logical origin is owned by the reducer
-      // (`state.fromVirtualIndex`); only residual velocity comes from the
-      // controller. The segment timestamp is the deferred rAF timestamp, so
-      // the clock does not advance while the commit's first paint is blocked.
-      const handoff = controller.captureHandoff(startedAt);
-      startResolvedMotion(
-        buildStartFromState(state, handoff.velocity),
-        startedAt,
-        "after-initial-frame",
-      );
-    });
+    // Cold start from idle: the logical origin is owned by the reducer
+    // (`state.fromVirtualIndex`); only residual velocity comes from the
+    // controller snapshot.
+    const handoff = controller.captureHandoff(startedAt);
+    startResolvedMotion(buildStartFromState(state, handoff.velocity), startedAt);
   }, [
-    cancelDeferredStart,
+    cancelCompositorMotion,
     config,
     controller,
     enabled,
@@ -296,8 +277,8 @@ export function useMotionRunner({
     isInstantMode,
     onAutoplayDurationCancel,
     onAutoplayDurationChange,
-    scheduleDeferredStart,
     settle,
+    startCompositorMotion,
     state.fromVirtualIndex,
     state.gesture.pointerVelocity,
     state.gesture.uiVelocity,
@@ -311,9 +292,9 @@ export function useMotionRunner({
 
   useEffect(
     () => () => {
-      cancelDeferredStart();
+      cancelCompositorMotion?.(controller.getSnapshot().value);
       controller.cancel();
     },
-    [cancelDeferredStart, controller],
+    [cancelCompositorMotion, controller],
   );
 }

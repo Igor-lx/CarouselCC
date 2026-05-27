@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { memo, useEffect } from "react";
 
+import { traceCarousel } from "../debug/performanceTrace";
 import { useImageResource } from "./imageResource";
 import type { SlideItemProps } from "./SlideItem.types";
 
@@ -41,6 +42,19 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
 
   const isImageSlide = imageSource !== null;
   const hasImageError = isImageSlide && status === "error";
+
+  useEffect(() => {
+    traceCarousel("slide:mount", {
+      id: slideData?.id,
+      isImageSlide,
+    });
+    return () => {
+      traceCarousel("slide:unmount", {
+        id: slideData?.id,
+        isImageSlide,
+      });
+    };
+  }, [isImageSlide, slideData?.id]);
 
   // An errored image that is currently in the active band is retried on a
   // backed-off schedule owned by the store. A successful retry flips the
