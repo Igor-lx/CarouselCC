@@ -24,7 +24,6 @@ import { useVisualPosition } from "./position";
 import { useModuleRenderPolicy } from "./render-policy/useModuleRenderPolicy";
 import { traceCarousel } from "./debug/performanceTrace";
 import {
-  CarouselImageResourceContext,
   SlideItem,
   useCarouselSlideDeck,
   useImageResourceStoreInstance,
@@ -413,52 +412,51 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   return (
     <CarouselModuleContext.Provider value={moduleContextValue}>
       <CarouselDiagnosticContext.Provider value={diagnosticContextValue}>
-        <CarouselImageResourceContext.Provider value={imageResourceStore}>
+        <div
+          className={classNames.outerContainer}
+          role="region"
+          aria-roledescription="carousel"
+          data-carousel-root=""
+          data-touch={isTouch}
+          data-reduced-motion={isInstantMode}
+        >
           <div
-            className={classNames.outerContainer}
-            role="region"
-            aria-roledescription="carousel"
-            data-carousel-root=""
-            data-touch={isTouch}
-            data-reduced-motion={isInstantMode}
+            ref={viewportRef}
+            tabIndex={-1}
+            className={classNames.innerContainer}
+            data-carousel-viewport=""
+            onMouseEnter={() => handleHoverChange(true)}
+            onMouseLeave={() => handleHoverChange(false)}
+            {...dragListeners}
           >
             <div
-              ref={viewportRef}
-              tabIndex={-1}
-              className={classNames.innerContainer}
-              data-carousel-viewport=""
-              onMouseEnter={() => handleHoverChange(true)}
-              onMouseLeave={() => handleHoverChange(false)}
-              {...dragListeners}
+              ref={trackRef}
+              className={classNames.slideContainer}
+              data-carousel-track=""
             >
-              <div
-                ref={trackRef}
-                className={classNames.slideContainer}
-                data-carousel-track=""
-              >
-                {virtualSlides.map((slide) => (
-                  <SlideItem
-                    key={slide.slideKey}
-                    slideData={slide.slideData}
-                    className={slideClassMap}
-                    style={slideStyle}
-                    isContentImg={isContentImg}
-                    isDataSaverEnabled={isDataSaverEnabled}
-                    errAltPlaceholder={config.errorAltPlaceholder}
-                    isInteractive={isInteractive}
-                    isActive={slide.isActive}
-                    isActual={slide.isActual}
-                    onSlideClick={navigation.handleSlideClick}
-                    {...slide.ariaProps}
-                  />
-                ))}
-              </div>
-              {renderPolicy.shouldRenderControls ? slots.controls : null}
+              {virtualSlides.map((slide) => (
+                <SlideItem
+                  key={slide.slideKey}
+                  slideData={slide.slideData}
+                  className={slideClassMap}
+                  style={slideStyle}
+                  isContentImg={isContentImg}
+                  imageResourceStore={imageResourceStore}
+                  isDataSaverEnabled={isDataSaverEnabled}
+                  errAltPlaceholder={config.errorAltPlaceholder}
+                  isInteractive={isInteractive}
+                  isActive={slide.isActive}
+                  isActual={slide.isActual}
+                  onSlideClick={navigation.handleSlideClick}
+                  {...slide.ariaProps}
+                />
+              ))}
             </div>
-            {renderPolicy.shouldRenderPagination ? slots.pagination : null}
-            {renderPolicy.shouldRenderDiagnostic ? slots.diagnostic : null}
+            {renderPolicy.shouldRenderControls ? slots.controls : null}
           </div>
-        </CarouselImageResourceContext.Provider>
+          {renderPolicy.shouldRenderPagination ? slots.pagination : null}
+          {renderPolicy.shouldRenderDiagnostic ? slots.diagnostic : null}
+        </div>
       </CarouselDiagnosticContext.Provider>
     </CarouselModuleContext.Provider>
   );

@@ -1,7 +1,10 @@
-import { useCallback, useContext, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 
-import { CarouselImageResourceContext } from "./context";
-import type { ImageResourceSnapshot, ImageStatus } from "./types";
+import type {
+  ImageResourceSnapshot,
+  ImageResourceStore,
+  ImageStatus,
+} from "./types";
 
 export interface ImageResourceHandle {
   readonly status: ImageStatus;
@@ -25,13 +28,15 @@ const STATIC_CALLBACKS = Object.freeze({
 });
 
 /**
- * Per-slide bridge to the compact image-resource store. Non-image slides and
- * `isContentImg={false}` short-circuit to a loaded snapshot with no
- * subscription.
+ * Per-slide bridge to the compact image-resource store. The store is passed
+ * explicitly from Carousel to SlideItem, keeping image state a local carousel
+ * dependency rather than a hidden context read. Non-image slides and
+ * `isContentImg={false}` short-circuit to a loaded snapshot with no subscription.
  */
-export function useImageResource(url: string | null): ImageResourceHandle {
-  const store = useContext(CarouselImageResourceContext);
-
+export function useImageResource(
+  url: string | null,
+  store: ImageResourceStore | null,
+): ImageResourceHandle {
   const subscribe = useCallback(
     (onStoreChange: () => void) =>
       store !== null && url !== null

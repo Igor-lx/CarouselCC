@@ -1,4 +1,3 @@
-export { CarouselImageResourceContext } from "./context";
 export { createImageResourceStore } from "./createImageResourceStore";
 export { useImageResource } from "./useImageResource";
 export type { ImageResourceHandle } from "./useImageResource";

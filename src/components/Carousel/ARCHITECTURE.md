@@ -355,7 +355,7 @@ Every responsibility has exactly one owner. The orchestrator
 | Track DOM | `useTrackBinding` | Measures slot size and subscribes to visual position; writes `transform`. |
 | Render window | `useSlideRenderModel` | Memoised; expands during motion, snaps on idle. |
 | Image resources | image-resource store (`createImageResourceStore`) | Compact per-URL render status and capped retry policy. One instance per carousel; the single authority on image renderability for cloned / duplicate URLs. |
-| Slide image binding | `useImageResource` | Subscribes a `SlideItem` to its URL snapshot via `useSyncExternalStore` and reports the real `<img>` load / error outcome back to the store. |
+| Slide image binding | `SlideItem` + `useImageResource` | Receives the carousel-owned store explicitly from `Carousel`, subscribes the slide URL via `useSyncExternalStore`, and reports the real `<img>` load / error outcome back to the store. |
 | Gesture lifecycle | `useCarouselGesture` | Wraps the shared `usePointerSwipe`. Converts pointer events into dispatches and direct position writes. |
 | Autoplay lifecycle | `useAutoplay` | Owns the interval timer, hover/visibility/dragging pause. |
 | Focus shift | `useFocusRecovery` | Triggers when the state settles. |
@@ -364,8 +364,8 @@ Every responsibility has exactly one owner. The orchestrator
 | Diagnostic warnings | `Diagnostic` module | Observe-only DEV warnings; never owns or replaces runtime values. |
 
 Each hook returns exactly the shape it owns. No hook reads another hook's
-internal state. Cross-layer values flow only through hook arguments and the
-context provider.
+internal state. Cross-layer values flow only through hook arguments, explicit
+props, and the module / diagnostic providers.
 
 ---
 
@@ -399,8 +399,9 @@ The system has five SSOTs, each owned by exactly one layer.
 
    Browser image loading remains browser-owned: the store never creates
    offscreen images, never calls `decode()`, and never schedules ahead of
-   mounted `<img>` elements. Each `SlideItem` subscribes to its URL via
-   `useImageResource`, then reports the real `<img>` outcome back. "Has this
+   mounted `<img>` elements. `Carousel` passes the store explicitly into each
+   `SlideItem`; the slide subscribes to its URL via `useImageResource`, then
+   reports the real `<img>` outcome back. "Has this
    slide's image failed" is a *derived read* of this SSOT, never a second
    copy of state. Observation-only: it never feeds navigation, layout, or
    motion.
@@ -769,7 +770,6 @@ src/components/Carousel/
 │   ├── SlideItem.types.ts
 │   ├── imageResource/             image-resource SSOT (store + React bridge)
 │   │   ├── createImageResourceStore.ts  framework-agnostic store
-│   │   ├── context.ts             per-carousel store provider
 │   │   ├── useImageResource.ts    per-slide useSyncExternalStore binding
 │   │   ├── useImageResourceStoreInstance.ts  lifecycle owner
 │   │   └── types.ts

@@ -23,6 +23,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
     className,
     style,
     isContentImg,
+    imageResourceStore,
     isDataSaverEnabled,
     errAltPlaceholder,
     isInteractive,
@@ -38,7 +39,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
       : null;
 
   const { status, generation, reportLoaded, reportError, requestRetry } =
-    useImageResource(imageSource);
+    useImageResource(imageSource, imageResourceStore);
 
   const isImageSlide = imageSource !== null;
   const hasImageError = isImageSlide && status === "error";
