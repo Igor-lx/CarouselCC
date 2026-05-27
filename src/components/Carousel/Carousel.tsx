@@ -4,6 +4,7 @@ import styles from "./Carousel.module.scss";
 import {
   mergeStyleMaps,
   resolveSlots,
+  useIsomorphicLayoutEffect,
   useViewportVisibility,
 } from "../../shared";
 import { CAROUSEL_DEFAULTS, useCarouselConfig } from "./config";
@@ -12,6 +13,7 @@ import {
   CarouselModuleContext,
   useModuleContextValue,
 } from "./context";
+import { traceCarousel } from "./debug/performanceTrace";
 import { carouselBoundaryState, slideFlexStyle } from "./domain";
 import { useAutoplay } from "./autoplay/useAutoplay";
 import { useFocusRecovery } from "./focus/useFocusRecovery";
@@ -371,6 +373,24 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     () => slideFlexStyle(layout.visibleSlidesCount),
     [layout.visibleSlidesCount],
   );
+
+  // Diagnostic-only commit-time trace. Fires on every render commit so the
+  // perf trace can correlate React commits with motion-layer effects in the
+  // same buffer. Cost is one `traceCarousel` call (no-op unless the
+  // `?carouselTrace` switch is on); production builds short-circuit the
+  // entire body via `import.meta.env.DEV` in the trace module.
+  useIsomorphicLayoutEffect(() => {
+    traceCarousel("carousel:commit", {
+      fromVirtualIndex: state.fromVirtualIndex,
+      isMoving: status.isMoving,
+      motionPhase: state.motionPhase,
+      renderWindowStart,
+      targetPageIndex: state.targetPageIndex,
+      targetVirtualIndex: state.virtualIndex,
+      virtualSlideCount: virtualSlides.length,
+      visibleSlidesCount: layout.visibleSlidesCount,
+    });
+  });
 
   return (
     <CarouselModuleContext.Provider value={moduleContextValue}>

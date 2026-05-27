@@ -7,6 +7,7 @@ import {
   type MotionSample,
 } from "../../../shared";
 import type { CarouselRuntimeConfig } from "../config";
+import { traceCarousel } from "../debug/performanceTrace";
 import type { CarouselState } from "../state";
 import { buildCarouselSegment } from "./segmentFactory";
 import { sampleCarouselSegment } from "./sampler";
@@ -165,6 +166,17 @@ export function useMotionRunner({
   );
 
   useIsomorphicLayoutEffect(() => {
+    traceCarousel("motion:layoutEffect", {
+      enabled,
+      fromVirtualIndex: state.fromVirtualIndex,
+      isDragging,
+      isInstantMode,
+      motionPhase: state.motionPhase,
+      moveReason: state.moveReason,
+      targetVirtualIndex: state.virtualIndex,
+      teleportVirtualIndex: state.teleportVirtualIndex,
+    });
+
     const key = [
       enabled,
       state.motionPhase,
@@ -259,6 +271,15 @@ export function useMotionRunner({
         onAutoplayDurationCancel?.();
       }
 
+      traceCarousel("motion:start", {
+        clockStart,
+        duration,
+        from: segment.from,
+        startedAt: segment.startedAt,
+        strategy: segment.strategy,
+        to: segment.to,
+      });
+
       controller.start({
         segment,
         sampler: sampleCarouselSegment,
@@ -275,6 +296,12 @@ export function useMotionRunner({
       // 16 ms "frozen at handoff" frame before the direction change.
       scheduleDeferredStart((retargetTimestamp) => {
         const handoff = controller.captureHandoff(retargetTimestamp);
+        traceCarousel("motion:handoff", {
+          position: handoff.position,
+          strategy: handoff.strategy,
+          timestamp: handoff.timestamp,
+          velocity: handoff.velocity,
+        });
         startResolvedMotion(
           {
             position: handoff.position,

@@ -6,6 +6,7 @@ import {
   trackPixelTransform,
 } from "../domain";
 import { useIsomorphicLayoutEffect } from "../../../shared";
+import { traceCarousel } from "../debug/performanceTrace";
 import type { VisualPositionSource } from "../position";
 
 const RESIZE_EPSILON_PX = 0.5;
@@ -75,12 +76,21 @@ export function useTrackBinding({
   }, []);
 
   const writePosition = useCallback(
-    (position: number) => {
+    (position: number, source: "frame" | "geometry" = "frame") => {
       const track = trackRef.current;
       if (!track) return;
       const transform = resolveTransform(position);
+      const changed = lastTransformRef.current !== transform;
 
-      if (lastTransformRef.current !== transform) {
+      traceCarousel("track:write", {
+        changed,
+        position,
+        renderWindowStart: renderWindowStartRef.current,
+        slotSize: slotSizeRef.current,
+        source,
+      });
+
+      if (changed) {
         track.style.transform = transform;
         lastTransformRef.current = transform;
       }
@@ -90,8 +100,16 @@ export function useTrackBinding({
 
   const syncGeometry = useCallback(
     (width?: number) => {
+      traceCarousel("track:syncGeometry:start", {
+        renderWindowStart: renderWindowStartRef.current,
+        width,
+      });
       measure(width);
-      writePosition(visualPosition.getSnapshot().position);
+      writePosition(visualPosition.getSnapshot().position, "geometry");
+      traceCarousel("track:syncGeometry:end", {
+        renderWindowStart: renderWindowStartRef.current,
+        slotSize: slotSizeRef.current,
+      });
     },
     [measure, visualPosition, writePosition],
   );

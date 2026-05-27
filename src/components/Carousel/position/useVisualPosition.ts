@@ -6,6 +6,7 @@ import {
   type MotionController,
   type MotionSample,
 } from "../../../shared";
+import { traceCarousel } from "../debug/performanceTrace";
 import type { CarouselMotionStrategy } from "../motion/types";
 import type {
   VisualPositionFrame,
@@ -58,7 +59,19 @@ export function useVisualPosition({
 
   useEffect(() => {
     const unsubscribe = controller.subscribe(
-      (sample) => emit(toFrame(sample, stepSizeRef.current)),
+      (sample) => {
+        const frame = toFrame(sample, stepSizeRef.current);
+        traceCarousel("visual:sample", {
+          pageOffset: frame.pageOffset,
+          phase: frame.phase,
+          position: frame.position,
+          progress: frame.progress,
+          strategy: frame.strategy,
+          target: frame.target,
+          velocity: frame.velocity,
+        });
+        emit(frame);
+      },
       { emitCurrent: false },
     );
     return unsubscribe;

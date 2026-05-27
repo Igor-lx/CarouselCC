@@ -1,6 +1,7 @@
 import { useCallback, useRef } from "react";
 
 import { useIsomorphicLayoutEffect } from "../../../../shared";
+import { traceCarousel } from "../../debug/performanceTrace";
 import type { VisualPositionSource } from "../../position";
 import {
   widgetProjectionSide,
@@ -164,6 +165,7 @@ export function usePaginationWidgetBinding({
     (visualOffset: number) => {
       const firstId = Math.round(visualOffset) - side;
       const cache = dotCacheRef.current;
+      let changedProperties = 0;
 
       for (let index = 0; index < slotCount; index += 1) {
         const dot = dotRefs.current[index];
@@ -177,9 +179,11 @@ export function usePaginationWidgetBinding({
         if (state.opacity === 0 && last !== null && last.opacity === 0) continue;
         if (last === null || last.transform !== transform) {
           dot.style.transform = transform;
+          changedProperties += 1;
         }
         if (last === null || last.opacity !== state.opacity) {
           dot.style.opacity = String(state.opacity);
+          changedProperties += 1;
         }
         if (last === null) cache[index] = { transform, opacity: state.opacity };
         else {
@@ -189,6 +193,12 @@ export function usePaginationWidgetBinding({
       }
 
       writeActiveProjection(visualOffset);
+
+      traceCarousel("paginationWidget:write", {
+        changedProperties,
+        slotCount,
+        visualOffset,
+      });
     },
     [geometry, side, slotCount, writeActiveProjection],
   );
