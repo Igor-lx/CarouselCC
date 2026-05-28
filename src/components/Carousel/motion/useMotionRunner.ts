@@ -2,16 +2,22 @@ import { useCallback, useEffect, useRef } from "react";
 
 import {
   useIsomorphicLayoutEffect,
-  type MotionClockStart,
   type MotionController,
   type MotionSample,
 } from "../../../shared";
 import type { CarouselRuntimeConfig } from "../config";
+import type { TrackBindingApi } from "../geometry";
 import { traceCarousel } from "../debug/performanceTrace";
 import type { CarouselState } from "../state";
+import { bezierToCss } from "./bezier";
 import { buildCarouselSegment } from "./segmentFactory";
 import { sampleCarouselSegment } from "./sampler";
-import type { CarouselMotionStrategy, MotionStart } from "./types";
+import type {
+  CarouselMotionStrategy,
+  CarouselSegment,
+  EasingSegment,
+  MotionStart,
+} from "./types";
 
 interface UseMotionRunnerInput {
   state: CarouselState;
@@ -20,6 +26,8 @@ interface UseMotionRunnerInput {
   isInstantMode: boolean;
   isDragging: boolean;
   enabled: boolean;
+  startCompositorMotion: TrackBindingApi["startCompositorMotion"];
+  cancelCompositorMotion: TrackBindingApi["cancelCompositorMotion"];
   /**
    * Called by the controller when a segment naturally settles. The argument
    * is the visual position where it settled, so the reducer can distinguish
@@ -31,38 +39,22 @@ interface UseMotionRunnerInput {
   onAutoplayDurationChange?: (duration: number) => void;
 }
 
+const now = (): number =>
+  typeof performance !== "undefined" ? performance.now() : Date.now();
+
 /**
- * Number of rAF ticks the runner waits before actually starting a new motion
- * segment — applied symmetrically to both a fresh cold start (from idle) and
- * a hot retarget (when a click lands during in-flight motion).
- *
- * Why the defer matters for both paths:
- *
- * - **Cold start.** The same React commit that flips `motionPhase` from
- *   "idle" to "step-normal" can mount many new SlideItems into the expanded
- *   render window. Each new `<img>` triggers a fresh decode and a heavy
- *   paint pass that on mobile can stall the browser for 100–300 ms. If the
- *   segment clock starts inside that layout effect, the controller's first
- *   rAF tick lands AFTER the heavy paint with `elapsed ≈ commit-paint
- *   duration`, and the user sees the track snap forward 20–30 px before
- *   motion continues at normal speed. Deferring the start to a rAF that
- *   fires AFTER the commit's paint pipeline has reached the compositor
- *   makes the segment's first observable frame be `progress = 0` (the
- *   resting `from` position), and every subsequent tick is one frame
- *   apart — no catch-up jump on the first visible frame.
- *
- * - **Hot retarget.** The old segment keeps painting during the defer
- *   window; at the boundary, the successor segment starts from one atomic
- *   `captureHandoff` point of the old curve, so position and velocity are
- *   read from the same sample at the same instant.
- *
- * Two rAFs is a defensive choice: a single rAF strictly suffices to "wait
- * until the previous commit's paint is on the compositor", but two also
- * give async image decode a frame of headroom — which matters on mobile,
- * where the heavy commit-driven paint also kicks off WebP decodes that
- * complete asynchronously.
+ * Only a plain `easing` step (click / autoplay / snap-back, a fixed
+ * cubic-bezier translation of the whole track) can be expressed as a single
+ * WAAPI keyframe pair and handed to the compositor. Profile segments
+ * (`gesture`, `repeated`, `jump`) carry speed-authored accel/cruise/decel
+ * shapes, teleport discontinuities, or inertial velocity that a single CSS
+ * easing curve cannot reproduce — they stay on the JS sampler. `gesture-easing`
+ * (a non-inertial release) also stays JS-driven for continuity with the live
+ * drag position.
  */
-const MOTION_START_FRAME_DELAY = 2;
+const isCompositorTrackSegment = (
+  segment: CarouselSegment,
+): segment is EasingSegment => segment.strategy === "easing";
 
 /**
  * Origin of a post-drag release segment. Drag writes are published into the
@@ -89,21 +81,24 @@ const buildStartFromState = (
  * The motion runner is the only bridge between logical state and the motion
  * controller.
  *
- * Every transition from a non-motion phase (idle / dragging / step-instant)
- * into a continuous-motion phase (step-normal / step-snap / step-jump) is
- * deferred by `MOTION_START_FRAME_DELAY` rAF ticks before the segment is
- * actually started — both for a cold start from idle and for a hot retarget
- * over an in-flight segment. See the constant's docblock for why.
+ * The JS motion controller stays the visual-position SSOT for every consumer:
+ * gesture/profile math, diagnostics, the pagination widget, status snapshots,
+ * handoff, and settle all read its sampled timeline. For a plain easing step
+ * the track DOM *additionally* runs the identical transform through the Web
+ * Animations API, so the deck translation lives on the compositor thread while
+ * the JS sampler keeps publishing the authoritative numbers to the non-track
+ * subscribers. The track binding skips its own per-frame transform write while
+ * a compositor animation is live (see `useTrackBinding.writePosition`), so the
+ * two never fight.
  *
- * Hot retargets keep the old segment painting through the defer window. At
- * the boundary, the successor segment starts from a single atomic
- * `controller.captureHandoff(t)` — a coherent `(position, velocity)` taken
- * from the *same* sample of the old curve. Position and velocity can no
- * longer be sourced from two different moments (see motion §4.2).
+ * Profile segments (gesture release, repeated-click, GO_TO jump) are not
+ * compositor-eligible and run fully on the JS sampler as before.
  *
- * Every segment — first click, repeated click, gesture release — drives
- * directly to `state.virtualIndex`. There is no intermediate destination and
- * no chained follow-up segment.
+ * Hot retargets hand off at a single atomic `controller.captureHandoff(t)` —
+ * a coherent `(position, velocity)` taken from the same sample of the old
+ * curve (see motion §4.2). Every segment drives directly to
+ * `state.virtualIndex`; there is no intermediate destination or chained
+ * follow-up segment.
  */
 export function useMotionRunner({
   state,
@@ -112,51 +107,13 @@ export function useMotionRunner({
   isInstantMode,
   isDragging,
   enabled,
+  startCompositorMotion,
+  cancelCompositorMotion,
   onSettle,
   onAutoplayDurationCancel,
   onAutoplayDurationChange,
 }: UseMotionRunnerInput): void {
   const lastKeyRef = useRef<string>("");
-  const startFrameRef = useRef<number | null>(null);
-  const startTokenRef = useRef(0);
-
-  const cancelDeferredStart = useCallback(() => {
-    startTokenRef.current += 1;
-    if (startFrameRef.current !== null && typeof window !== "undefined") {
-      window.cancelAnimationFrame(startFrameRef.current);
-    }
-    startFrameRef.current = null;
-  }, []);
-
-  const scheduleDeferredStart = useCallback(
-    (callback: (timestamp: number) => void) => {
-      cancelDeferredStart();
-
-      if (typeof window === "undefined") {
-        callback(performance.now());
-        return;
-      }
-
-      const token = startTokenRef.current;
-      let framesLeft = MOTION_START_FRAME_DELAY;
-
-      const tick: FrameRequestCallback = (timestamp) => {
-        if (startTokenRef.current !== token) return;
-
-        framesLeft -= 1;
-        if (framesLeft > 0) {
-          startFrameRef.current = window.requestAnimationFrame(tick);
-          return;
-        }
-
-        startFrameRef.current = null;
-        callback(timestamp);
-      };
-
-      startFrameRef.current = window.requestAnimationFrame(tick);
-    },
-    [cancelDeferredStart],
-  );
 
   const settle = useCallback(
     (sample: MotionSample<CarouselMotionStrategy>) => {
@@ -196,27 +153,29 @@ export function useMotionRunner({
     lastKeyRef.current = key;
 
     if (!enabled) {
-      cancelDeferredStart();
+      cancelCompositorMotion(state.virtualIndex);
       onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, { strategy: "idle" });
       return;
     }
 
     if (state.motionPhase === "idle") {
-      cancelDeferredStart();
+      cancelCompositorMotion(state.virtualIndex);
       onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, { strategy: "idle" });
       return;
     }
 
     if (state.motionPhase === "dragging") {
-      cancelDeferredStart();
+      // A drag re-takes the track directly through the visual-position stream;
+      // freeze the compositor at the live sample so the finger owns it again.
+      cancelCompositorMotion(controller.getSnapshot().value);
       onAutoplayDurationCancel?.();
       return;
     }
 
     if (state.motionPhase === "step-instant") {
-      cancelDeferredStart();
+      cancelCompositorMotion(state.virtualIndex);
       onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, {
         strategy: "idle",
@@ -225,23 +184,14 @@ export function useMotionRunner({
       return;
     }
 
-    const isActive = controller.isActive();
-    // For a cold start the handoff is consulted only for residual velocity
-    // (position is owned by the reducer's `state.fromVirtualIndex`). The
-    // handoff's timestamp is unused — the segment's `startedAt` comes from
-    // the deferred rAF callback below.
-    const coldHandoff = isActive
-      ? null
-      : controller.captureHandoff(performance.now());
-
     const startResolvedMotion = (
       resolvedStart: MotionStart,
       resolvedStartedAt: number,
-      clockStart: MotionClockStart,
     ) => {
       const distance = state.virtualIndex - resolvedStart.position;
 
       if (Math.abs(distance) < config.motion.epsilon) {
+        cancelCompositorMotion(state.virtualIndex);
         controller.snap(state.virtualIndex, {
           strategy: resolvedStart.strategy,
           velocity: resolvedStart.velocity,
@@ -271,8 +221,25 @@ export function useMotionRunner({
         onAutoplayDurationCancel?.();
       }
 
+      // Try to drive a plain easing step on the compositor. When it takes,
+      // the track binding suppresses its own per-frame writes; when it does
+      // not (profile segment, no slot measured, no `Element.animate`), make
+      // sure no stale compositor animation is left running over the JS path.
+      const isComposited =
+        isCompositorTrackSegment(segment) &&
+        startCompositorMotion({
+          from: segment.from,
+          to: segment.to,
+          duration: segment.duration,
+          easing: bezierToCss(segment.easing),
+        });
+
+      if (!isComposited) {
+        cancelCompositorMotion(resolvedStart.position);
+      }
+
       traceCarousel("motion:start", {
-        clockStart,
+        composited: isComposited,
         duration,
         from: segment.from,
         startedAt: segment.startedAt,
@@ -280,71 +247,51 @@ export function useMotionRunner({
         to: segment.to,
       });
 
+      // The controller runs regardless of compositing: it remains the SSOT for
+      // pagination, status, handoff, and settle. When composited, its
+      // per-frame samples simply do not reach the track DOM.
       controller.start({
         segment,
         sampler: sampleCarouselSegment,
         onComplete: settle,
-        clockStart,
       });
     };
 
-    if (isActive) {
-      // Hot retarget. The old segment was already publishing presentation-
-      // aligned frames; the handoff position is what the user already sees,
-      // so the new segment can start ticking from `handoff.timestamp`
-      // immediately — `after-initial-frame` would only add an unnecessary
-      // 16 ms "frozen at handoff" frame before the direction change.
-      scheduleDeferredStart((retargetTimestamp) => {
-        const handoff = controller.captureHandoff(retargetTimestamp);
-        traceCarousel("motion:handoff", {
-          position: handoff.position,
-          strategy: handoff.strategy,
-          timestamp: handoff.timestamp,
-          velocity: handoff.velocity,
-        });
-        startResolvedMotion(
-          {
-            position: handoff.position,
-            velocity: handoff.velocity,
-            strategy: handoff.strategy,
-          },
-          handoff.timestamp,
-          "immediate",
-        );
+    const startedAt = now();
+
+    if (controller.isActive()) {
+      // One atomic point: position + velocity + time from the same sample.
+      const handoff = controller.captureHandoff(startedAt);
+      traceCarousel("motion:handoff", {
+        position: handoff.position,
+        strategy: handoff.strategy,
+        timestamp: handoff.timestamp,
+        velocity: handoff.velocity,
       });
+      startResolvedMotion(
+        {
+          position: handoff.position,
+          velocity: handoff.velocity,
+          strategy: handoff.strategy,
+        },
+        handoff.timestamp,
+      );
       return;
     }
 
-    // Cold start from idle. Defer through the same window so the React
-    // commit's paint pipeline (which often mounts new SlideItems and
-    // triggers fresh image decodes — the dominant cost on mobile) reaches
-    // the compositor BEFORE the segment clock starts ticking. `clockStart:
-    // "after-initial-frame"` then absorbs any leftover first-paint delay
-    // (async WebP decode racing the initial sample's compositor commit)
-    // into the `from` plateau instead of into the first visible elapsed —
-    // without it, the user sees a catch-up jump of 20-30 px on the first
-    // observable frame. See `MOTION_START_FRAME_DELAY` and `MotionClockStart`
-    // docblocks for the full failure-mode walk-through.
-    scheduleDeferredStart((startedAt) => {
-      if (state.moveReason === "gesture") {
-        startResolvedMotion(
-          buildStartFromGesture(state),
-          startedAt,
-          "after-initial-frame",
-        );
-        return;
-      }
-      // The logical origin is owned by the reducer
-      // (`state.fromVirtualIndex`); only the residual velocity comes from the
-      // controller. That cross-layer split is intentional — not a mixed handoff.
-      startResolvedMotion(
-        buildStartFromState(state, coldHandoff?.velocity ?? 0),
-        startedAt,
-        "after-initial-frame",
-      );
-    });
+    if (state.moveReason === "gesture") {
+      startResolvedMotion(buildStartFromGesture(state), startedAt);
+      return;
+    }
+
+    // Cold start from idle: the logical origin is owned by the reducer
+    // (`state.fromVirtualIndex`); only the residual velocity comes from the
+    // controller snapshot. That cross-layer split is intentional — not a
+    // mixed handoff.
+    const handoff = controller.captureHandoff(startedAt);
+    startResolvedMotion(buildStartFromState(state, handoff.velocity), startedAt);
   }, [
-    cancelDeferredStart,
+    cancelCompositorMotion,
     config,
     controller,
     enabled,
@@ -352,8 +299,8 @@ export function useMotionRunner({
     isInstantMode,
     onAutoplayDurationCancel,
     onAutoplayDurationChange,
-    scheduleDeferredStart,
     settle,
+    startCompositorMotion,
     state.fromVirtualIndex,
     state.gesture.pointerVelocity,
     state.gesture.uiVelocity,
@@ -367,9 +314,9 @@ export function useMotionRunner({
 
   useEffect(
     () => () => {
-      cancelDeferredStart();
+      cancelCompositorMotion(controller.getSnapshot().value);
       controller.cancel();
     },
-    [cancelDeferredStart, controller],
+    [cancelCompositorMotion, controller],
   );
 }

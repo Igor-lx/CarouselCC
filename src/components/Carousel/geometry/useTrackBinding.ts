@@ -1,4 +1,4 @@
-import { useCallback, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useRef, type RefObject } from "react";
 
 import {
   measureSlotSize,
@@ -18,9 +18,32 @@ interface UseTrackBindingInput {
   visualPosition: VisualPositionSource;
 }
 
+export interface TrackCompositorMotionOptions {
+  from: number;
+  to: number;
+  duration: number;
+  easing: string;
+}
+
 export interface TrackBindingApi {
   readCurrentPosition: () => number;
   getSlotSize: () => number;
+  /**
+   * Hand a plain easing translation to the compositor via the Web Animations
+   * API. Returns `true` when the animation was started — the JS-sampled
+   * `writePosition` then steps aside for the track DOM until the animation
+   * finishes or is cancelled. Returns `false` when compositor motion is not
+   * possible (no measured slot size, no `Element.animate`, degenerate input),
+   * in which case the caller keeps the JS-driven per-frame transform write.
+   */
+  startCompositorMotion: (options: TrackCompositorMotionOptions) => boolean;
+  /**
+   * Tear down any running compositor animation and pin the track to a known
+   * transform. Pass the authoritative `position` when it is known (the common
+   * case: the reducer/handoff origin); omit it only to freeze at the
+   * currently-painted transform, which costs a `getComputedStyle` read.
+   */
+  cancelCompositorMotion: (position?: number) => void;
 }
 
 /**
@@ -41,6 +64,7 @@ export function useTrackBinding({
   const slotSizeRef = useRef<number | null>(null);
   const lastTransformRef = useRef<string | null>(null);
   const lastMeasuredWidthRef = useRef<number | null>(null);
+  const compositorAnimationRef = useRef<Animation | null>(null);
 
   renderWindowStartRef.current = renderWindowStart;
   visibleSlidesCountRef.current = visibleSlidesCount;
@@ -81,14 +105,25 @@ export function useTrackBinding({
       if (!track) return;
       const transform = resolveTransform(position);
       const changed = lastTransformRef.current !== transform;
+      // While a compositor animation owns the track, the JS sampler still
+      // publishes its authoritative timeline to non-track subscribers, but its
+      // per-frame transform write here would fight the WAAPI keyframes. A
+      // `geometry` write (render-window / resize sync) is allowed through
+      // because it must re-baseline the transform; that path cancels the
+      // compositor animation first (see `syncGeometry`).
+      const isCompositedFrame =
+        source === "frame" && compositorAnimationRef.current !== null;
 
       traceCarousel("track:write", {
         changed,
+        composited: isCompositedFrame,
         position,
         renderWindowStart: renderWindowStartRef.current,
         slotSize: slotSizeRef.current,
         source,
       });
+
+      if (isCompositedFrame) return;
 
       if (changed) {
         track.style.transform = transform;
@@ -98,12 +133,120 @@ export function useTrackBinding({
     [resolveTransform, trackRef],
   );
 
+  const cancelCompositorMotion = useCallback(
+    (position?: number) => {
+      const animation = compositorAnimationRef.current;
+      if (!animation) return;
+      compositorAnimationRef.current = null;
+
+      const track = trackRef.current;
+      if (!track) {
+        animation.cancel();
+        return;
+      }
+
+      // Freeze the track at a known transform before cancelling: an explicit
+      // `position` (the usual case) is resolved through the same math the JS
+      // path uses; only when it is omitted do we pay a `getComputedStyle`
+      // read to capture whatever the compositor curve was showing.
+      const transform =
+        typeof position === "number"
+          ? resolveTransform(position)
+          : typeof window !== "undefined"
+            ? window.getComputedStyle(track).transform
+            : null;
+      animation.cancel();
+      if (transform && transform !== "none") {
+        track.style.transform = transform;
+        lastTransformRef.current = transform;
+      }
+    },
+    [resolveTransform, trackRef],
+  );
+
+  const startCompositorMotion = useCallback(
+    ({ from, to, duration, easing }: TrackCompositorMotionOptions): boolean => {
+      const track = trackRef.current;
+      const slot = slotSizeRef.current;
+      if (
+        !track ||
+        slot === null ||
+        !Number.isFinite(from) ||
+        !Number.isFinite(to) ||
+        !(duration > 0) ||
+        typeof track.animate !== "function"
+      ) {
+        return false;
+      }
+
+      // Replace any in-flight compositor animation, anchored at the new origin.
+      cancelCompositorMotion(from);
+
+      const fromTransform = trackPixelTransform(
+        from,
+        renderWindowStartRef.current,
+        slot,
+      );
+      const toTransform = trackPixelTransform(
+        to,
+        renderWindowStartRef.current,
+        slot,
+      );
+
+      // Paint the origin synchronously so the first compositor frame and the
+      // JS sampler's `from` plateau agree, then start the keyframe animation.
+      track.style.transform = fromTransform;
+      lastTransformRef.current = fromTransform;
+
+      let animation: Animation;
+      try {
+        animation = track.animate(
+          [{ transform: fromTransform }, { transform: toTransform }],
+          { duration, easing, fill: "both" },
+        );
+      } catch {
+        // Some restrictive engines expose `animate` but throw on use.
+        return false;
+      }
+
+      compositorAnimationRef.current = animation;
+      animation.onfinish = () => {
+        if (compositorAnimationRef.current !== animation) return;
+        compositorAnimationRef.current = null;
+        track.style.transform = toTransform;
+        lastTransformRef.current = toTransform;
+        animation.cancel();
+      };
+      animation.oncancel = () => {
+        if (compositorAnimationRef.current === animation) {
+          compositorAnimationRef.current = null;
+        }
+      };
+
+      traceCarousel("track:compositor-start", {
+        duration,
+        easing,
+        from,
+        renderWindowStart: renderWindowStartRef.current,
+        to,
+      });
+
+      return true;
+    },
+    [cancelCompositorMotion, trackRef],
+  );
+
   const syncGeometry = useCallback(
     (width?: number) => {
       traceCarousel("track:syncGeometry:start", {
         renderWindowStart: renderWindowStartRef.current,
         width,
       });
+      // A geometry change re-bases the transform math (slot size /
+      // render-window-start), so any compositor animation keyed off the old
+      // baseline must be torn down first and the track re-pinned to the live
+      // visual position.
+      cancelCompositorMotion(visualPosition.getSnapshot().position);
       measure(width);
       writePosition(visualPosition.getSnapshot().position, "geometry");
       traceCarousel("track:syncGeometry:end", {
@@ -111,7 +254,7 @@ export function useTrackBinding({
         slotSize: slotSizeRef.current,
       });
     },
-    [measure, visualPosition, writePosition],
+    [cancelCompositorMotion, measure, visualPosition, writePosition],
   );
 
   // The track is animated solely by the JS motion controller writing
@@ -176,5 +319,21 @@ export function useTrackBinding({
 
   const getSlotSize = useCallback(() => slotSizeRef.current ?? 0, []);
 
-  return { readCurrentPosition, getSlotSize };
+  // Stop a dangling compositor animation on unmount. The motion runner's own
+  // teardown also cancels, but this keeps the binding self-contained: the
+  // animation is tied to a track element that is about to leave the DOM.
+  useEffect(
+    () => () => {
+      compositorAnimationRef.current?.cancel();
+      compositorAnimationRef.current = null;
+    },
+    [],
+  );
+
+  return {
+    readCurrentPosition,
+    getSlotSize,
+    startCompositorMotion,
+    cancelCompositorMotion,
+  };
 }

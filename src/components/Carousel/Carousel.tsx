@@ -179,7 +179,12 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   const trackRef = useRef<HTMLDivElement>(null);
 
   // --- track DOM bridge -----------------------------------------------------
-  const { readCurrentPosition, getSlotSize } = useTrackBinding({
+  const {
+    readCurrentPosition,
+    getSlotSize,
+    startCompositorMotion,
+    cancelCompositorMotion,
+  } = useTrackBinding({
     trackRef,
     renderWindowStart,
     visibleSlidesCount: layout.visibleSlidesCount,
@@ -195,6 +200,8 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     isInstantMode,
     isDragging: status.isDragging,
     enabled: layout.canSlide,
+    startCompositorMotion,
+    cancelCompositorMotion,
   });
 
   // --- navigation -----------------------------------------------------------

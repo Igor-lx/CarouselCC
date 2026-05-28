@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { MotionController } from "../../../shared";
 import type { CarouselRuntimeConfig } from "../config";
+import type { TrackBindingApi } from "../geometry";
 import type { CarouselDispatch, CarouselState } from "../state";
 import type { CarouselMotionStrategy } from "./types";
 import { useMotionRunner } from "./useMotionRunner";
@@ -14,6 +15,8 @@ interface UseCarouselMotionExecutionInput {
   isInstantMode: boolean;
   isDragging: boolean;
   enabled: boolean;
+  startCompositorMotion: TrackBindingApi["startCompositorMotion"];
+  cancelCompositorMotion: TrackBindingApi["cancelCompositorMotion"];
 }
 
 interface UseCarouselMotionExecutionResult {
@@ -33,6 +36,8 @@ export function useCarouselMotionExecution({
   isInstantMode,
   isDragging,
   enabled,
+  startCompositorMotion,
+  cancelCompositorMotion,
 }: UseCarouselMotionExecutionInput): UseCarouselMotionExecutionResult {
   const [autoplayMotionDuration, setAutoplayMotionDuration] = useState(0);
   const autoplayDurationFrameRef = useRef<number | null>(null);
@@ -92,6 +97,8 @@ export function useCarouselMotionExecution({
     isInstantMode,
     isDragging,
     enabled,
+    startCompositorMotion,
+    cancelCompositorMotion,
     onSettle: handleMotionSettled,
     onAutoplayDurationCancel: cancelAutoplayDurationPublish,
     onAutoplayDurationChange: publishAutoplayDuration,

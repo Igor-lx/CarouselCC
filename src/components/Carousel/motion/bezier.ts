@@ -63,6 +63,18 @@ export const isParsedBezierValid = (bezier: CubicBezier) =>
   Number.isFinite(bezier.x2) &&
   Number.isFinite(bezier.y2);
 
+/**
+ * Serialise a parsed control-point record back into the CSS easing string a
+ * Web Animations API timing function accepts. The `(0,0,1,1)` identity maps
+ * to the keyword `linear` (which `cubic-bezier(0,0,1,1)` is equivalent to,
+ * but the keyword is the canonical form the platform expects). Used when a
+ * plain easing segment is handed to the compositor via `Element.animate`.
+ */
+export const bezierToCss = (bezier: CubicBezier): string =>
+  bezier.x1 === 0 && bezier.y1 === 0 && bezier.x2 === 1 && bezier.y2 === 1
+    ? "linear"
+    : `cubic-bezier(${bezier.x1}, ${bezier.y1}, ${bezier.x2}, ${bezier.y2})`;
+
 const bezierValue = (t: number, p1: number, p2: number) => {
   const inverse = 1 - t;
   return (
