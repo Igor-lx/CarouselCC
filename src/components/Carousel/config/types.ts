@@ -25,6 +25,7 @@ export interface RepeatedClickSettings {
   speedMultiplier: number;
   accelerationDistanceShare: number;
   decelerationDistanceShare: number;
+  retargetFrameDelay: number;
 }
 
 export interface InteractionSettings {

@@ -72,6 +72,11 @@ export function useVisualPosition({
     [],
   );
 
+  const sampleNow = useCallback<VisualPositionSource["sampleNow"]>(
+    () => controller.captureHandoff().position,
+    [controller],
+  );
+
   useIsomorphicLayoutEffect(() => {
     emit(toFrame(controller.getSnapshot(), stepSizeRef.current));
   }, [controller, emit, visibleSlidesCount]);
@@ -90,8 +95,8 @@ export function useVisualPosition({
   );
 
   const source = useMemo<VisualPositionSource>(
-    () => ({ getSnapshot, subscribe }),
-    [getSnapshot, subscribe],
+    () => ({ getSnapshot, sampleNow, subscribe }),
+    [getSnapshot, sampleNow, subscribe],
   );
 
   const applyImmediatePosition = useCallback(

@@ -32,6 +32,9 @@ interface UseMotionRunnerInput {
 const now = (): number =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
 
+const requestFrame = (callback: () => void): number | null =>
+  typeof window === "undefined" ? null : window.requestAnimationFrame(callback);
+
 const motionConfigKey = (config: CarouselRuntimeConfig): string =>
   [
     config.autoplayDuration,
@@ -46,6 +49,7 @@ const motionConfigKey = (config: CarouselRuntimeConfig): string =>
     config.repeatedClick.speedMultiplier,
     config.repeatedClick.accelerationDistanceShare,
     config.repeatedClick.decelerationDistanceShare,
+    config.repeatedClick.retargetFrameDelay,
     config.releaseConfig.inertiaBoost,
     config.releaseConfig.decelerationDistanceShare,
   ].join(":");
@@ -77,6 +81,41 @@ export function useMotionRunner({
   onSettle,
 }: UseMotionRunnerInput): void {
   const lastKeyRef = useRef<string>("");
+  const retargetFrameRef = useRef<number | null>(null);
+  const retargetTokenRef = useRef(0);
+
+  const cancelDeferredRetarget = useCallback(() => {
+    retargetTokenRef.current += 1;
+    if (retargetFrameRef.current !== null && typeof window !== "undefined") {
+      window.cancelAnimationFrame(retargetFrameRef.current);
+    }
+    retargetFrameRef.current = null;
+  }, []);
+
+  const scheduleDeferredRetarget = useCallback(
+    (frames: number, run: () => void) => {
+      cancelDeferredRetarget();
+      if (typeof window === "undefined") {
+        run();
+        return;
+      }
+
+      const token = retargetTokenRef.current;
+      let framesLeft = frames;
+      const tick = () => {
+        if (retargetTokenRef.current !== token) return;
+        framesLeft -= 1;
+        if (framesLeft > 0) {
+          retargetFrameRef.current = requestFrame(tick);
+          return;
+        }
+        retargetFrameRef.current = null;
+        run();
+      };
+      retargetFrameRef.current = requestFrame(tick);
+    },
+    [cancelDeferredRetarget],
+  );
 
   const settle = useCallback(
     (sample: MotionSample<CarouselMotionStrategy>) => {
@@ -104,6 +143,7 @@ export function useMotionRunner({
 
     if (lastKeyRef.current === key) return;
     lastKeyRef.current = key;
+    cancelDeferredRetarget();
 
     if (!enabled) {
       cancelCompositorMotion(state.virtualIndex);
@@ -176,10 +216,9 @@ export function useMotionRunner({
       });
     };
 
-    const startedAt = now();
-
-    if (controller.isActive()) {
-      const handoff = controller.captureHandoff(startedAt);
+    const startActiveRetarget = () => {
+      if (!controller.isActive()) return;
+      const handoff = controller.captureHandoff(now());
       startResolvedMotion(
         {
           position: handoff.position,
@@ -188,8 +227,19 @@ export function useMotionRunner({
         },
         handoff.timestamp,
       );
+    };
+
+    if (controller.isActive()) {
+      const retargetDelay = config.repeatedClick.retargetFrameDelay;
+      if (state.isRepeatedClickAdvance && retargetDelay > 0) {
+        scheduleDeferredRetarget(retargetDelay, startActiveRetarget);
+        return;
+      }
+      startActiveRetarget();
       return;
     }
+
+    const startedAt = now();
 
     if (state.moveReason === "gesture") {
       startResolvedMotion(buildStartFromGesture(state), startedAt);
@@ -200,11 +250,13 @@ export function useMotionRunner({
     startResolvedMotion(buildStartFromState(state, handoff.velocity), startedAt);
   }, [
     cancelCompositorMotion,
+    cancelDeferredRetarget,
     config,
     controller,
     enabled,
     isDragging,
     isInstantMode,
+    scheduleDeferredRetarget,
     settle,
     startCompositorMotion,
     state.fromVirtualIndex,
@@ -220,9 +272,10 @@ export function useMotionRunner({
 
   useEffect(
     () => () => {
+      cancelDeferredRetarget();
       cancelCompositorMotion(controller.getSnapshot().value);
       controller.cancel();
     },
-    [cancelCompositorMotion, controller],
+    [cancelCompositorMotion, cancelDeferredRetarget, controller],
   );
 }

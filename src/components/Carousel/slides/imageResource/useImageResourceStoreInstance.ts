@@ -15,14 +15,12 @@ export function useImageResourceStoreInstance(
   useEffect(() => {
     if (!enabled) {
       storeRef.current?.dispose();
-      storeRef.current = null;
     }
   }, [enabled]);
 
   useEffect(
     () => () => {
       storeRef.current?.dispose();
-      storeRef.current = null;
     },
     [],
   );

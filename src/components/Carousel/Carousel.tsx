@@ -1,4 +1,11 @@
-import { memo, useEffect, useImperativeHandle, useMemo, useRef } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+} from "react";
 
 import styles from "./Carousel.module.scss";
 import {
@@ -16,7 +23,7 @@ import { carouselBoundaryState, slideFlexStyle } from "./domain";
 import { useAutoplay } from "./autoplay/useAutoplay";
 import { useFocusRecovery } from "./focus/useFocusRecovery";
 import { useCarouselGesture } from "./gesture";
-import { useTrackBinding } from "./geometry";
+import { useTrackBinding, useTrackRasterWarmup } from "./geometry";
 import { useCarouselMotionExecution } from "./motion";
 import { useCarouselNavigation } from "./navigation";
 import { useVisualPosition } from "./position";
@@ -25,6 +32,7 @@ import {
   SlideItem,
   useCarouselSlideDeck,
   useImageResourceStoreInstance,
+  useSlideImagePreload,
   useSlideRenderModel,
 } from "./slides";
 import { CAROUSEL_SLOTS } from "./slots";
@@ -114,6 +122,13 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
 
   const imageResourceStore = useImageResourceStoreInstance(isContentImg);
 
+  const isImageWarmable = useCallback(
+    (url: string) =>
+      imageResourceStore === null ||
+      imageResourceStore.getSnapshot(url).status !== "error",
+    [imageResourceStore],
+  );
+
   const imageResourceUrls = useMemo(
     () => collectImageResourceUrls(records, isContentImg),
     [isContentImg, records],
@@ -122,6 +137,16 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   useEffect(() => {
     imageResourceStore?.prune(imageResourceUrls);
   }, [imageResourceStore, imageResourceUrls]);
+
+  useSlideImagePreload({
+    records,
+    layout,
+    currentVirtualIndex: state.virtualIndex,
+    isIdle: status.isIdle,
+    isContentImg,
+    isDataSaverEnabled,
+    isWarmable: isImageWarmable,
+  });
 
   useEffect(() => {
     if (!onCarouselStatusChange) return;
@@ -170,11 +195,28 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     getSlotSize,
     startCompositorMotion,
     cancelCompositorMotion,
+    warmCompositorLayer,
   } = useTrackBinding({
     trackRef,
     renderWindowStart,
     visibleSlidesCount: layout.visibleSlidesCount,
     visualPosition,
+  });
+
+  const rasterWarmupVersion = useMemo(() => {
+    let key = `${renderWindowStart}:${layout.dataKey}:${virtualSlides.length}`;
+    for (const slide of virtualSlides) key += `:${slide.slideKey}`;
+    return key;
+  }, [layout.dataKey, renderWindowStart, virtualSlides]);
+
+  useTrackRasterWarmup({
+    enabled:
+      layout.canSlide &&
+      status.isIdle &&
+      !isDataSaverEnabled &&
+      !isInstantMode,
+    version: rasterWarmupVersion,
+    warmCompositorLayer,
   });
 
   const { autoplayMotionDuration } = useCarouselMotionExecution({

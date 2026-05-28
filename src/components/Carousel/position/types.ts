@@ -17,5 +17,6 @@ export type VisualPositionListener = (frame: VisualPositionFrame) => void;
 
 export interface VisualPositionSource {
   getSnapshot(): VisualPositionFrame;
+  sampleNow(): number;
   subscribe(listener: VisualPositionListener, options?: { emitCurrent?: boolean }): () => void;
 }

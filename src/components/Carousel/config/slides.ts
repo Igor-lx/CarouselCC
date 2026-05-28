@@ -1,3 +1,5 @@
+export const PRELOAD_NEIGHBOR_PAGE_SPAN = 2;
+
 export const IMAGE_RETRY_BASE_DELAY_MS = 400;
 export const IMAGE_RETRY_MAX_DELAY_MS = 8_000;
 export const IMAGE_RETRY_MAX_ATTEMPTS = 5;

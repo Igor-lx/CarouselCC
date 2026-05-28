@@ -9,20 +9,8 @@ import { useIsomorphicLayoutEffect } from "../../../shared";
 import type { VisualPositionSource } from "../position";
 
 const RESIZE_EPSILON_PX = 0.5;
-
-const transformTranslateX = (transform: string): number | null => {
-  if (!transform || transform === "none") return null;
-
-  const match = /matrix(3d)?\(([^)]+)\)/.exec(transform);
-  if (!match) return null;
-
-  const values = match[2]?.split(",").map((value) => Number.parseFloat(value));
-  if (!values) return null;
-
-  const translateIndex = match[1] ? 12 : 4;
-  const translateX = values[translateIndex];
-  return Number.isFinite(translateX) ? translateX : null;
-};
+const RASTER_WARMUP_PIXEL_NUDGE = 0.05;
+const RASTER_WARMUP_DURATION_MS = 96;
 
 interface UseTrackBindingInput {
   trackRef: RefObject<HTMLDivElement | null>;
@@ -42,7 +30,8 @@ export interface TrackBindingApi {
   readCurrentPosition: () => number;
   getSlotSize: () => number;
   startCompositorMotion: (options: TrackCompositorMotionOptions) => boolean;
-  cancelCompositorMotion: (position?: number) => void;
+  cancelCompositorMotion: (position: number) => void;
+  warmCompositorLayer: () => void;
 }
 
 export function useTrackBinding({
@@ -57,6 +46,7 @@ export function useTrackBinding({
   const lastTransformRef = useRef<string | null>(null);
   const lastMeasuredWidthRef = useRef<number | null>(null);
   const compositorAnimationRef = useRef<Animation | null>(null);
+  const rasterWarmupAnimationRef = useRef<Animation | null>(null);
 
   renderWindowStartRef.current = renderWindowStart;
   visibleSlidesCountRef.current = visibleSlidesCount;
@@ -91,22 +81,20 @@ export function useTrackBinding({
     );
   }, []);
 
-  const readCompositorPosition = useCallback((): number | null => {
-    const track = trackRef.current;
-    const slot = slotSizeRef.current;
-    if (
-      compositorAnimationRef.current === null ||
-      !track ||
-      slot === null ||
-      !(slot > 0) ||
-      typeof window === "undefined"
-    ) {
-      return null;
-    }
+  const readLivePosition = useCallback(
+    () =>
+      compositorAnimationRef.current !== null
+        ? visualPosition.sampleNow()
+        : visualPosition.getSnapshot().position,
+    [visualPosition],
+  );
 
-    const translateX = transformTranslateX(window.getComputedStyle(track).transform);
-    return translateX === null ? null : renderWindowStartRef.current - translateX / slot;
-  }, [trackRef]);
+  const cancelRasterWarmup = useCallback(() => {
+    const animation = rasterWarmupAnimationRef.current;
+    if (!animation) return;
+    rasterWarmupAnimationRef.current = null;
+    animation.cancel();
+  }, []);
 
   const writePosition = useCallback(
     (position: number, source: "frame" | "geometry" = "frame") => {
@@ -125,29 +113,24 @@ export function useTrackBinding({
   );
 
   const cancelCompositorMotion = useCallback(
-    (position?: number) => {
+    (position: number) => {
+      cancelRasterWarmup();
       const animation = compositorAnimationRef.current;
       if (!animation) return;
       compositorAnimationRef.current = null;
 
       const track = trackRef.current;
-      if (track) {
-        const transform =
-          typeof position === "number"
-            ? resolveTransform(position)
-            : typeof window !== "undefined"
-              ? window.getComputedStyle(track).transform
-              : null;
+      if (!track) {
         animation.cancel();
-        if (transform && transform !== "none") {
-          track.style.transform = transform;
-          lastTransformRef.current = transform;
-        }
-      } else {
-        animation.cancel();
+        return;
       }
+
+      const transform = resolveTransform(position);
+      animation.cancel();
+      track.style.transform = transform;
+      lastTransformRef.current = transform;
     },
-    [resolveTransform, trackRef],
+    [cancelRasterWarmup, resolveTransform, trackRef],
   );
 
   const startCompositorMotion = useCallback(
@@ -165,6 +148,7 @@ export function useTrackBinding({
         return false;
       }
 
+      cancelRasterWarmup();
       cancelCompositorMotion(from);
 
       const fromTransform = trackPixelTransform(
@@ -211,13 +195,73 @@ export function useTrackBinding({
 
       return true;
     },
-    [cancelCompositorMotion, trackRef],
+    [cancelCompositorMotion, cancelRasterWarmup, trackRef],
+  );
+
+  const warmCompositorLayer = useCallback(() => {
+    const track = trackRef.current;
+    const slot = slotSizeRef.current;
+    if (
+      !track ||
+      slot === null ||
+      !(slot > 0) ||
+      compositorAnimationRef.current !== null ||
+      typeof track.animate !== "function"
+    ) {
+      return;
+    }
+
+    const position = readLivePosition();
+    const fromTransform = trackPixelTransform(
+      position,
+      renderWindowStartRef.current,
+      slot,
+    );
+    const toTransform = trackPixelTransform(
+      position + RASTER_WARMUP_PIXEL_NUDGE / slot,
+      renderWindowStartRef.current,
+      slot,
+    );
+    if (fromTransform === toTransform) return;
+
+    cancelRasterWarmup();
+
+    let animation: Animation;
+    try {
+      animation = track.animate(
+        [
+          { transform: fromTransform },
+          { transform: toTransform },
+          { transform: fromTransform },
+        ],
+        {
+          duration: RASTER_WARMUP_DURATION_MS,
+          easing: "linear",
+          fill: "none",
+        },
+      );
+    } catch {
+      return;
+    }
+
+    rasterWarmupAnimationRef.current = animation;
+    const clear = () => {
+      if (rasterWarmupAnimationRef.current === animation) {
+        rasterWarmupAnimationRef.current = null;
+      }
+    };
+    animation.onfinish = clear;
+    animation.oncancel = clear;
+  }, [cancelRasterWarmup, readLivePosition, trackRef]);
+
+  const readCurrentPosition = useCallback(
+    () => readLivePosition(),
+    [readLivePosition],
   );
 
   const syncGeometry = useCallback(
     (width?: number) => {
-      const currentPosition =
-        readCompositorPosition() ?? visualPosition.getSnapshot().position;
+      const currentPosition = readLivePosition();
       cancelCompositorMotion(currentPosition);
       measure(width);
       writePosition(currentPosition, "geometry");
@@ -225,8 +269,7 @@ export function useTrackBinding({
     [
       cancelCompositorMotion,
       measure,
-      readCompositorPosition,
-      visualPosition,
+      readLivePosition,
       writePosition,
     ],
   );
@@ -282,15 +325,12 @@ export function useTrackBinding({
     [visualPosition, writePosition],
   );
 
-  const readCurrentPosition = useCallback(
-    () => readCompositorPosition() ?? visualPosition.getSnapshot().position,
-    [readCompositorPosition, visualPosition],
-  );
-
   const getSlotSize = useCallback(() => slotSizeRef.current ?? 0, []);
 
   useEffect(
     () => () => {
+      rasterWarmupAnimationRef.current?.cancel();
+      rasterWarmupAnimationRef.current = null;
       compositorAnimationRef.current?.cancel();
       compositorAnimationRef.current = null;
     },
@@ -302,5 +342,6 @@ export function useTrackBinding({
     getSlotSize,
     startCompositorMotion,
     cancelCompositorMotion,
+    warmCompositorLayer,
   };
 }
