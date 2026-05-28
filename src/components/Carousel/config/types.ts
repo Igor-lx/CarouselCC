@@ -34,6 +34,12 @@ export interface RepeatedClickSettings {
   speedMultiplier: number;
   accelerationDistanceShare: number;
   decelerationDistanceShare: number;
+  /**
+   * Frames the runner keeps the in-flight segment before rebuilding for a
+   * same-direction repeated click, moving that compute off the click tick.
+   * @see REPEATED_CLICK_RETARGET_FRAME_DELAY
+   */
+  retargetFrameDelay: number;
 }
 
 export interface InteractionSettings {

@@ -6,7 +6,6 @@ import {
   trackPixelTransform,
 } from "../domain";
 import { useIsomorphicLayoutEffect } from "../../../shared";
-import { traceCarousel } from "../debug/performanceTrace";
 import type { VisualPositionSource } from "../position";
 
 const RESIZE_EPSILON_PX = 0.5;
@@ -103,32 +102,20 @@ export function useTrackBinding({
     (position: number, source: "frame" | "geometry" = "frame") => {
       const track = trackRef.current;
       if (!track) return;
-      const transform = resolveTransform(position);
-      const changed = lastTransformRef.current !== transform;
+
       // While a compositor animation owns the track, the JS sampler still
       // publishes its authoritative timeline to non-track subscribers, but its
-      // per-frame transform write here would fight the WAAPI keyframes. A
-      // `geometry` write (render-window / resize sync) is allowed through
-      // because it must re-baseline the transform; that path cancels the
-      // compositor animation first (see `syncGeometry`).
-      const isCompositedFrame =
-        source === "frame" && compositorAnimationRef.current !== null;
+      // per-frame transform write here would fight the WAAPI keyframes. Bail
+      // before resolving the transform so a composited frame costs no string
+      // build. A `geometry` write (render-window / resize sync) is allowed
+      // through because it must re-baseline the transform; that path cancels
+      // the compositor animation first (see `syncGeometry`).
+      if (source === "frame" && compositorAnimationRef.current !== null) return;
 
-      traceCarousel("track:write", {
-        changed,
-        composited: isCompositedFrame,
-        position,
-        renderWindowStart: renderWindowStartRef.current,
-        slotSize: slotSizeRef.current,
-        source,
-      });
-
-      if (isCompositedFrame) return;
-
-      if (changed) {
-        track.style.transform = transform;
-        lastTransformRef.current = transform;
-      }
+      const transform = resolveTransform(position);
+      if (lastTransformRef.current === transform) return;
+      track.style.transform = transform;
+      lastTransformRef.current = transform;
     },
     [resolveTransform, trackRef],
   );
@@ -223,14 +210,6 @@ export function useTrackBinding({
         }
       };
 
-      traceCarousel("track:compositor-start", {
-        duration,
-        easing,
-        from,
-        renderWindowStart: renderWindowStartRef.current,
-        to,
-      });
-
       return true;
     },
     [cancelCompositorMotion, trackRef],
@@ -238,10 +217,6 @@ export function useTrackBinding({
 
   const syncGeometry = useCallback(
     (width?: number) => {
-      traceCarousel("track:syncGeometry:start", {
-        renderWindowStart: renderWindowStartRef.current,
-        width,
-      });
       // A geometry change re-bases the transform math (slot size /
       // render-window-start), so any compositor animation keyed off the old
       // baseline must be torn down first and the track re-pinned to the live
@@ -249,10 +224,6 @@ export function useTrackBinding({
       cancelCompositorMotion(visualPosition.getSnapshot().position);
       measure(width);
       writePosition(visualPosition.getSnapshot().position, "geometry");
-      traceCarousel("track:syncGeometry:end", {
-        renderWindowStart: renderWindowStartRef.current,
-        slotSize: slotSizeRef.current,
-      });
     },
     [cancelCompositorMotion, measure, visualPosition, writePosition],
   );

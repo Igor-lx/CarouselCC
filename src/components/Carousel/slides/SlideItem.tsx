@@ -27,6 +27,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
     isInteractive,
     isActive,
     isActual,
+    isDataSaverEnabled,
     onSlideClick,
     ...ariaProps
   } = props;
@@ -84,6 +85,11 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
             alt={slideData.alt || ""}
             draggable={false}
             decoding="async"
+            // Prioritization is delegated to the platform now that the JS
+            // warm-up layer is gone: the active band fetches eagerly and at
+            // high priority; under reduced-data the off-band slides defer.
+            loading={isDataSaverEnabled && !isActual ? "lazy" : "eager"}
+            fetchPriority={isActual ? "high" : isDataSaverEnabled ? "low" : "auto"}
             onLoad={reportLoaded}
             onError={reportError}
           />

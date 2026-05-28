@@ -15,10 +15,9 @@ import {
   IMAGE_RETRY_MAX_DELAY_MS,
   MOTION_EPSILON,
   MOVE_BEZIER,
-  PRELOAD_PAGE_LOOKAHEAD_BY_VISIBLE,
-  PRELOAD_PAGE_LOOKAHEAD_DEFAULT,
   REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
   REPEATED_CLICK_DECELERATION_DISTANCE_SHARE,
+  REPEATED_CLICK_RETARGET_FRAME_DELAY,
   REPEATED_CLICK_SPEED_MULTIPLIER,
   RENDER_WINDOW_BUFFER_MULTIPLIER,
   SNAP_BACK_BEZIER,
@@ -81,6 +80,15 @@ const numericRules: NumericRule[] = [
     expected: "Expected a finite number greater than 1",
     consequence: "Repeated-click acceleration loses the feel of an in-flight boost",
     predicate: greaterThan(1),
+  },
+  {
+    layer: "Motion",
+    field: "REPEATED_CLICK_RETARGET_FRAME_DELAY",
+    value: REPEATED_CLICK_RETARGET_FRAME_DELAY,
+    severity: "LOGICAL",
+    expected: "Expected a non-negative finite integer number of frames",
+    consequence: "A negative or fractional retarget delay never fires, so a repeated click would not rebuild its segment",
+    predicate: isNonNegativeInteger,
   },
   {
     layer: "Motion",
@@ -167,15 +175,6 @@ const numericRules: NumericRule[] = [
     severity: "LOGICAL",
     expected: "Expected a non-negative finite integer",
     consequence: "Render window buffer collapses or oversizes, increasing churn or blank slides",
-    predicate: isNonNegativeInteger,
-  },
-  {
-    layer: "Slides",
-    field: "PRELOAD_PAGE_LOOKAHEAD_DEFAULT",
-    value: PRELOAD_PAGE_LOOKAHEAD_DEFAULT,
-    severity: "LOGICAL",
-    expected: "Expected a non-negative finite integer",
-    consequence: "The idle preload window becomes malformed for unsupported visible-slide counts",
     predicate: isNonNegativeInteger,
   },
   {
@@ -433,24 +432,6 @@ const collectGoToShareRelation = (): CarouselDiagnosticWarning | null => {
   };
 };
 
-const collectPreloadWindowWarnings = (): CarouselDiagnosticWarning[] => {
-  const out: CarouselDiagnosticWarning[] = [];
-  for (const [visibleSlidesCount, lookahead] of Object.entries(
-    PRELOAD_PAGE_LOOKAHEAD_BY_VISIBLE,
-  )) {
-    if (isFiniteNumber(lookahead) && isNonNegativeInteger(lookahead)) continue;
-    out.push({
-      severity: "LOGICAL",
-      layer: "Slides",
-      field: `PRELOAD_PAGE_LOOKAHEAD_BY_VISIBLE[${visibleSlidesCount}]`,
-      actual: lookahead,
-      expected: "Expected a non-negative finite integer",
-      consequence: "The idle preload window becomes malformed for this visible-slide count",
-    });
-  }
-  return out;
-};
-
 const collectRetryDelayRelation = (): CarouselDiagnosticWarning | null => {
   if (IMAGE_RETRY_MAX_DELAY_MS >= IMAGE_RETRY_BASE_DELAY_MS) return null;
   return {
@@ -482,7 +463,6 @@ export const collectConstantWarnings = (): CarouselDiagnosticWarning[] => {
   if (goToShareRelation) out.push(goToShareRelation);
   const retryDelayRelation = collectRetryDelayRelation();
   if (retryDelayRelation) out.push(retryDelayRelation);
-  out.push(...collectPreloadWindowWarnings());
   out.push(...collectBezierWarnings());
   return out;
 };

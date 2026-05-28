@@ -1,7 +1,6 @@
 import { useCallback, useRef } from "react";
 
 import { useIsomorphicLayoutEffect } from "../../../../shared";
-import { traceCarousel } from "../../debug/performanceTrace";
 import type { VisualPositionSource } from "../../position";
 import {
   DOT_OPACITY_EPSILON,
@@ -145,14 +144,13 @@ export function usePaginationWidgetBinding({
   }, [activeClassName, activeSlotIndex, slotCount]);
 
   const writeActiveProjection = useCallback(
-    (visualOffset: number): number => {
+    (visualOffset: number) => {
       // Two scalar locals instead of a per-frame `[floor, ceil]` array
       // allocation — the active-projection write runs on every motion
       // frame so this drops one short-lived array per RAF tick.
       const floorId = Math.floor(visualOffset);
       const ceilId = Math.ceil(visualOffset);
       const cache = activeDotCacheRef.current;
-      let changedProperties = 0;
 
       for (let index = 0; index < ACTIVE_DOT_COUNT; index += 1) {
         const dot = activeDotRefs.current[index];
@@ -167,7 +165,6 @@ export function usePaginationWidgetBinding({
         const scale = state?.scale ?? 0;
         const opacity = state?.activeStrength ?? 0;
         const last = cache[index];
-
         if (opacity === 0 && last !== null && last.opacity === 0) continue;
 
         const transformChanged = shouldWriteTransform(last, x, scale);
@@ -175,11 +172,9 @@ export function usePaginationWidgetBinding({
 
         if (transformChanged) {
           dot.style.transform = toTransform(x, scale);
-          changedProperties += 1;
         }
         if (opacityChanged) {
           dot.style.opacity = String(opacity);
-          changedProperties += 1;
         }
 
         if (last === null) cache[index] = { x, scale, opacity };
@@ -191,8 +186,6 @@ export function usePaginationWidgetBinding({
           if (opacityChanged) last.opacity = opacity;
         }
       }
-
-      return changedProperties;
     },
     [geometry],
   );
@@ -201,7 +194,6 @@ export function usePaginationWidgetBinding({
     (visualOffset: number) => {
       const firstId = Math.round(visualOffset) - side;
       const cache = dotCacheRef.current;
-      let changedProperties = 0;
 
       for (let index = 0; index < slotCount; index += 1) {
         const dot = dotRefs.current[index];
@@ -218,11 +210,9 @@ export function usePaginationWidgetBinding({
 
         if (transformChanged) {
           dot.style.transform = toTransform(state.x, state.scale);
-          changedProperties += 1;
         }
         if (opacityChanged) {
           dot.style.opacity = String(state.opacity);
-          changedProperties += 1;
         }
         if (last === null) {
           cache[index] = { x: state.x, scale: state.scale, opacity: state.opacity };
@@ -235,13 +225,7 @@ export function usePaginationWidgetBinding({
         }
       }
 
-      changedProperties += writeActiveProjection(visualOffset);
-
-      traceCarousel("paginationWidget:write", {
-        changedProperties,
-        slotCount,
-        visualOffset,
-      });
+      writeActiveProjection(visualOffset);
     },
     [geometry, side, slotCount, writeActiveProjection],
   );

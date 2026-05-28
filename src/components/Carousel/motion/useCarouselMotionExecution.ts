@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useMemo } from "react";
 
 import type { MotionController } from "../../../shared";
 import type { CarouselRuntimeConfig } from "../config";
 import type { TrackBindingApi } from "../geometry";
 import type { CarouselDispatch, CarouselState } from "../state";
 import type { CarouselMotionStrategy } from "./types";
+import { resolveAutoplayMotionDuration } from "./autoplayDuration";
 import { useMotionRunner } from "./useMotionRunner";
 
 interface UseCarouselMotionExecutionInput {
@@ -24,9 +25,10 @@ interface UseCarouselMotionExecutionResult {
 }
 
 /**
- * Post-state motion orchestration. Keeps autoplay-pagination duration and
- * settle-feedback mechanics out of the composition root while the runner
- * remains the sole state -> segment -> controller bridge.
+ * Post-state motion orchestration. The runner stays the sole
+ * `state -> segment -> controller` bridge; the autoplay-pagination duration is
+ * a pure derivation of the same state, so it is read here with a `useMemo`
+ * rather than published back out of the runner.
  */
 export function useCarouselMotionExecution({
   state,
@@ -39,49 +41,16 @@ export function useCarouselMotionExecution({
   startCompositorMotion,
   cancelCompositorMotion,
 }: UseCarouselMotionExecutionInput): UseCarouselMotionExecutionResult {
-  const [autoplayMotionDuration, setAutoplayMotionDuration] = useState(0);
-  const autoplayDurationFrameRef = useRef<number | null>(null);
-  const autoplayDurationTimeoutRef = useRef<number | null>(null);
-
-  const cancelAutoplayDurationPublish = useCallback(() => {
-    if (typeof window === "undefined") return;
-
-    if (autoplayDurationFrameRef.current !== null) {
-      window.cancelAnimationFrame(autoplayDurationFrameRef.current);
-      autoplayDurationFrameRef.current = null;
-    }
-
-    if (autoplayDurationTimeoutRef.current !== null) {
-      window.clearTimeout(autoplayDurationTimeoutRef.current);
-      autoplayDurationTimeoutRef.current = null;
-    }
-  }, []);
-
-  const publishAutoplayDuration = useCallback(
-    (duration: number) => {
-      if (typeof window === "undefined") {
-        setAutoplayMotionDuration(duration);
-        return;
-      }
-
-      cancelAutoplayDurationPublish();
-
-      autoplayDurationFrameRef.current = window.requestAnimationFrame(() => {
-        autoplayDurationFrameRef.current = null;
-        autoplayDurationTimeoutRef.current = window.setTimeout(() => {
-          autoplayDurationTimeoutRef.current = null;
-          setAutoplayMotionDuration((current) =>
-            current === duration ? current : duration,
-          );
-        }, 0);
-      });
-    },
-    [cancelAutoplayDurationPublish],
-  );
-
-  useEffect(
-    () => cancelAutoplayDurationPublish,
-    [cancelAutoplayDurationPublish],
+  const autoplayMotionDuration = useMemo(
+    () =>
+      resolveAutoplayMotionDuration({
+        state,
+        config,
+        isInstantMode,
+        isDragging,
+        enabled,
+      }),
+    [config, enabled, isDragging, isInstantMode, state],
   );
 
   const handleMotionSettled = useCallback(
@@ -100,8 +69,6 @@ export function useCarouselMotionExecution({
     startCompositorMotion,
     cancelCompositorMotion,
     onSettle: handleMotionSettled,
-    onAutoplayDurationCancel: cancelAutoplayDurationPublish,
-    onAutoplayDurationChange: publishAutoplayDuration,
   });
 
   return { autoplayMotionDuration };

@@ -13,6 +13,18 @@ export const REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE = 0.3;
 export const REPEATED_CLICK_DECELERATION_DISTANCE_SHARE = 0.35;
 
 /**
+ * Frames the motion runner lets the in-flight segment keep painting before it
+ * rebuilds for a same-direction repeated click. The rebuild (handoff sample +
+ * profile build + controller start) is the heaviest work the runner does and
+ * would otherwise land in the same tick as the click event. Because a repeated
+ * click only happens while the deck is already moving, deferring the rebuild a
+ * few frames is invisible — the old segment carries the motion meanwhile — and
+ * it lifts that compute spike off the input tick. `0` restores the original
+ * synchronous rebuild.
+ */
+export const REPEATED_CLICK_RETARGET_FRAME_DELAY = 3;
+
+/**
  * Number of page screens animated before a far-GO_TO teleport. After the
  * teleport the carousel shows only the final approach page. GO_TO spans that
  * fit within preflight + final approach animate directly without teleport.

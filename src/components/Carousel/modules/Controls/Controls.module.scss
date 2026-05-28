@@ -118,8 +118,10 @@
   }
 
   // Desktop: reveal the 8%-wide strip on viewport hover or focus-visible.
-  [data-touch="false"]:has(*:focus-visible) .navZone,
-  [data-touch="false"]:has([data-carousel-viewport]:hover) .navZone {
+  // Scoped to the viewport (a plain descendant `:hover` / `:has`) instead of a
+  // root-level `:has()`, which is cheaper for the style engine to invalidate.
+  [data-touch="false"] [data-carousel-viewport]:hover .navZone,
+  [data-touch="false"] [data-carousel-viewport]:has(*:focus-visible) .navZone {
     opacity: 1;
     pointer-events: auto;
   }

@@ -7,17 +7,12 @@ import {
 } from "../../../shared";
 import type { CarouselRuntimeConfig } from "../config";
 import type { TrackBindingApi } from "../geometry";
-import { traceCarousel } from "../debug/performanceTrace";
 import type { CarouselState } from "../state";
 import { bezierToCss } from "./bezier";
+import { canUseCompositorTrackMotion } from "./compositorEligibility";
 import { buildCarouselSegment } from "./segmentFactory";
 import { sampleCarouselSegment } from "./sampler";
-import type {
-  CarouselMotionStrategy,
-  CarouselSegment,
-  EasingSegment,
-  MotionStart,
-} from "./types";
+import type { CarouselMotionStrategy, MotionStart } from "./types";
 
 interface UseMotionRunnerInput {
   state: CarouselState;
@@ -35,26 +30,13 @@ interface UseMotionRunnerInput {
    * click had already been queued.
    */
   onSettle: (settledPosition: number) => void;
-  onAutoplayDurationCancel?: () => void;
-  onAutoplayDurationChange?: (duration: number) => void;
 }
 
 const now = (): number =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
 
-/**
- * Only a plain `easing` step (click / autoplay / snap-back, a fixed
- * cubic-bezier translation of the whole track) can be expressed as a single
- * WAAPI keyframe pair and handed to the compositor. Profile segments
- * (`gesture`, `repeated`, `jump`) carry speed-authored accel/cruise/decel
- * shapes, teleport discontinuities, or inertial velocity that a single CSS
- * easing curve cannot reproduce — they stay on the JS sampler. `gesture-easing`
- * (a non-inertial release) also stays JS-driven for continuity with the live
- * drag position.
- */
-const isCompositorTrackSegment = (
-  segment: CarouselSegment,
-): segment is EasingSegment => segment.strategy === "easing";
+const requestFrame = (callback: () => void): number | null =>
+  typeof window === "undefined" ? null : window.requestAnimationFrame(callback);
 
 /**
  * Origin of a post-drag release segment. Drag writes are published into the
@@ -82,23 +64,28 @@ const buildStartFromState = (
  * controller.
  *
  * The JS motion controller stays the visual-position SSOT for every consumer:
- * gesture/profile math, diagnostics, the pagination widget, status snapshots,
- * handoff, and settle all read its sampled timeline. For a plain easing step
- * the track DOM *additionally* runs the identical transform through the Web
- * Animations API, so the deck translation lives on the compositor thread while
- * the JS sampler keeps publishing the authoritative numbers to the non-track
- * subscribers. The track binding skips its own per-frame transform write while
- * a compositor animation is live (see `useTrackBinding.writePosition`), so the
- * two never fight.
+ * gesture/profile math, the pagination widget, status snapshots, handoff, and
+ * settle all read its sampled timeline. An `EasingSegment` (click, autoplay,
+ * snap-back, non-inertial gesture release) *additionally* runs the identical
+ * translation through the Web Animations API, so the deck translation lives on
+ * the compositor thread while the JS sampler keeps publishing the authoritative
+ * numbers to the non-track subscribers (see `canUseCompositorTrackMotion`). The
+ * track binding skips its own per-frame transform write while a compositor
+ * animation is live, so the two never fight. `ProfileSegment`s (inertial
+ * gesture release, repeated-click, GO_TO jump) run fully on the JS sampler.
  *
- * Profile segments (gesture release, repeated-click, GO_TO jump) are not
- * compositor-eligible and run fully on the JS sampler as before.
+ * In-flight handoffs are taken as a single atomic `controller.captureHandoff(t)`
+ * — a coherent `(position, velocity)` from one sample of the old curve. Every
+ * segment drives directly to `state.virtualIndex`; there is no intermediate
+ * destination or chained follow-up segment.
  *
- * Hot retargets hand off at a single atomic `controller.captureHandoff(t)` —
- * a coherent `(position, velocity)` taken from the same sample of the old
- * curve (see motion §4.2). Every segment drives directly to
- * `state.virtualIndex`; there is no intermediate destination or chained
- * follow-up segment.
+ * Same-direction repeated clicks rebuild a `ProfileSegment`, which is the
+ * heaviest work the runner does and cannot be masked by the compositor. Since
+ * such a click only arrives while the deck is already moving, the rebuild is
+ * held `repeatedClick.retargetFrameDelay` frames — the current segment keeps
+ * painting meanwhile — so that compute leaves the input tick. The handoff is
+ * still captured atomically, but at the deferred boundary, from whatever curve
+ * is actually painting then.
  */
 export function useMotionRunner({
   state,
@@ -110,10 +97,42 @@ export function useMotionRunner({
   startCompositorMotion,
   cancelCompositorMotion,
   onSettle,
-  onAutoplayDurationCancel,
-  onAutoplayDurationChange,
 }: UseMotionRunnerInput): void {
   const lastKeyRef = useRef<string>("");
+  const retargetFrameRef = useRef<number | null>(null);
+  const retargetTokenRef = useRef(0);
+
+  const cancelDeferredRetarget = useCallback(() => {
+    retargetTokenRef.current += 1;
+    if (retargetFrameRef.current !== null && typeof window !== "undefined") {
+      window.cancelAnimationFrame(retargetFrameRef.current);
+    }
+    retargetFrameRef.current = null;
+  }, []);
+
+  const scheduleDeferredRetarget = useCallback(
+    (frames: number, run: () => void) => {
+      cancelDeferredRetarget();
+      if (typeof window === "undefined") {
+        run();
+        return;
+      }
+      const token = retargetTokenRef.current;
+      let framesLeft = frames;
+      const tick = () => {
+        if (retargetTokenRef.current !== token) return;
+        framesLeft -= 1;
+        if (framesLeft > 0) {
+          retargetFrameRef.current = requestFrame(tick);
+          return;
+        }
+        retargetFrameRef.current = null;
+        run();
+      };
+      retargetFrameRef.current = requestFrame(tick);
+    },
+    [cancelDeferredRetarget],
+  );
 
   const settle = useCallback(
     (sample: MotionSample<CarouselMotionStrategy>) => {
@@ -123,17 +142,6 @@ export function useMotionRunner({
   );
 
   useIsomorphicLayoutEffect(() => {
-    traceCarousel("motion:layoutEffect", {
-      enabled,
-      fromVirtualIndex: state.fromVirtualIndex,
-      isDragging,
-      isInstantMode,
-      motionPhase: state.motionPhase,
-      moveReason: state.moveReason,
-      targetVirtualIndex: state.virtualIndex,
-      teleportVirtualIndex: state.teleportVirtualIndex,
-    });
-
     const key = [
       enabled,
       state.motionPhase,
@@ -152,16 +160,17 @@ export function useMotionRunner({
     if (lastKeyRef.current === key) return;
     lastKeyRef.current = key;
 
+    // Any newly-committed state supersedes a pending deferred retarget.
+    cancelDeferredRetarget();
+
     if (!enabled) {
       cancelCompositorMotion(state.virtualIndex);
-      onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, { strategy: "idle" });
       return;
     }
 
     if (state.motionPhase === "idle") {
       cancelCompositorMotion(state.virtualIndex);
-      onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, { strategy: "idle" });
       return;
     }
@@ -170,13 +179,11 @@ export function useMotionRunner({
       // A drag re-takes the track directly through the visual-position stream;
       // freeze the compositor at the live sample so the finger owns it again.
       cancelCompositorMotion(controller.getSnapshot().value);
-      onAutoplayDurationCancel?.();
       return;
     }
 
     if (state.motionPhase === "step-instant") {
       cancelCompositorMotion(state.virtualIndex);
-      onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, {
         strategy: "idle",
         onComplete: settle,
@@ -197,11 +204,10 @@ export function useMotionRunner({
           velocity: resolvedStart.velocity,
           onComplete: settle,
         });
-        onAutoplayDurationCancel?.();
         return;
       }
 
-      const { segment, duration } = buildCarouselSegment({
+      const { segment } = buildCarouselSegment({
         state,
         config,
         isInstantMode,
@@ -210,23 +216,13 @@ export function useMotionRunner({
         startedAt: resolvedStartedAt,
       });
 
-      // Autoplay duration is the only thing the runner needs to publish, and
-      // it is published for every autoplay segment - including the finite-mode
-      // loop-back GO_TO, whose intent is "jump" but whose moveReason is still
-      // "autoplay". Reading moveReason keeps the runner free of intent
-      // taxonomy and matches the user-facing "during autoplay" guarantee.
-      if (state.moveReason === "autoplay") {
-        onAutoplayDurationChange?.(duration);
-      } else {
-        onAutoplayDurationCancel?.();
-      }
-
-      // Try to drive a plain easing step on the compositor. When it takes,
-      // the track binding suppresses its own per-frame writes; when it does
-      // not (profile segment, no slot measured, no `Element.animate`), make
-      // sure no stale compositor animation is left running over the JS path.
+      // Try to drive an eligible easing segment on the compositor. When it
+      // takes, the track binding suppresses its own per-frame writes; when it
+      // does not (profile segment, no slot measured, no `Element.animate`),
+      // make sure no stale compositor animation is left running over the JS
+      // path.
       const isComposited =
-        isCompositorTrackSegment(segment) &&
+        canUseCompositorTrackMotion(segment) &&
         startCompositorMotion({
           from: segment.from,
           to: segment.to,
@@ -238,15 +234,6 @@ export function useMotionRunner({
         cancelCompositorMotion(resolvedStart.position);
       }
 
-      traceCarousel("motion:start", {
-        composited: isComposited,
-        duration,
-        from: segment.from,
-        startedAt: segment.startedAt,
-        strategy: segment.strategy,
-        to: segment.to,
-      });
-
       // The controller runs regardless of compositing: it remains the SSOT for
       // pagination, status, handoff, and settle. When composited, its
       // per-frame samples simply do not reach the track DOM.
@@ -257,17 +244,11 @@ export function useMotionRunner({
       });
     };
 
-    const startedAt = now();
-
-    if (controller.isActive()) {
-      // One atomic point: position + velocity + time from the same sample.
-      const handoff = controller.captureHandoff(startedAt);
-      traceCarousel("motion:handoff", {
-        position: handoff.position,
-        strategy: handoff.strategy,
-        timestamp: handoff.timestamp,
-        velocity: handoff.velocity,
-      });
+    // Atomic in-flight handoff: position + velocity + time from one sample of
+    // the curve that is painting *now* (which, when deferred, is the boundary).
+    const startActiveRetarget = () => {
+      if (!controller.isActive()) return;
+      const handoff = controller.captureHandoff(now());
       startResolvedMotion(
         {
           position: handoff.position,
@@ -276,8 +257,19 @@ export function useMotionRunner({
         },
         handoff.timestamp,
       );
+    };
+
+    if (controller.isActive()) {
+      const retargetDelay = config.repeatedClick.retargetFrameDelay;
+      if (state.isRepeatedClickAdvance && retargetDelay > 0) {
+        scheduleDeferredRetarget(retargetDelay, startActiveRetarget);
+        return;
+      }
+      startActiveRetarget();
       return;
     }
+
+    const startedAt = now();
 
     if (state.moveReason === "gesture") {
       startResolvedMotion(buildStartFromGesture(state), startedAt);
@@ -292,13 +284,13 @@ export function useMotionRunner({
     startResolvedMotion(buildStartFromState(state, handoff.velocity), startedAt);
   }, [
     cancelCompositorMotion,
+    cancelDeferredRetarget,
     config,
     controller,
     enabled,
     isDragging,
     isInstantMode,
-    onAutoplayDurationCancel,
-    onAutoplayDurationChange,
+    scheduleDeferredRetarget,
     settle,
     startCompositorMotion,
     state.fromVirtualIndex,
@@ -314,9 +306,10 @@ export function useMotionRunner({
 
   useEffect(
     () => () => {
+      cancelDeferredRetarget();
       cancelCompositorMotion(controller.getSnapshot().value);
       controller.cancel();
     },
-    [cancelCompositorMotion, controller],
+    [cancelCompositorMotion, cancelDeferredRetarget, controller],
   );
 }

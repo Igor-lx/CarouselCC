@@ -1,6 +1,5 @@
 import { useCallback, useContext, useMemo, useSyncExternalStore } from "react";
 
-import { useIsomorphicLayoutEffect } from "../../../../shared";
 import { CarouselImageResourceContext } from "./context";
 import type { ImageResourceSnapshot, ImageStatus } from "./types";
 
@@ -54,11 +53,6 @@ const STATIC_CALLBACKS = Object.freeze({
  */
 export function useImageResource(url: string | null): ImageResourceHandle {
   const store = useContext(CarouselImageResourceContext);
-
-  useIsomorphicLayoutEffect(() => {
-    if (store === null || url === null) return;
-    return store.observe(url);
-  }, [store, url]);
 
   const subscribe = useCallback(
     (onStoreChange: () => void) =>

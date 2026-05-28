@@ -9,11 +9,12 @@ slot modules. A single visual-position SSOT (the JS motion controller) owns
 "where the track is" and publishes per-RAF samples outside React; React only
 re-renders on logical state transitions (click, gesture release, autoplay tick,
 settle). The track's horizontal `transform` is written from that stream — except
-for plain cubic-bezier steps (click / autoplay / snap-back), which are
-additionally handed to the compositor thread via the Web Animations API so the
-deck translation does not compete with main-thread work. The JS controller stays
-the SSOT for every other consumer (pagination widget, status, handoff, settle)
-even while the compositor drives the pixels. See §4.5.
+for duration-authored cubic-bezier steps (every `EasingSegment`: click,
+autoplay, snap-back, and a non-inertial gesture release), which are additionally
+handed to the compositor thread via the Web Animations API so the deck
+translation does not compete with main-thread work. The JS controller stays the
+SSOT for every other consumer (pagination widget, status, handoff, settle) even
+while the compositor drives the pixels. See §4.5.
 
 This document is the source of truth for the component. It starts from the
 public contract — every prop, every dependency between props, every default —
@@ -78,23 +79,23 @@ for `undefined` props. Other values pass through unchanged — invalid input
 `Diagnostic` slot but never repaired at config resolution time, so the failure
 mode is visible. Motion-profile share over-allocation is the one explicit
 runtime exception: profile math normalizes acceleration/deceleration zones to
-`0.5 / 0.5`, and Diagnostic reports that normalized shape.
+equal halves with no cruise zone, and Diagnostic reports that normalized shape.
 
 #### Slides
 
 | Prop          | Type            | Default | Effect |
 | ------------- | --------------- | ------- | ------ |
 | `slidesData`  | `Slide[]`       | —       | Required. `Slide = { id: string \| number; content: string \| number \| ReactElement; alt?: string }`. `content` must be a trimmed-non-empty string, a number, or a React element. |
-| `visibleSlidesNr` | `number`     | `3`     | How many slides share the viewport. Drives layout flex-basis, slot-size measurement, page math (`pageCount = ceil(slidesData.length / visibleSlidesNr)`), and the PaginationWidget projection slot count. |
-| `isPagePaddingOn` | `boolean`    | `false` | When on, pads the deck with cloned tail slides so `length` becomes a multiple of `visibleSlidesNr`. Eliminates partial pages at the tail. |
-| `isContentImg` | `boolean`      | `true`  | When on, treats string `content` as an `<img src>`. When off, renders raw `content`. Image errors fall back to `slide.alt` or `errAltPlaceholder`. |
-| `errAltPlaceholder` | `string`  | `"Downloading Error"` | Used when an image fails to load and the slide has no `alt`. |
+| `visibleSlidesNr` | `number`     | — | How many slides share the viewport. Drives layout flex-basis, slot-size measurement, page math (`pageCount = ceil(slidesData.length / visibleSlidesNr)`), and the PaginationWidget projection slot count. |
+| `isPagePaddingOn` | `boolean`    | — | When on, pads the deck with cloned tail slides so `length` becomes a multiple of `visibleSlidesNr`. Eliminates partial pages at the tail. |
+| `isContentImg` | `boolean`      | — | When on, treats string `content` as an `<img src>`. When off, renders raw `content`. Image errors fall back to `slide.alt` or `errAltPlaceholder`. |
+| `errAltPlaceholder` | `string`  | — | Used when an image fails to load and the slide has no `alt`. |
 
 #### Layout / motion mode
 
 | Prop            | Type      | Default | Effect |
 | --------------- | --------- | ------- | ------ |
-| `isFinite`      | `boolean` | `false` | When on, the track stops at the boundaries (no wrap, `isAtStart`/`isAtEnd` flag the edges). When off, the track loops cyclically and `GO_TO` always travels the shortest cyclic distance. |
+| `isFinite`      | `boolean` | — | When on, the track stops at the boundaries (no wrap, `isAtStart`/`isAtEnd` flag the edges). When off, the track loops cyclically and `GO_TO` always travels the shortest cyclic distance. |
 
 #### User environment
 
@@ -106,25 +107,28 @@ referentially-stable object.
 
 | Prop              | Type             | Effect |
 | ----------------- | ---------------- | ------ |
-| `userEnvironment` | `{ reducedMotion?: boolean; touch?: boolean; dataSaver?: boolean }` | All fields optional. `reducedMotion`: every transition snaps instantly, gesture is disabled, the PaginationWidget runs static. `touch`: gesture eligibility, `data-touch` attribute, autoplay hover-pause exemption. `dataSaver`: speculative image warm-up is skipped. An unset field resolves to `false`; the omission is reported by the `Diagnostic` slot (DEV-only) — never silently repaired. |
+| `userEnvironment` | `{ reducedMotion?: boolean; touch?: boolean; dataSaver?: boolean }` | All fields optional. `reducedMotion`: every transition snaps instantly, gesture is disabled, the PaginationWidget runs static. `touch`: gesture eligibility, `data-touch` attribute, autoplay hover-pause exemption. `dataSaver`: off-band slide images load lazily and at low fetch priority. An unset field resolves to `false`; the omission is reported by the `Diagnostic` slot (DEV-only) — never silently repaired. |
 
 #### Motion timing
 
 | Prop              | Default | Effect |
 | ----------------- | ------- | ------ |
-| `durationAutoplay` | `3000` ms | Duration of an autoplay-driven page step. |
-| `intervalAutoplay` | `3000` ms | Idle interval between two autoplay steps. |
-| `durationStep`    | `2000` ms | Base duration of duration-authored click / gesture-driven steps. Repeated-click profile segments instead derive their duration from their speed profile. Multi-page click distances scale linearly. |
-| `jumpSpeedMultiplier` | `8` | `GO_TO` peak cruise speed as a multiple of the normal one-step speed. A jump's duration is derived from distance and this multiplier, so a near and a far jump share one consistent speed. Drives short jumps and the bounded segments of a far-jump teleport alike. |
+| `durationAutoplay` | — | Duration of an autoplay-driven page step. |
+| `intervalAutoplay` | — | Idle interval between two autoplay steps. |
+| `durationStep`    | — | Base duration of duration-authored click / gesture-driven steps. Repeated-click profile segments instead derive their duration from their speed profile. Multi-page click distances scale linearly. |
+| `jumpSpeedMultiplier` | — | `GO_TO` peak cruise speed as a multiple of the normal one-step speed. A jump's duration is derived from distance and this multiplier, so a near and a far jump share one consistent speed. Drives short jumps and the bounded segments of a far-jump teleport alike. |
+
+All public-prop defaults (and every tunable) live in `config/` — see §1.7.
+This document does not restate them, so it cannot drift from the code.
 
 #### Module gates
 
 | Prop             | Default | Effect |
 | ---------------- | ------- | ------ |
-| `isAuto`         | `true`  | Master autoplay switch. When `false`, the `setTimeout` loop never runs. Autoplay also auto-pauses when (a) the viewport is <`VISIBILITY_THRESHOLD` (20 %) on screen, (b) the user is dragging or motion is in progress, (c) on desktop only, the pointer hovers the viewport (`HOVER_PAUSE_DELAY` 150 ms debounce). On the final page in finite mode it loops back to page 0 via `GO_TO`. |
-| `isPaginationOn` | `true`  | Gates the rendering of the attached `Pagination`/`PaginationWidget` slot. If the prop is `true` but no pagination slot is attached, nothing renders; the slot must opt in by being placed in `children`. |
-| `isControlsOn`   | `true`  | Same contract as `isPaginationOn`, for the `Controls` slot. |
-| `isInteractive`  | `true`  | When on, a slide whose image has loaded successfully and that has an `onSlideClick` handler renders as a `<button>`. When off, slides are never interactive even with a handler. |
+| `isAuto`         | — | Master autoplay switch. When `false`, the `setTimeout` loop never runs. Autoplay also auto-pauses when (a) the viewport is less than `VISIBILITY_THRESHOLD` on screen, (b) the user is dragging or motion is in progress, (c) on desktop only, the pointer hovers the viewport (`HOVER_PAUSE_DELAY` debounce). On the final page in finite mode it loops back to page 0 via `GO_TO`. |
+| `isPaginationOn` | — | Gates the rendering of the attached `Pagination`/`PaginationWidget` slot. If the prop is `true` but no pagination slot is attached, nothing renders; the slot must opt in by being placed in `children`. |
+| `isControlsOn`   | — | Same contract as `isPaginationOn`, for the `Controls` slot. |
+| `isInteractive`  | — | When on, a slide whose image has loaded successfully and that has an `onSlideClick` handler renders as a `<button>`. When off, slides are never interactive even with a handler. |
 
 #### Callbacks
 
@@ -227,16 +231,22 @@ These are the user-facing behaviours the implementation guarantees.
   the destination can never get more than two pages ahead of what the
   user actually sees. When clicks stop, motion finishes the in-flight
   segment and settles. There is no separate admission buffer and no
-  special path through `useCarouselNavigation`; the rule lives entirely
-  inside `stepOrigin` + the `effectiveMoveStep` doubling in
-  `state/transitions.ts`.
+  special path through `useCarouselNavigation`; the destination rule lives
+  entirely inside `stepOrigin` + the `effectiveMoveStep` doubling in
+  `state/transitions.ts`. The *motion* side adds one optimization: because a
+  repeated click rebuilds a profile segment (the heaviest runner work, and not
+  compositor-eligible) in the same tick as the keypress, and because the deck
+  is already moving, the runner holds the current segment a configurable few
+  frames before rebuilding — lifting that compute off the input tick while the
+  old segment carries the motion. The handoff is still a single atomic
+  `captureHandoff`, taken at the deferred boundary (§4.2).
 - **Drag / swipe.** Touch only (pointer events with `pointerType === "touch"`).
   EMA-smoothed velocity, edge resistance with a configurable curvature.
   Release resolves to a swipe direction via either a quick-flick (raw
   velocity + raw offset) or a distance-based threshold
   (`swipeThresholdRatio` of the viewport width with a hard min). When the
   intent is `NONE`, the track snaps back via the snap-back curve over
-  `SNAP_BACK_DURATION` (1300 ms).
+  `SNAP_BACK_DURATION`.
 - **Gesture interrupts motion.** A touch on the non-interactive carousel
   surface cancels active motion at press-down and starts from the visually
   sampled position. A touch on an interactive child (button/link-like slide)
@@ -265,30 +275,19 @@ These are the user-facing behaviours the implementation guarantees.
   are safe no-ops at the edges; hosts can also surface that state on the
   button itself by wiring `disabled` to the matching `isAtStart` / `isAtEnd`
   flag from the status snapshot.
-- **Image preparation.** When `isContentImg` is on, the slide layer warms
-  image URLs around the idle viewport: the visible band plus a page-lookahead
-  buffer on each side, nearest-first. The carousel steps a whole page
-  (`visibleSlidesCount` slides) at a time, so the buffer is sized in
-  page-steps via a lookahead schedule (`config/slides`) that shrinks as the
-  visible band widens, keeping the absolute warmed buffer bounded. Each idle
-  period is one preparation session; entering motion closes that session in
-  the layout phase before paint — aborting in-flight offscreen warm-up
-  fetches and cancelling queued decode work. Warm-up fetches are low priority
-  and decode only inside an active idle session. A successful warm-up lands
-  in the image-resource SSOT, so a slide entering the render window can
-  observe an already-`loaded` resource; a speculative warm-up failure does
-  not become a visible slide error. Heavyweight offscreen warm-up `Image`
-  handles live only while their URL is inside the active preload window —
-  once it leaves, the handle is released, so even a 500-slide deck never
-  turns the store into a hidden full-deck image cache. It never changes
-  navigation, layout, motion state, or slide rendering semantics.
-
-  Warm-up is purely speculative, so it is skipped — on every device — when
-  the host reports reduced data usage via `userEnvironment.dataSaver` (the
-  host derives it from `prefers-reduced-data` / the Network Information API
-  `saveData` flag, e.g. through `useUserEnvironment`). The image-resource
-  store, its render SSOT, and image error handling / retry are unaffected:
-  those are correctness, not optimization, and always run.
+- **Image preparation.** Image prioritization is delegated to the platform,
+  not a hand-rolled JS warm-up layer. Each rendered slide's `<img>` carries
+  native hints derived from its band: the active band fetches eagerly and at
+  high `fetchpriority`; off-band slides fall back to default priority. When the
+  host reports reduced data usage via `userEnvironment.dataSaver` (derived from
+  `prefers-reduced-data` / the Network Information API `saveData` flag, e.g.
+  through `useUserEnvironment`), off-band slides additionally load lazily and at
+  low priority so the deck does not eagerly pull bandwidth it may not need.
+  There is no speculative offscreen fetch or decode session: prioritization is a
+  property of the rendered element, so it never changes navigation, layout,
+  motion state, or slide-render semantics. The image-resource store — its render
+  status SSOT and image error handling / retry — is unaffected and always runs;
+  those are correctness, not optimization.
 - **Image errors and retry.** A slide whose image fails to load renders a
   text placeholder (`alt`, or `errAltPlaceholder`) and is not interactive.
   While such a slide sits in the active band, the image-resource store
@@ -302,12 +301,12 @@ These are the user-facing behaviours the implementation guarantees.
 - **Pagination (`Pagination`).** One dot per page. The active dot reflects
   the `targetPageIndex` immediately on click and gesture. During
   *autoplay*, the dot switch is delayed by
-  `autoplayMotionDuration * AUTOPLAY_PAGINATION_FACTOR` (default 20 % of the
+  `autoplayMotionDuration * AUTOPLAY_PAGINATION_FACTOR` (a fraction of the
   animation) — this matches the historical product behaviour where
   autoplay rolls the dot later than the visual.
-- **PaginationWidget (touch).** A fixed-width odd-count widget (default
-  5 dots, configurable via internal `PAGINATION_WIDGET_DEFAULTS`). Centre
-  dot is largest; sides shrink exponentially by `scaleFactor` (0.585).
+- **PaginationWidget (touch).** A fixed-width odd-count widget (dot count
+  configurable via internal `PAGINATION_WIDGET_DEFAULTS`). Centre
+  dot is largest; sides shrink exponentially by `scaleFactor`.
   When reduced motion is *off*, the widget subscribes to the visual
   position source and mutates its dots' `transform` and `opacity` per RAF
   frame without re-rendering React. Two `activeDot` overlays interpolate
@@ -336,46 +335,25 @@ These are the user-facing behaviours the implementation guarantees.
   (e.g. `PaginationWidget`'s `useWidgetDiagnostic`) skip their work when
   no diagnostic is wired up.
 
-### 1.7 Default values reference
+### 1.7 Where the tunable values live
 
-For copy-paste / quick lookup. Source: `config/defaults.ts`,
-`config/interaction.ts`, `config/motion.ts`, `config/gesture.ts`,
-`config/constants.ts`.
+This document deliberately does **not** enumerate concrete constant values.
+Numbers (durations, multipliers, distance shares, easing curves, epsilons,
+dot counts, thresholds) are feel/tuning and change frequently; duplicating them
+here only invites doc/code drift. The single source of truth is `config/`:
 
-| Constant | Value | Where it shows |
-| --- | --- | --- |
-| `visibleSlidesNr` (default) | `3` | slot count, flex basis |
-| `durationAutoplay` (default) | `3000` ms | autoplay step duration |
-| `intervalAutoplay` (default) | `3000` ms | autoplay idle interval |
-| `durationStep` (default) | `2000` ms | click/gesture-driven step |
-| `jumpSpeedMultiplier` (default) | `8` | `GO_TO` peak speed vs. one-step speed |
-| `errAltPlaceholder` (default) | `"Downloading Error"` | image error text |
-| `HOVER_PAUSE_DELAY` | `150` ms | hover-pause debounce |
-| `VISIBILITY_THRESHOLD` | `0.2` | viewport visibility fraction |
-| `AUTOPLAY_PAGINATION_FACTOR` | `0.2` | autoplay dot switch delay |
-| `SNAP_BACK_DURATION` | `1300` ms | drag snap-back |
-| `REPEATED_CLICK_SPEED_MULTIPLIER` | `5` | fast-segment peak vs. normal |
-| `REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE` | `0.35` | profile ramp-up |
-| `REPEATED_CLICK_DECELERATION_DISTANCE_SHARE` | `0.35` | profile ramp-down |
-| `GO_TO_PREFLIGHT_PAGE_SPAN` | `2` | page screens animated before a far-GO_TO teleport |
-| `GO_TO_FINAL_APPROACH_PAGE_SPAN` | `1` | page screens animated after a far-GO_TO teleport |
-| `GO_TO_ACCELERATION_DISTANCE_SHARE` | `0.5` | GO_TO ramp-up share of the first page screen |
-| `GO_TO_DECELERATION_DISTANCE_SHARE` | `0.5` | GO_TO ramp-down share of the final page screen |
-| `MOVE_BEZIER` | `cubic-bezier(0.32, 0.2, 0.28, 1)` | normal step |
-| `AUTO_BEZIER` | `cubic-bezier(0.28, 0.72, 0.38, 1)` | autoplay step |
-| `SNAP_BACK_BEZIER` | `cubic-bezier(0.18, 0.82, 0.28, 1)` | drag snap-back |
-| `CAROUSEL_SWIPE_CONFIG.resistance` | `0.53` | drag edge resistance |
-| `CAROUSEL_SWIPE_CONFIG.emaAlpha` | `0.85` | velocity smoothing |
-| `CAROUSEL_SWIPE_CONFIG.swipeThresholdRatio` | `0.23` | distance threshold |
-| `CAROUSEL_SWIPE_CONFIG.minSwipeDistance` | `20` px | hard min for distance threshold |
-| `CAROUSEL_INERTIAL_RELEASE_CONFIG.inertiaBoost` | `2.15` | post-release acceleration |
-| `CAROUSEL_INERTIAL_RELEASE_CONFIG.decelerationDistanceShare` | `0.25` | post-release tail share |
-| `MOTION_EPSILON` | `0.0001` | sample comparison tolerance |
-| `DRAG_RELEASE_EPSILON` | `0.001` | drag "on target" tolerance |
-| `RENDER_WINDOW_BUFFER_MULTIPLIER` | `1` | mounted-slide neighbour count |
+- `config/defaults.ts` — public-prop defaults.
+- `config/motion.ts` — easing curves, repeated-click and GO_TO factors.
+- `config/interaction.ts` — hover delay, visibility threshold, autoplay dot factor.
+- `config/gesture.ts` — swipe + inertial-release config.
+- `config/constants.ts` — epsilons, render-window buffer.
+- `modules/PaginationWidget/defaults.ts` — widget geometry + write epsilons.
 
-These are part of the visual contract. Changing them changes how the
-component *feels* — they are not safe to tune without a UX review.
+These values are part of the visual contract: changing them changes how the
+component *feels*, so they are not safe to tune without a UX review. The
+`Diagnostic` slot range-checks them at runtime (DEV-only). This document
+describes *what* each constant governs (see §4, §5, §8); the value itself is
+read from `config/`.
 
 ---
 
@@ -396,8 +374,8 @@ Every responsibility has exactly one owner. The orchestrator
 | Motion execution | `useCarouselMotionExecution` + `useMotionRunner` | Owns motion-duration publication and settle feedback, then reads logical state, builds a segment, calls into the controller, and routes compositor-eligible easing segments to the track binding's WAAPI path (§4.5). |
 | Track DOM | `useTrackBinding` | Measures slot size and subscribes to visual position; writes `transform`. Also owns the compositor (WAAPI) animation for plain easing steps and suppresses its own per-frame write while that animation runs (§4.5). |
 | Render window | `useSlideRenderModel` | Memoised; expands during motion, snaps on idle. |
-| Image resources | image-resource store (`createImageResourceStore`) | Per-URL render status, explicit visible-owner count, speculative warm-up lifecycle, retry policy, and a session-scoped decode queue. One instance per carousel; the single authority on image renderability. |
-| Image preparation | `useSlideImagePreload` | React adapter that derives the deck + idle-window URL sets and drives the store through one atomic preparation-window API. Holds no image logic of its own. |
+| Image resources | image-resource store (`createImageResourceStore`) | Per-URL render status and retry policy. One instance per carousel; the single authority on image renderability. |
+| Image prioritization | `SlideItem` | Native `<img loading>` / `fetchpriority` hints derived from the slide's band and the data-saver signal. No JS warm-up layer. |
 | Slide image binding | `useImageResource` | Registers a `SlideItem` as a visible owner of its URL and subscribes to the URL's snapshot via `useSyncExternalStore`. |
 | Gesture lifecycle | `useCarouselGesture` | Wraps the shared `usePointerSwipe`. Converts pointer events into dispatches and direct position writes. |
 | Autoplay lifecycle | `useAutoplay` | Owns the interval timer, hover/visibility/dragging pause. |
@@ -435,22 +413,15 @@ The system has five SSOTs, each owned by exactly one layer.
    resolved config.
 5. **Image resources** — the image-resource store
    (`createImageResourceStore`, one instance per carousel, created only when
-   `isContentImg` is on). Holds one entry per image URL with two separate
-   models:
-   - render SSOT: `status` (`loading | loaded | error`) plus retry
-     `generation`;
-   - preparation lifecycle: visible owner count, warm-up status
-     (`unattempted | fetching | ready | failed | suspended`), retained
-     offscreen element, and decode ownership.
-
-   `useSlideImagePreload` is its only writer of preparation intent; each
-   `SlideItem` registers as a visible owner and subscribes to its URL via
-   `useImageResource`, then reports the real `<img>` outcome back. Warm-up
-   success may publish `loaded` only while no real visible failure exists;
-   warm-up failure stays speculative and never publishes `error`. "Has this
-   slide's image failed" is a *derived read* of this SSOT, never a second
-   copy of state. Observation-only: it never feeds navigation, layout, or
-   motion.
+   `isContentImg` is on). Holds one entry per image URL: render `status`
+   (`loading | loaded | error`) plus a retry `generation`, with one capped,
+   backed-off retry timer per URL. Each `SlideItem` subscribes to its URL via
+   `useImageResource` and reports the real `<img>` outcome back via
+   `reportLoaded` / `reportError`, which is authoritative. "Has this slide's
+   image failed" is a *derived read* of this SSOT, never a second copy of
+   state. Observation-only: it never feeds navigation, layout, or motion.
+   Prioritization is not modeled here — it is delegated to native `<img>`
+   hints on the rendered element (see §1.6).
 
 No layer mirrors another layer's value. The state machine never reads a
 sampled motion value: the gesture controller reads the visual position and
@@ -488,17 +459,21 @@ phase }`.
 - **`EasingSegment`** — a cubic-bezier eased translation with a known
   duration, carrying its `easing` control points. Two strategies:
   - `"easing"` — click step (`MOVE_BEZIER`), autoplay step (`AUTO_BEZIER`),
-    and snap-back (`SNAP_BACK_BEZIER`). This is the **only** compositor-eligible
-    segment: a single keyframe pair plus a CSS easing string reproduce it
-    exactly, so the track translation can run on the compositor thread via
-    WAAPI (§4.5).
-  - `"gesture-easing"` — a non-inertial gesture release. Stays JS-driven for
-    frame-exact continuity with the live drag position it hands off from.
+    and snap-back (`SNAP_BACK_BEZIER`).
+  - `"gesture-easing"` — a non-inertial gesture release.
+
+    Both easing strategies are compositor-eligible: a single keyframe pair plus
+    a CSS easing string reproduce either one exactly, so the track translation
+    can run on the compositor thread via WAAPI (§4.5). A gesture release hands
+    off from a *static* position (the finger is already up), painted
+    synchronously as the first compositor frame, so there is no live-drag
+    continuity that would force it onto the JS path.
 - **`ProfileSegment`** — a smoothstep-driven acceleration / cruise /
   deceleration profile, carrying a `profile` rather than an easing curve.
   Speed-authored: start / peak / end speeds plus zone distances derive the
   segment duration. If acceleration and deceleration shares sum above `1`,
-  runtime normalizes the profile to `0.5 / 0.5` with no cruise zone. A single
+  runtime normalizes the profile to equal acceleration/deceleration halves with
+no cruise zone. A single
   CSS easing curve cannot reproduce its shape, so it always runs on the JS
   sampler. Three strategies:
   - `"jump"` — **every GO_TO**, at `jumpSpeedMultiplier × normalStepSpeed`. A
@@ -516,10 +491,20 @@ phase }`.
 `useMotionRunner` is the only place the controller is started. It runs on state
 changes inside a layout effect: when `motionPhase` becomes a non-idle value it
 samples the motion origin, builds the segment, and starts the controller
-**synchronously** in that same turn. There is no deferred-frame window: the
-compositor (§4.5), not a delay, is what keeps a retarget from reading as a
-stall, because for a plain easing step the visible track pixels are driven off
-the main thread while the JS retarget happens.
+**synchronously** in that same turn. For an easing step there is no
+deferred-frame window: the compositor (§4.5), not a delay, keeps a retarget from
+reading as a stall, because the visible track pixels are driven off the main
+thread while the JS retarget happens.
+
+The one deliberate exception is a same-direction **repeated click**. Its segment
+is a profile (not compositor-eligible), so its rebuild — the heaviest runner
+work — cannot be masked by the compositor and would otherwise land in the same
+tick as the keypress. Since the deck is already moving, the runner holds the
+in-flight segment a configurable few frames (`repeatedClick.retargetFrameDelay`)
+and rebuilds at that boundary, moving the compute off the input tick while the
+current segment carries the motion. This is a timing deferral only: the handoff
+is still one atomic `captureHandoff`, taken from whatever curve is painting at
+the boundary — never a split of position and velocity.
 
 When a previous segment is still running (repeated click, opposite-direction
 click, any interruption), the new segment starts from a **single atomic handoff
@@ -602,8 +587,8 @@ from JS on every RAF tick competes with React commits, image decode, and paint,
 so a busy frame skips the track write and the deck stutters. The fix is to take
 the track translation off the main thread for the segments that allow it.
 
-A plain `"easing"` segment is a single cubic-bezier translation of the whole
-track from `from` to `to` over `duration` — exactly what a two-keyframe
+An `EasingSegment` is a single cubic-bezier translation of the whole track from
+`from` to `to` over `duration` — exactly what a two-keyframe
 `Element.animate([{transform}, {transform}], { duration, easing })` expresses.
 For those segments `useMotionRunner` calls `startCompositorMotion` on the track
 binding; the easing curve is serialised to a CSS easing string by `bezierToCss`
@@ -620,11 +605,12 @@ controller's samples keep flowing to all other subscribers unchanged.
 
 Boundaries and guarantees:
 
-- **Eligibility.** Only `strategy === "easing"` is handed to the compositor
-  (`isCompositorTrackSegment`). `"gesture-easing"` and all `ProfileSegment`
-  strategies (`gesture`, `repeated`, `jump`) stay JS-driven — their shapes,
-  teleport discontinuities, or inertial velocity cannot be reproduced by one
-  CSS easing curve.
+- **Eligibility.** Exactly the `EasingSegment` strategies (`"easing"` and
+  `"gesture-easing"`) are handed to the compositor (`canUseCompositorTrackMotion`
+  — the eligibility check is "is this an `EasingSegment`"). The `ProfileSegment`
+  strategies (`gesture` inertial release, `repeated`, `jump`) stay JS-driven —
+  their accel/cruise/decel shapes, teleport discontinuities, or inertial
+  velocity cannot be reproduced by one CSS easing curve.
 - **Graceful fallback.** `startCompositorMotion` returns `false` (and the
   caller keeps the JS per-frame write) when there is no measured slot size, no
   `Element.animate`, the input is degenerate (non-finite, zero duration), or
@@ -766,7 +752,7 @@ dots — the component carries no internal `pageCount <= 1` guard of its own.
 
 ### 8.2 `<PaginationWidget />`
 
-Touch dot pagination. A fixed-width odd-count strip (5 dots default) with
+Touch dot pagination. A fixed-width odd-count strip with
 exponentially shrinking side dots. Two `activeDot` overlays interpolate
 across adjacent page indexes to track the visual progress, not the
 logical target. Subscribes to `visualPosition` and mutates dot
@@ -830,8 +816,6 @@ src/components/Carousel/
 │   ├── CarouselDiagnosticContext.ts  raw props/layout/slots for Diagnostic
 │   ├── useModuleContextValue.ts
 │   └── types.ts
-├── debug/
-│   └── performanceTrace.ts        DEV-only opt-in performance marks/measures
 ├── domain/                        pure functions, no React
 │   ├── math.ts                    clamp, mod, normalizePageIndex, shortestCyclicDistance
 │   ├── slides.ts                  record building, partial-page detection, extension
@@ -856,8 +840,10 @@ src/components/Carousel/
 │   ├── duration.ts                bezier-segment duration math
 │   ├── segmentFactory.ts          builds the Segment for the next motion step
 │   ├── sampler.ts                 segment → MotionSampleData at timestamp
+│   ├── compositorEligibility.ts   is a segment an EasingSegment (WAAPI-eligible)
+│   ├── autoplayDuration.ts        pure autoplay-step duration derivation
 │   ├── useMotionRunner.ts         state → segment → controller
-│   └── useCarouselMotionExecution.ts  runner + motion-duration publication
+│   └── useCarouselMotionExecution.ts  runner + autoplay-duration derivation
 ├── position/
 │   ├── types.ts                   VisualPositionFrame, VisualPositionSource
 │   └── useVisualPosition.ts       VisualPositionSource owner
@@ -882,7 +868,6 @@ src/components/Carousel/
 │   │   ├── useImageResource.ts    per-slide useSyncExternalStore binding
 │   │   ├── useImageResourceStoreInstance.ts  lifecycle owner
 │   │   └── types.ts
-│   ├── useSlideImagePreload.ts     idle warm-up window → image-resource store
 │   ├── useCarouselSlideDeck.ts    layout, records, perfect-page info
 │   └── useSlideRenderModel.ts     virtual slides + render window
 ├── slots/
@@ -948,10 +933,10 @@ dependencies, the architecture has held.
   fight. The alternative (drive the track from JS like everything else) keeps a
   single expression but puts the heaviest per-frame write back on the main
   thread, where it drops frames under React-commit / image-decode / paint
-  contention — the original jank this rework removes. Eligibility is narrow
-  (only `"easing"`) and fallback is total (any failure reverts to the JS write),
-  so the duplication never becomes a correctness fork: the JS controller stays
-  the single authority on where the deck is.
+  contention — the original jank this rework removes. Eligibility is exactly the
+  `EasingSegment` strategies and fallback is total (any failure reverts to the
+  JS write), so the duplication never becomes a correctness fork: the JS
+  controller stays the single authority on where the deck is.
 - **Visual position is global per-instance, not via context.** Every
   consumer takes it as an explicit dependency through props (Carousel
   internals) or through the module context value (modules). This makes
@@ -1029,25 +1014,20 @@ dependencies, the architecture has held.
   diagnostic layer surfaces violations separately, without ever feeding back
   into runtime.
 - **Performance.** Bezier and profile samplers cache their work where the
-  inputs are known (parsed beziers, computed strips). Plain easing track motion
-  is handed to the compositor thread via WAAPI (§4.5), so the dominant
-  per-frame cost — writing the track `transform` — leaves the main thread for
-  click / autoplay / snap-back steps. The track binding short-circuits writes
-  that would re-apply the same transform, and suppresses its per-frame write
-  entirely while a compositor animation owns the track. The PaginationWidget
-  binding short-circuits per dot against numeric position / scale / opacity
-  epsilons (`PaginationWidget/defaults.ts`), so an imperceptible delta neither
-  writes the DOM nor allocates a transform string. The motion controller emits
-  only on actual sample change (per RAF tick of an active segment; one
-  synchronous emit on segment start, including a synchronous retarget handoff;
-  no emits while idle). Image preload/decode is scoped to the slide layer and
-  starts only from idle states.
-- **Diagnostic performance trace.** `debug/performanceTrace.ts` is a DEV-only,
-  opt-in instrument (`?carouselTrace` query param or
-  `localStorage.carouselTrace = "1"`) that records `performance.mark` /
-  `measure` around motion start, handoff, track and widget writes, and React
-  commits, plus browser `longtask` / `paint` entries via a `PerformanceObserver`.
-  It compiles out of production through the `import.meta.env.DEV` gate, hot-path
-  per-RAF events (`visual:sample`, `track:write`, `paginationWidget:write`) skip
-  the User-Timing `mark` to stay cheap, and the buffer is capped. It is
-  observation-only and never feeds runtime behaviour.
+  inputs are known (parsed beziers, computed strips). Every `EasingSegment`
+  track motion is handed to the compositor thread via WAAPI (§4.5), so the
+  dominant per-frame cost — writing the track `transform` — leaves the main
+  thread for click / autoplay / snap-back / non-inertial gesture-release steps.
+  The track binding short-circuits writes that would re-apply the same
+  transform, and suppresses its per-frame write entirely (before even building
+  the transform string) while a compositor animation owns the track. The
+  PaginationWidget binding short-circuits per dot against numeric position /
+  scale / opacity epsilons (`PaginationWidget/defaults.ts`), so an imperceptible
+  delta neither writes the DOM nor allocates a transform string. The motion
+  controller emits only on actual sample change (per RAF tick of an active
+  segment; one synchronous emit on segment start; no emits while idle). A
+  repeated-click profile retarget — the heaviest rebuild and not
+  compositor-eligible — is deferred a few frames off the input tick (§4.2), so
+  the recompute does not contend with the click event itself. Image
+  prioritization is delegated to native `<img>` hints, adding no per-frame or
+  idle JS work.

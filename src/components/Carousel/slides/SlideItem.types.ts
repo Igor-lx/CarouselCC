@@ -11,5 +11,10 @@ export interface SlideItemProps extends SlideAriaProps {
   isInteractive: boolean;
   isActive: boolean;
   isActual: boolean;
+  /**
+   * Host reduced-data signal. When on, off-band images load lazily and at low
+   * fetch priority so the deck does not eagerly pull bandwidth it may not need.
+   */
+  isDataSaverEnabled: boolean;
   onSlideClick?: (slide: Slide) => void;
 }

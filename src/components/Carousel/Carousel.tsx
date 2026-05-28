@@ -1,20 +1,18 @@
 import { memo, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 
 import styles from "./Carousel.module.scss";
-import {
-  mergeStyleMaps,
-  resolveSlots,
-  useIsomorphicLayoutEffect,
-  useViewportVisibility,
-} from "../../shared";
+import { mergeStyleMaps, resolveSlots, useViewportVisibility } from "../../shared";
 import { CAROUSEL_DEFAULTS, useCarouselConfig } from "./config";
 import {
   CarouselDiagnosticContext,
   CarouselModuleContext,
   useModuleContextValue,
 } from "./context";
-import { traceCarousel } from "./debug/performanceTrace";
-import { carouselBoundaryState, slideFlexStyle } from "./domain";
+import {
+  carouselBoundaryState,
+  slideFlexStyle,
+  type CarouselSlideRecord,
+} from "./domain";
 import { useAutoplay } from "./autoplay/useAutoplay";
 import { useFocusRecovery } from "./focus/useFocusRecovery";
 import { useCarouselGesture } from "./gesture";
@@ -28,7 +26,6 @@ import {
   SlideItem,
   useCarouselSlideDeck,
   useImageResourceStoreInstance,
-  useSlideImagePreload,
   useSlideRenderModel,
 } from "./slides";
 import { CAROUSEL_SLOTS } from "./slots";
@@ -40,6 +37,22 @@ import type {
   CarouselStatusSnapshot,
   SlideClassMap,
 } from "./contract/types";
+
+const EMPTY_IMAGE_URLS: readonly string[] = Object.freeze([]);
+
+/** Every distinct image URL in the live deck — the set the store retains. */
+const collectImageResourceUrls = (
+  records: CarouselSlideRecord[],
+  isContentImg: boolean,
+): readonly string[] => {
+  if (!isContentImg) return EMPTY_IMAGE_URLS;
+  const urls = new Set<string>();
+  for (const record of records) {
+    const { content } = record.slideData;
+    if (typeof content === "string") urls.add(content);
+  }
+  return [...urls];
+};
 
 const Carousel = memo(function Carousel(props: CarouselProps) {
   const {
@@ -119,15 +132,17 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // writes into it; every SlideItem subscribes to its own URL via context.
   const imageResourceStore = useImageResourceStoreInstance(isContentImg);
 
-  useSlideImagePreload({
-    records,
-    layout,
-    currentVirtualIndex: state.virtualIndex,
-    isIdle: status.isIdle,
-    isContentImg,
-    isDataSaverEnabled,
-    store: imageResourceStore,
-  });
+  // Keep the store's per-URL entries bounded to the live deck. Retained entries
+  // are lightweight (render status + retry bookkeeping); a data replacement
+  // drops any URL no longer present.
+  const imageResourceUrls = useMemo(
+    () => collectImageResourceUrls(records, isContentImg),
+    [isContentImg, records],
+  );
+
+  useEffect(() => {
+    imageResourceStore?.prune(imageResourceUrls);
+  }, [imageResourceStore, imageResourceUrls]);
 
   // Read-only, low-frequency status reported to the host. Fires on mount and
   // whenever the idle flag, target page, or page count changes — never on a
@@ -381,24 +396,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     [layout.visibleSlidesCount],
   );
 
-  // Diagnostic-only commit-time trace. Fires on every render commit so the
-  // perf trace can correlate React commits with motion-layer effects in the
-  // same buffer. Cost is one `traceCarousel` call (no-op unless the
-  // `?carouselTrace` switch is on); production builds short-circuit the
-  // entire body via `import.meta.env.DEV` in the trace module.
-  useIsomorphicLayoutEffect(() => {
-    traceCarousel("carousel:commit", {
-      fromVirtualIndex: state.fromVirtualIndex,
-      isMoving: status.isMoving,
-      motionPhase: state.motionPhase,
-      renderWindowStart,
-      targetPageIndex: state.targetPageIndex,
-      targetVirtualIndex: state.virtualIndex,
-      virtualSlideCount: virtualSlides.length,
-      visibleSlidesCount: layout.visibleSlidesCount,
-    });
-  });
-
   return (
     <CarouselModuleContext.Provider value={moduleContextValue}>
       <CarouselDiagnosticContext.Provider value={diagnosticContextValue}>
@@ -436,6 +433,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
                     isInteractive={isInteractive}
                     isActive={slide.isActive}
                     isActual={slide.isActual}
+                    isDataSaverEnabled={isDataSaverEnabled}
                     onSlideClick={navigation.handleSlideClick}
                     {...slide.ariaProps}
                   />

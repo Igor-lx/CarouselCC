@@ -1,15 +1,4 @@
-// Image-preload tuning for the slide layer.
-
-export const PRELOAD_PAGE_LOOKAHEAD_BY_VISIBLE: Readonly<
-  Record<number, number>
-> = {
-  1: 3,
-  2: 2,
-  3: 2,
-};
-
-/** Lookahead for any `visibleSlidesCount` absent from the map above. */
-export const PRELOAD_PAGE_LOOKAHEAD_DEFAULT = 1;
+// Image-retry tuning for the slide layer.
 
 /**
  * Image-retry policy. A slide image that fails to load is retried while the

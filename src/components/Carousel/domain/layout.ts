@@ -3,8 +3,13 @@ import { clamp, mod, normalizePageIndex } from "./math";
 import { clampedVisibleSlidesCount } from "./slides";
 import type { CarouselLayout, CarouselSlideRecord, PageBoundaryState } from "./types";
 
-const slideContentKey = (slide: Slide) =>
-  `${slide.id}-${typeof slide.content === "string" ? slide.content : "obj"}`;
+const slideContentKey = (slide: Slide): string => {
+  const { content } = slide;
+  if (typeof content === "string" || typeof content === "number") {
+    return `${typeof content}:${String(content)}`;
+  }
+  return "react-element";
+};
 
 /**
  * One-pass `dataKey` builder. The previous `records.map(...).join("|")`

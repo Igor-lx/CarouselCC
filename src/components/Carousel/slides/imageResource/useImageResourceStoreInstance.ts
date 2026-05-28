@@ -27,6 +27,14 @@ export function useImageResourceStoreInstance(
     storeRef.current = createImageResourceStore();
   }
 
+  // When image content is turned off, soft-dispose the store so its retry
+  // timers are released. `dispose()` keeps the instance usable, and the ref is
+  // deliberately NOT nulled, so a later re-enable (or a StrictMode remount)
+  // reuses the same store instead of churning a fresh one.
+  useEffect(() => {
+    if (!enabled) storeRef.current?.dispose();
+  }, [enabled]);
+
   useEffect(
     () => () => {
       storeRef.current?.dispose();
