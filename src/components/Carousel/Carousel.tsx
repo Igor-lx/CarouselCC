@@ -26,6 +26,7 @@ import {
   SlideItem,
   useCarouselSlideDeck,
   useImageResourceStoreInstance,
+  useSlideImagePreload,
   useSlideRenderModel,
 } from "./slides";
 import { CAROUSEL_SLOTS } from "./slots";
@@ -143,6 +144,18 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   useEffect(() => {
     imageResourceStore?.prune(imageResourceUrls);
   }, [imageResourceStore, imageResourceUrls]);
+
+  // Lightweight idle predecode: warm the fetch + decoded-image caches for the
+  // off-band neighbour slides a step can reveal, so motion into them does not
+  // fetch/decode on the frame the slide mounts. Decoupled from the store.
+  useSlideImagePreload({
+    records,
+    layout,
+    currentVirtualIndex: state.virtualIndex,
+    isIdle: status.isIdle,
+    isContentImg,
+    isDataSaverEnabled,
+  });
 
   // Read-only, low-frequency status reported to the host. Fires on mount and
   // whenever the idle flag, target page, or page count changes — never on a

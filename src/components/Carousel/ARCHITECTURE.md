@@ -107,7 +107,7 @@ referentially-stable object.
 
 | Prop              | Type             | Effect |
 | ----------------- | ---------------- | ------ |
-| `userEnvironment` | `{ reducedMotion?: boolean; touch?: boolean; dataSaver?: boolean }` | All fields optional. `reducedMotion`: every transition snaps instantly, gesture is disabled, the PaginationWidget runs static. `touch`: gesture eligibility, `data-touch` attribute, autoplay hover-pause exemption. `dataSaver`: off-band slide images load lazily and at low fetch priority. An unset field resolves to `false`; the omission is reported by the `Diagnostic` slot (DEV-only) — never silently repaired. |
+| `userEnvironment` | `{ reducedMotion?: boolean; touch?: boolean; dataSaver?: boolean }` | All fields optional. `reducedMotion`: every transition snaps instantly, gesture is disabled, the PaginationWidget runs static. `touch`: gesture eligibility, `data-touch` attribute, autoplay hover-pause exemption. `dataSaver`: off-band slide images load lazily and at low fetch priority, and idle predecode is skipped. An unset field resolves to `false`; the omission is reported by the `Diagnostic` slot (DEV-only) — never silently repaired. |
 
 #### Motion timing
 
@@ -275,19 +275,31 @@ These are the user-facing behaviours the implementation guarantees.
   are safe no-ops at the edges; hosts can also surface that state on the
   button itself by wiring `disabled` to the matching `isAtStart` / `isAtEnd`
   flag from the status snapshot.
-- **Image preparation.** Image prioritization is delegated to the platform,
-  not a hand-rolled JS warm-up layer. Each rendered slide's `<img>` carries
-  native hints derived from its band: the active band fetches eagerly and at
-  high `fetchpriority`; off-band slides fall back to default priority. When the
-  host reports reduced data usage via `userEnvironment.dataSaver` (derived from
-  `prefers-reduced-data` / the Network Information API `saveData` flag, e.g.
-  through `useUserEnvironment`), off-band slides additionally load lazily and at
-  low priority so the deck does not eagerly pull bandwidth it may not need.
-  There is no speculative offscreen fetch or decode session: prioritization is a
-  property of the rendered element, so it never changes navigation, layout,
-  motion state, or slide-render semantics. The image-resource store — its render
-  status SSOT and image error handling / retry — is unaffected and always runs;
-  those are correctness, not optimization.
+- **Image preparation.** Two cooperating, lightweight pieces — no warm-up
+  state machine, no decode queue, no coupling to the render-status store.
+  1. **Native prioritization on the rendered element.** Each slide's `<img>`
+     carries hints derived from its band: the active band fetches eagerly and at
+     high `fetchpriority`; off-band slides fall back to default. Under
+     `userEnvironment.dataSaver` (derived from `prefers-reduced-data` / the
+     Network Information API `saveData` flag, e.g. through `useUserEnvironment`)
+     off-band slides instead load lazily and at low priority.
+  2. **Idle predecode** (`useSlideImagePreload`). While the carousel is idle it
+     warms the browser's fetch + decoded-image caches for the off-band
+     neighbour slides a single step can reveal (a bounded page span on each
+     side, nearest-first), so a slide entering the render window during the next
+     motion paints from a warm cache instead of fetching/decoding on the frame
+     it mounts. It creates short-lived offscreen `Image()`s, calls the async
+     `decode()` (off the main thread), retains them only while their URL stays
+     in the neighbour window (bounded regardless of deck size), and is skipped
+     entirely under `dataSaver`. It publishes no render status — each rendered
+     `<img>` remains the sole authority on its own outcome; the predecode only
+     pre-warms the platform caches that element will hit. Warming runs only on
+     idle and is left untouched during motion, so a step never drops and
+     re-warms what it is about to use.
+
+  Neither piece changes navigation, layout, motion state, or slide-render
+  semantics. The image-resource store — its render-status SSOT and error /
+  retry — is unaffected and always runs; that is correctness, not optimization.
 - **Image errors and retry.** A slide whose image fails to load renders a
   text placeholder (`alt`, or `errAltPlaceholder`) and is not interactive.
   While such a slide sits in the active band, the image-resource store
@@ -375,7 +387,8 @@ Every responsibility has exactly one owner. The orchestrator
 | Track DOM | `useTrackBinding` | Measures slot size and subscribes to visual position; writes `transform`. Also owns the compositor (WAAPI) animation for plain easing steps and suppresses its own per-frame write while that animation runs (§4.5). |
 | Render window | `useSlideRenderModel` | Memoised; expands during motion, snaps on idle. |
 | Image resources | image-resource store (`createImageResourceStore`) | Per-URL render status and retry policy. One instance per carousel; the single authority on image renderability. |
-| Image prioritization | `SlideItem` | Native `<img loading>` / `fetchpriority` hints derived from the slide's band and the data-saver signal. No JS warm-up layer. |
+| Image prioritization | `SlideItem` | Native `<img loading>` / `fetchpriority` hints derived from the slide's band and the data-saver signal. |
+| Image predecode | `useSlideImagePreload` | Idle, store-decoupled warming (fetch + async `decode()`) of off-band neighbour slides; bounded to the neighbour window, skipped under data-saver. |
 | Slide image binding | `useImageResource` | Registers a `SlideItem` as a visible owner of its URL and subscribes to the URL's snapshot via `useSyncExternalStore`. |
 | Gesture lifecycle | `useCarouselGesture` | Wraps the shared `usePointerSwipe`. Converts pointer events into dispatches and direct position writes. |
 | Autoplay lifecycle | `useAutoplay` | Owns the interval timer, hover/visibility/dragging pause. |
@@ -868,6 +881,7 @@ src/components/Carousel/
 │   │   ├── useImageResource.ts    per-slide useSyncExternalStore binding
 │   │   ├── useImageResourceStoreInstance.ts  lifecycle owner
 │   │   └── types.ts
+│   ├── useSlideImagePreload.ts    idle off-band fetch + async decode (store-decoupled)
 │   ├── useCarouselSlideDeck.ts    layout, records, perfect-page info
 │   └── useSlideRenderModel.ts     virtual slides + render window
 ├── slots/
@@ -1029,5 +1043,6 @@ dependencies, the architecture has held.
   repeated-click profile retarget — the heaviest rebuild and not
   compositor-eligible — is deferred a few frames off the input tick (§4.2), so
   the recompute does not contend with the click event itself. Image
-  prioritization is delegated to native `<img>` hints, adding no per-frame or
-  idle JS work.
+  prioritization is delegated to native `<img>` hints; the idle predecode adds
+  no per-frame work and uses the async `decode()`, so it never blocks the main
+  thread, and it is gated to idle so it does not contend with motion.
