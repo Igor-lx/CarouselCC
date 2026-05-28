@@ -79,6 +79,26 @@ describe("reconcileStateToLayout — hard reset", () => {
     expect(next).toEqual(buildInitialState(replaced));
   });
 
+  it("resets when numeric content changes under the same ids and length", () => {
+    const beforeSlides: Slide[] = [
+      { id: "same-1", content: 1 },
+      { id: "same-2", content: 2 },
+      { id: "same-3", content: 3 },
+      { id: "same-4", content: 4 },
+    ];
+    const afterSlides: Slide[] = [
+      { id: "same-1", content: 10 },
+      { id: "same-2", content: 20 },
+      { id: "same-3", content: 30 },
+      { id: "same-4", content: 40 },
+    ];
+    const layout = buildCarouselLayout(buildSlideRecords(beforeSlides), 2, false);
+    const replaced = buildCarouselLayout(buildSlideRecords(afterSlides), 2, false);
+    const next = reconcileStateToLayout(movedState(layout, 1), replaced);
+
+    expect(next).toEqual(buildInitialState(replaced));
+  });
+
   it("resets to the initial state on an isFinite change", () => {
     const cyclic = makeLayout(12, 3, false);
     const finite = makeLayout(12, 3, true);

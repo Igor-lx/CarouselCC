@@ -433,6 +433,9 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
               ref={trackRef}
               className={classNames.slideContainer}
               data-carousel-track=""
+              data-carousel-track-active={
+                status.isMoving || status.isDragging ? true : undefined
+              }
             >
               {virtualSlides.map((slide) => (
                 <SlideItem

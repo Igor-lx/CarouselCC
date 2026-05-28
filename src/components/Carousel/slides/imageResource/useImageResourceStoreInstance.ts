@@ -17,12 +17,20 @@ export function useImageResourceStoreInstance(
     storeRef.current = createImageResourceStore();
   }
 
+  useEffect(() => {
+    if (!enabled) {
+      storeRef.current?.dispose();
+      storeRef.current = null;
+    }
+  }, [enabled]);
+
   useEffect(
     () => () => {
       storeRef.current?.dispose();
+      storeRef.current = null;
     },
     [],
   );
 
-  return storeRef.current;
+  return enabled ? storeRef.current : null;
 }

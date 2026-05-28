@@ -35,8 +35,6 @@ interface UseMotionRunnerInput {
    * click had already been queued.
    */
   onSettle: (settledPosition: number) => void;
-  onAutoplayDurationCancel?: () => void;
-  onAutoplayDurationChange?: (duration: number) => void;
 }
 
 const now = (): number =>
@@ -50,6 +48,24 @@ const now = (): number =>
 const isCompositorTrackSegment = (
   segment: CarouselSegment,
 ): segment is EasingSegment => segment.strategy === "easing";
+
+const motionConfigKey = (config: CarouselRuntimeConfig): string =>
+  [
+    config.autoplayDuration,
+    config.stepDuration,
+    config.jumpSpeedMultiplier,
+    config.motion.snapBackDuration,
+    config.motion.epsilon,
+    config.motion.goToPreflightPageSpan,
+    config.motion.goToFinalApproachPageSpan,
+    config.motion.goToAccelerationDistanceShare,
+    config.motion.goToDecelerationDistanceShare,
+    config.repeatedClick.speedMultiplier,
+    config.repeatedClick.accelerationDistanceShare,
+    config.repeatedClick.decelerationDistanceShare,
+    config.releaseConfig.inertiaBoost,
+    config.releaseConfig.decelerationDistanceShare,
+  ].join(":");
 
 /**
  * Origin of a post-drag release segment. Drag writes are published into the
@@ -96,8 +112,6 @@ export function useMotionRunner({
   startCompositorMotion,
   cancelCompositorMotion,
   onSettle,
-  onAutoplayDurationCancel,
-  onAutoplayDurationChange,
 }: UseMotionRunnerInput): void {
   const lastKeyRef = useRef<string>("");
 
@@ -133,6 +147,7 @@ export function useMotionRunner({
       state.gesture.uiVelocity,
       isInstantMode,
       isDragging,
+      motionConfigKey(config),
     ].join(":");
 
     if (lastKeyRef.current === key) return;
@@ -140,27 +155,23 @@ export function useMotionRunner({
 
     if (!enabled) {
       cancelCompositorMotion(state.virtualIndex);
-      onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, { strategy: "idle" });
       return;
     }
 
     if (state.motionPhase === "idle") {
       cancelCompositorMotion(state.virtualIndex);
-      onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, { strategy: "idle" });
       return;
     }
 
     if (state.motionPhase === "dragging") {
       cancelCompositorMotion(controller.getSnapshot().value);
-      onAutoplayDurationCancel?.();
       return;
     }
 
     if (state.motionPhase === "step-instant") {
       cancelCompositorMotion(state.virtualIndex);
-      onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, {
         strategy: "idle",
         onComplete: settle,
@@ -181,7 +192,6 @@ export function useMotionRunner({
           velocity: resolvedStart.velocity,
           onComplete: settle,
         });
-        onAutoplayDurationCancel?.();
         return;
       }
 
@@ -193,17 +203,6 @@ export function useMotionRunner({
         start: resolvedStart,
         startedAt: resolvedStartedAt,
       });
-
-      // Autoplay duration is the only thing the runner needs to publish, and
-      // it is published for every autoplay segment - including the finite-mode
-      // loop-back GO_TO, whose intent is "jump" but whose moveReason is still
-      // "autoplay". Reading moveReason keeps the runner free of intent
-      // taxonomy and matches the user-facing "during autoplay" guarantee.
-      if (state.moveReason === "autoplay") {
-        onAutoplayDurationChange?.(duration);
-      } else {
-        onAutoplayDurationCancel?.();
-      }
 
       const isComposited =
         isCompositorTrackSegment(segment) &&
@@ -273,8 +272,6 @@ export function useMotionRunner({
     enabled,
     isDragging,
     isInstantMode,
-    onAutoplayDurationCancel,
-    onAutoplayDurationChange,
     settle,
     startCompositorMotion,
     state.fromVirtualIndex,

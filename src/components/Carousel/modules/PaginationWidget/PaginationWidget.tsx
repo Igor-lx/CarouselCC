@@ -23,7 +23,7 @@ const PaginationWidgetBase = memo(function PaginationWidget({
   scaleFactor = PAGINATION_WIDGET_DEFAULTS.scaleFactor,
   className,
 }: PaginationWidgetProps) {
-  const { intent, layout, visualPosition } = useCarouselModuleContext();
+  const { intent, layout, status, visualPosition } = useCarouselModuleContext();
 
   // When reduced motion is on, the binding has nothing to subscribe to and we
   // render a static snapshot. Otherwise the binding mutates dots frame-by-frame.
@@ -85,6 +85,9 @@ const PaginationWidgetBase = memo(function PaginationWidget({
     <div
       className={classNames.container_PW}
       data-motion-bound={isMotionBound ? true : undefined}
+      data-motion-active={
+        isMotionBound && (status.isMoving || status.isDragging) ? true : undefined
+      }
       style={containerStyle}
     >
       {isMotionBound
