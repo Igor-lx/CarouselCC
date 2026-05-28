@@ -1,7 +1,10 @@
-import { useCallback, useContext, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 
-import { CarouselImageResourceContext } from "./context";
-import type { ImageResourceSnapshot, ImageStatus } from "./types";
+import type {
+  ImageResourceSnapshot,
+  ImageResourceStore,
+  ImageStatus,
+} from "./types";
 
 /**
  * One slide's view of its image resource: the reactive snapshot plus the
@@ -39,21 +42,22 @@ const STATIC_CALLBACKS = Object.freeze({
 /**
  * Subscribes a slide to its image resource.
  *
- * Pass `null` for non-image slides. The store itself is also `null` for the
- * whole carousel when `isContentImg` is off. In either case the hook
- * short-circuits to `READY_SNAPSHOT` with no-op callbacks and never touches a
- * store — no subscription, no allocation, no work. The call stays
- * unconditional, so the Rules of Hooks hold whatever the slide content is.
- *
- * `url` is non-null only when `isContentImg` is on, which is exactly when a
- * store exists — so a tracked slide always resolves to a real store.
+ * The store is passed in explicitly (not pulled from context), so the slide's
+ * data dependency is visible in source — consistent with how the rest of the
+ * carousel threads its per-instance singletons. Pass `null` for `url` on
+ * non-image slides; `store` is also `null` for the whole carousel when
+ * `isContentImg` is off. In either case the hook short-circuits to
+ * `READY_SNAPSHOT` with no-op callbacks and never touches a store — no
+ * subscription, no allocation, no work. The call stays unconditional, so the
+ * Rules of Hooks hold whatever the slide content is.
  *
  * When tracked, the hook is backed by `useSyncExternalStore`, so the slide
  * re-renders precisely when *its own* URL changes status.
  */
-export function useImageResource(url: string | null): ImageResourceHandle {
-  const store = useContext(CarouselImageResourceContext);
-
+export function useImageResource(
+  url: string | null,
+  store: ImageResourceStore | null,
+): ImageResourceHandle {
   const subscribe = useCallback(
     (onStoreChange: () => void) =>
       store !== null && url !== null

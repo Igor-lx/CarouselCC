@@ -1,4 +1,11 @@
-import { memo, useEffect, useImperativeHandle, useMemo, useRef } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+} from "react";
 
 import styles from "./Carousel.module.scss";
 import { mergeStyleMaps, resolveSlots, useViewportVisibility } from "../../shared";
@@ -22,7 +29,6 @@ import { useCarouselNavigation } from "./navigation";
 import { useVisualPosition } from "./position";
 import { useModuleRenderPolicy } from "./render-policy/useModuleRenderPolicy";
 import {
-  CarouselImageResourceContext,
   SlideItem,
   useCarouselSlideDeck,
   useImageResourceStoreInstance,
@@ -129,9 +135,22 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
 
   // --- image-resource SSOT --------------------------------------------------
   // The store exists only when the carousel renders image content; with
-  // `isContentImg` off it is `null` and no image machinery runs. Preload
-  // writes into it; every SlideItem subscribes to its own URL via context.
+  // `isContentImg` off it is `null` and no image machinery runs. It is passed
+  // explicitly to each `SlideItem` (no context) so the data flow stays visible
+  // in source. Each slide subscribes to its own URL; the store is the single
+  // authority on render status and retry. The idle predecode below never writes
+  // to it — it only warms browser caches.
   const imageResourceStore = useImageResourceStoreInstance(isContentImg);
+
+  // Read-only warm-ability gate for the predecode: never spend a speculative
+  // fetch on a URL the visible layer has already seen fail. Injected as a plain
+  // predicate so the predecode stays store-agnostic.
+  const isImageWarmable = useCallback(
+    (url: string) =>
+      imageResourceStore === null ||
+      imageResourceStore.getSnapshot(url).status !== "error",
+    [imageResourceStore],
+  );
 
   // Keep the store's per-URL entries bounded to the live deck. Retained entries
   // are lightweight (render status + retry bookkeeping); a data replacement
@@ -155,6 +174,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     isIdle: status.isIdle,
     isContentImg,
     isDataSaverEnabled,
+    isWarmable: isImageWarmable,
   });
 
   // Read-only, low-frequency status reported to the host. Fires on mount and
@@ -412,52 +432,51 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   return (
     <CarouselModuleContext.Provider value={moduleContextValue}>
       <CarouselDiagnosticContext.Provider value={diagnosticContextValue}>
-        <CarouselImageResourceContext.Provider value={imageResourceStore}>
+        <div
+          className={classNames.outerContainer}
+          role="region"
+          aria-roledescription="carousel"
+          data-carousel-root=""
+          data-touch={isTouch}
+          data-reduced-motion={isInstantMode}
+        >
           <div
-            className={classNames.outerContainer}
-            role="region"
-            aria-roledescription="carousel"
-            data-carousel-root=""
-            data-touch={isTouch}
-            data-reduced-motion={isInstantMode}
+            ref={viewportRef}
+            tabIndex={-1}
+            className={classNames.innerContainer}
+            data-carousel-viewport=""
+            onMouseEnter={() => handleHoverChange(true)}
+            onMouseLeave={() => handleHoverChange(false)}
+            {...dragListeners}
           >
             <div
-              ref={viewportRef}
-              tabIndex={-1}
-              className={classNames.innerContainer}
-              data-carousel-viewport=""
-              onMouseEnter={() => handleHoverChange(true)}
-              onMouseLeave={() => handleHoverChange(false)}
-              {...dragListeners}
+              ref={trackRef}
+              className={classNames.slideContainer}
+              data-carousel-track=""
             >
-              <div
-                ref={trackRef}
-                className={classNames.slideContainer}
-                data-carousel-track=""
-              >
-                {virtualSlides.map((slide) => (
-                  <SlideItem
-                    key={slide.slideKey}
-                    slideData={slide.slideData}
-                    className={slideClassMap}
-                    style={slideStyle}
-                    isContentImg={isContentImg}
-                    errAltPlaceholder={config.errorAltPlaceholder}
-                    isInteractive={isInteractive}
-                    isActive={slide.isActive}
-                    isActual={slide.isActual}
-                    isDataSaverEnabled={isDataSaverEnabled}
-                    onSlideClick={navigation.handleSlideClick}
-                    {...slide.ariaProps}
-                  />
-                ))}
-              </div>
-              {renderPolicy.shouldRenderControls ? slots.controls : null}
+              {virtualSlides.map((slide) => (
+                <SlideItem
+                  key={slide.slideKey}
+                  slideData={slide.slideData}
+                  className={slideClassMap}
+                  style={slideStyle}
+                  isContentImg={isContentImg}
+                  errAltPlaceholder={config.errorAltPlaceholder}
+                  isInteractive={isInteractive}
+                  isActive={slide.isActive}
+                  isActual={slide.isActual}
+                  isDataSaverEnabled={isDataSaverEnabled}
+                  imageResourceStore={imageResourceStore}
+                  onSlideClick={navigation.handleSlideClick}
+                  {...slide.ariaProps}
+                />
+              ))}
             </div>
-            {renderPolicy.shouldRenderPagination ? slots.pagination : null}
-            {renderPolicy.shouldRenderDiagnostic ? slots.diagnostic : null}
+            {renderPolicy.shouldRenderControls ? slots.controls : null}
           </div>
-        </CarouselImageResourceContext.Provider>
+          {renderPolicy.shouldRenderPagination ? slots.pagination : null}
+          {renderPolicy.shouldRenderDiagnostic ? slots.diagnostic : null}
+        </div>
       </CarouselDiagnosticContext.Provider>
     </CarouselModuleContext.Provider>
   );

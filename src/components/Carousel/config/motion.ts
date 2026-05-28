@@ -22,7 +22,7 @@ export const REPEATED_CLICK_DECELERATION_DISTANCE_SHARE = 0.35;
  * it lifts that compute spike off the input tick. `0` restores the original
  * synchronous rebuild.
  */
-export const REPEATED_CLICK_RETARGET_FRAME_DELAY = 3;
+export const REPEATED_CLICK_RETARGET_FRAME_DELAY = 4;
 
 /**
  * Number of page screens animated before a far-GO_TO teleport. After the

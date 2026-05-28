@@ -15,6 +15,12 @@ interface UseSlideImagePreloadInput {
   isContentImg: boolean;
   /** When true, speculative warming is skipped entirely. */
   isDataSaverEnabled: boolean;
+  /**
+   * Read-only gate deciding whether a URL is worth warming. Injected by the
+   * caller (typically "the render store does not already mark it failed") so
+   * this hook stays store-agnostic and never spends a fetch on a known-bad URL.
+   */
+  isWarmable: (url: string) => boolean;
 }
 
 interface CollectInput {
@@ -108,6 +114,7 @@ export function useSlideImagePreload({
   isIdle,
   isContentImg,
   isDataSaverEnabled,
+  isWarmable,
 }: UseSlideImagePreloadInput): void {
   const isEnabled = isContentImg && !isDataSaverEnabled;
   const warmedRef = useRef<Map<string, HTMLImageElement>>(new Map());
@@ -138,7 +145,7 @@ export function useSlideImagePreload({
     });
 
     for (const url of targetUrls) {
-      if (warmed.has(url)) continue;
+      if (warmed.has(url) || !isWarmable(url)) continue;
       const image = new Image();
       image.decoding = "async";
       image.fetchPriority = "low";
@@ -150,7 +157,7 @@ export function useSlideImagePreload({
         image.decode().catch(() => undefined);
       }
     }
-  }, [targetUrls]);
+  }, [targetUrls, isWarmable]);
 
   useEffect(() => {
     const warmed = warmedRef.current;

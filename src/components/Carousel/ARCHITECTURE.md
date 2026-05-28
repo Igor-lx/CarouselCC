@@ -293,9 +293,11 @@ These are the user-facing behaviours the implementation guarantees.
      in the neighbour window (bounded regardless of deck size), and is skipped
      entirely under `dataSaver`. It publishes no render status — each rendered
      `<img>` remains the sole authority on its own outcome; the predecode only
-     pre-warms the platform caches that element will hit. Warming runs only on
-     idle and is left untouched during motion, so a step never drops and
-     re-warms what it is about to use.
+     pre-warms the platform caches that element will hit. It takes a read-only
+     `isWarmable(url)` gate (injected by the root from the store's status) so it
+     never spends a fetch on a URL the visible layer already saw fail, yet stays
+     store-agnostic. Warming runs only on idle and is left untouched during
+     motion, so a step never drops and re-warms what it is about to use.
 
   Neither piece changes navigation, layout, motion state, or slide-render
   semantics. The image-resource store — its render-status SSOT and error /
@@ -428,7 +430,8 @@ The system has five SSOTs, each owned by exactly one layer.
    (`createImageResourceStore`, one instance per carousel, created only when
    `isContentImg` is on). Holds one entry per image URL: render `status`
    (`loading | loaded | error`) plus a retry `generation`, with one capped,
-   backed-off retry timer per URL. Each `SlideItem` subscribes to its URL via
+   backed-off retry timer per URL. The store is passed explicitly into each
+   `SlideItem` (not via context); the slide subscribes to its URL via
    `useImageResource` and reports the real `<img>` outcome back via
    `reportLoaded` / `reportError`, which is authoritative. "Has this slide's
    image failed" is a *derived read* of this SSOT, never a second copy of
@@ -877,8 +880,7 @@ src/components/Carousel/
 │   ├── SlideItem.types.ts
 │   ├── imageResource/             image-resource SSOT (store + React bridge)
 │   │   ├── createImageResourceStore.ts  framework-agnostic store
-│   │   ├── context.ts             per-carousel store provider
-│   │   ├── useImageResource.ts    per-slide useSyncExternalStore binding
+│   │   ├── useImageResource.ts    per-slide useSyncExternalStore binding (store passed in)
 │   │   ├── useImageResourceStoreInstance.ts  lifecycle owner
 │   │   └── types.ts
 │   ├── useSlideImagePreload.ts    idle off-band fetch + async decode (store-decoupled)
@@ -951,11 +953,15 @@ dependencies, the architecture has held.
   `EasingSegment` strategies and fallback is total (any failure reverts to the
   JS write), so the duplication never becomes a correctness fork: the JS
   controller stays the single authority on where the deck is.
-- **Visual position is global per-instance, not via context.** Every
-  consumer takes it as an explicit dependency through props (Carousel
-  internals) or through the module context value (modules). This makes
-  the data flow visible in source rather than relying on hidden context
-  provider scope.
+- **Per-instance singletons flow explicitly, not via internal context.** The
+  visual position and the image-resource store are both taken as explicit
+  dependencies — through props / hook arguments for Carousel internals (e.g.
+  the store is passed straight into each `SlideItem`), or through the module
+  context value for slot modules. There is no internal carousel-only context
+  provider: the data flow is visible in source rather than relying on hidden
+  provider scope. (The single React context the carousel exposes,
+  `CarouselModuleContext`, is the deliberate module-boundary API in §7, not an
+  internal wiring shortcut.)
 - **State machine reads `fromVirtualIndex` from the gesture/click site,
   not internally.** Callers pass the visually-sampled origin as part of
   the dispatch payload. The state machine never reaches into the motion
