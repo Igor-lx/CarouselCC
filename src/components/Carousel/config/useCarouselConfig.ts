@@ -12,12 +12,6 @@ interface UseCarouselConfigInput {
   errAltPlaceholder?: unknown;
 }
 
-/**
- * Resolve the runtime config from raw prop input. Defaults are substituted
- * only for `undefined` props (the public default contract). Other values flow
- * through unchanged - invalid input is the caller's responsibility and is
- * surfaced by the diagnostic layer, never repaired here.
- */
 export function useCarouselConfig({
   visibleSlidesNr,
   durationAutoplay,

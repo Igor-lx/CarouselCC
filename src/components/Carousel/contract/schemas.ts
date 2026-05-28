@@ -3,12 +3,6 @@ import { z } from "zod";
 
 import { CLASS_NAME_KEYS } from "./classKeys";
 
-/**
- * Public Zod schemas for host-side runtime validation of external data
- * (API responses, CMS payloads, user config) before it is handed to the
- * carousel. The carousel itself stays dumb and does not import this module.
- */
-
 const createReactElementSchema = () =>
   z.custom<ReactElement>((value) => {
     if (typeof value !== "object" || value === null) return false;
@@ -19,8 +13,7 @@ const createReactElementSchema = () =>
     );
   });
 
-export const ReactElementSchema =
-  /* @__PURE__ */ createReactElementSchema();
+export const ReactElementSchema = createReactElementSchema();
 
 const createContentSchema = () =>
   z.union([
@@ -29,7 +22,7 @@ const createContentSchema = () =>
     ReactElementSchema,
   ]);
 
-export const ContentSchema = /* @__PURE__ */ createContentSchema();
+export const ContentSchema = createContentSchema();
 
 const createClassMapShape = () => {
   const shape = {} as Record<
@@ -47,7 +40,7 @@ const createClassMapShape = () => {
 const createClassMapSchema = () =>
   z.object(createClassMapShape()).partial();
 
-export const ClassMapSchema = /* @__PURE__ */ createClassMapSchema();
+export const ClassMapSchema = createClassMapSchema();
 
 const createSlideSchema = () =>
   z.object({
@@ -56,7 +49,7 @@ const createSlideSchema = () =>
     alt: z.string().optional(),
   });
 
-export const SlideSchema = /* @__PURE__ */ createSlideSchema();
+export const SlideSchema = createSlideSchema();
 
 const createCarouselStatusSnapshotSchema = () =>
   z.object({
@@ -68,7 +61,7 @@ const createCarouselStatusSnapshotSchema = () =>
   });
 
 export const CarouselStatusSnapshotSchema =
-  /* @__PURE__ */ createCarouselStatusSnapshotSchema();
+  createCarouselStatusSnapshotSchema();
 
 const createOnSlideClickSchema = () =>
   z.function({
@@ -76,7 +69,7 @@ const createOnSlideClickSchema = () =>
     output: z.void(),
   });
 
-const OnSlideClickSchema = /* @__PURE__ */ createOnSlideClickSchema();
+const OnSlideClickSchema = createOnSlideClickSchema();
 
 const createOnCarouselStatusChangeSchema = () =>
   z.function({
@@ -85,7 +78,7 @@ const createOnCarouselStatusChangeSchema = () =>
   });
 
 const OnCarouselStatusChangeSchema =
-  /* @__PURE__ */ createOnCarouselStatusChangeSchema();
+  createOnCarouselStatusChangeSchema();
 
 const createUserEnvironmentSchema = () =>
   z
@@ -96,8 +89,7 @@ const createUserEnvironmentSchema = () =>
     })
     .partial();
 
-export const UserEnvironmentSchema =
-  /* @__PURE__ */ createUserEnvironmentSchema();
+export const UserEnvironmentSchema = createUserEnvironmentSchema();
 
 const createCarouselPropsSchema = () =>
   z.object({
@@ -121,10 +113,9 @@ const createCarouselPropsSchema = () =>
     onCarouselStatusChange: OnCarouselStatusChangeSchema.optional(),
   });
 
-export const CarouselPropsSchema =
-  /* @__PURE__ */ createCarouselPropsSchema();
+export const CarouselPropsSchema = createCarouselPropsSchema();
 
 const createCarouselSlidesDataSchema = () => CarouselPropsSchema.shape.slidesData;
 
 export const CarouselSlidesDataSchema =
-  /* @__PURE__ */ createCarouselSlidesDataSchema();
+  createCarouselSlidesDataSchema();

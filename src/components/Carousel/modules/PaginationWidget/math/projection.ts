@@ -6,11 +6,6 @@ import type {
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
-/**
- * Write the projection state for one dot directly into `target`. Reusing
- * the target object avoids per-frame allocations for the motion-bound write
- * path.
- */
 export const writeDotProjection = (
   target: PaginationWidgetDotState,
   id: number,

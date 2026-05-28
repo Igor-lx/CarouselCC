@@ -17,17 +17,11 @@ export interface CarouselLayoutView {
   isAtEnd: boolean;
   isTouch: boolean;
   isReducedMotion: boolean;
-  /**
-   * True when a Diagnostic slot is attached. Modules with their own checks
-   * (e.g. PaginationWidget) gate diagnostic work on this flag so the carousel
-   * incurs zero diagnostic overhead when no Diagnostic slot is mounted.
-   */
   isDiagnosticActive: boolean;
 }
 
 export interface CarouselIntentView {
   targetPageIndex: number;
-  /** `null` before the carousel has moved for the first time. */
   moveReason: MoveReason | null;
   autoplayMotionDuration: number;
   autoplayPaginationFactor: number;
@@ -44,16 +38,6 @@ export interface CarouselModuleContextValue {
   visualPosition: VisualPositionSource | null;
 }
 
-/**
- * Inputs the Diagnostic slot reads to produce dev-only warnings. The values
- * mirror what the runtime sees; the Diagnostic layer must never read mutated
- * or filtered copies, otherwise its observations would diverge from reality.
- *
- * `state` is the full effective `CarouselState` (carrying its own `layout`),
- * so the structural-invariant validator can consume it directly without an
- * extra sub-view; `layout` exposes only the layout-shape metrics the
- * Diagnostic layer presents on top.
- */
 export interface CarouselDiagnosticContextValue {
   state: CarouselState;
   props: {

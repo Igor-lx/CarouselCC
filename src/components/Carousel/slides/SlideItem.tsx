@@ -1,22 +1,9 @@
 import clsx from "clsx";
 import { memo, useEffect } from "react";
 
-import { traceCarousel } from "../debug/performanceTrace";
 import { useImageResource } from "./imageResource";
 import type { SlideItemProps } from "./SlideItem.types";
 
-/**
- * Renders one slide. The active band is derived externally via
- * `isActive` / `isActual`.
- *
- * Image content is governed by the compact image-resource SSOT
- * (`useImageResource`): duplicate URLs / clones share load-error status and a
- * capped retry policy, while actual fetching and decoding stay browser-owned.
- *
- * A slide is interactive only when it is configured interactive, a click
- * handler is provided, and — for image slides — the image has actually
- * loaded. Text slides are interactive as soon as a handler is provided.
- */
 export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
   const {
     slideData,
@@ -44,24 +31,6 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
   const isImageSlide = imageSource !== null;
   const hasImageError = isImageSlide && status === "error";
 
-  useEffect(() => {
-    traceCarousel("slide:mount", {
-      id: slideData?.id,
-      isImageSlide,
-    });
-    return () => {
-      traceCarousel("slide:unmount", {
-        id: slideData?.id,
-        isImageSlide,
-      });
-    };
-  }, [isImageSlide, slideData?.id]);
-
-  // An errored image that is currently in the active band is retried on a
-  // backed-off schedule owned by the store. A successful retry flips the
-  // resource back to `loading` with a new `generation`, which remounts the
-  // `<img>` below and triggers a fresh fetch. The store deduplicates and caps
-  // attempts, so re-running this effect on every status change is safe.
   useEffect(() => {
     if (hasImageError && isActual) requestRetry();
   }, [hasImageError, isActual, requestRetry]);

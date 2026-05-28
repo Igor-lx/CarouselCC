@@ -18,13 +18,6 @@ export interface MotionSampleData<Strategy extends string = string> {
   strategy: Strategy;
 }
 
-/**
- * An atomic motion-continuation point: the coherent `(position, velocity)` of
- * the controller as of one `timestamp`. Returned by `captureHandoff` so a
- * caller starting a new segment cannot accidentally mix a position from one
- * moment with a velocity from another — there is exactly one method and one
- * answer. Distinct from `MotionSample` (the full visual frame for UI).
- */
 export interface MotionHandoff<Strategy extends string = string> {
   position: number;
   velocity: number;
@@ -76,14 +69,7 @@ export type MotionSubscriber<Strategy extends string = string> = (
 ) => void;
 
 export interface MotionController<Strategy extends string = string> {
-  /**
-   * The atomic motion-continuation point as of `timestamp` — a coherent
-   * `(position, velocity)` from the active curve (or the resting sample when
-   * idle). The single API for handing motion off to a new segment; it cannot
-   * be mixed with `getSnapshot`. Does not emit, cancel, or notify subscribers.
-   */
   captureHandoff: (timestamp?: number) => MotionHandoff<Strategy>;
-  /** The last *emitted* visual frame — for UI reads, not motion handoff. */
   getSnapshot: () => MotionSample<Strategy>;
   isActive: () => boolean;
   subscribe: (

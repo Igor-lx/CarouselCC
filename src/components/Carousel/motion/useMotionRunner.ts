@@ -7,7 +7,6 @@ import {
 } from "../../../shared";
 import type { CarouselRuntimeConfig } from "../config";
 import type { TrackBindingApi } from "../geometry";
-import { traceCarousel } from "../debug/performanceTrace";
 import type { CarouselState } from "../state";
 import { bezierToCss } from "./bezier";
 import { canUseCompositorTrackMotion } from "./compositorEligibility";
@@ -27,12 +26,6 @@ interface UseMotionRunnerInput {
   enabled: boolean;
   startCompositorMotion: TrackBindingApi["startCompositorMotion"];
   cancelCompositorMotion: TrackBindingApi["cancelCompositorMotion"];
-  /**
-   * Called by the controller when a segment naturally settles. The argument
-   * is the visual position where it settled, so the reducer can distinguish
-   * a finished current target from an older target that settled after a newer
-   * click had already been queued.
-   */
   onSettle: (settledPosition: number) => void;
 }
 
@@ -57,12 +50,6 @@ const motionConfigKey = (config: CarouselRuntimeConfig): string =>
     config.releaseConfig.decelerationDistanceShare,
   ].join(":");
 
-/**
- * Origin of a post-drag release segment. Drag writes are published into the
- * visual position stream, while END_DRAG records the release position and
- * release velocity in state. The reducer payload stays canonical here because
- * it binds the sampled position and the release velocity to the same event.
- */
 const buildStartFromGesture = (state: CarouselState): MotionStart => ({
   position: state.fromVirtualIndex,
   velocity: state.gesture.uiVelocity,
@@ -78,21 +65,6 @@ const buildStartFromState = (
   strategy: "easing",
 });
 
-/**
- * The motion runner is the only bridge between logical state and the motion
- * controller.
- *
- * The controller remains the visual-position SSOT for gesture/profile math,
- * diagnostics, pagination, handoff, and settle. For cubic-bezier easing
- * movement (normal steps and non-inertial gesture release / snap-back) the
- * track DOM additionally runs the same transform through WAAPI, allowing the
- * deck transform to stay on the compositor while the JS sampler keeps
- * publishing the authoritative numeric timeline to non-track subscribers.
- *
- * Every segment - first click, repeated click, gesture release - drives
- * directly to `state.virtualIndex`. There is no intermediate destination and
- * no chained follow-up segment.
- */
 export function useMotionRunner({
   state,
   config,
@@ -114,17 +86,6 @@ export function useMotionRunner({
   );
 
   useIsomorphicLayoutEffect(() => {
-    traceCarousel("motion:layoutEffect", {
-      enabled,
-      fromVirtualIndex: state.fromVirtualIndex,
-      isDragging,
-      isInstantMode,
-      motionPhase: state.motionPhase,
-      moveReason: state.moveReason,
-      targetVirtualIndex: state.virtualIndex,
-      teleportVirtualIndex: state.teleportVirtualIndex,
-    });
-
     const key = [
       enabled,
       state.motionPhase,
@@ -186,7 +147,7 @@ export function useMotionRunner({
         return;
       }
 
-      const { segment, duration } = buildCarouselSegment({
+      const { segment } = buildCarouselSegment({
         state,
         config,
         isInstantMode,
@@ -208,15 +169,6 @@ export function useMotionRunner({
         cancelCompositorMotion(resolvedStart.position);
       }
 
-      traceCarousel("motion:start", {
-        composited: isComposited,
-        duration,
-        from: segment.from,
-        startedAt: segment.startedAt,
-        strategy: segment.strategy,
-        to: segment.to,
-      });
-
       controller.start({
         segment,
         sampler: sampleCarouselSegment,
@@ -227,14 +179,7 @@ export function useMotionRunner({
     const startedAt = now();
 
     if (controller.isActive()) {
-      // One atomic point: position + velocity + time from the same sample.
       const handoff = controller.captureHandoff(startedAt);
-      traceCarousel("motion:handoff", {
-        position: handoff.position,
-        strategy: handoff.strategy,
-        timestamp: handoff.timestamp,
-        velocity: handoff.velocity,
-      });
       startResolvedMotion(
         {
           position: handoff.position,
@@ -251,9 +196,6 @@ export function useMotionRunner({
       return;
     }
 
-    // Cold start from idle: the logical origin is owned by the reducer
-    // (`state.fromVirtualIndex`); only residual velocity comes from the
-    // controller snapshot.
     const handoff = controller.captureHandoff(startedAt);
     startResolvedMotion(buildStartFromState(state, handoff.velocity), startedAt);
   }, [

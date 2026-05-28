@@ -19,11 +19,6 @@ export interface WidgetDiagnosticInput {
   scaleFactor: unknown;
 }
 
-/**
- * Audit PaginationWidget props. Each entry fires when the *resolved* value
- * (default-substituted if `undefined`) is out of its expected domain. The
- * runtime uses the same value either way — Diagnostics only describes it.
- */
 export const collectWidgetWarnings = (
   input: WidgetDiagnosticInput,
 ): CarouselDiagnosticWarning[] => {

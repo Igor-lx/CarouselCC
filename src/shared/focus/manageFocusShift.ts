@@ -7,12 +7,6 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(",");
 
-/**
- * Move focus into the active band when the current focus has been hidden
- * inside an `inert` subtree. Used after a carousel settle. The function is
- * intentionally generic: it expects a container scope and a `data-active-zone`
- * marker on the in-band element.
- */
 export const manageFocusShift = (container: HTMLElement | null): void => {
   if (!container) return;
   const active = document.activeElement as HTMLElement | null;

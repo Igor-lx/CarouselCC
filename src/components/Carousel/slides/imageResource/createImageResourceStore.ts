@@ -30,15 +30,6 @@ const createEntry = (): ImageEntry => ({
   snapshot: LOADING_SNAPSHOT,
 });
 
-/**
- * Creates a compact per-URL image status store.
- *
- * The store intentionally does not create offscreen `Image()` objects, does not
- * call `decode()`, and does not schedule browser work ahead of mounted `<img>`
- * elements. Browser image loading remains browser-owned. This layer only
- * provides the product contract that is still useful for a carousel with cloned
- * slides: one render status and one capped retry policy per URL.
- */
 export function createImageResourceStore(): ImageResourceStore {
   const entries = new Map<string, ImageEntry>();
   const listeners = new Map<string, Set<() => void>>();

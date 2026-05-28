@@ -1,7 +1,6 @@
 import { useCallback, useRef } from "react";
 
 import { useIsomorphicLayoutEffect } from "../../../../shared";
-import { traceCarousel } from "../../debug/performanceTrace";
 import type { VisualPositionSource } from "../../position";
 import {
   DOT_OPACITY_EPSILON,
@@ -146,7 +145,6 @@ export function usePaginationWidgetBinding({
       const floorId = Math.floor(visualOffset);
       const ceilId = Math.ceil(visualOffset);
       const cache = activeDotCacheRef.current;
-      let changedProperties = 0;
 
       for (let index = 0; index < ACTIVE_DOT_COUNT; index += 1) {
         const dot = activeDotRefs.current[index];
@@ -169,11 +167,9 @@ export function usePaginationWidgetBinding({
 
         if (transformChanged) {
           dot.style.transform = toTransform(x, scale);
-          changedProperties += 1;
         }
         if (opacityChanged) {
           dot.style.opacity = String(opacity);
-          changedProperties += 1;
         }
 
         if (last === null) cache[index] = { x, scale, opacity };
@@ -185,8 +181,6 @@ export function usePaginationWidgetBinding({
           if (opacityChanged) last.opacity = opacity;
         }
       }
-
-      return changedProperties;
     },
     [geometry],
   );
@@ -195,7 +189,6 @@ export function usePaginationWidgetBinding({
     (visualOffset: number) => {
       const firstId = Math.round(visualOffset) - side;
       const cache = dotCacheRef.current;
-      let changedProperties = 0;
 
       for (let index = 0; index < slotCount; index += 1) {
         const dot = dotRefs.current[index];
@@ -211,11 +204,9 @@ export function usePaginationWidgetBinding({
 
         if (transformChanged) {
           dot.style.transform = toTransform(state.x, state.scale);
-          changedProperties += 1;
         }
         if (opacityChanged) {
           dot.style.opacity = String(state.opacity);
-          changedProperties += 1;
         }
         if (last === null) {
           cache[index] = {
@@ -233,14 +224,7 @@ export function usePaginationWidgetBinding({
         }
       }
 
-      changedProperties += writeActiveProjection(visualOffset);
-      if (changedProperties === 0) return;
-
-      traceCarousel("paginationWidget:write", {
-        changedProperties,
-        slotCount,
-        visualOffset,
-      });
+      writeActiveProjection(visualOffset);
     },
     [geometry, side, slotCount, writeActiveProjection],
   );

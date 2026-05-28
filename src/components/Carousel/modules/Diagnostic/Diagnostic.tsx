@@ -1,6 +1,5 @@
 import { memo, useEffect, useMemo } from "react";
 
-import { traceCarousel } from "../../debug/performanceTrace";
 import { useCarouselDiagnosticContext } from "../../context";
 import type { CarouselSlotComponent } from "../../slots";
 import {
@@ -24,21 +23,16 @@ const DiagnosticBase = memo(function CarouselDiagnostic() {
     console.info(BANNER);
   }, []);
 
-  const warnings = useMemo<CarouselDiagnosticWarning[]>(() => {
-    const startedAt = performance.now();
-    const next = [
+  const warnings = useMemo<CarouselDiagnosticWarning[]>(
+    () => [
       ...collectPropWarnings(props),
       ...collectConstantWarnings(),
       ...collectLayoutWarnings(layout),
       ...collectSlotWarnings(slots),
       ...collectStateWarnings(state),
-    ];
-    traceCarousel("diagnostic:collect", {
-      duration: performance.now() - startedAt,
-      warnings: next.length,
-    });
-    return next;
-  }, [layout, props, slots, state]);
+    ],
+    [layout, props, slots, state],
+  );
 
   useGroupedWarnings(warnings);
 

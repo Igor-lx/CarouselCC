@@ -60,11 +60,6 @@ const subscribe = (callback: () => void) => {
 const getSnapshot = () => current;
 const getServerSnapshot = (): Breakpoint => "MOBILE";
 
-/**
- * Resolves a value for the active breakpoint. Backed by
- * `useSyncExternalStore`, which handles the SSR/hydration snapshot split
- * natively via `getServerSnapshot` — no manual mount gate needed.
- */
 export function useBreakpoint<T>(values: Partial<Record<Breakpoint, T>> & { DEFAULT: T }): T {
   const active = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   return values[active] ?? values.DEFAULT;

@@ -1,11 +1,6 @@
 import type { CarouselLayout } from "../domain";
 import type { CarouselRuntimeConfig } from "../config";
 
-/**
- * What initiated the current motion. A real reason is always carried by the
- * command that starts a step; `null` is the pre-action initial state, before
- * the carousel has moved for any reason.
- */
 export type MoveReason = "click" | "gesture" | "autoplay";
 
 export type MotionPhase =
@@ -31,29 +26,10 @@ export interface CarouselState {
   targetPageIndex: number;
   fromVirtualIndex: number;
   virtualIndex: number;
-  /**
-   * Final virtual position of a far GO_TO after its bounded preflight. While
-   * set, `virtualIndex` is the bounded preflight landing and `targetPageIndex`
-   * already names the final logical destination. Kept bounded on purpose: the
-   * render window is built from `virtualIndex`, so the far target must not
-   * leak into it before the teleport. `null` for every non-teleport step.
-   */
   teleportVirtualIndex: number | null;
-  /**
-   * True for the post-teleport approach segment of a far GO_TO. Selects the
-   * approach slice of the GO_TO profile: it enters at cruise speed and decays
-   * to rest at the final target.
-   */
   isTeleportApproach: boolean;
-  /**
-   * True when this segment was started by a click that arrived while the
-   * carousel was already moving in the same direction. It selects the fast
-   * acceleration profile for the bounded visual-lookahead target and decays
-   * to zero speed at that target.
-   */
   isRepeatedClickAdvance: boolean;
   motionPhase: MotionPhase;
-  /** `null` until the carousel first moves; a concrete reason thereafter. */
   moveReason: MoveReason | null;
   gesture: GestureRelease;
 }
@@ -94,15 +70,6 @@ export interface EndDragCommand extends VirtualIndexSource {
 
 export interface MotionSettledCommand {
   type: "MOTION_SETTLED";
-  /**
-   * The visual position where the controller actually settled.
-   *
-   * Between the RAF tick that settles a segment and the reducer turn that
-   * handles MOTION_SETTLED, another click may already have replaced
-   * `state.virtualIndex` with a later target. The reducer needs the settled
-   * position to distinguish "the current target finished" from "an older
-   * target finished while a newer one is already pending".
-   */
   settledPosition: number;
 }
 

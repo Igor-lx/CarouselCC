@@ -24,11 +24,6 @@ interface UseCarouselMotionExecutionResult {
   autoplayMotionDuration: number;
 }
 
-/**
- * Post-state motion orchestration. Keeps autoplay-pagination duration and
- * settle-feedback mechanics out of the composition root while the runner
- * remains the sole state -> segment -> controller bridge.
- */
 export function useCarouselMotionExecution({
   state,
   config,

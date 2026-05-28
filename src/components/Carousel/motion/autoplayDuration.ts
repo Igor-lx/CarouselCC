@@ -20,14 +20,6 @@ const shouldPublishAutoplayDuration = (
   state.motionPhase !== "idle" &&
   state.motionPhase !== "dragging";
 
-/**
- * Render-time duration used by pagination modules for autoplay dot sync.
- *
- * Autoplay commands are scheduled only from an idle carousel, so the reducer's
- * `fromVirtualIndex` is the canonical origin and residual velocity is zero.
- * Keeping this as pure derived data avoids a one-commit delay where pagination
- * would otherwise see the new target with the previous segment duration.
- */
 export const resolveAutoplayMotionDuration = ({
   state,
   config,

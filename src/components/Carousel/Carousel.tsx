@@ -4,7 +4,6 @@ import styles from "./Carousel.module.scss";
 import {
   mergeStyleMaps,
   resolveSlots,
-  useIsomorphicLayoutEffect,
   useViewportVisibility,
 } from "../../shared";
 import { CAROUSEL_DEFAULTS, useCarouselConfig } from "./config";
@@ -22,7 +21,6 @@ import { useCarouselMotionExecution } from "./motion";
 import { useCarouselNavigation } from "./navigation";
 import { useVisualPosition } from "./position";
 import { useModuleRenderPolicy } from "./render-policy/useModuleRenderPolicy";
-import { traceCarousel } from "./debug/performanceTrace";
 import {
   SlideItem,
   useCarouselSlideDeck,
@@ -80,20 +78,12 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     ref,
   } = props;
 
-  // --- environment (injected, never self-detected) --------------------------
-  // The carousel is a pure function of its props: it does not read matchMedia
-  // / navigator itself. The host supplies the environment via `userEnvironment`
-  // (see `useUserEnvironment` in `shared`). An unset signal resolves to `false`
-  // — full motion, desktop behaviour, eager buffered-image loading — and the omission is
-  // surfaced by the Diagnostic slot rather than silently repaired.
   const isInstantMode = userEnvironment?.reducedMotion ?? false;
   const isTouch = userEnvironment?.touch ?? false;
   const isDataSaverEnabled = userEnvironment?.dataSaver ?? false;
 
-  // --- slots ----------------------------------------------------------------
   const slots = useMemo(() => resolveSlots(children, CAROUSEL_SLOTS), [children]);
 
-  // --- resolved runtime config (no diagnostic dependency) ------------------
   const config = useCarouselConfig({
     visibleSlidesNr,
     durationAutoplay,
@@ -103,7 +93,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     errAltPlaceholder,
   });
 
-  // --- slide deck + layout --------------------------------------------------
   const { records, layout, perfectPageLayoutInfo } = useCarouselSlideDeck({
     slidesData,
     visibleSlidesCount: config.visibleSlidesCount,
@@ -111,7 +100,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     isPagePaddingOn,
   });
 
-  // --- logical state machine ------------------------------------------------
   const { state, status, dispatch } = useCarouselState({
     layout,
     config,
@@ -119,19 +107,11 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   });
   const lastStatusSnapshotRef = useRef<CarouselStatusSnapshot | null>(null);
 
-  // --- boundary state -------------------------------------------------------
-  // One computed boundary state feeds both the module context and the public
-  // status snapshot, so external ref-buttons observe the same rule that the
-  // built-in <Controls> slot uses internally.
   const { isAtStart, isAtEnd } = useMemo(
     () => carouselBoundaryState(state.targetPageIndex, layout),
     [layout, state.targetPageIndex],
   );
 
-  // --- image-resource SSOT --------------------------------------------------
-  // The store exists only when the carousel renders image content; with
-  // `isContentImg` off it is `null` and no image machinery runs. It owns only
-  // per-URL render status and retry, while the browser owns loading/decode.
   const imageResourceStore = useImageResourceStoreInstance(isContentImg);
 
   const imageResourceUrls = useMemo(
@@ -143,10 +123,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     imageResourceStore?.prune(imageResourceUrls);
   }, [imageResourceStore, imageResourceUrls]);
 
-  // Read-only, low-frequency status reported to the host. Fires on mount and
-  // whenever the idle flag, target page, or page count changes — never on a
-  // per-frame motion sample. The target page (not the settled page) is
-  // reported, so the snapshot reflects intent immediately on click/gesture.
   useEffect(() => {
     if (!onCarouselStatusChange) return;
     const snapshot: CarouselStatusSnapshot = {
@@ -169,7 +145,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     isAtEnd,
   ]);
 
-  // --- visual position SSOT -------------------------------------------------
   const {
     source: visualPosition,
     controller,
@@ -178,7 +153,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     visibleSlidesCount: layout.visibleSlidesCount,
   });
 
-  // --- render model: virtual slides + render window -------------------------
   const { virtualSlides, renderWindowStart } = useSlideRenderModel({
     current: state.virtualIndex,
     previous: state.fromVirtualIndex,
@@ -188,11 +162,9 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     renderWindowBufferMultiplier: config.layout.renderWindowBufferMultiplier,
   });
 
-  // --- DOM refs --------------------------------------------------------------
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
 
-  // --- track DOM bridge -----------------------------------------------------
   const {
     readCurrentPosition,
     getSlotSize,
@@ -205,7 +177,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     visualPosition,
   });
 
-  // --- motion execution: state -> controller, autoplay duration signal -----
   const { autoplayMotionDuration } = useCarouselMotionExecution({
     state,
     config,
@@ -218,7 +189,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     cancelCompositorMotion,
   });
 
-  // --- navigation -----------------------------------------------------------
   const navigation = useCarouselNavigation({
     enabled: layout.canSlide,
     dispatch,
@@ -226,9 +196,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     onSlideClick,
   });
 
-  // --- imperative handle ----------------------------------------------------
-  // External prev/next control routes through the very same navigation
-  // pipeline as the built-in <Controls> — no second control path.
   useImperativeHandle(
     ref,
     () => ({
@@ -238,7 +205,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     [navigation.handlePrev, navigation.handleNext],
   );
 
-  // --- gesture --------------------------------------------------------------
   const { listeners: dragListeners } = useCarouselGesture({
     enabled: layout.canSlide,
     viewportRef,
@@ -251,13 +217,11 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     config,
   });
 
-  // --- visibility (for autoplay pause) -------------------------------------
   const visible = useViewportVisibility({
     elementRef: viewportRef,
     threshold: config.interaction.visibilityThreshold,
   });
 
-  // --- autoplay -------------------------------------------------------------
   const autoplayPaused = !visible || status.isDragging || status.isMoving;
   const { handleHoverChange } = useAutoplay({
     enabled: isAuto && layout.canSlide,
@@ -270,14 +234,12 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     onGoToStart: () => navigation.goTo(0, "autoplay"),
   });
 
-  // --- focus recovery after settle -----------------------------------------
   useFocusRecovery({
     containerRef: viewportRef,
     isIdle: status.isIdle,
     targetPageIndex: state.targetPageIndex,
   });
 
-  // --- module render policy & values ---------------------------------------
   const renderPolicy = useModuleRenderPolicy({
     controlsSlot: slots.controls,
     paginationSlot: slots.pagination,
@@ -301,12 +263,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     isDiagnosticActive: renderPolicy.shouldRenderDiagnostic,
   });
 
-  // --- diagnostic context ---------------------------------------------------
-  // Carries raw props + observable layout/slot state. The carousel uses the
-  // resolved runtime config regardless of this context — diagnostic data never
-  // feeds back into runtime. The three sub-views are memoised independently so
-  // a change in one (e.g. a slot toggle) leaves the others referentially
-  // stable.
   const diagnosticPropsView = useMemo(
     () => ({
       visibleSlidesNr,
@@ -362,11 +318,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     ],
   );
 
-  // Full effective `state` is forwarded as-is. It carries its own `layout`
-  // (CarouselState.layout), so the structural-invariant validator inside
-  // `<Diagnostic />` cannot receive a state/layout pair from different
-  // render turns. The other diagnostic sub-views (props/layout/slots) stay
-  // independently memoised so unrelated changes do not invalidate them.
   const diagnosticContextValue = useMemo(
     () => ({
       state,
@@ -377,7 +328,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     [diagnosticLayoutView, diagnosticPropsView, diagnosticSlotsView, state],
   );
 
-  // --- style mapping --------------------------------------------------------
   const classNames = useMemo(
     () => (className ? mergeStyleMaps(styles, className) : styles),
     [className],
@@ -395,19 +345,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     () => slideFlexStyle(layout.visibleSlidesCount),
     [layout.visibleSlidesCount],
   );
-
-  useIsomorphicLayoutEffect(() => {
-    traceCarousel("carousel:commit", {
-      fromVirtualIndex: state.fromVirtualIndex,
-      isMoving: status.isMoving,
-      motionPhase: state.motionPhase,
-      renderWindowStart,
-      targetPageIndex: state.targetPageIndex,
-      targetVirtualIndex: state.virtualIndex,
-      virtualSlideCount: virtualSlides.length,
-      visibleSlidesCount: layout.visibleSlidesCount,
-    });
-  });
 
   return (
     <CarouselModuleContext.Provider value={moduleContextValue}>

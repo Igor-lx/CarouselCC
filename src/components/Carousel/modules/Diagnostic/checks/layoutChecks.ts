@@ -4,10 +4,6 @@ import type { CarouselDiagnosticWarning } from "../types";
 const LAYOUT_LAYER = "Layout";
 const SLOT_LAYER = "Slots";
 
-/**
- * Slot attachment mismatch (LOGICAL): user asked for a Controls / Pagination
- * module but did not pass the corresponding child.
- */
 export const collectSlotWarnings = (
   slots: CarouselDiagnosticContextValue["slots"],
 ): CarouselDiagnosticWarning[] => {
@@ -40,10 +36,6 @@ export const collectSlotWarnings = (
   return out;
 };
 
-/**
- * Layout invariants (LOGICAL): partial page layout without padding, or the
- * deck cannot slide because of slide count vs. visibleSlidesNr.
- */
 export const collectLayoutWarnings = (
   layout: CarouselDiagnosticContextValue["layout"],
 ): CarouselDiagnosticWarning[] => {

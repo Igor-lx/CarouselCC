@@ -16,16 +16,6 @@ export interface DragReleaseTarget {
   isSnap: boolean;
 }
 
-/**
- * Decide the page target after a drag release.
- * - direction "left"/"right": commit by ±1 page from origin if possible;
- *   otherwise snap back to origin.
- * - direction "none": snap to the nearest page index based on the visual
- *   release position.
- *
- * The returned `isSnap` flag is `true` when the result is a passive snap
- * (no real navigation), which the runner uses to pick a snap-back curve.
- */
 export const resolveDragRelease = ({
   direction,
   releasePosition,

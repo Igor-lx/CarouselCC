@@ -9,8 +9,6 @@ import { buildInitialState } from "./initial";
 import { carouselReducer } from "./reducer";
 import type { CarouselCommand, CarouselState } from "./types";
 
-// --- test kit ---------------------------------------------------------------
-
 const config: CarouselRuntimeConfig = buildRawCarouselConfig({});
 
 const makeLayout = (
@@ -26,7 +24,6 @@ const makeLayout = (
   return buildCarouselLayout(buildSlideRecords(slides), visibleSlidesCount, isFinite);
 };
 
-/** Dispatch one command through the reducer with an explicit context. */
 const reduce = (
   state: CarouselState,
   command: CarouselCommand,
@@ -34,8 +31,6 @@ const reduce = (
   isInstantMode = false,
 ): CarouselState =>
   carouselReducer(state, { ...command, context: { layout, config, isInstantMode } });
-
-// --- tests ------------------------------------------------------------------
 
 describe("buildInitialState", () => {
   it("starts on page 0, idle, with no move reason", () => {
@@ -48,7 +43,7 @@ describe("buildInitialState", () => {
   });
 });
 describe("MOVE — cyclic", () => {
-  const layout = makeLayout(12, 3, false); // pageCount 4
+  const layout = makeLayout(12, 3, false);
 
   it("advances one page on MOVE(+1)", () => {
     const next = reduce(buildInitialState(layout), {
@@ -85,7 +80,7 @@ describe("MOVE — cyclic", () => {
   });
 });
 describe("MOVE — finite", () => {
-  const layout = makeLayout(12, 3, true); // pageCount 4, finite
+  const layout = makeLayout(12, 3, true);
 
   it("clamps and no-ops at the start boundary", () => {
     const next = reduce(buildInitialState(layout), {
@@ -117,7 +112,7 @@ describe("MOVE — finite", () => {
 
 describe("GO_TO", () => {
   it("jumps directly for a short span (no teleport)", () => {
-    const layout = makeLayout(12, 3, false); // pageCount 4
+    const layout = makeLayout(12, 3, false);
     const next = reduce(buildInitialState(layout), {
       type: "GO_TO",
       targetPageIndex: 2,
@@ -131,7 +126,7 @@ describe("GO_TO", () => {
   });
 
   it("splits a far span into a bounded preflight + pending teleport", () => {
-    const layout = makeLayout(30, 3, false); // pageCount 10
+    const layout = makeLayout(30, 3, false);
     const next = reduce(buildInitialState(layout), {
       type: "GO_TO",
       targetPageIndex: 5,
@@ -139,9 +134,8 @@ describe("GO_TO", () => {
       fromVirtualIndex: 0,
     });
     expect(next.targetPageIndex).toBe(5);
-    // preflight is bounded; the final target is parked in teleportVirtualIndex.
-    expect(next.virtualIndex).toBe(6); // preflight = 2 pages * stepSize 3
-    expect(next.teleportVirtualIndex).toBe(15); // final = 5 pages * stepSize 3
+    expect(next.virtualIndex).toBe(6);
+    expect(next.teleportVirtualIndex).toBe(15);
     expect(next.motionPhase).toBe("step-jump");
   });
 });
@@ -182,8 +176,8 @@ describe("MOTION_SETTLED", () => {
     });
     expect(approach.teleportVirtualIndex).toBeNull();
     expect(approach.isTeleportApproach).toBe(true);
-    expect(approach.virtualIndex).toBe(15); // final target
-    expect(approach.fromVirtualIndex).toBe(12); // one approach page (stepSize 3) before it
+    expect(approach.virtualIndex).toBe(15);
+    expect(approach.fromVirtualIndex).toBe(12);
     expect(approach.motionPhase).toBe("step-jump");
   });
 
@@ -214,12 +208,11 @@ describe("MOTION_SETTLED", () => {
       moveReason: "click",
       fromVirtualIndex: 0,
     });
-    // settle of an OLDER segment that finished at a different position.
     const reanchored = reduce(moving, {
       type: "MOTION_SETTLED",
       settledPosition: moving.virtualIndex - 3,
     });
-    expect(reanchored.motionPhase).toBe(moving.motionPhase); // still moving
+    expect(reanchored.motionPhase).toBe(moving.motionPhase);
     expect(reanchored.fromVirtualIndex).toBe(moving.virtualIndex - 3);
   });
 });

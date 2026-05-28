@@ -27,12 +27,6 @@ export const carouselEasingString = (
   }
 };
 
-/**
- * Parse a `cubic-bezier(...)` or `linear` string into a control-point record.
- * No clamping, no fallback: the caller is responsible for syntactically valid
- * input. A non-matching string yields a record of NaNs and downstream motion
- * math will visibly fail — the diagnostic layer surfaces the same issue.
- */
 const parseBezierString = (raw: string): CubicBezier => {
   if (raw.trim().toLowerCase() === "linear") return LINEAR;
   const match = BEZIER_REGEX.exec(raw);

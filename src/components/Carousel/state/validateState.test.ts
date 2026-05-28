@@ -22,7 +22,7 @@ const makeLayout = (
   return buildCarouselLayout(buildSlideRecords(slides), visibleSlidesCount, isFinite);
 };
 
-const layout = makeLayout(12, 3, false); // pageCount 4
+const layout = makeLayout(12, 3, false);
 const baseState: CarouselState = buildInitialState(layout);
 
 const kinds = (issues: CarouselStateIssue[]): string[] =>

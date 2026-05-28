@@ -16,11 +16,6 @@ const isNonNegativeFinite = (value: unknown): value is number =>
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
-/**
- * Audit the public props the user passed in. Each check fires only when the
- * prop was *explicitly* provided (an `undefined` prop is the public-default
- * contract and is not an error).
- */
 export const collectPropWarnings = (
   props: CarouselDiagnosticContextValue["props"],
 ): CarouselDiagnosticWarning[] => {
@@ -129,7 +124,6 @@ export const collectPropWarnings = (
 
 const ENVIRONMENT_LAYER = "Environment";
 
-/** Read one field of the untyped `userEnvironment` prop. */
 const readEnvironmentField = (environment: unknown, field: string): unknown =>
   typeof environment === "object" && environment !== null
     ? (environment as Record<string, unknown>)[field]
@@ -153,12 +147,6 @@ const ENVIRONMENT_FIELDS: ReadonlyArray<{ field: string; consequence: string }> 
   },
 ];
 
-/**
- * The carousel does not detect the environment itself — the host must inject
- * it via the `userEnvironment` prop (see `useUserEnvironment` in `shared`).
- * A missing object, or a missing field, is reported here rather than silently
- * defaulted, so the wiring gap is visible.
- */
 const collectEnvironmentWarnings = (
   environment: unknown,
 ): CarouselDiagnosticWarning[] => {

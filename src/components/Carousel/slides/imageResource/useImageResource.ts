@@ -27,12 +27,6 @@ const STATIC_CALLBACKS = Object.freeze({
   requestRetry: noop,
 });
 
-/**
- * Per-slide bridge to the compact image-resource store. The store is passed
- * explicitly from Carousel to SlideItem, keeping image state a local carousel
- * dependency rather than a hidden context read. Non-image slides and
- * `isContentImg={false}` short-circuit to a loaded snapshot with no subscription.
- */
 export function useImageResource(
   url: string | null,
   store: ImageResourceStore | null,

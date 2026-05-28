@@ -20,7 +20,6 @@ const makeLayout = (
   return buildCarouselLayout(buildSlideRecords(slides), visibleSlidesCount, isFinite);
 };
 
-/** A non-idle state to prove reconciliation collapses motion to a snap. */
 const movedState = (layout: CarouselLayout, targetPageIndex: number): CarouselState => ({
   ...buildInitialState(layout),
   targetPageIndex,
@@ -110,8 +109,8 @@ describe("reconcileStateToLayout — hard reset", () => {
 
 describe("reconcileStateToLayout — proportional remap", () => {
   it("maps the page proportionally and collapses motion to an instant snap", () => {
-    const before = makeLayout(12, 3, false); // pageCount 4
-    const after = makeLayout(12, 4, false); // same deck, pageCount 3
+    const before = makeLayout(12, 3, false);
+    const after = makeLayout(12, 4, false);
     const next = reconcileStateToLayout(movedState(before, 2), after);
     expect(next.motionPhase).toBe("step-instant");
     expect(next.targetPageIndex).toBeGreaterThanOrEqual(0);
@@ -141,8 +140,8 @@ describe("reconcileStateToLayout — idempotency (ADR-001 contract)", () => {
 
 describe("reconcileStateToLayout — recovery from a stuck phase", () => {
   it("lifts a dragging state out of the dragging phase when the deck collapses", () => {
-    const slidable = makeLayout(12, 3, false); // canSlide
-    const collapsed = makeLayout(12, 20, false); // visible >= length -> !canSlide
+    const slidable = makeLayout(12, 3, false);
+    const collapsed = makeLayout(12, 20, false);
     expect(collapsed.canSlide).toBe(false);
 
     const dragging: CarouselState = {

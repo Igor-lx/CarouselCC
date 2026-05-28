@@ -56,10 +56,6 @@ export function useCarouselGesture({
   );
 
   const startDragFromCurrentPosition = useCallback(() => {
-    // Called from two paths: `onPressStart` on a non-interactive surface
-    // (immediate motion cancel), and `onDragStart` for an interactive child
-    // once horizontal intent is recognised. The early return deduplicates the
-    // second path when the first has already initialised this drag.
     if (originPositionRef.current !== null) return;
 
     slotSizeRef.current = getSlotSize();
@@ -145,14 +141,6 @@ export function useCarouselGesture({
     [applyTrackPosition, dispatch, enabled, layout, offsetToPosition],
   );
 
-  // When the carousel becomes non-sliding (`enabled` flips false because a
-  // resize or slidesData replace collapsed the deck to a single page), the
-  // pointer-swipe listeners are torn down without ever delivering `onRelease`.
-  // The reducer recovers from the stale `dragging` phase on its own via layout
-  // reconciliation, but the adapter's drag-origin refs would otherwise stay
-  // pinned — and `startDragFromCurrentPosition` early-returns while
-  // `originPositionRef` is non-null, so the *next* drag would start from a
-  // stale origin. Clearing the refs here keeps a later drag correct.
   useEffect(() => {
     if (enabled) return;
     originPositionRef.current = null;

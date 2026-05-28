@@ -40,10 +40,6 @@ export function useCarouselState({
     [committedState, layout],
   );
 
-  // Layout / config / isInstantMode live in refs so the dispatcher reference
-  // stays stable across renders. The reducer reads them via the envelope;
-  // they are refreshed during render so a dispatch fired in the same commit
-  // still sees the latest values.
   const layoutRef = useRef(layout);
   const configRef = useRef(config);
   const instantRef = useRef(isInstantMode);

@@ -22,11 +22,6 @@ export const hasPartialPageLayout = (length: number, visibleSlidesCount: number)
   return length % effective !== 0;
 };
 
-/**
- * Pad the deck with clones drawn from the head so the total length is a
- * multiple of `visibleSlidesCount`. Used when `isPagePaddingOn` is true so
- * the last page is not visually short.
- */
 export const padDeckToFullPage = (
   records: CarouselSlideRecord[],
   visibleSlidesCount: number,

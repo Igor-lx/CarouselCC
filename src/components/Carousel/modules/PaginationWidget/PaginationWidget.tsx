@@ -25,8 +25,6 @@ const PaginationWidgetBase = memo(function PaginationWidget({
 }: PaginationWidgetProps) {
   const { intent, layout, status, visualPosition } = useCarouselModuleContext();
 
-  // When reduced motion is on, the binding has nothing to subscribe to and we
-  // render a static snapshot. Otherwise the binding mutates dots frame-by-frame.
   const isMotionBound = visualPosition !== null && !layout.isReducedMotion;
 
   const spatial = useMemo(

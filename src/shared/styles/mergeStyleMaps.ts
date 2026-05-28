@@ -1,10 +1,5 @@
 type StyleMap = Record<string, string>;
 
-/**
- * Combine multiple CSS module maps by concatenating class strings per key.
- * Used to overlay user-supplied class overrides on top of the component's
- * own module map without losing the originals.
- */
 export function mergeStyleMaps<T extends StyleMap>(
   ...maps: (Partial<T> | null | undefined)[]
 ): T {

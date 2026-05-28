@@ -1,11 +1,5 @@
 import type { SlideAriaProps } from "./types";
 
-/**
- * `isActual` is "this slide is inside the visible band right now".
- * `isActive` extends the band during motion to also include slides that were
- * visible at the start of the segment, so they stay interactive throughout
- * the transition.
- */
 export const slideVisibilityFlags = (
   virtualIndex: number,
   currentVirtualIndex: number,

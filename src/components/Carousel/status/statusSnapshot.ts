@@ -1,10 +1,5 @@
 import type { CarouselStatusSnapshot } from "../contract/types";
 
-/**
- * Shallow equality of two status snapshots. The `onCarouselStatusChange`
- * callback fires only when this returns `false`, so a status that did not
- * change never reaches the host.
- */
 export const areStatusSnapshotsEqual = (
   a: CarouselStatusSnapshot,
   b: CarouselStatusSnapshot,

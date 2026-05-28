@@ -15,14 +15,6 @@ export interface AutoplayApi {
   handleHoverChange: (hovering: boolean) => void;
 }
 
-/**
- * Drives the autoplay loop.
- * - The base `setTimeout` is suppressed while `enabled` is false, or
- *   `isPaused` is true, or the internal hover-pause is active.
- * - Hover-pause has a debounce so cursor jitter does not toggle the timer.
- * - On the final page in finite mode, the next step loops back via
- *   `onGoToStart` to make the loop visually continuous.
- */
 export function useAutoplay({
   enabled,
   isPaused,

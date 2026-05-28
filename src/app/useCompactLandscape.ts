@@ -36,12 +36,6 @@ const subscribe = (callback: () => void) => {
 const getSnapshot = () => isCompact;
 const getServerSnapshot = () => false;
 
-/**
- * Tracks the demo-specific "compact landscape" condition used to pick a
- * different visible-slides count and to fall back to desktop imagery. Shares
- * the `useSyncExternalStore` + module-store pattern of the other media-query
- * hooks (`useIsReducedMotion`, `useIsTouchDevice`, `useBreakpoint`).
- */
 export function useCompactLandscape(): boolean {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

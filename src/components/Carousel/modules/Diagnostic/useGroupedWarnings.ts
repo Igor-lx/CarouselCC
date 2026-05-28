@@ -2,11 +2,6 @@ import { useEffect, useRef } from "react";
 import { formatWarning, warningSignature } from "./formatter";
 import type { CarouselDiagnosticWarning } from "./types";
 
-/**
- * Emit a batch of diagnostic warnings to `console.warn`, deduped by signature
- * so React Strict Mode double-invocations and stable inputs do not produce
- * warning spam. DEV-only: production builds are silent.
- */
 export function useGroupedWarnings(warnings: CarouselDiagnosticWarning[]): void {
   const lastSignatureRef = useRef("");
 

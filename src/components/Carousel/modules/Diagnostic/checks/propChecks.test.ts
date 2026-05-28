@@ -5,7 +5,6 @@ import { collectPropWarnings } from "./propChecks";
 
 type DiagnosticProps = CarouselDiagnosticContextValue["props"];
 
-/** All public props undefined — the public-default contract, no warnings. */
 const baseProps = (overrides: Partial<DiagnosticProps> = {}): DiagnosticProps => ({
   visibleSlidesNr: undefined,
   durationAutoplay: undefined,

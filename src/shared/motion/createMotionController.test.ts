@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { createMotionController } from "./createMotionController";
 import type { MotionSegmentBase, MotionSegmentSampler } from "./types";
 
-/** Trivial linear curve, enough to exercise the controller's sampling. */
 const linearSampler: MotionSegmentSampler<MotionSegmentBase> = (
   segment,
   timestamp,
@@ -97,9 +96,9 @@ describe("captureHandoff", () => {
     const controller = createMotionController<string>(0, "idle");
     controller.start({ segment: segment(), sampler: linearSampler });
 
-    const handoff = controller.captureHandoff(500); // halfway through
+    const handoff = controller.captureHandoff(500);
     expect(handoff.position).toBeCloseTo(50);
-    expect(handoff.velocity).toBeCloseTo(0.1); // span 100 / duration 1000
+    expect(handoff.velocity).toBeCloseTo(0.1);
     expect(handoff.timestamp).toBe(500);
   });
 
@@ -139,7 +138,6 @@ describe("soft lifecycle", () => {
     controller.destroy();
     expect(controller.isActive()).toBe(false);
 
-    // A destroyed controller is a soft reset, not a brick: it can be reused.
     controller.start({ segment: segment({ from: 0, to: 200 }), sampler: linearSampler });
     expect(controller.isActive()).toBe(true);
     expect(controller.captureHandoff(500).position).toBeCloseTo(100);

@@ -30,9 +30,6 @@ const openSlide = (slide: Slide) => {
 
 export default function App() {
   const { toggleTheme, theme } = useTheme();
-  // One read of the user environment at the app boundary: used here for the
-  // responsive layout and forwarded whole into <Carousel> (which never detects
-  // the environment itself). The hook returns a memoised, stable object.
   const userEnvironment = useUserEnvironment();
   const isTouch = userEnvironment.touch;
   const isCompactLandscape = useCompactLandscape();
@@ -40,9 +37,6 @@ export default function App() {
   const [isAutoplay, setIsAutoplay] = useState(false);
   const [isInteractive, setIsInteractive] = useState(false);
 
-  // External control + status: the carousel is driven from a different part of
-  // the page through its imperative handle, and reports a low-frequency status
-  // snapshot ("page X of Y" + idle) back for the label.
   const carouselRef = useRef<CarouselHandle>(null);
   const [status, setStatus] = useState<CarouselStatusSnapshot | null>(null);
 

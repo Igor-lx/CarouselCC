@@ -2,7 +2,6 @@ import { useCallback, useMemo } from "react";
 
 import type { CarouselDispatch, MoveReason } from "../state";
 import type { Slide } from "../contract/types";
-import { traceCarousel } from "../debug/performanceTrace";
 
 interface UseCarouselNavigationInput {
   enabled: boolean;
@@ -30,7 +29,6 @@ export function useCarouselNavigation({
     (step: number, reason: MoveReason) => {
       if (!enabled) return;
       const fromVirtualIndex = readCurrentPosition();
-      traceCarousel("nav:move", { step, reason, fromVirtualIndex });
       dispatch({
         type: "MOVE",
         step,
@@ -45,7 +43,6 @@ export function useCarouselNavigation({
     (pageIndex: number, reason: MoveReason) => {
       if (!enabled) return;
       const fromVirtualIndex = readCurrentPosition();
-      traceCarousel("nav:goTo", { pageIndex, reason, fromVirtualIndex });
       dispatch({
         type: "GO_TO",
         targetPageIndex: pageIndex,

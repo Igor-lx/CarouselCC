@@ -2,10 +2,6 @@ import type { ResolvedPointerSwipeConfig } from "./types";
 
 const FRAME_BUDGET_MS = 1000 / 60;
 
-/**
- * Lower bound for the `1 - resistance` denominator in the stiffness term.
- * Keeps `applyResistance` finite as `resistance` approaches 1.
- */
 const MIN_RESISTANCE_DENOMINATOR = 0.001;
 
 export const safeResistance = (value: number) => Math.max(0, Math.min(1, value));

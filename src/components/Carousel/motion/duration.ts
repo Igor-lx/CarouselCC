@@ -31,14 +31,6 @@ interface ResolveEasingDurationInput {
   stepDuration: number;
 }
 
-/**
- * Resolve durations only for duration-authored bezier segments: the click
- * step, the autoplay step, the snap-back, and a non-inertial gesture release.
- *
- * Profile segments are intentionally absent from this resolver - repeated
- * click, inertial gesture release, and every GO_TO / teleport segment own a
- * speed model that derives duration from distance + zone speeds.
- */
 export const resolveEasingDuration = ({
   motionPhase,
   moveReason,

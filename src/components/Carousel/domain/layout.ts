@@ -49,12 +49,6 @@ export const buildCarouselLayout = (
   };
 };
 
-/**
- * Reconstructs the virtual index for a page so that it stays on the same
- * cyclic "lane" as the reference virtual index. Used when navigating to a
- * page index that may live on a different cycle than the current motion
- * origin.
- */
 export const alignedVirtualIndex = (
   pageIndex: number,
   referenceVirtualIndex: number,

@@ -82,9 +82,6 @@ export function usePointerSwipe({
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
-  // The full pointer phase is internal and synchronous. The carousel reducer
-  // owns public dragging state, so pointer bookkeeping never re-renders React
-  // by itself.
   const phaseRef = useRef<PointerSwipePhase>("idle");
 
   const lockUntilRef = useRef(0);
@@ -114,7 +111,6 @@ export function usePointerSwipe({
       target.setPointerCapture(pointerId);
       gesture.hasCapture = true;
     } catch {
-      // capture lost between events — ignore
     }
   }, []);
 
@@ -189,7 +185,6 @@ export function usePointerSwipe({
         try {
           target.releasePointerCapture(gesture.pointerId);
         } catch {
-          // already released — ignore
         }
         gesture.hasCapture = false;
       }

@@ -61,7 +61,6 @@ const isNonNegativeInteger = (v: number) => v >= 0 && Number.isInteger(v);
 const isPositiveInteger = (v: number) => v > 0 && Number.isInteger(v);
 
 const numericRules: NumericRule[] = [
-  // Motion timings / factors
   {
     layer: "Motion",
     field: "SNAP_BACK_DURATION",
@@ -137,7 +136,6 @@ const numericRules: NumericRule[] = [
     predicate: inRangeInclusive(0, 1),
   },
 
-  // Epsilons (must be small positive)
   {
     layer: "Motion",
     field: "MOTION_EPSILON",
@@ -157,7 +155,6 @@ const numericRules: NumericRule[] = [
     predicate: greaterThan(0),
   },
 
-  // Layout
   {
     layer: "Layout",
     field: "RENDER_WINDOW_BUFFER_MULTIPLIER",
@@ -195,7 +192,6 @@ const numericRules: NumericRule[] = [
     predicate: isPositiveInteger,
   },
 
-  // Interaction
   {
     layer: "Interaction",
     field: "HOVER_PAUSE_DELAY",
@@ -224,7 +220,6 @@ const numericRules: NumericRule[] = [
     predicate: inRangeInclusive(0, 1),
   },
 
-  // Gesture (swipe config)
   {
     layer: "Gesture",
     field: "CAROUSEL_SWIPE_CONFIG.cooldownMs",
@@ -316,7 +311,6 @@ const numericRules: NumericRule[] = [
     predicate: inRangeExclusiveLower(0, 1),
   },
 
-  // Release config
   {
     layer: "Gesture",
     field: "CAROUSEL_INERTIAL_RELEASE_CONFIG.inertiaBoost",
@@ -437,10 +431,6 @@ const collectRetryDelayRelation = (): CarouselDiagnosticWarning | null => {
   };
 };
 
-/**
- * Audit every hand-written carousel constant used at runtime. The constants
- * are imported by value so the checks always see what the runtime sees.
- */
 export const collectConstantWarnings = (): CarouselDiagnosticWarning[] => {
   const out: CarouselDiagnosticWarning[] = [];
   for (const rule of numericRules) {

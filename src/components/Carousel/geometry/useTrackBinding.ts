@@ -7,7 +7,6 @@ import {
 } from "../domain";
 import { useIsomorphicLayoutEffect } from "../../../shared";
 import type { VisualPositionSource } from "../position";
-import { traceCarousel } from "../debug/performanceTrace";
 
 const RESIZE_EPSILON_PX = 0.5;
 
@@ -42,26 +41,10 @@ export interface TrackCompositorMotionOptions {
 export interface TrackBindingApi {
   readCurrentPosition: () => number;
   getSlotSize: () => number;
-  /**
-   * Attempts to present a plain easing translation through WAAPI. Returns
-   * `false` when the platform or current geometry cannot support compositor
-   * motion, so the motion runner can keep the JS-driven path.
-   */
   startCompositorMotion: (options: TrackCompositorMotionOptions) => boolean;
-  /**
-   * Stops a running compositor animation and pins the track to `position` when
-   * provided. Omitting `position` freezes at the currently painted transform.
-   */
   cancelCompositorMotion: (position?: number) => void;
 }
 
-/**
- * Wires the track DOM to the visual position source. Owns the slot-size
- * measurement (ResizeObserver + window resize) and the transform write
- * (subscribes to the visual position and mutates `transform` directly).
- * Returns a small imperative API used by the gesture adapter and the
- * navigation controller.
- */
 export function useTrackBinding({
   trackRef,
   renderWindowStart,
@@ -137,14 +120,6 @@ export function useTrackBinding({
 
       track.style.transform = transform;
       lastTransformRef.current = transform;
-
-      traceCarousel("track:write", {
-        changed: true,
-        position,
-        renderWindowStart: renderWindowStartRef.current,
-        slotSize: slotSizeRef.current,
-        source,
-      });
     },
     [resolveTransform, trackRef],
   );
@@ -216,14 +191,7 @@ export function useTrackBinding({
             fill: "both",
           },
         );
-      } catch (error) {
-        traceCarousel("track:compositor-fallback", {
-          duration,
-          easing,
-          error: error instanceof Error ? error.message : String(error),
-          from,
-          to,
-        });
+      } catch {
         return false;
       }
 
@@ -241,14 +209,6 @@ export function useTrackBinding({
         }
       };
 
-      traceCarousel("track:compositor-start", {
-        duration,
-        easing,
-        from,
-        renderWindowStart: renderWindowStartRef.current,
-        to,
-      });
-
       return true;
     },
     [cancelCompositorMotion, trackRef],
@@ -256,19 +216,11 @@ export function useTrackBinding({
 
   const syncGeometry = useCallback(
     (width?: number) => {
-      traceCarousel("track:syncGeometry:start", {
-        renderWindowStart: renderWindowStartRef.current,
-        width,
-      });
       const currentPosition =
         readCompositorPosition() ?? visualPosition.getSnapshot().position;
       cancelCompositorMotion(currentPosition);
       measure(width);
       writePosition(currentPosition, "geometry");
-      traceCarousel("track:syncGeometry:end", {
-        renderWindowStart: renderWindowStartRef.current,
-        slotSize: slotSizeRef.current,
-      });
     },
     [
       cancelCompositorMotion,
@@ -279,8 +231,6 @@ export function useTrackBinding({
     ],
   );
 
-  // CSS transitions would double-animate both JS-sampled and WAAPI-driven
-  // transform writes. Disable them once; compositor motion is explicit.
   useIsomorphicLayoutEffect(() => {
     const track = trackRef.current;
     if (track) track.style.transition = "none";

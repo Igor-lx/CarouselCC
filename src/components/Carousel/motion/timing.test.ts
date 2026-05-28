@@ -56,7 +56,6 @@ describe("resolveGoToApproachDistance", () => {
 
 describe("resolveGoToPlan", () => {
   const stepSize = 3;
-  // preflight = 2 pages, approach = 1 page -> a jump within 3 pages is direct.
   const visibleTeleportSpan = motion.goToPreflightPageSpan + motion.goToFinalApproachPageSpan;
 
   it("animates the whole distance for a short jump (no teleport)", () => {
@@ -76,7 +75,6 @@ describe("resolveGoToPlan", () => {
       expect(plan.isTeleport).toBe(true);
       expect(plan.leadDistance).toBe(motion.goToPreflightPageSpan * stepSize);
       expect(plan.approachDistance).toBe(motion.goToFinalApproachPageSpan * stepSize);
-      // preflight + teleport + approach must cover the whole real distance.
       expect(plan.leadDistance + plan.teleportDistance + plan.approachDistance).toBe(
         realDistance,
       );

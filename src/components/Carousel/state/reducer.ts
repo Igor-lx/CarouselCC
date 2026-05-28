@@ -14,18 +14,7 @@ import {
   type ReducerEnvelope,
 } from "./types";
 
-/**
- * ADR-001 — layout reconciliation has one pure rule and two boundaries.
- *
- * `CarouselLayout` is derived from props that change in the render phase
- * without any dispatch (viewport resize, `slidesData` replace, `isFinite`
- * toggle). `useCarouselState` projects the committed reducer state through
- * `reconcileStateToLayout` during render, so runtime consumers immediately see
- * a state/layout pair for the live layout even when no command was dispatched.
- * This reducer applies the same pure reconciler at the command boundary, so
- * the physical transition also starts from the live layout. There is one
- * reconciliation rule and no layout-effect catch-up command.
- */
+// ADR-001
 
 const dragReleasePhase = (
   command: EndDragCommand,
@@ -138,9 +127,6 @@ export function carouselReducer(
         nextVirtualIndex === synced.virtualIndex;
 
       if (isNoop) {
-        // Boundary no-ops hold the current phase. Same-direction repeat no-ops
-        // can still refresh the live origin and fast profile while the visual
-        // has not crossed into the next page yet.
         return {
           ...synced,
           fromVirtualIndex: nextFromVirtualIndex,
@@ -179,8 +165,6 @@ export function carouselReducer(
         context.config.motion.epsilon;
 
       if (targetChanged) {
-        // A newer click already replaced the target while this segment was
-        // settling - re-anchor to where it actually settled, keep motion.
         return {
           ...synced,
           fromVirtualIndex: settledPosition,
@@ -192,9 +176,6 @@ export function carouselReducer(
       }
 
       if (synced.teleportVirtualIndex !== null) {
-        // A far GO_TO's bounded preflight just settled. Teleport across the
-        // un-rendered middle and start the fixed approach from a bounded
-        // origin, so the render window never spans the full jump.
         const direction = Math.sign(
           synced.teleportVirtualIndex - settledPosition,
         );
@@ -217,7 +198,6 @@ export function carouselReducer(
           };
         }
 
-        // Degenerate: the final target coincides with the preflight landing.
         return {
           ...synced,
           fromVirtualIndex: synced.teleportVirtualIndex,

@@ -1,10 +1,5 @@
 export interface InertialReleaseConfig {
-  /** Multiplier applied to the raw release velocity before clamping. */
   inertiaBoost: number;
-  /**
-   * Fraction of the remaining distance dedicated to smooth deceleration into
-   * the target after the inertial fast segment.
-   */
   decelerationDistanceShare: number;
 }
 
@@ -26,11 +21,6 @@ interface ResolveReleaseInput {
   config: InertialReleaseConfig;
 }
 
-/**
- * Resolve the speed intent of an inertial release. Inputs are trusted —
- * the caller is responsible for finite, in-range values. The function performs
- * algorithmic math only.
- */
 export function resolveInertialRelease({
   gestureReleaseVelocity,
   distanceToTarget,

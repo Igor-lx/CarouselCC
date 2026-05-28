@@ -43,9 +43,6 @@ const subscribe = (callback: () => void) => {
       mediaQuery.removeEventListener("change", onMediaChange);
       window.removeEventListener("pointerdown", onPointerDown);
       mediaQuery = null;
-      // Reset to the declared initial state so a later re-subscribe starts
-      // clean, mirroring `useDataSaver`'s teardown. The next `subscribe` re-
-      // reads `matchMedia`, so this only governs the no-listener gap.
       isTouch = false;
     }
   };
@@ -54,11 +51,6 @@ const subscribe = (callback: () => void) => {
 const getSnapshot = () => isTouch;
 const getServerSnapshot = () => false;
 
-/**
- * Reports whether the device is touch-first. Backed by `useSyncExternalStore`,
- * which handles the SSR/hydration snapshot split natively via
- * `getServerSnapshot` — no manual mount gate needed.
- */
 export function useIsTouchDevice(): boolean {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

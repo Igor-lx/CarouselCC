@@ -14,8 +14,6 @@ describe("resolvePaginationInstantSync", () => {
   });
 
   it("delays an autoplay move regardless of how it travels (step or loop-back jump)", () => {
-    // The finite-mode loop-back is an autoplay GO_TO; it must observe the same
-    // delay as an ordinary autoplay step — there is no jump-specific override.
     expect(resolvePaginationInstantSync("autoplay", false)).toBe(false);
   });
 

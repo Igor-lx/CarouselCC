@@ -28,12 +28,6 @@ const finishSentence = (message: string) => {
   return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
 };
 
-/**
- * Build the canonical warning line shared by every diagnostic check.
- *
- *   [Carousel Diagnostic][SEVERITY] <Layer> -> <field> has value <actual>.
- *   <expected>. <consequence>. Diagnostics is observe-only.
- */
 export const formatWarning = (warning: CarouselDiagnosticWarning): string =>
   [
     `[${BANNER}][${warning.severity}] ${warning.layer} -> ${warning.field}`,
@@ -46,7 +40,6 @@ export const formatWarning = (warning: CarouselDiagnosticWarning): string =>
     TRAILER,
   ].filter(Boolean).join(" ");
 
-/** Deterministic signature for dedupe / cache. */
 export const warningSignature = (warning: CarouselDiagnosticWarning): string =>
   [
     warning.severity,

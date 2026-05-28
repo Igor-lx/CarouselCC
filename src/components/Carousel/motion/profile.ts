@@ -24,11 +24,6 @@ export interface MotionProfileInput {
   decelerationDistanceShare: number;
 }
 
-/**
- * Lower bound for the average speed used to compute zone duration. Avoids
- * a 0-divide singularity in `distance / averageSpeed`; not a substitution
- * for an invalid input.
- */
 const MIN_PROFILE_SPEED = 1e-6;
 const OVERALLOCATED_PROFILE_SHARE = 0.5;
 const smoothstep = (progress: number) => progress * progress * (3 - 2 * progress);

@@ -34,11 +34,6 @@ const subscribe = (callback: () => void) => {
 const getSnapshot = () => isReduced;
 const getServerSnapshot = () => false;
 
-/**
- * Reports the `prefers-reduced-motion` setting. Backed by
- * `useSyncExternalStore`, which handles the SSR/hydration snapshot split
- * natively via `getServerSnapshot` — no manual mount gate needed.
- */
 export function useIsReducedMotion(): boolean {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

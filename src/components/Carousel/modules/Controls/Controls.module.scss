@@ -1,8 +1,4 @@
 @layer components {
-  // Sizing tokens. Both the non-touch button (centred in an 8%-wide
-  // hover/focus strip) and the touch zone (which *is* the button) read these
-  // four custom properties. Each breakpoint overrides only the tokens; the
-  // rules that consume them never change.
   .navZone {
     --nav-button-w: 45px;
     --nav-button-h: 45px;
@@ -58,7 +54,6 @@
     }
   }
 
-  // Touch: the zone *is* the button, vertically centred.
   [data-touch="true"] .navZone {
     top: 50%;
     width: var(--nav-button-w);
@@ -85,8 +80,6 @@
     transition: none;
   }
 
-  // Scale the tokens per breakpoint — one source of truth each.
-  // Tablet / small desktop: a tall pill, easier to hit by thumb.
   @media (width <= 1024px) {
     .navZone {
       --nav-button-w: 48px;
@@ -96,7 +89,6 @@
     }
   }
 
-  // Mobile portrait: smaller pill, tighter to the edge.
   @media (width <= 767px) {
     .navZone {
       --nav-button-w: 40px;
@@ -106,8 +98,6 @@
     }
   }
 
-  // Compact landscape (low-height handhelds): shorter pill that never
-  // exceeds the viewport edge-to-edge.
   @media (orientation: landscape) and (height <= 520px) {
     .navZone {
       --nav-button-w: 36px;
@@ -117,12 +107,6 @@
     }
   }
 
-  // Desktop: reveal the 8%-wide strip on viewport hover or keyboard focus.
-  // `:focus-visible` (not `:focus-within`) is deliberate — `:focus-within`
-  // matches the focus that lands on a `<button>` zone after a mouse click,
-  // so the zones would stay opaque/clickable until the user clicked outside
-  // the carousel. `:focus-visible` only matches keyboard / programmatic
-  // focus, which is what the reveal should track on desktop.
   [data-touch="false"] [data-carousel-viewport]:has(*:focus-visible) .navZone,
   [data-touch="false"] [data-carousel-viewport]:hover .navZone {
     opacity: 1;

@@ -16,16 +16,6 @@ import type {
 
 const REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES = 2;
 
-/**
- * Picks the page cursor and virtual lane for the next step.
- *
- * Default path: `targetPageIndex` is the logical cursor. During in-flight
- * motion it already names the pending destination; while idle it names the
- * settled page.
- *
- * Same-direction repeated click: the cursor is derived from the live visual
- * sample, so rapid clicks stay bounded by what the user can actually see.
- */
 const stepOrigin = (
   state: CarouselState,
   fromVirtualIndex: number,
@@ -66,10 +56,6 @@ interface StepResolution {
   nextFromVirtualIndex: number;
   nextTargetPageIndex: number;
   nextVirtualIndex: number;
-  /**
-   * Final virtual position of a far GO_TO, or `null` for a step that does not
-   * teleport. When set, `nextVirtualIndex` is the bounded preflight landing.
-   */
   nextTeleportVirtualIndex: number | null;
   phase: MotionPhase;
 }
@@ -126,15 +112,10 @@ export const resolveStepTransition = (
       : normalizePageIndex(currentPageIndex + pageDelta, layout.pageCount);
   }
 
-  // The full visual destination, before any teleport bounding is applied.
   const canonicalVirtualIndex = layout.isFinite
     ? pageStart(nextTargetPageIndex, stepSize)
     : currentVirtualIndex + pageDelta * stepSize;
 
-  // A GO_TO over a long span animates a bounded preflight, teleports the
-  // middle, then animates a fixed approach near the final target.
-  // `virtualIndex` is kept at the preflight landing on purpose - the render
-  // window is built from it, so it must not name the far target.
   const goToPlan =
     command.type === "GO_TO" && !command.isInstant && !isInstantMode
       ? resolveGoToPlan(Math.abs(pageDelta), stepSize, motion)
@@ -154,13 +135,6 @@ export const resolveStepTransition = (
   };
 };
 
-/**
- * A repeated click is a MOVE click that arrives while the carousel is already
- * animating in the same direction. It selects the fast motion profile and
- * retargets to two pages ahead of the live visual page, so a click burst can
- * extend motion as the visual crosses page boundaries without building an
- * unbounded command queue.
- */
 export const isSameDirectionRepeat = (
   state: CarouselState,
   step: number,

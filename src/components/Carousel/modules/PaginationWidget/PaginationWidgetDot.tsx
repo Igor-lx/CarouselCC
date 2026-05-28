@@ -7,9 +7,6 @@ interface PaginationWidgetDotProps {
 export const PaginationWidgetDot = memo(
   forwardRef<HTMLDivElement, PaginationWidgetDotProps>(
     function PaginationWidgetDot({ className }, ref) {
-      // Initial inline values keep the dot invisible until the binding
-      // writes the first frame. This avoids a flash of the un-projected
-      // dots when the widget first mounts.
       return (
         <div
           ref={ref}

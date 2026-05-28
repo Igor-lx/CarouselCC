@@ -55,13 +55,7 @@ interface BuildSegmentInput {
 }
 
 export interface BuildSegmentResult {
-  /** The segment to hand to the controller. */
   segment: CarouselSegment;
-  /**
-   * The segment's duration. Published by the runner as the autoplay-motion
-   * duration for the pagination dot delay; the controller derives its own
-   * timing from the segment.
-   */
   duration: number;
 }
 
@@ -80,13 +74,6 @@ const buildEasing = (
   easing: parseBezier(carouselEasingString(state.motionPhase, state.moveReason)),
 });
 
-/**
- * Fast acceleration profile for a repeated click - a same-direction click
- * that arrives while the carousel is already moving. The segment drives
- * straight to the reducer's bounded visual-lookahead target
- * (`state.virtualIndex`) and decays to zero speed; there is no intermediate
- * target and no chained follow-up.
- */
 const buildRepeatedProfile = (
   state: CarouselState,
   start: MotionStart,
@@ -149,20 +136,6 @@ const buildGestureProfile = (
 
 type GoToProfilePhase = "single" | "preflight" | "approach";
 
-/**
- * Builds one segment of the GO_TO speed profile.
- *
- * Acceleration and deceleration are local page-screen budgets, not shares of
- * the whole visible jump. A long jump therefore starts the same way as a short
- * one: accelerate inside the first page screen, cruise, teleport the hidden
- * middle, then cruise/decelerate inside the final page screen.
- *
- * - `single`    - a direct jump: acceleration lives in the first page screen,
- *   deceleration in the last page screen.
- * - `preflight` - the pre-teleport slice: local acceleration, then cruise.
- * - `approach`  - the post-teleport final page: cruise until the configured
- *   deceleration distance starts, then stop on target.
- */
 const buildGoToProfile = (
   state: CarouselState,
   start: MotionStart,
@@ -189,13 +162,11 @@ const buildGoToProfile = (
       absDistance > 0 ? zones.decelerationDistance / absDistance : 0;
     endSpeed = 0;
   } else {
-    // Each teleport slice re-expresses an absolute local page-screen budget as
-    // a share of that slice's own distance.
     if (phase === "preflight") {
       accelerationDistanceShare =
         absDistance > 0 ? zones.accelerationDistance / absDistance : 0;
       decelerationDistanceShare = 0;
-      endSpeed = peakSpeed; // hand the cruise speed to the approach segment
+      endSpeed = peakSpeed;
     } else {
       accelerationDistanceShare = 0;
       decelerationDistanceShare =

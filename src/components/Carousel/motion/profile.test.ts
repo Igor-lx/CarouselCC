@@ -48,7 +48,6 @@ describe("createMotionProfile", () => {
     });
     expect(profile.duration).toBeGreaterThan(0);
     expect(profile.zones.length).toBe(3);
-    // zones are laid out contiguously in distance-progress space.
     expect(profile.zones[0]!.startDistanceProgress).toBeCloseTo(0);
     expect(profile.zones[profile.zones.length - 1]!.endDistanceProgress).toBeCloseTo(1);
   });
@@ -67,7 +66,6 @@ describe("createMotionProfile", () => {
   });
 
   it("raises the resolved peak to cover start/end speeds", () => {
-    // peakSpeed below startSpeed must not invert the profile.
     const profile = createMotionProfile({
       distance: 100,
       startSpeed: 5,

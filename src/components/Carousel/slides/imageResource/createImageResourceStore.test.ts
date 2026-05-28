@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import {
   afterEach,
   beforeEach,
@@ -18,11 +17,18 @@ import type { ImageResourceStore } from "./types";
 let store: ImageResourceStore;
 
 beforeEach(() => {
+  vi.stubGlobal("window", {
+    clearTimeout: (...args: Parameters<typeof globalThis.clearTimeout>) =>
+      globalThis.clearTimeout(...args),
+    setTimeout: (...args: Parameters<typeof globalThis.setTimeout>) =>
+      globalThis.setTimeout(...args),
+  });
   store = createImageResourceStore();
 });
 
 afterEach(() => {
   store.dispose();
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
