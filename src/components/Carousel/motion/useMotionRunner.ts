@@ -6,6 +6,7 @@ import {
   type MotionSample,
 } from "../../../shared";
 import type { CarouselRuntimeConfig } from "../config";
+import type { TrackBindingApi } from "../geometry";
 import { traceCarousel } from "../debug/performanceTrace";
 import type { CarouselState } from "../state";
 import { bezierToCss } from "./bezier";
@@ -18,13 +19,6 @@ import type {
   MotionStart,
 } from "./types";
 
-interface TrackCompositorMotionOptions {
-  from: number;
-  to: number;
-  duration: number;
-  easing: string;
-}
-
 interface UseMotionRunnerInput {
   state: CarouselState;
   config: CarouselRuntimeConfig;
@@ -32,8 +26,8 @@ interface UseMotionRunnerInput {
   isInstantMode: boolean;
   isDragging: boolean;
   enabled: boolean;
-  startCompositorMotion?: (options: TrackCompositorMotionOptions) => boolean;
-  cancelCompositorMotion?: (position?: number) => void;
+  startCompositorMotion: TrackBindingApi["startCompositorMotion"];
+  cancelCompositorMotion: TrackBindingApi["cancelCompositorMotion"];
   /**
    * Called by the controller when a segment naturally settles. The argument
    * is the visual position where it settled, so the reducer can distinguish
@@ -45,9 +39,14 @@ interface UseMotionRunnerInput {
   onAutoplayDurationChange?: (duration: number) => void;
 }
 
-const now = () =>
+const now = (): number =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
 
+/**
+ * Only a plain `easing` step can be expressed as one CSS timing function and
+ * handed to WAAPI. Gesture / repeated-click / GO_TO profile segments carry
+ * velocity-authored shapes or teleport discontinuities and remain JS-sampled.
+ */
 const isCompositorTrackSegment = (
   segment: CarouselSegment,
 ): segment is EasingSegment => segment.strategy === "easing";
@@ -79,9 +78,9 @@ const buildStartFromState = (
  *
  * The controller remains the visual-position SSOT for gesture/profile math,
  * diagnostics, pagination, handoff, and settle. For plain easing movement the
- * track DOM may also run the same transform through WAAPI, allowing the deck
- * transform to stay on the compositor while the JS sampler keeps publishing
- * the authoritative numeric timeline to non-track subscribers.
+ * track DOM additionally runs the same transform through WAAPI, allowing the
+ * deck transform to stay on the compositor while the JS sampler keeps
+ * publishing the authoritative numeric timeline to non-track subscribers.
  *
  * Every segment - first click, repeated click, gesture release - drives
  * directly to `state.virtualIndex`. There is no intermediate destination and
@@ -140,27 +139,27 @@ export function useMotionRunner({
     lastKeyRef.current = key;
 
     if (!enabled) {
-      cancelCompositorMotion?.(state.virtualIndex);
+      cancelCompositorMotion(state.virtualIndex);
       onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, { strategy: "idle" });
       return;
     }
 
     if (state.motionPhase === "idle") {
-      cancelCompositorMotion?.(state.virtualIndex);
+      cancelCompositorMotion(state.virtualIndex);
       onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, { strategy: "idle" });
       return;
     }
 
     if (state.motionPhase === "dragging") {
-      cancelCompositorMotion?.(controller.getSnapshot().value);
+      cancelCompositorMotion(controller.getSnapshot().value);
       onAutoplayDurationCancel?.();
       return;
     }
 
     if (state.motionPhase === "step-instant") {
-      cancelCompositorMotion?.(state.virtualIndex);
+      cancelCompositorMotion(state.virtualIndex);
       onAutoplayDurationCancel?.();
       controller.snap(state.virtualIndex, {
         strategy: "idle",
@@ -176,7 +175,7 @@ export function useMotionRunner({
       const distance = state.virtualIndex - resolvedStart.position;
 
       if (Math.abs(distance) < config.motion.epsilon) {
-        cancelCompositorMotion?.(state.virtualIndex);
+        cancelCompositorMotion(state.virtualIndex);
         controller.snap(state.virtualIndex, {
           strategy: resolvedStart.strategy,
           velocity: resolvedStart.velocity,
@@ -208,16 +207,15 @@ export function useMotionRunner({
 
       const isComposited =
         isCompositorTrackSegment(segment) &&
-        (startCompositorMotion?.({
+        startCompositorMotion({
           from: segment.from,
           to: segment.to,
           duration: segment.duration,
           easing: bezierToCss(segment.easing),
-        }) ??
-          false);
+        });
 
       if (!isComposited) {
-        cancelCompositorMotion?.(resolvedStart.position);
+        cancelCompositorMotion(resolvedStart.position);
       }
 
       traceCarousel("motion:start", {
@@ -292,7 +290,7 @@ export function useMotionRunner({
 
   useEffect(
     () => () => {
-      cancelCompositorMotion?.(controller.getSnapshot().value);
+      cancelCompositorMotion(controller.getSnapshot().value);
       controller.cancel();
     },
     [cancelCompositorMotion, controller],

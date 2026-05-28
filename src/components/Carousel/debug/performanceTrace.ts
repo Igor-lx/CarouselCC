@@ -1,3 +1,12 @@
+/**
+ * Diagnostic-only carousel performance trace.
+ *
+ * Enabled only in development via `?carouselTrace` or
+ * `localStorage.carouselTrace === "1"`. Hot-path events stay in the in-memory
+ * buffer without User Timing marks, so the trace does not add mark pressure to
+ * per-RAF writes. Browser `paint` and `longtask` entries are mirrored into the
+ * same buffer when the platform supports them.
+ */
 export interface CarouselTraceEntry {
   name: string;
   timestamp: number;
@@ -18,12 +27,24 @@ const TRACE_STORAGE_KEY = "carouselTrace";
 const MARK_PREFIX = "carousel:";
 let observersStarted = false;
 
-const shouldWritePerformanceMark = (name: string) =>
-  !(
-    name === "visual:sample" ||
-    name === "track:write" ||
-    name === "paginationWidget:write"
-  );
+const HOT_PATH_EVENTS: ReadonlySet<string> = new Set([
+  "visual:sample",
+  "track:write",
+  "paginationWidget:write",
+]);
+
+const clearCarouselUserTiming = (): void => {
+  performance
+    .getEntriesByType("mark")
+    .forEach((entry) => {
+      if (entry.name.startsWith(MARK_PREFIX)) performance.clearMarks(entry.name);
+    });
+  performance
+    .getEntriesByType("measure")
+    .forEach((entry) => {
+      if (entry.name.startsWith(MARK_PREFIX)) performance.clearMeasures(entry.name);
+    });
+};
 
 const hasWindow = () => typeof window !== "undefined";
 
@@ -47,8 +68,7 @@ const ensureTraceBuffer = (): CarouselTraceEntry[] => {
   window.__CAROUSEL_TRACE__ = next;
   window.__CAROUSEL_TRACE_RESET__ = () => {
     next.length = 0;
-    performance.clearMarks(MARK_PREFIX);
-    performance.clearMeasures(MARK_PREFIX);
+    clearCarouselUserTiming();
   };
   window.__CAROUSEL_TRACE_TABLE__ = () => {
     console.table(next);
@@ -86,11 +106,10 @@ export const traceCarousel = (name: string, detail?: unknown): void => {
   if (!isCarouselTraceEnabled()) return;
 
   const timestamp = performance.now();
-  const entry: CarouselTraceEntry = { name, timestamp, detail };
   const buffer = ensureTraceBuffer();
-  pushEntry(buffer, entry);
+  pushEntry(buffer, { name, timestamp, detail });
 
-  if (shouldWritePerformanceMark(name)) {
+  if (!HOT_PATH_EVENTS.has(name)) {
     try {
       performance.mark(`${MARK_PREFIX}${name}`);
     } catch {

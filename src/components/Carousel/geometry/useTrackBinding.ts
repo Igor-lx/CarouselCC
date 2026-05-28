@@ -1,4 +1,4 @@
-import { useCallback, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useRef, type RefObject } from "react";
 
 import {
   measureSlotSize,
@@ -42,7 +42,16 @@ export interface TrackCompositorMotionOptions {
 export interface TrackBindingApi {
   readCurrentPosition: () => number;
   getSlotSize: () => number;
+  /**
+   * Attempts to present a plain easing translation through WAAPI. Returns
+   * `false` when the platform or current geometry cannot support compositor
+   * motion, so the motion runner can keep the JS-driven path.
+   */
   startCompositorMotion: (options: TrackCompositorMotionOptions) => boolean;
+  /**
+   * Stops a running compositor animation and pins the track to `position` when
+   * provided. Omitting `position` freezes at the currently painted transform.
+   */
   cancelCompositorMotion: (position?: number) => void;
 }
 
@@ -329,6 +338,14 @@ export function useTrackBinding({
   );
 
   const getSlotSize = useCallback(() => slotSizeRef.current ?? 0, []);
+
+  useEffect(
+    () => () => {
+      compositorAnimationRef.current?.cancel();
+      compositorAnimationRef.current = null;
+    },
+    [],
+  );
 
   return {
     readCurrentPosition,
