@@ -10,12 +10,11 @@ import type { TrackBindingApi } from "../geometry";
 import { traceCarousel } from "../debug/performanceTrace";
 import type { CarouselState } from "../state";
 import { bezierToCss } from "./bezier";
+import { canUseCompositorTrackMotion } from "./compositorEligibility";
 import { buildCarouselSegment } from "./segmentFactory";
 import { sampleCarouselSegment } from "./sampler";
 import type {
   CarouselMotionStrategy,
-  CarouselSegment,
-  EasingSegment,
   MotionStart,
 } from "./types";
 
@@ -39,15 +38,6 @@ interface UseMotionRunnerInput {
 
 const now = (): number =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
-
-/**
- * Only a plain `easing` step can be expressed as one CSS timing function and
- * handed to WAAPI. Gesture / repeated-click / GO_TO profile segments carry
- * velocity-authored shapes or teleport discontinuities and remain JS-sampled.
- */
-const isCompositorTrackSegment = (
-  segment: CarouselSegment,
-): segment is EasingSegment => segment.strategy === "easing";
 
 const motionConfigKey = (config: CarouselRuntimeConfig): string =>
   [
@@ -93,7 +83,8 @@ const buildStartFromState = (
  * controller.
  *
  * The controller remains the visual-position SSOT for gesture/profile math,
- * diagnostics, pagination, handoff, and settle. For plain easing movement the
+ * diagnostics, pagination, handoff, and settle. For cubic-bezier easing
+ * movement (normal steps and non-inertial gesture release / snap-back) the
  * track DOM additionally runs the same transform through WAAPI, allowing the
  * deck transform to stay on the compositor while the JS sampler keeps
  * publishing the authoritative numeric timeline to non-track subscribers.
@@ -205,7 +196,7 @@ export function useMotionRunner({
       });
 
       const isComposited =
-        isCompositorTrackSegment(segment) &&
+        canUseCompositorTrackMotion(segment) &&
         startCompositorMotion({
           from: segment.from,
           to: segment.to,
