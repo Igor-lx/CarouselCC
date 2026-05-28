@@ -39,9 +39,13 @@ const bandDistance = (index: number, bandStart: number, bandEnd: number): number
 
 /**
  * Image URLs of the **off-band** slides within `neighborPageSpan` page screens
- * of the visible band, nearest-first. The visible band itself is excluded — its
- * real `<img>`s are already fetching at high priority — so this only warms what
- * a next/previous step would reveal. Pure: no DOM, no React.
+ * of the visible band, nearest-first. The visible band is excluded — its real
+ * `<img>`s are already fetching at high priority — so this only warms what a
+ * next/previous step would reveal. Exclusion is by *resolved URL*, not just by
+ * virtual index: in a small looped deck an off-band virtual index can wrap onto
+ * a currently-visible record, and a deck may reuse one URL across slides; either
+ * way a URL the visible band already shows is never warmed again. Pure: no DOM,
+ * no React.
  */
 export const collectIdlePreloadUrls = ({
   records,
@@ -58,6 +62,25 @@ export const collectIdlePreloadUrls = ({
   const bandStart = current;
   const bandEnd = current + visible - 1;
 
+  const resolveRecordIndex = (virtualIndex: number): number | null =>
+    layout.isFinite
+      ? virtualIndex >= 0 && virtualIndex < recordCount
+        ? virtualIndex
+        : null
+      : loopedSlideIndex(virtualIndex, recordCount);
+
+  const urlAt = (virtualIndex: number): string | null => {
+    const recordIndex = resolveRecordIndex(virtualIndex);
+    return recordIndex === null ? null : slideImageSource(records[recordIndex]!);
+  };
+
+  // URLs the visible band already owns — never warm these speculatively.
+  const visibleUrls = new Set<string>();
+  for (let index = bandStart; index <= bandEnd; index += 1) {
+    const src = urlAt(index);
+    if (src) visibleUrls.add(src);
+  }
+
   const indices: number[] = [];
   for (let index = bandStart - radius; index <= bandEnd + radius; index += 1) {
     if (index >= bandStart && index <= bandEnd) continue; // visible band: skip
@@ -69,14 +92,8 @@ export const collectIdlePreloadUrls = ({
 
   const urls = new Set<string>();
   for (const virtualIndex of indices) {
-    const recordIndex = layout.isFinite
-      ? virtualIndex >= 0 && virtualIndex < recordCount
-        ? virtualIndex
-        : null
-      : loopedSlideIndex(virtualIndex, recordCount);
-    if (recordIndex === null) continue;
-    const src = slideImageSource(records[recordIndex]!);
-    if (src) urls.add(src);
+    const src = urlAt(virtualIndex);
+    if (src && !visibleUrls.has(src)) urls.add(src);
   }
   return [...urls];
 };

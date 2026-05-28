@@ -22,6 +22,12 @@ interface UseCarouselGestureInput {
   dispatch: CarouselDispatch;
   readCurrentPosition: () => number;
   applyTrackPosition: (position: number) => void;
+  /**
+   * Synchronously tear down any compositor track animation, pinning the track
+   * at `position`. Called at press so the finger owns the track in the same
+   * turn — without waiting for the motion runner's post-commit effect.
+   */
+  cancelTrackMotion: (position: number) => void;
   getSlotSize: () => number;
   config: CarouselRuntimeConfig;
 }
@@ -37,6 +43,7 @@ export function useCarouselGesture({
   dispatch,
   readCurrentPosition,
   applyTrackPosition,
+  cancelTrackMotion,
   getSlotSize,
   config,
 }: UseCarouselGestureInput): CarouselGestureResult {
@@ -54,14 +61,20 @@ export function useCarouselGesture({
   );
 
   const startDragFromCurrentPosition = useCallback(() => {
-    // Called from two paths: `onPressStart` on a non-interactive surface
-    // (immediate motion cancel), and `onDragStart` for an interactive child
-    // once horizontal intent is recognised. The early return deduplicates the
-    // second path when the first has already initialised this drag.
+    // Called from two paths: `onPressStart` on a non-interactive surface, and
+    // `onDragStart` for an interactive child once horizontal intent is
+    // recognised. The early return deduplicates the second path when the first
+    // has already initialised this drag.
     if (originPositionRef.current !== null) return;
 
     slotSizeRef.current = getSlotSize();
     const origin = readCurrentPosition();
+    // Take the track synchronously: drop any compositor animation and pin it at
+    // the live origin *first*, so the finger owns the track in this same turn
+    // (otherwise the per-frame write below is suppressed while the compositor
+    // animation is still live, and ownership would only transfer after the
+    // motion runner's post-commit effect).
+    cancelTrackMotion(origin);
     applyTrackPosition(origin);
     const pageIndex = nearestPageIndex(origin, layout);
 
@@ -75,6 +88,7 @@ export function useCarouselGesture({
     });
   }, [
     applyTrackPosition,
+    cancelTrackMotion,
     dispatch,
     getSlotSize,
     layout,

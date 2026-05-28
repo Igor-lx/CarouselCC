@@ -71,6 +71,15 @@ export function useVisualPosition({
     [],
   );
 
+  // Exact current position from the controller's curve at `now()`, reflow-free.
+  // `captureHandoff` is the controller's coherent continuation point — exactly
+  // what a cold read that starts a new segment wants — so it is the right
+  // source here, not the possibly-stale last-emitted frame.
+  const sampleNow = useCallback<VisualPositionSource["sampleNow"]>(
+    () => controller.captureHandoff().position,
+    [controller],
+  );
+
   useIsomorphicLayoutEffect(() => {
     emit(toFrame(controller.getSnapshot(), stepSizeRef.current));
   }, [controller, emit, visibleSlidesCount]);
@@ -89,8 +98,8 @@ export function useVisualPosition({
   );
 
   const source = useMemo<VisualPositionSource>(
-    () => ({ getSnapshot, subscribe }),
-    [getSnapshot, subscribe],
+    () => ({ getSnapshot, sampleNow, subscribe }),
+    [getSnapshot, sampleNow, subscribe],
   );
 
   const applyImmediatePosition = useCallback(

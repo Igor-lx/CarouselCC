@@ -61,4 +61,26 @@ describe("collectIdlePreloadUrls", () => {
     expect(urls.length).toBe(new Set(urls).size); // no duplicates
     expect(urls).not.toContain("a"); // visible band excluded
   });
+
+  it("excludes visible URLs even when a wide span wraps onto them (small looped deck)", () => {
+    // 4 records, visible 3, span 2: the off-band window spans more than the
+    // deck, so cyclic wrap reaches the visible records a/b/c. Only the single
+    // genuinely off-band record (d) must be warmed.
+    const smallRecords = buildSlideRecords([
+      { id: 1, content: "a" },
+      { id: 2, content: "b" },
+      { id: 3, content: "c" },
+      { id: 4, content: "d" },
+    ]);
+    const urls = collectIdlePreloadUrls({
+      records: smallRecords,
+      layout: buildCarouselLayout(smallRecords, 3, false),
+      currentVirtualIndex: 0,
+      neighborPageSpan: 2,
+    });
+    expect(urls).toEqual(["d"]);
+    expect(urls).not.toContain("a");
+    expect(urls).not.toContain("b");
+    expect(urls).not.toContain("c");
+  });
 });

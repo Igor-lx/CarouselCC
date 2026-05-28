@@ -283,8 +283,19 @@ export function useTrackBinding({
     [visualPosition, writePosition],
   );
 
+  // Cold read for a new segment's origin (gesture press, navigation click):
+  // return where the track is *actually painted*.
+  //  - JS-driven track: the last emitted frame IS what was painted, so use it
+  //    (a fresh controller sample would be ahead of the paint — the original
+  //    §4 rationale for preferring the emitted frame here).
+  //  - Composited track: the compositor has painted ahead of the last emitted
+  //    frame, so the emitted frame is stale; `sampleNow` (the curve at `now()`,
+  //    reflow-free) is the closer match. Never read the DOM to recover this.
   const readCurrentPosition = useCallback(
-    () => visualPosition.getSnapshot().position,
+    () =>
+      compositorAnimationRef.current !== null
+        ? visualPosition.sampleNow()
+        : visualPosition.getSnapshot().position,
     [visualPosition],
   );
 

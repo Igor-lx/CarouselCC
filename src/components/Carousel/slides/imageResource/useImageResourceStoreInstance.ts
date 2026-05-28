@@ -6,17 +6,18 @@ import type { ImageResourceStore } from "./types";
 /**
  * Owns the image-resource store for the lifetime of a Carousel instance.
  *
- * The store is created lazily and *only when `enabled`* — i.e. only when the
- * carousel renders image content (`isContentImg`). While `enabled` is false
- * nothing is allocated and `null` is returned: no store, no maps, no timers,
- * no fetches, no decodes. Once created the store is kept (a later
- * `isContentImg` toggle does not churn it).
+ * Created lazily, only once the carousel first renders image content
+ * (`enabled`). The returned value is the store **only while `enabled`** and
+ * `null` otherwise — so the contract matches the `ImageResourceStore | null`
+ * type at every call site (with image content off, consumers get `null` and do
+ * no work).
  *
- * The cleanup `dispose()`s the store. `dispose()` is a *soft* reset — it frees
- * every heavyweight resource but the instance stays usable — so the ref is
- * deliberately NOT nulled: a React StrictMode unmount/remount reuses the same
- * store (re-populated by the re-run preload/observe effects) instead of
- * swapping in a fresh one, which would lose accumulated render status.
+ * The retained ref is a separate concern from the returned value: when
+ * `enabled` flips false the store is *soft-disposed* (retry timers released,
+ * maps cleared) but the ref is deliberately kept, because `dispose()` leaves
+ * the instance usable. A later re-enable — or a React StrictMode
+ * unmount/remount — therefore reuses the same store (re-populated by the slides
+ * as they re-subscribe) instead of churning a fresh one.
  */
 export function useImageResourceStoreInstance(
   enabled: boolean,
@@ -27,10 +28,8 @@ export function useImageResourceStoreInstance(
     storeRef.current = createImageResourceStore();
   }
 
-  // When image content is turned off, soft-dispose the store so its retry
-  // timers are released. `dispose()` keeps the instance usable, and the ref is
-  // deliberately NOT nulled, so a later re-enable (or a StrictMode remount)
-  // reuses the same store instead of churning a fresh one.
+  // When image content is turned off, soft-dispose so retry timers are freed.
+  // The ref is kept (see above) for cheap reuse on a later re-enable / remount.
   useEffect(() => {
     if (!enabled) storeRef.current?.dispose();
   }, [enabled]);
@@ -42,5 +41,5 @@ export function useImageResourceStoreInstance(
     [],
   );
 
-  return storeRef.current;
+  return enabled ? storeRef.current : null;
 }

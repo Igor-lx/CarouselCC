@@ -458,10 +458,18 @@ phase }`.
 - `subscribe(listener)` — per-frame stream while a segment is active.
   Subscribers (track binding, pagination widget binding) mutate their own
   DOM inside the callback; React is not involved at this tempo.
-- `getSnapshot()` returns the last emitted visual frame. Cold reads on user
-  events (gesture press start, navigation click) use this so the captured
-  origin matches what DOM subscribers have already received, not a
-  mathematically fresh but unpainted controller sample.
+- `getSnapshot()` returns the last emitted visual frame.
+- `sampleNow()` returns the exact position from the controller's curve at
+  `now()` — reflow-free, and ahead of `getSnapshot()` by the sub-frame elapsed
+  since the last emit during a live segment.
+- A cold read that starts a new segment (gesture press, navigation click) wants
+  the origin to match *what is actually painted*. The track binding chooses
+  per-source: while the track is **JS-driven**, the last emitted frame *is* what
+  was painted, so `getSnapshot()` is used (a fresh controller sample would be
+  ahead of the paint); while a **compositor** animation owns the track it has
+  painted ahead of the last emit, so `sampleNow()` is the closer match. Neither
+  path reads the DOM — the painted position is recovered from the controller's
+  own math, never `getComputedStyle`.
 - `applyImmediatePosition(position)` — publish a position into the stream
   during drag. Internally calls `controller.set`, which cancels any
   active motion and emits, so the track, the widget, and the motion
@@ -660,8 +668,11 @@ It is not carousel-specific and is reusable.
 
 1. on press-start for the non-interactive surface, or on horizontal intent for
    an interactive child: records the visually sampled origin position and the
-   slot size (`getSlotSize()`), dispatches `START_DRAG`, then publishes the
-   origin into the visual stream via `applyTrackPosition`;
+   slot size (`getSlotSize()`), then takes the track **synchronously** —
+   `cancelTrackMotion(origin)` tears down any compositor animation and pins the
+   track at the live origin, so the finger owns it in the same turn rather than
+   after the motion runner's post-commit effect — and publishes the origin into
+   the visual stream via `applyTrackPosition` before dispatching `START_DRAG`;
 2. on every move payload: translates `uiOffset` into a virtual-index
    delta using the recorded slot size and writes that into the visual
    position via `applyTrackPosition`. No React state per move;

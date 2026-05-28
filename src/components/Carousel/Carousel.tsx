@@ -280,6 +280,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     dispatch,
     readCurrentPosition,
     applyTrackPosition: applyImmediatePosition,
+    cancelTrackMotion: cancelCompositorMotion,
     getSlotSize,
     config,
   });
