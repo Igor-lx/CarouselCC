@@ -207,28 +207,21 @@ For each logical slide you need, starting from a single high-resolution source:
    - landscape crop (only if a wide-and-short slot would otherwise crop a tall
      image): the same two widths, re-cropped for the wide slot.
 
-   The demo keeps them as `assets/carousel/{mobile,desktop}/carouselN.webp`
-   (portrait 480/720) and `assets/carousel/landscape/{480,720}/carouselN.webp`.
-   Any layout works — the host owns file organisation.
-2. **Group the assets into named sets and call `buildResponsiveSlides` once.**
-   Every app does the same shaping, so the carousel ships a pure builder (a host
-   tool exported alongside the Zod schemas — no React, not used in the
-   component's runtime) that zips parallel per-resolution sets into `Slide[]`,
-   encoding every convention by construction: canonical fallback = smallest
-   candidate, `w`-descriptor `srcSet`s, `sizes` left to the carousel. The host
-   carries no assembly logic — just sets in, slides out.
+   The demo serves them from `public/carousel/<orientation>/<width>/carouselN.webp`
+   (so they have stable URLs, not bundler-hashed ones). In production they'd
+   typically sit on a CDN. Any layout works — the host owns file organisation.
+2. **Shape them with the exported builder.** Every app does the same shaping, so
+   the carousel ships a pure builder (a host tool exported alongside the Zod
+   schemas — no React, not used in the component's runtime) that zips parallel
+   per-resolution sets into `Slide[]`, encoding every convention by construction:
+   canonical fallback = smallest candidate, `w`-descriptor `srcSet`s, `sizes`
+   left to the carousel.
    ```ts
    import { buildResponsiveSlides } from "@/components/Carousel";
 
-   // Import assets and group them into one set per resolution/orientation.
-   const portraitW480 = [...]; // one URL per slide, index-aligned
-   const portraitW720 = [...];
-   const landscapeW480 = [...];
-   const landscapeW720 = [...];
-
-   export const slidesData = buildResponsiveSlides({
+   buildResponsiveSlides({
      sets: [
-       { width: 480, urls: portraitW480 },
+       { width: 480, urls: portraitW480 }, // one URL per slide, index-aligned
        { width: 720, urls: portraitW720 },
      ],
      sources: [
@@ -244,21 +237,31 @@ For each logical slide you need, starting from a single high-resolution source:
    });
    ```
    Sets are index-aligned (slide `i` is `urls[i]` of every set). The builder is
-   **orientation-neutral**: the *default* asset is simply whatever goes in `sets`
-   — a natively-landscape deck puts landscape there and portrait (if any) in
-   `sources`. Omit `sources` entirely for a single-orientation deck. `content`
-   (identity + fallback) defaults to the smallest candidate per slide, so it is
-   fixed across viewports — that is what keeps the position on rotation. It is a
-   plain function: wrap in `useMemo` if inputs change, but it is intentionally
-   not a hook. For one-off non-image or single-resolution slides, build the
-   `Slide` directly (or use the single `buildResponsiveSlide`).
-3. **Ship one set, not per-device arrays.** Do **not** swap `slidesData` on a
+   **orientation-neutral**: the *default* asset is whatever goes in `sets` — a
+   natively-landscape deck puts landscape there and portrait (if any) in
+   `sources`. Omit `sources` for a single-orientation deck. `content` (identity
+   + fallback) defaults to the smallest candidate, fixed across viewports — that
+   is what keeps the position on rotation. It is a plain function (not a hook).
+   For a one-off slide use the singular `buildResponsiveSlide`.
+3. **Decide where the shaping runs — two valid models:**
+   - *In-app* (build/runtime): call `buildResponsiveSlides` and pass the result
+     straight as `slidesData`. Simplest when assets ship with the app.
+   - *Content artifact* (what the demo does): run the builder **offline once** to
+     emit a static `Slide[]` JSON (`npm run gen:carousel` →
+     `public/carousel-slides.json`), serve it next to the images, and have the
+     client fetch it at load. This decouples content from the app build — new
+     images / alt text need only a regenerated JSON, no redeploy — and is the
+     natural fit for a CDN/CMS. The generator is **idempotent**: it identifies a
+     slide by its asset slug, so regeneration preserves each slide's `id` and
+     hand-written `alt`, mints ids only for new assets, and drops removed ones.
+4. **Validate the fetched document.** A content artifact is external data, so
+   validate it before render with the exported `CarouselSlidesDataSchema`
+   (ADR-002 — the integration boundary). The demo's `App` does
+   `fetch → safeParse → render` with loading / error states; the carousel itself
+   only ever receives a finished, validated `Slide[]`.
+5. **Ship one set, not per-device arrays.** Do **not** swap `slidesData` on a
    breakpoint/orientation change — that changes `content` and resets the deck.
-   Source the sets however assets arrive (glob, CDN, CMS); the demo
-   (`app/carouselData.ts`) uses an `import.meta.glob` per variant folder, which
-   emits only short URL strings into the bundle (the `.webp` bytes stay separate
-   assets fetched only for the selected candidate).
-4. **`sizes` is automatic** — do not pass it unless a slide genuinely needs to
+6. **`sizes` is automatic** — do not pass it unless a slide genuinely needs to
    override the carousel's `visibleSlidesNr`-derived value.
 
 ### 1.4 Slot children

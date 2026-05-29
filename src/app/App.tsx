@@ -1,7 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import appStyles from "./App.module.scss";
-import { CAROUSEL_SLIDES } from "./carouselData";
 import { useCompactLandscape } from "./useCompactLandscape";
 import { useBreakpoint, useUserEnvironment } from "../shared";
 import Carousel, {
@@ -9,6 +8,7 @@ import Carousel, {
   type CarouselStatusSnapshot,
   type Slide,
 } from "../components/Carousel";
+import { CarouselSlidesDataSchema } from "../components/Carousel/contract/schemas";
 import { Controls } from "../components/Carousel/modules/Controls";
 import { Pagination } from "../components/Carousel/modules/Pagination";
 import { PaginationWidget } from "../components/Carousel/modules/PaginationWidget";
@@ -23,6 +23,9 @@ const VISIBLE_BY_BREAKPOINT = {
 } as const;
 
 const COMPACT_LANDSCAPE_VISIBLE_SLIDES = 2;
+
+/** The generated content document, served from `public/` (see `npm run gen:carousel`). */
+const SLIDES_DATA_URL = `${import.meta.env.BASE_URL}carousel-slides.json`;
 
 const openSlide = (slide: Slide) => {
   window.open(String(slide.content), "_blank");
@@ -49,15 +52,44 @@ export default function App() {
   const device = useBreakpoint(VISIBLE_BY_BREAKPOINT);
 
   // Layout-only: how many slides share the viewport. Orientation can change
-  // this, but it never changes slide identity (one responsive set, below), so
-  // rotation re-flows the layout without resetting the viewing position.
+  // this, but it never changes slide identity (one responsive set), so rotation
+  // re-flows the layout without resetting the viewing position.
   const visibleSlidesNr =
     isTouch && isCompactLandscape ? COMPACT_LANDSCAPE_VISIBLE_SLIDES : device;
 
-  // One stable responsive slide set: the browser selects the per-device /
-  // per-orientation asset natively (see `carouselData`). No async per-device
-  // swap, so `slidesData` identity is constant across breakpoints/rotation.
-  const slidesData = CAROUSEL_SLIDES as Slide[];
+  // Content document, fetched at load from the static file the generator
+  // produced (one stable responsive set; the browser selects the asset). It is
+  // external data, so it is validated with the carousel's exported Zod schema
+  // before render — the integration boundary from ADR-002.
+  const [slidesData, setSlidesData] = useState<Slide[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  useEffect(() => {
+    let isCurrent = true;
+    fetch(SLIDES_DATA_URL)
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then((json) => {
+        if (!isCurrent) return;
+        const parsed = CarouselSlidesDataSchema.safeParse(json);
+        if (parsed.success) {
+          setSlidesData(parsed.data as Slide[]);
+        } else {
+          console.error("[App] invalid carousel slides data", parsed.error);
+          setLoadFailed(true);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!isCurrent) return;
+        console.error("[App] failed to load carousel slides data", error);
+        setLoadFailed(true);
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   return (
     <main className={appStyles.app}>
@@ -85,7 +117,11 @@ export default function App() {
         </div>
 
         <div className={appStyles.component}>
-          {slidesData.length > 0 ? (
+          {loadFailed ? (
+            <p>Failed to load carousel data.</p>
+          ) : slidesData === null ? (
+            <p>Loading…</p>
+          ) : (
             <Carousel
               ref={carouselRef}
               visibleSlidesNr={visibleSlidesNr}
@@ -106,7 +142,7 @@ export default function App() {
               <Controls />
               <Diagnostic />
             </Carousel>
-          ) : null}
+          )}
         </div>
       </section>
       <section className={appStyles.page}>

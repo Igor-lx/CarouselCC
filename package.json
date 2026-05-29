@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "gen:carousel": "tsx scripts/gen-carousel-data.ts",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },
@@ -29,6 +30,7 @@
     "gh-pages": "^6.3.0",
     "jsdom": "^25.0.1",
     "sass-embedded": "^1.89.2",
+    "tsx": "^4.22.3",
     "typescript": "~5.8.3",
     "vite": "^7.0.4",
     "vitest": "^3.2.4"
