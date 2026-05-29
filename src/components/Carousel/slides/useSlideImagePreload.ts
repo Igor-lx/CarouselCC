@@ -11,6 +11,8 @@ interface UseSlideImagePreloadInput {
   records: CarouselSlideRecord[];
   layout: CarouselLayout;
   currentVirtualIndex: number;
+  /** Carousel-owned default `sizes` mirrored onto the offscreen warm-up image. */
+  imageSizes: string;
   isIdle: boolean;
   isContentImg: boolean;
   /** When true, speculative warming is skipped entirely. */
@@ -28,31 +30,62 @@ interface CollectInput {
   layout: CarouselLayout;
   currentVirtualIndex: number;
   neighborPageSpan: number;
+  imageSizes: string;
+  /** Resolves a `<source media>` to whether it currently applies. */
+  isMediaMatch?: (media: string) => boolean;
 }
 
-const slideImageSource = (record: CarouselSlideRecord): string | null =>
-  typeof record.slideData.content === "string" ? record.slideData.content : null;
+/**
+ * The exact image descriptor the browser would pick for a slide right now: the
+ * matching responsive `<source>` if any (`isMediaMatch`), else the default
+ * `srcSet`, with `content` as the identity/fallback `src` and a mirrored
+ * `sizes`. `key` collapses identical descriptors so one is warmed once.
+ */
+export interface SlideImagePreloadTarget {
+  key: string;
+  src: string;
+  srcSet?: string;
+  sizes?: string;
+}
+
+const slideImagePreloadTarget = (
+  record: CarouselSlideRecord,
+  imageSizes: string,
+  isMediaMatch?: (media: string) => boolean,
+): SlideImagePreloadTarget | null => {
+  const { content, image } = record.slideData;
+  if (typeof content !== "string") return null;
+
+  const matchedSource = image?.sources?.find(
+    (source) => isMediaMatch?.(source.media) ?? false,
+  );
+  const srcSet = matchedSource?.srcSet ?? image?.srcSet;
+  const sizes = matchedSource?.sizes ?? image?.sizes ?? imageSizes;
+  const key = `${content}|${srcSet ?? ""}|${sizes ?? ""}`;
+
+  return { key, src: content, srcSet, sizes };
+};
 
 /** Distance from a virtual index to the nearest edge of the visible band. */
 const bandDistance = (index: number, bandStart: number, bandEnd: number): number =>
   index < bandStart ? bandStart - index : index - bandEnd;
 
 /**
- * Image URLs of the **off-band** slides within `neighborPageSpan` page screens
- * of the visible band, nearest-first. The visible band is excluded — its real
- * `<img>`s are already fetching at high priority — so this only warms what a
- * next/previous step would reveal. Exclusion is by *resolved URL*, not just by
- * virtual index: in a small looped deck an off-band virtual index can wrap onto
- * a currently-visible record, and a deck may reuse one URL across slides; either
- * way a URL the visible band already shows is never warmed again. Pure: no DOM,
- * no React.
+ * Descriptors of the **off-band** slides within `neighborPageSpan` page screens
+ * of the visible band, nearest-first. The visible band is excluded by resolved
+ * `src` (so a small looped deck wrapping onto a visible record, or a reused URL,
+ * is never re-warmed). Each descriptor mirrors what `<picture>`/`srcSet` would
+ * select, so warming hits the same candidate the rendered `<img>` will. Pure:
+ * no DOM, no React (the media match is injected).
  */
-export const collectIdlePreloadUrls = ({
+export const collectIdlePreloadTargets = ({
   records,
   layout,
   currentVirtualIndex,
   neighborPageSpan,
-}: CollectInput): string[] => {
+  imageSizes,
+  isMediaMatch,
+}: CollectInput): SlideImagePreloadTarget[] => {
   const recordCount = records.length;
   if (recordCount === 0 || !layout.canSlide) return [];
 
@@ -69,16 +102,18 @@ export const collectIdlePreloadUrls = ({
         : null
       : loopedSlideIndex(virtualIndex, recordCount);
 
-  const urlAt = (virtualIndex: number): string | null => {
+  const targetAt = (virtualIndex: number): SlideImagePreloadTarget | null => {
     const recordIndex = resolveRecordIndex(virtualIndex);
-    return recordIndex === null ? null : slideImageSource(records[recordIndex]!);
+    return recordIndex === null
+      ? null
+      : slideImagePreloadTarget(records[recordIndex]!, imageSizes, isMediaMatch);
   };
 
   // URLs the visible band already owns — never warm these speculatively.
   const visibleUrls = new Set<string>();
   for (let index = bandStart; index <= bandEnd; index += 1) {
-    const src = urlAt(index);
-    if (src) visibleUrls.add(src);
+    const target = targetAt(index);
+    if (target) visibleUrls.add(target.src);
   }
 
   const indices: number[] = [];
@@ -90,12 +125,12 @@ export const collectIdlePreloadUrls = ({
     (a, b) => bandDistance(a, bandStart, bandEnd) - bandDistance(b, bandStart, bandEnd),
   );
 
-  const urls = new Set<string>();
+  const targets = new Map<string, SlideImagePreloadTarget>();
   for (const virtualIndex of indices) {
-    const src = urlAt(virtualIndex);
-    if (src && !visibleUrls.has(src)) urls.add(src);
+    const target = targetAt(virtualIndex);
+    if (target && !visibleUrls.has(target.src)) targets.set(target.key, target);
   }
-  return [...urls];
+  return [...targets.values()];
 };
 
 const releaseWarmImage = (image: HTMLImageElement): void => {
@@ -111,7 +146,10 @@ const releaseWarmImage = (image: HTMLImageElement): void => {
  * While the carousel is idle, it warms the browser's fetch + decoded-image
  * caches for the off-band neighbour slides a single step can reveal, so a slide
  * entering the render window during the next motion paints from a warm cache
- * instead of fetching/decoding on the frame it mounts.
+ * instead of fetching/decoding on the frame it mounts. It mirrors each slide's
+ * responsive descriptor (`srcSet` + `sizes`, and the matching `<source>` via
+ * `matchMedia`) onto the offscreen `Image`, so it warms exactly the candidate
+ * the rendered `<img>`/`<picture>` will pick — never every variant.
  *
  * It is deliberately decoupled from the image-resource store: it never publishes
  * render status. Each rendered `<img>` remains the sole authority on its own
@@ -128,6 +166,7 @@ export function useSlideImagePreload({
   records,
   layout,
   currentVirtualIndex,
+  imageSizes,
   isIdle,
   isContentImg,
   isDataSaverEnabled,
@@ -138,43 +177,53 @@ export function useSlideImagePreload({
 
   // `null` means "leave the warm set as-is" (mid-motion: no churn). An array —
   // including the empty array when disabled — means "reconcile to this set".
-  const targetUrls = useMemo<string[] | null>(() => {
+  const targets = useMemo<SlideImagePreloadTarget[] | null>(() => {
     if (!isEnabled) return [];
     if (!isIdle) return null;
-    return collectIdlePreloadUrls({
+    return collectIdlePreloadTargets({
       records,
       layout,
       currentVirtualIndex,
+      imageSizes,
       neighborPageSpan: PRELOAD_NEIGHBOR_PAGE_SPAN,
+      isMediaMatch:
+        typeof window === "undefined"
+          ? undefined
+          : (media) => window.matchMedia(media).matches,
     });
-  }, [isEnabled, isIdle, records, layout, currentVirtualIndex]);
+  }, [currentVirtualIndex, imageSizes, isEnabled, isIdle, layout, records]);
 
   useEffect(() => {
-    if (targetUrls === null || typeof window === "undefined") return;
+    if (targets === null || typeof window === "undefined") return;
 
     const warmed = warmedRef.current;
-    const keep = new Set(targetUrls);
+    const keep = new Set(targets.map((target) => target.key));
 
-    warmed.forEach((image, url) => {
-      if (keep.has(url)) return;
+    warmed.forEach((image, key) => {
+      if (keep.has(key)) return;
       releaseWarmImage(image);
-      warmed.delete(url);
+      warmed.delete(key);
     });
 
-    for (const url of targetUrls) {
-      if (warmed.has(url) || !isWarmable(url)) continue;
+    for (const target of targets) {
+      if (warmed.has(target.key) || !isWarmable(target.src)) continue;
       const image = new Image();
       image.decoding = "async";
       image.fetchPriority = "low";
-      image.src = url;
-      warmed.set(url, image);
+      // Mirror the rendered selection so the warmed candidate is the same one
+      // the `<img>`/`<picture>` will pick (a bare `src` would warm the wrong
+      // resolution/crop).
+      if (target.sizes) image.sizes = target.sizes;
+      if (target.srcSet) image.srcset = target.srcSet;
+      image.src = target.src;
+      warmed.set(target.key, image);
       // Async decode warms the decoded-image cache off the main thread; a
       // rejection (e.g. the URL is later dropped) is harmless.
       if (typeof image.decode === "function") {
         image.decode().catch(() => undefined);
       }
     }
-  }, [targetUrls, isWarmable]);
+  }, [targets, isWarmable]);
 
   useEffect(() => {
     const warmed = warmedRef.current;

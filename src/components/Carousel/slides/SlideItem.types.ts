@@ -15,6 +15,11 @@ export interface SlideItemProps extends SlideAriaProps {
   /** The carousel's image-resource store, or `null` when image content is off. */
   imageResourceStore: ImageResourceStore | null;
   /**
+   * Carousel-derived default `sizes` (from `visibleSlidesCount`) for responsive
+   * `srcSet`/`<source>` selection. A slide's own `image.sizes` overrides it.
+   */
+  imageSizes: string;
+  /**
    * Host reduced-data signal. When on, off-band images load lazily and at low
    * fetch priority so the deck does not eagerly pull bandwidth it may not need.
    */

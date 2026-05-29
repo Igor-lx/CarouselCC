@@ -50,10 +50,24 @@ const ClassMapSchema = z
   } satisfies Record<(typeof CLASS_NAME_KEYS)[number], z.ZodString>)
   .partial();
 
+const SlideImageSourceSchema = z.object({
+  media: z.string(),
+  srcSet: z.string(),
+  sizes: z.string().optional(),
+  type: z.string().optional(),
+});
+
+const SlideImageVariantsSchema = z.object({
+  srcSet: z.string().optional(),
+  sizes: z.string().optional(),
+  sources: z.array(SlideImageSourceSchema).optional(),
+});
+
 const SlideSchema = z.object({
   id: z.union([z.string(), z.number()]),
   content: ContentSchema,
   alt: z.string().optional(),
+  image: SlideImageVariantsSchema.optional(),
 });
 
 const OnSlideClickSchema = z.function({

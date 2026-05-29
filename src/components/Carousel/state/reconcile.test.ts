@@ -99,6 +99,45 @@ describe("reconcileStateToLayout — idempotency (ADR-001 contract)", () => {
   }
 });
 
+describe("reconcileStateToLayout — render-only image variants do not affect identity", () => {
+  // The position-preservation guarantee for orientation changes: a slide's
+  // `image` (responsive srcSet / sources) is render-only and must never enter
+  // `dataKey`, so swapping it on slides with the same id/content keeps the same
+  // layout identity and never hard-resets the viewing position.
+  const baseSlides: Slide[] = Array.from({ length: 12 }, (_, i) => ({
+    id: `s-${i}`,
+    content: `slide-${i}`,
+  }));
+  const withVariants: Slide[] = baseSlides.map((slide) => ({
+    ...slide,
+    image: {
+      srcSet: `${String(slide.content)}-480 480w, ${String(slide.content)}-720 720w`,
+      sources: [
+        {
+          media: "(orientation: landscape)",
+          srcSet: `${String(slide.content)}-l-480 480w`,
+          sizes: "50vw",
+        },
+      ],
+    },
+  }));
+
+  it("produces an identical dataKey when only image variants differ", () => {
+    const plain = buildCarouselLayout(buildSlideRecords(baseSlides), 3, false);
+    const responsive = buildCarouselLayout(buildSlideRecords(withVariants), 3, false);
+    expect(responsive.dataKey).toBe(plain.dataKey);
+  });
+
+  it("keeps the viewing position (no hard reset) when image variants are added", () => {
+    const plain = buildCarouselLayout(buildSlideRecords(baseSlides), 3, false);
+    const responsive = buildCarouselLayout(buildSlideRecords(withVariants), 3, false);
+    const next = reconcileStateToLayout(movedState(plain, 2), responsive);
+    // Same-shape fast path: position preserved, motion not collapsed to a snap.
+    expect(next.targetPageIndex).toBe(2);
+    expect(next.motionPhase).toBe("step-normal");
+  });
+});
+
 describe("reconcileStateToLayout — recovery from a stuck phase", () => {
   it("lifts a dragging state out of the dragging phase when the deck collapses", () => {
     const slidable = makeLayout(12, 3, false); // canSlide

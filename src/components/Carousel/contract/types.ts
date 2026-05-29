@@ -8,10 +8,44 @@ export type SlideClassKey = (typeof SLIDE_CLASS_KEYS)[number];
 export type ClassNameMap = Partial<Record<ClassNameKey, string>>;
 export type SlideClassMap = Pick<ClassNameMap, SlideClassKey>;
 
+/** One art-directed `<source>` for a slide's `<picture>` (render-only). */
+export interface SlideImageSource {
+  /** Media condition under which the browser may pick this source. */
+  media: string;
+  /** Candidate set, normally with width (`w`) descriptors. */
+  srcSet: string;
+  /** Slot hint; defaults to the carousel's auto-derived value when omitted. */
+  sizes?: string;
+  /** e.g. `"image/webp"` — lets the browser skip an unsupported source. */
+  type?: string;
+}
+
+/**
+ * Render-only responsive image variants for an image slide. The browser
+ * selects the concrete asset (by `sizes` / DPR within `srcSet`, by `media`
+ * for `sources`). This NEVER participates in slide identity: reconcile and
+ * `dataKey` key only on `id` + `content`, so supplying or switching variants
+ * (e.g. an orientation-specific crop) never resets the viewing position.
+ */
+export interface SlideImageVariants {
+  /** Resolution candidates for the default `<img>` (width `w` descriptors). */
+  srcSet?: string;
+  /** Override the carousel's auto-derived `sizes`. Rarely needed. */
+  sizes?: string;
+  /** Art-directed `<source>` overrides (e.g. a landscape crop). */
+  sources?: readonly SlideImageSource[];
+}
+
 export interface Slide {
   id: string | number;
+  /**
+   * Logical identity + fallback `<img src>`. The only image field that feeds
+   * `dataKey`/reconcile — keep it stable across responsive variants.
+   */
   content: string | number | ReactElement;
   alt?: string;
+  /** Render-only responsive sources — see {@link SlideImageVariants}. */
+  image?: SlideImageVariants;
 }
 
 /**

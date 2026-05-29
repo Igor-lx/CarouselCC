@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import appStyles from "./App.module.scss";
-import { loadCarouselSources, type CarouselSourceRecord } from "./carouselData";
+import { CAROUSEL_SLIDES } from "./carouselData";
 import { useCompactLandscape } from "./useCompactLandscape";
 import { useBreakpoint, useUserEnvironment } from "../shared";
 import Carousel, {
@@ -48,36 +48,16 @@ export default function App() {
 
   const device = useBreakpoint(VISIBLE_BY_BREAKPOINT);
 
+  // Layout-only: how many slides share the viewport. Orientation can change
+  // this, but it never changes slide identity (one responsive set, below), so
+  // rotation re-flows the layout without resetting the viewing position.
   const visibleSlidesNr =
     isTouch && isCompactLandscape ? COMPACT_LANDSCAPE_VISIBLE_SLIDES : device;
-  const isMobileImagery = isTouch || device === VISIBLE_BY_BREAKPOINT.MOBILE;
 
-  // Async load the desktop or mobile image chunk only — never both — so the
-  // initial app bundle stays free of the 12 WebP URLs the user will not see.
-  const [sourceRecords, setSourceRecords] = useState<
-    readonly CarouselSourceRecord[]
-  >([]);
-
-  useEffect(() => {
-    let isCurrent = true;
-
-    void loadCarouselSources(isMobileImagery).then((records) => {
-      if (isCurrent) setSourceRecords(records);
-    });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [isMobileImagery]);
-
-  const slidesData = useMemo(
-    () =>
-      sourceRecords.map((entry) => ({
-        id: entry.id,
-        content: entry.content,
-      })),
-    [sourceRecords],
-  );
+  // One stable responsive slide set: the browser selects the per-device /
+  // per-orientation asset natively (see `carouselData`). No async per-device
+  // swap, so `slidesData` identity is constant across breakpoints/rotation.
+  const slidesData = CAROUSEL_SLIDES as Slide[];
 
   return (
     <main className={appStyles.app}>
@@ -105,7 +85,7 @@ export default function App() {
         </div>
 
         <div className={appStyles.component}>
-          {sourceRecords.length > 0 ? (
+          {slidesData.length > 0 ? (
             <Carousel
               ref={carouselRef}
               visibleSlidesNr={visibleSlidesNr}

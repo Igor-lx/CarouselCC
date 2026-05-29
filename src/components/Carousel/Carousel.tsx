@@ -61,6 +61,16 @@ const collectImageResourceUrls = (
   return [...urls];
 };
 
+/**
+ * Default `sizes` for responsive slide images, derived from the slot count the
+ * carousel owns (each slide spans ~`100/visibleSlidesCount` of the viewport).
+ * The carousel owns slot geometry, so it — not the host — supplies `sizes`,
+ * which prevents the `srcSet` "no sizes → assume 100vw → oversized candidate"
+ * trap. A slide's own `image.sizes` overrides this when it must differ.
+ */
+const resolveSlideImageSizes = (visibleSlidesCount: number): string =>
+  visibleSlidesCount > 0 ? `${Math.ceil(100 / visibleSlidesCount)}vw` : "100vw";
+
 const Carousel = memo(function Carousel(props: CarouselProps) {
   const {
     slidesData,
@@ -142,6 +152,12 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // to it — it only warms browser caches.
   const imageResourceStore = useImageResourceStoreInstance(isContentImg);
 
+  // Carousel-owned default `sizes` for responsive slide images (see helper).
+  const imageSizes = useMemo(
+    () => resolveSlideImageSizes(layout.visibleSlidesCount),
+    [layout.visibleSlidesCount],
+  );
+
   // Read-only warm-ability gate for the predecode: never spend a speculative
   // fetch on a URL the visible layer has already seen fail. Injected as a plain
   // predicate so the predecode stays store-agnostic.
@@ -171,6 +187,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     records,
     layout,
     currentVirtualIndex: state.virtualIndex,
+    imageSizes,
     isIdle: status.isIdle,
     isContentImg,
     isDataSaverEnabled,
@@ -468,6 +485,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
                   isActual={slide.isActual}
                   isDataSaverEnabled={isDataSaverEnabled}
                   imageResourceStore={imageResourceStore}
+                  imageSizes={imageSizes}
                   onSlideClick={navigation.handleSlideClick}
                   {...slide.ariaProps}
                 />

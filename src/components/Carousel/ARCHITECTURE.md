@@ -85,7 +85,7 @@ equal halves with no cruise zone, and Diagnostic reports that normalized shape.
 
 | Prop          | Type            | Default | Effect |
 | ------------- | --------------- | ------- | ------ |
-| `slidesData`  | `Slide[]`       | —       | Required. `Slide = { id: string \| number; content: string \| number \| ReactElement; alt?: string }`. `content` must be a trimmed-non-empty string, a number, or a React element. |
+| `slidesData`  | `Slide[]`       | —       | Required. `Slide = { id; content; alt?; image? }` — see §1.4.1. `content` must be a trimmed-non-empty string, a number, or a React element, and is the slide's **identity** (it alone, with `id`, feeds `dataKey`). `image` is optional render-only responsive variants. |
 | `visibleSlidesNr` | `number`     | — | How many slides share the viewport. Drives layout flex-basis, slot-size measurement, page math (`pageCount = ceil(slidesData.length / visibleSlidesNr)`), and the PaginationWidget projection slot count. |
 | `isPagePaddingOn` | `boolean`    | — | When on, pads the deck with cloned tail slides so `length` becomes a multiple of `visibleSlidesNr`. Eliminates partial pages at the tail. |
 | `isContentImg` | `boolean`      | — | When on, treats string `content` as an `<img src>`. When off, renders raw `content`. Image errors fall back to `slide.alt` or `errAltPlaceholder`. |
@@ -148,6 +148,118 @@ This document does not restate them, so it cannot drift from the code.
 | Prop        | Type           | Effect |
 | ----------- | -------------- | ------ |
 | `className` | `ClassNameMap` | Partial map keyed by `outerContainer`, `innerContainer`, `slideContainer`, `slide`, `slideInteractive`, `slideError`, `slideText`. Merged into the deck SCSS via `mergeStyleMaps`. Keys not provided fall back to the built-in styles. |
+
+#### Responsive images (`Slide.image`)
+
+A slide's `content` is its **identity** (with `id` it is the only thing in
+`dataKey`) and doubles as the fallback `<img src>`. Responsive variants are
+carried separately, in an optional **render-only** `image` object — so the
+browser can pick a per-resolution / per-orientation asset without ever changing
+identity:
+
+```ts
+interface SlideImageSource {
+  media: string;            // e.g. "(orientation: landscape) and (max-height: 520px)"
+  srcSet: string;           // "crop-480.webp 480w, crop-720.webp 720w"
+  sizes?: string;           // defaults to the carousel's auto value
+  type?: string;            // e.g. "image/webp"
+}
+interface SlideImageVariants {
+  srcSet?: string;          // resolution candidates for the default <img>
+  sizes?: string;           // override the auto value (rarely needed)
+  sources?: SlideImageSource[]; // art-directed <source> overrides
+}
+interface Slide {
+  id: string | number;
+  content: string | number | ReactElement; // identity + fallback src
+  alt?: string;
+  image?: SlideImageVariants;               // render-only; NOT in dataKey
+}
+```
+
+Contract guarantees:
+
+- **Identity is `id` + `content` only.** `image` never enters `dataKey` or
+  reconciliation, so adding, removing, or switching variants — including swapping
+  an orientation crop on device rotation — **never resets the viewing position**.
+  Keep `content` stable across orientations; vary only `image`.
+- **`sizes` is supplied by the carousel.** It owns slot geometry, so it injects a
+  default `sizes` derived from `visibleSlidesNr` (≈`100 / visibleSlidesNr` vw)
+  onto the `<img>` and each `<source>`. This prevents the `srcSet`
+  "no `sizes` → assume `100vw` → oversized candidate" trap. A slide's own
+  `image.sizes` / `source.sizes` overrides it for the rare exception.
+- **`<source>` is for exceptions; `<img>` is the default.** When `image.sources`
+  is present the slide renders a `<picture>` (each `source` → a `<source>`), with
+  the default `<img srcset={image.srcSet}>` as the fallback. Place portrait/normal
+  candidates in `image.srcSet`; reserve `sources` for art-directed crops.
+- **Predecode follows the selection.** The idle predecode mirrors the same
+  `srcSet`/`sizes` and resolves the active `<source>` via `matchMedia`, so it
+  warms exactly the candidate the rendered element will pick (see the
+  image-preparation bullet in §1.6).
+
+#### Host how-to: one source image → responsive `slidesData`
+
+For each logical slide you need, starting from a single high-resolution source:
+
+1. **Produce the variant files.** Two axes — resolution and (optionally)
+   orientation crop:
+   - portrait/normal: a small (`≈480w`) and a large (`≈720w`) width;
+   - landscape crop (only if a wide-and-short slot would otherwise crop a tall
+     image): the same two widths, re-cropped for the wide slot.
+
+   The demo keeps them as `assets/carousel/{mobile,desktop}/carouselN.webp`
+   (portrait 480/720) and `assets/carousel/landscape/{480,720}/carouselN.webp`.
+   Any layout works — the host owns file organisation.
+2. **Group the assets into named sets and call `buildResponsiveSlides` once.**
+   Every app does the same shaping, so the carousel ships a pure builder (a host
+   tool exported alongside the Zod schemas — no React, not used in the
+   component's runtime) that zips parallel per-resolution sets into `Slide[]`,
+   encoding every convention by construction: canonical fallback = smallest
+   candidate, `w`-descriptor `srcSet`s, `sizes` left to the carousel. The host
+   carries no assembly logic — just sets in, slides out.
+   ```ts
+   import { buildResponsiveSlides } from "@/components/Carousel";
+
+   // Import assets and group them into one set per resolution/orientation.
+   const portraitW480 = [...]; // one URL per slide, index-aligned
+   const portraitW720 = [...];
+   const landscapeW480 = [...];
+   const landscapeW720 = [...];
+
+   export const slidesData = buildResponsiveSlides({
+     sets: [
+       { width: 480, urls: portraitW480 },
+       { width: 720, urls: portraitW720 },
+     ],
+     sources: [
+       {
+         media: "(orientation: landscape) and (max-height: 520px)",
+         type: "image/webp",
+         sets: [
+           { width: 480, urls: landscapeW480 },
+           { width: 720, urls: landscapeW720 },
+         ],
+       },
+     ],
+   });
+   ```
+   Sets are index-aligned (slide `i` is `urls[i]` of every set). The builder is
+   **orientation-neutral**: the *default* asset is simply whatever goes in `sets`
+   — a natively-landscape deck puts landscape there and portrait (if any) in
+   `sources`. Omit `sources` entirely for a single-orientation deck. `content`
+   (identity + fallback) defaults to the smallest candidate per slide, so it is
+   fixed across viewports — that is what keeps the position on rotation. It is a
+   plain function: wrap in `useMemo` if inputs change, but it is intentionally
+   not a hook. For one-off non-image or single-resolution slides, build the
+   `Slide` directly (or use the single `buildResponsiveSlide`).
+3. **Ship one set, not per-device arrays.** Do **not** swap `slidesData` on a
+   breakpoint/orientation change — that changes `content` and resets the deck.
+   Source the sets however assets arrive (glob, CDN, CMS); the demo
+   (`app/carouselData.ts`) uses an `import.meta.glob` per variant folder, which
+   emits only short URL strings into the bundle (the `.webp` bytes stay separate
+   assets fetched only for the selected candidate).
+4. **`sizes` is automatic** — do not pass it unless a slide genuinely needs to
+   override the carousel's `visibleSlidesNr`-derived value.
 
 ### 1.4 Slot children
 
@@ -277,9 +389,12 @@ These are the user-facing behaviours the implementation guarantees.
   flag from the status snapshot.
 - **Image preparation.** Two cooperating, lightweight pieces — no warm-up
   state machine, no decode queue, no coupling to the render-status store.
-  1. **Native prioritization on the rendered element.** Each slide's `<img>`
-     carries hints derived from its band: the active band fetches eagerly and at
-     high `fetchpriority`; off-band slides fall back to default. Under
+  1. **Native selection + prioritization on the rendered element.** A slide's
+     responsive variants (`Slide.image`, §1.4) render as `srcSet` / `<picture>`,
+     so the browser picks the right asset per resolution/DPR and orientation —
+     the carousel supplies `sizes` from its slot count. Each `<img>` also carries
+     band-derived hints: the active band fetches eagerly and at high
+     `fetchpriority`; off-band slides fall back to default. Under
      `userEnvironment.dataSaver` (derived from `prefers-reduced-data` / the
      Network Information API `saveData` flag, e.g. through `useUserEnvironment`)
      off-band slides instead load lazily and at low priority.
@@ -288,10 +403,13 @@ These are the user-facing behaviours the implementation guarantees.
      neighbour slides a single step can reveal (a bounded page span on each
      side, nearest-first), so a slide entering the render window during the next
      motion paints from a warm cache instead of fetching/decoding on the frame
-     it mounts. It creates short-lived offscreen `Image()`s, calls the async
-     `decode()` (off the main thread), retains them only while their URL stays
-     in the neighbour window (bounded regardless of deck size), and is skipped
-     entirely under `dataSaver`. It publishes no render status — each rendered
+     it mounts. It creates short-lived offscreen `Image()`s **mirroring the same
+     responsive descriptor** (`srcSet` + `sizes`, and the matching `<source>`
+     resolved via `matchMedia`), so it warms exactly the candidate the rendered
+     element will pick — never every variant. It calls the async `decode()` (off
+     the main thread), retains them only while their URL stays in the neighbour
+     window (bounded regardless of deck size), and is skipped entirely under
+     `dataSaver`. It publishes no render status — each rendered
      `<img>` remains the sole authority on its own outcome; the predecode only
      pre-warms the platform caches that element will hit. It takes a read-only
      `isWarmable(url)` gate (injected by the root from the store's status) so it
@@ -390,7 +508,7 @@ Every responsibility has exactly one owner. The orchestrator
 | Render window | `useSlideRenderModel` | Memoised; expands during motion, snaps on idle. |
 | Image resources | image-resource store (`createImageResourceStore`) | Per-URL render status and retry policy. One instance per carousel; the single authority on image renderability. |
 | Image prioritization | `SlideItem` | Native `<img loading>` / `fetchpriority` hints derived from the slide's band and the data-saver signal. |
-| Image predecode | `useSlideImagePreload` | Idle, store-decoupled warming (fetch + async `decode()`) of off-band neighbour slides; bounded to the neighbour window, skipped under data-saver. |
+| Image predecode | `useSlideImagePreload` | Idle, store-decoupled warming (fetch + async `decode()`) of off-band neighbour slides, mirroring each slide's responsive descriptor (`srcSet`/`sizes` + matched `<source>`); bounded to the neighbour window, skipped under data-saver. |
 | Slide image binding | `useImageResource` | Registers a `SlideItem` as a visible owner of its URL and subscribes to the URL's snapshot via `useSyncExternalStore`. |
 | Gesture lifecycle | `useCarouselGesture` | Wraps the shared `usePointerSwipe`. Converts pointer events into dispatches and direct position writes. |
 | Autoplay lifecycle | `useAutoplay` | Owns the interval timer, hover/visibility/dragging pause. |
@@ -894,7 +1012,7 @@ src/components/Carousel/
 │   │   ├── useImageResource.ts    per-slide useSyncExternalStore binding (store passed in)
 │   │   ├── useImageResourceStoreInstance.ts  lifecycle owner
 │   │   └── types.ts
-│   ├── useSlideImagePreload.ts    idle off-band fetch + async decode (store-decoupled)
+│   ├── useSlideImagePreload.ts    idle descriptor-aware off-band fetch + async decode (store-decoupled)
 │   ├── useCarouselSlideDeck.ts    layout, records, perfect-page info
 │   └── useSlideRenderModel.ts     virtual slides + render window
 ├── slots/

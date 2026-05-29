@@ -29,6 +29,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
     isActual,
     isDataSaverEnabled,
     imageResourceStore,
+    imageSizes,
     onSlideClick,
     ...ariaProps
   } = props;
@@ -60,6 +61,37 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
     Boolean(onSlideClick) && isInteractive && isContentReady;
   const Tag = isClickable ? "button" : "div";
 
+  // Render-only responsive sources (see `Slide.image`). The browser selects the
+  // concrete asset; identity stays `content`. `sizes` is only meaningful with a
+  // `srcSet`, so a plain `<img src>` slide carries none.
+  const image = slideData.image;
+  const sources = image?.sources ?? [];
+  const isResponsive = image?.srcSet !== undefined || sources.length > 0;
+  const resolvedSizes = image?.sizes ?? imageSizes;
+
+  const imageNode =
+    imageSource !== null ? (
+      <img
+        // Outside `<picture>` the `<img>` carries the retry key (a retry then
+        // remounts it); inside `<picture>` the key lives on the wrapper.
+        key={sources.length === 0 ? generation : undefined}
+        src={imageSource}
+        srcSet={image?.srcSet}
+        sizes={isResponsive ? resolvedSizes : undefined}
+        alt={slideData.alt || ""}
+        draggable={false}
+        decoding="async"
+        // Prioritization is delegated to the platform: the active band fetches
+        // eagerly and at high priority; under reduced-data the off-band slides
+        // defer. Responsive selection (resolution / orientation crop) is the
+        // browser's via `srcSet`/`<source>`.
+        loading={isDataSaverEnabled && !isActual ? "lazy" : "eager"}
+        fetchPriority={isActual ? "high" : isDataSaverEnabled ? "low" : "auto"}
+        onLoad={reportLoaded}
+        onError={reportError}
+      />
+    ) : null;
+
   return (
     <Tag
       {...ariaProps}
@@ -79,21 +111,21 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
       {imageSource !== null ? (
         hasImageError ? (
           slideData.alt || errAltPlaceholder
+        ) : sources.length > 0 ? (
+          <picture key={generation}>
+            {sources.map((source) => (
+              <source
+                key={`${source.media}:${source.srcSet}`}
+                media={source.media}
+                srcSet={source.srcSet}
+                sizes={source.sizes ?? resolvedSizes}
+                type={source.type}
+              />
+            ))}
+            {imageNode}
+          </picture>
         ) : (
-          <img
-            key={generation}
-            src={imageSource}
-            alt={slideData.alt || ""}
-            draggable={false}
-            decoding="async"
-            // Prioritization is delegated to the platform now that the JS
-            // warm-up layer is gone: the active band fetches eagerly and at
-            // high priority; under reduced-data the off-band slides defer.
-            loading={isDataSaverEnabled && !isActual ? "lazy" : "eager"}
-            fetchPriority={isActual ? "high" : isDataSaverEnabled ? "low" : "auto"}
-            onLoad={reportLoaded}
-            onError={reportError}
-          />
+          imageNode
         )
       ) : (
         slideData.content
