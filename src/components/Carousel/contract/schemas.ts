@@ -24,6 +24,25 @@ const createContentSchema = () =>
 
 export const ContentSchema = createContentSchema();
 
+const createSlideImageSourceSchema = () =>
+  z.object({
+    media: z.string().trim().min(1),
+    srcSet: z.string().trim().min(1),
+    sizes: z.string().trim().min(1).optional(),
+    type: z.string().trim().min(1).optional(),
+  });
+
+export const SlideImageSourceSchema = createSlideImageSourceSchema();
+
+const createSlideImageSchema = () =>
+  z.object({
+    srcSet: z.string().trim().min(1).optional(),
+    sizes: z.string().trim().min(1).optional(),
+    sources: z.array(SlideImageSourceSchema).optional(),
+  });
+
+export const SlideImageSchema = createSlideImageSchema();
+
 const createClassMapShape = () => {
   const shape = {} as Record<
     (typeof CLASS_NAME_KEYS)[number],
@@ -47,6 +66,7 @@ const createSlideSchema = () =>
     id: z.union([z.string(), z.number()]),
     content: ContentSchema,
     alt: z.string().optional(),
+    image: SlideImageSchema.optional(),
   });
 
 export const SlideSchema = createSlideSchema();

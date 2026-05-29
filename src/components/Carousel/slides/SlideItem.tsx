@@ -11,6 +11,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
     style,
     isContentImg,
     imageResourceStore,
+    imageSizes,
     isDataSaverEnabled,
     errAltPlaceholder,
     isInteractive,
@@ -41,6 +42,25 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
   const isClickable =
     Boolean(onSlideClick) && isInteractive && isContentReady;
   const Tag = isClickable ? "button" : "div";
+  const image = slideData.image;
+  const resolvedSizes = image?.sizes ?? imageSizes;
+  const sources = image?.sources ?? [];
+  const imageNode =
+    imageSource !== null ? (
+      <img
+        key={sources.length === 0 ? generation : undefined}
+        src={imageSource}
+        srcSet={image?.srcSet}
+        sizes={resolvedSizes}
+        alt={slideData.alt || ""}
+        draggable={false}
+        decoding="async"
+        loading={isDataSaverEnabled && !isActual ? "lazy" : "eager"}
+        fetchPriority={isActual ? "high" : isDataSaverEnabled ? "low" : "auto"}
+        onLoad={reportLoaded}
+        onError={reportError}
+      />
+    ) : null;
 
   return (
     <Tag
@@ -61,18 +81,21 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
       {imageSource !== null ? (
         hasImageError ? (
           slideData.alt || errAltPlaceholder
+        ) : sources.length > 0 ? (
+          <picture key={generation}>
+            {sources.map((source) => (
+              <source
+                key={`${source.media}:${source.srcSet}`}
+                media={source.media}
+                srcSet={source.srcSet}
+                sizes={source.sizes ?? resolvedSizes}
+                type={source.type}
+              />
+            ))}
+            {imageNode}
+          </picture>
         ) : (
-          <img
-            key={generation}
-            src={imageSource}
-            alt={slideData.alt || ""}
-            draggable={false}
-            decoding="async"
-            loading={isDataSaverEnabled && !isActual ? "lazy" : "eager"}
-            fetchPriority={isActual ? "high" : isDataSaverEnabled ? "low" : "auto"}
-            onLoad={reportLoaded}
-            onError={reportError}
-          />
+          imageNode
         )
       ) : (
         slideData.content

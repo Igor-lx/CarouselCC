@@ -10,6 +10,7 @@ export interface SlideItemProps extends SlideAriaProps {
   style: CSSProperties;
   isContentImg: boolean;
   imageResourceStore: ImageResourceStore | null;
+  imageSizes: string;
   isDataSaverEnabled: boolean;
   errAltPlaceholder: string;
   isInteractive: boolean;

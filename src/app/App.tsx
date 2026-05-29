@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import appStyles from "./App.module.scss";
-import { loadCarouselSources, type CarouselSourceRecord } from "./carouselData";
+import { CAROUSEL_SOURCES } from "./carouselData";
 import { useCompactLandscape } from "./useCompactLandscape";
 import { useBreakpoint, useUserEnvironment } from "../shared";
 import Carousel, {
@@ -44,30 +44,14 @@ export default function App() {
 
   const visibleSlidesNr =
     isTouch && isCompactLandscape ? COMPACT_LANDSCAPE_VISIBLE_SLIDES : device;
-  const isMobileImagery = isTouch || device === VISIBLE_BY_BREAKPOINT.MOBILE;
-  const [sourceRecords, setSourceRecords] = useState<
-    readonly CarouselSourceRecord[]
-  >([]);
-
-  useEffect(() => {
-    let isCurrent = true;
-
-    void loadCarouselSources(isMobileImagery).then((records) => {
-      if (isCurrent) setSourceRecords(records);
-    });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [isMobileImagery]);
-
   const slidesData = useMemo(
     () =>
-      sourceRecords.map((entry) => ({
+      CAROUSEL_SOURCES.map((entry) => ({
         id: entry.id,
         content: entry.content,
+        image: entry.image,
       })),
-    [sourceRecords],
+    [],
   );
 
   return (
@@ -96,7 +80,7 @@ export default function App() {
         </div>
 
         <div className={appStyles.component}>
-          {sourceRecords.length > 0 ? (
+          {slidesData.length > 0 ? (
             <Carousel
               ref={carouselRef}
               visibleSlidesNr={visibleSlidesNr}

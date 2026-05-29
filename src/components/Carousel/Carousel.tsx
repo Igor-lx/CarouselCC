@@ -62,6 +62,11 @@ const collectImageResourceUrls = (
   return [...urls];
 };
 
+const resolveSlideImageSizes = (visibleSlidesCount: number): string =>
+  visibleSlidesCount > 0
+    ? `${Math.ceil(100 / visibleSlidesCount)}vw`
+    : "100vw";
+
 const Carousel = memo(function Carousel(props: CarouselProps) {
   const {
     slidesData,
@@ -121,6 +126,10 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   );
 
   const imageResourceStore = useImageResourceStoreInstance(isContentImg);
+  const imageSizes = useMemo(
+    () => resolveSlideImageSizes(layout.visibleSlidesCount),
+    [layout.visibleSlidesCount],
+  );
 
   const isImageWarmable = useCallback(
     (url: string) =>
@@ -142,6 +151,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     records,
     layout,
     currentVirtualIndex: state.virtualIndex,
+    imageSizes,
     isIdle: status.isIdle,
     isContentImg,
     isDataSaverEnabled,
@@ -421,6 +431,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
                   style={slideStyle}
                   isContentImg={isContentImg}
                   imageResourceStore={imageResourceStore}
+                  imageSizes={imageSizes}
                   isDataSaverEnabled={isDataSaverEnabled}
                   errAltPlaceholder={config.errorAltPlaceholder}
                   isInteractive={isInteractive}

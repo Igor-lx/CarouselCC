@@ -46,6 +46,54 @@ describe("reconcileStateToLayout — equivalence fast path", () => {
     expect(next.targetPageIndex).toBe(2);
     expect(next.motionPhase).toBe("step-normal");
   });
+
+  it("does not reset when only render-only responsive image fields change", () => {
+    const beforeSlides: Slide[] = [
+      {
+        id: "same-1",
+        content: "canonical-1",
+        image: { srcSet: "one-small 480w, one-large 720w" },
+      },
+      {
+        id: "same-2",
+        content: "canonical-2",
+        image: { srcSet: "two-small 480w, two-large 720w" },
+      },
+      { id: "same-3", content: "canonical-3" },
+      { id: "same-4", content: "canonical-4" },
+    ];
+    const afterSlides: Slide[] = [
+      {
+        id: "same-1",
+        content: "canonical-1",
+        image: {
+          srcSet: "one-replaced-small 480w, one-replaced-large 720w",
+          sources: [
+            {
+              media: "(orientation: landscape)",
+              srcSet: "one-landscape 720w",
+            },
+          ],
+        },
+      },
+      {
+        id: "same-2",
+        content: "canonical-2",
+        image: { sizes: "50vw" },
+      },
+      { id: "same-3", content: "canonical-3" },
+      { id: "same-4", content: "canonical-4" },
+    ];
+    const layout = buildCarouselLayout(buildSlideRecords(beforeSlides), 2, false);
+    const equivalent = buildCarouselLayout(buildSlideRecords(afterSlides), 2, false);
+    const state = movedState(layout, 1);
+    const next = reconcileStateToLayout(state, equivalent);
+
+    expect(next).not.toBe(state);
+    expect(next.layout).toBe(equivalent);
+    expect(next.targetPageIndex).toBe(1);
+    expect(next.motionPhase).toBe("step-normal");
+  });
 });
 
 describe("reconcileStateToLayout — hard reset", () => {

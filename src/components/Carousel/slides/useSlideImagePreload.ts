@@ -11,6 +11,7 @@ interface UseSlideImagePreloadInput {
   records: CarouselSlideRecord[];
   layout: CarouselLayout;
   currentVirtualIndex: number;
+  imageSizes: string;
   isIdle: boolean;
   isContentImg: boolean;
   isDataSaverEnabled: boolean;
@@ -22,20 +23,46 @@ interface CollectInput {
   layout: CarouselLayout;
   currentVirtualIndex: number;
   neighborPageSpan: number;
+  imageSizes: string;
+  isMediaMatch?: (media: string) => boolean;
 }
 
-const slideImageSource = (record: CarouselSlideRecord): string | null =>
-  typeof record.slideData.content === "string" ? record.slideData.content : null;
+export interface SlideImagePreloadTarget {
+  key: string;
+  src: string;
+  srcSet?: string;
+  sizes?: string;
+}
+
+const slideImagePreloadTarget = (
+  record: CarouselSlideRecord,
+  imageSizes: string,
+  isMediaMatch?: (media: string) => boolean,
+): SlideImagePreloadTarget | null => {
+  const { content, image } = record.slideData;
+  if (typeof content !== "string") return null;
+
+  const matchedSource = image?.sources?.find((source) =>
+    isMediaMatch?.(source.media) ?? false,
+  );
+  const srcSet = matchedSource?.srcSet ?? image?.srcSet;
+  const sizes = matchedSource?.sizes ?? image?.sizes ?? imageSizes;
+  const key = `${content}|${srcSet ?? ""}|${sizes ?? ""}`;
+
+  return { key, src: content, srcSet, sizes };
+};
 
 const bandDistance = (index: number, bandStart: number, bandEnd: number): number =>
   index < bandStart ? bandStart - index : index - bandEnd;
 
-export const collectIdlePreloadUrls = ({
+export const collectIdlePreloadTargets = ({
   records,
   layout,
   currentVirtualIndex,
   neighborPageSpan,
-}: CollectInput): string[] => {
+  imageSizes,
+  isMediaMatch,
+}: CollectInput): SlideImagePreloadTarget[] => {
   const recordCount = records.length;
   if (recordCount === 0 || !layout.canSlide) return [];
 
@@ -52,15 +79,17 @@ export const collectIdlePreloadUrls = ({
         : null
       : loopedSlideIndex(virtualIndex, recordCount);
 
-  const urlAt = (virtualIndex: number): string | null => {
+  const targetAt = (virtualIndex: number): SlideImagePreloadTarget | null => {
     const recordIndex = resolveRecordIndex(virtualIndex);
-    return recordIndex === null ? null : slideImageSource(records[recordIndex]!);
+    return recordIndex === null
+      ? null
+      : slideImagePreloadTarget(records[recordIndex]!, imageSizes, isMediaMatch);
   };
 
   const visibleUrls = new Set<string>();
   for (let index = bandStart; index <= bandEnd; index += 1) {
-    const src = urlAt(index);
-    if (src) visibleUrls.add(src);
+    const target = targetAt(index);
+    if (target) visibleUrls.add(target.src);
   }
 
   const indices: number[] = [];
@@ -72,12 +101,12 @@ export const collectIdlePreloadUrls = ({
     (a, b) => bandDistance(a, bandStart, bandEnd) - bandDistance(b, bandStart, bandEnd),
   );
 
-  const urls = new Set<string>();
+  const targets = new Map<string, SlideImagePreloadTarget>();
   for (const virtualIndex of indices) {
-    const src = urlAt(virtualIndex);
-    if (src && !visibleUrls.has(src)) urls.add(src);
+    const target = targetAt(virtualIndex);
+    if (target && !visibleUrls.has(target.src)) targets.set(target.key, target);
   }
-  return [...urls];
+  return [...targets.values()];
 };
 
 const releaseWarmImage = (image: HTMLImageElement): void => {
@@ -88,6 +117,7 @@ export function useSlideImagePreload({
   records,
   layout,
   currentVirtualIndex,
+  imageSizes,
   isIdle,
   isContentImg,
   isDataSaverEnabled,
@@ -96,22 +126,27 @@ export function useSlideImagePreload({
   const isEnabled = isContentImg && !isDataSaverEnabled;
   const warmedRef = useRef<Map<string, HTMLImageElement>>(new Map());
 
-  const targetUrls = useMemo<string[] | null>(() => {
+  const targetImages = useMemo<SlideImagePreloadTarget[] | null>(() => {
     if (!isEnabled) return [];
     if (!isIdle) return null;
-    return collectIdlePreloadUrls({
+    return collectIdlePreloadTargets({
       records,
       layout,
       currentVirtualIndex,
+      imageSizes,
       neighborPageSpan: PRELOAD_NEIGHBOR_PAGE_SPAN,
+      isMediaMatch:
+        typeof window === "undefined"
+          ? undefined
+          : (media) => window.matchMedia(media).matches,
     });
-  }, [isEnabled, isIdle, records, layout, currentVirtualIndex]);
+  }, [currentVirtualIndex, imageSizes, isEnabled, isIdle, layout, records]);
 
   useEffect(() => {
-    if (targetUrls === null || typeof window === "undefined") return;
+    if (targetImages === null || typeof window === "undefined") return;
 
     const warmed = warmedRef.current;
-    const keep = new Set(targetUrls);
+    const keep = new Set(targetImages.map((target) => target.key));
 
     warmed.forEach((image, url) => {
       if (keep.has(url)) return;
@@ -119,18 +154,20 @@ export function useSlideImagePreload({
       warmed.delete(url);
     });
 
-    for (const url of targetUrls) {
-      if (warmed.has(url) || !isWarmable(url)) continue;
+    for (const target of targetImages) {
+      if (warmed.has(target.key) || !isWarmable(target.src)) continue;
       const image = new Image();
       image.decoding = "async";
       image.fetchPriority = "low";
-      image.src = url;
-      warmed.set(url, image);
+      image.sizes = target.sizes ?? "";
+      image.srcset = target.srcSet ?? "";
+      image.src = target.src;
+      warmed.set(target.key, image);
       if (typeof image.decode === "function") {
         image.decode().catch(() => undefined);
       }
     }
-  }, [targetUrls, isWarmable]);
+  }, [targetImages, isWarmable]);
 
   useEffect(() => {
     const warmed = warmedRef.current;

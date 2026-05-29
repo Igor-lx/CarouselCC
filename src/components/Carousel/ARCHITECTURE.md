@@ -78,11 +78,167 @@ runtime exception: profile math normalizes acceleration/deceleration zones to
 
 | Prop          | Type            | Default | Effect |
 | ------------- | --------------- | ------- | ------ |
-| `slidesData`  | `Slide[]`       | —       | Required. `Slide = { id: string \| number; content: string \| number \| ReactElement; alt?: string }`. `content` must be a trimmed-non-empty string, a number, or a React element. |
+| `slidesData`  | `Slide[]`       | —       | Required. `Slide = { id: string \| number; content: string \| number \| ReactElement; alt?: string; image?: SlideImage }`. `content` must be a trimmed-non-empty string, a number, or a React element. For image slides, `content` is the canonical fallback `src` and the logical content identity; `image` contains render-only responsive variants and never participates in layout reconciliation. |
 | `visibleSlidesNr` | `number`     | `3`     | How many slides share the viewport. Drives layout flex-basis, slot-size measurement, page math (`pageCount = ceil(slidesData.length / visibleSlidesNr)`), and the PaginationWidget projection slot count. |
 | `isPagePaddingOn` | `boolean`    | `false` | When on, pads the deck with cloned tail slides so `length` becomes a multiple of `visibleSlidesNr`. Eliminates partial pages at the tail. |
 | `isContentImg` | `boolean`      | `true`  | When on, treats string `content` as an `<img src>`. When off, renders raw `content`. Image errors fall back to `slide.alt` or `errAltPlaceholder`. |
 | `errAltPlaceholder` | `string`  | `"Downloading Error"` | Used when an image fails to load and the slide has no `alt`. |
+
+`SlideImage` is optional and only applies when `isContentImg` is on and
+`content` is a string:
+
+```ts
+type SlideImage = {
+  srcSet?: string;
+  sizes?: string;
+  sources?: Array<{
+    media: string;
+    srcSet: string;
+    sizes?: string;
+    type?: string;
+  }>;
+};
+```
+
+When `sources` is present, `SlideItem` renders one `<picture>` per slide:
+matching `<source>` elements are tried first, and the `<img>` fallback uses
+`content` / `image.srcSet`. When `sources` is absent, the slide renders a
+plain `<img>`. The carousel computes a default `sizes` value from
+`visibleSlidesCount` (`100vw`, `50vw`, `34vw`, ...); a host may override it
+with `image.sizes` or per-source `sizes` when it knows a more exact slot size.
+
+`image` is render-only. Changing `image.srcSet`, `image.sizes`, or
+`image.sources` while keeping the same `id` and canonical `content` must not
+reset the carousel. Changing `content` is treated as replacing the logical
+slide data and therefore changes `dataKey`.
+
+#### Host responsive-image pipeline
+
+When a host starts with one original image set, prepare the carousel images as
+one logical slide set with several physical render variants. Do **not** create
+separate `slidesData` arrays for portrait, landscape, mobile, or desktop.
+Swapping arrays changes `content` URLs, changes `dataKey`, and resets the
+viewer position. The browser should choose the physical file through
+`<picture>`, while the carousel receives one stable logical data set.
+
+Recommended asset layout:
+
+```txt
+src/assets/carousel/
+  portrait/
+    480/
+      carousel1.webp
+      carousel2.webp
+    720/
+      carousel1.webp
+      carousel2.webp
+  landscape/
+    480/
+      carousel1.webp
+      carousel2.webp
+    720/
+      carousel1.webp
+      carousel2.webp
+```
+
+Meaning:
+
+- `portrait/480` and `portrait/720` are the default portrait-composition
+  variants. Their `w` descriptors are `480w` and `720w` because those are the
+  intrinsic file widths.
+- `landscape/480` and `landscape/720` are art-directed landscape crops. They
+  are used only when the compact-landscape media query matches.
+- Folder names are dimensions, not devices. A high-DPR phone may legitimately
+  choose a `720w` file; a narrow low-DPR viewport may choose `480w`.
+
+For the current demo assets, the generated dimensions are:
+
+```txt
+portrait/480:  480x853
+portrait/720:  720x1280
+landscape/480: 480x334
+landscape/720: 720x501
+```
+
+If an external developer has only one high-resolution source per slide, create
+the variants before wiring the data:
+
+1. Export a portrait/default variant at each required intrinsic width
+   (`480w`, `720w` in the current demo). Preserve the composition that should
+   be used outside compact landscape.
+2. Create a center or art-directed landscape crop at the same widths. The
+   current compact-landscape slot is approximately `1.44:1`, so `480x334` and
+   `720x501` match it closely. If the host design changes, derive the crop
+   height from the actual target aspect ratio instead of reusing these exact
+   numbers.
+3. Use the same file names in every width/aspect folder. `carousel7.webp`
+   should refer to the same logical slide in all four folders.
+4. Keep one stable `id` and one stable canonical `content` per logical slide.
+   Use `content` as the fallback/default `src`, not as the orientation switch.
+5. Put the alternate files into `image.srcSet` and `image.sources`. These
+   fields are render-only and may change without resetting the carousel.
+
+Example host data file:
+
+```ts
+import type { Slide } from "@/components/Carousel";
+
+const COMPACT_LANDSCAPE_MEDIA =
+  "(orientation: landscape) and (max-height: 520px)";
+
+const ASSET_URLS = import.meta.glob<string>(
+  "../assets/carousel/**/*.webp",
+  {
+    eager: true,
+    import: "default",
+    query: "?url",
+  },
+);
+
+const asset = (
+  aspect: "portrait" | "landscape",
+  width: 480 | 720,
+  index: number,
+) => {
+  const key = `../assets/carousel/${aspect}/${width}/carousel${index}.webp`;
+  const url = ASSET_URLS[key];
+  if (!url) throw new Error(`Missing carousel asset: ${key}`);
+  return url;
+};
+
+const slide = (index: number): Slide => {
+  const portrait480 = asset("portrait", 480, index);
+  const portrait720 = asset("portrait", 720, index);
+  const landscape480 = asset("landscape", 480, index);
+  const landscape720 = asset("landscape", 720, index);
+
+  return {
+    id: String(index),
+    content: portrait480,
+    image: {
+      srcSet: `${portrait480} 480w, ${portrait720} 720w`,
+      sources: [
+        {
+          media: COMPACT_LANDSCAPE_MEDIA,
+          srcSet: `${landscape480} 480w, ${landscape720} 720w`,
+          type: "image/webp",
+        },
+      ],
+    },
+  };
+};
+
+export const slidesData = Array.from(
+  { length: 12 },
+  (_, index) => slide(index + 1),
+);
+```
+
+This imports URL strings into the JS bundle; it does **not** download every
+image file. Network fetch and decode happen only for the candidate selected by
+the browser from `picture` / `srcset` / `sizes`. Avoid hidden `<img>` elements,
+manual `new Image()` warmups over every variant, or JS orientation switches
+outside the carousel; those patterns defeat browser-native source selection.
 
 #### Layout / motion mode
 
@@ -239,13 +395,17 @@ These are the user-facing behaviours the implementation guarantees.
 - **External imperative control.** A `ref` of type `CarouselHandle` exposes
   `prev()` / `next()` for buttons outside the carousel subtree or programmatic
   use. Both route through the same navigation pipeline as `<Controls>`.
-- **Image loading.** The carousel does not run an offscreen image-preparation
-  subsystem. Render-window slides mount normal `<img>` elements and the browser
-  owns network and decode scheduling. The image-resource store only keeps a compact
-  per-URL render status and capped retry policy so cloned slides with the same
-  `src` agree on `loading | loaded | error`. When the host reports reduced data
-  usage via `userEnvironment.dataSaver`, non-actual buffered images are rendered
-  with lazy / low-priority loading hints; actual images still load eagerly.
+- **Image loading.** Render-window slides mount normal `<img>` / `<picture>`
+  elements and the browser owns source selection, network, and decode
+  scheduling. During idle, the carousel may warm nearby off-band image
+  descriptors with low-priority `Image` objects that mirror the same
+  `src`/`srcset`/`sizes` the slide would render; this is disabled when
+  `userEnvironment.dataSaver` is on and never writes into the render-status
+  store. The image-resource store only keeps a compact per-canonical-URL render
+  status and capped retry policy so cloned slides with the same fallback `src`
+  agree on `loading | loaded | error`. When the host reports reduced data usage
+  via `userEnvironment.dataSaver`, non-actual buffered images are rendered with
+  lazy / low-priority loading hints; actual images still load eagerly.
 - **Image errors and retry.** A slide whose image fails to load renders a
   text placeholder (`alt`, or `errAltPlaceholder`) and is not interactive.
   While such a slide sits in the active band, the image-resource store
@@ -397,14 +557,17 @@ The system has five SSOTs, each owned by exactly one layer.
    - retry `generation`, incremented when the same URL should remount its
      `<img>` after a capped backoff retry.
 
-   Browser image loading remains browser-owned: the store never creates
-   offscreen images, never calls `decode()`, and never schedules ahead of
-   mounted `<img>` elements. `Carousel` passes the store explicitly into each
-   `SlideItem`; the slide subscribes to its URL via `useImageResource`, then
-   reports the real `<img>` outcome back. "Has this
-   slide's image failed" is a *derived read* of this SSOT, never a second
-   copy of state. Observation-only: it never feeds navigation, layout, or
-   motion.
+   Browser image loading remains browser-owned: mounted `<picture>` / `<img>`
+   elements choose the concrete candidate through native `media`, `srcset`, and
+   `sizes`. The store is keyed by the canonical fallback URL (`content`), not by
+   the browser-selected candidate, and it never participates in layout identity.
+   `Carousel` passes the store explicitly into each `SlideItem`; the slide
+   subscribes to its canonical URL via `useImageResource`, then reports the real
+   `<img>` outcome back. Idle predecode is separate: it creates low-priority
+   `Image` objects for nearby off-band descriptors, mirrors `srcset` / `sizes`,
+   is skipped under data-saver mode, and never writes to the store. "Has this
+   slide's image failed" is a *derived read* of this SSOT, never a second copy
+   of state. Observation-only: it never feeds navigation, layout, or motion.
 
 No layer mirrors another layer's value. The state machine never reads a
 sampled motion value: the gesture controller reads the visual position and
@@ -917,5 +1080,6 @@ dependencies, the architecture has held.
   controller keeps publishing the numeric timeline. The PaginationWidget
   binding short-circuits writes per dot using visual thresholds. The motion
   controller emits only on active-segment RAF ticks and never emits while idle.
-  Image rendering uses native `<img>` loading, priority, and async decode hints
-  plus a compact per-URL status / retry store.
+  Image rendering uses native `<picture>` / `<img>` source selection, loading,
+  priority, and async decode hints plus a compact per-canonical-URL status /
+  retry store and bounded idle predecode for nearby off-band descriptors.
