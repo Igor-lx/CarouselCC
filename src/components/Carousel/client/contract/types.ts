@@ -1,6 +1,35 @@
-import type { ReactElement, ReactNode, Ref } from "react";
+import type { ReactNode, Ref } from "react";
+import type { z } from "zod";
 
-import type { CLASS_NAME_KEYS, SLIDE_CLASS_KEYS } from "./classKeys";
+import type {
+  SlideImageSourceSchema,
+  SlideImageVariantsSchema,
+  SlideSchema,
+} from "./schemas";
+
+/**
+ * Single source of truth for the class-name keys the carousel and its slides
+ * accept through `className`. Plain `as const` arrays with zero dependencies
+ * (no React, no Zod): the runtime hot path iterates them and the key types
+ * below derive from the same definition. These two arrays are the only runtime
+ * values this otherwise type-only module emits.
+ */
+export const CLASS_NAME_KEYS = [
+  "outerContainer",
+  "innerContainer",
+  "slideContainer",
+  "slide",
+  "slideInteractive",
+  "slideError",
+  "slideText",
+] as const;
+
+export const SLIDE_CLASS_KEYS = [
+  "slide",
+  "slideInteractive",
+  "slideError",
+  "slideText",
+] as const;
 
 export type ClassNameKey = (typeof CLASS_NAME_KEYS)[number];
 export type SlideClassKey = (typeof SLIDE_CLASS_KEYS)[number];
@@ -8,45 +37,41 @@ export type SlideClassKey = (typeof SLIDE_CLASS_KEYS)[number];
 export type ClassNameMap = Partial<Record<ClassNameKey, string>>;
 export type SlideClassMap = Pick<ClassNameMap, SlideClassKey>;
 
-/** One art-directed `<source>` for a slide's `<picture>` (render-only). */
-export interface SlideImageSource {
-  /** Media condition under which the browser may pick this source. */
-  media: string;
-  /** Candidate set, normally with width (`w`) descriptors. */
-  srcSet: string;
-  /** Slot hint; defaults to the carousel's auto-derived value when omitted. */
-  sizes?: string;
-  /** e.g. `"image/webp"` — lets the browser skip an unsupported source. */
-  type?: string;
-}
+/**
+ * One art-directed `<source>` for a slide's `<picture>` (render-only). Inferred
+ * from {@link SlideImageSourceSchema} (single source of truth). Fields:
+ * `media` — the media condition under which the browser may pick this source;
+ * `srcSet` — candidate set, normally with width (`w`) descriptors;
+ * `sizes?` — slot hint, defaults to the carousel's auto-derived value;
+ * `type?` — e.g. `"image/webp"`, lets the browser skip an unsupported source.
+ */
+export type SlideImageSource = z.infer<typeof SlideImageSourceSchema>;
 
 /**
- * Render-only responsive image variants for an image slide. The browser
- * selects the concrete asset (by `sizes` / DPR within `srcSet`, by `media`
- * for `sources`). This NEVER participates in slide identity: reconcile and
- * `dataKey` key only on `id` + `content`, so supplying or switching variants
- * (e.g. an orientation-specific crop) never resets the viewing position.
+ * Render-only responsive image variants for an image slide. The browser selects
+ * the concrete asset (by `sizes` / DPR within `srcSet`, by `media` for
+ * `sources`). This NEVER participates in slide identity: reconcile and `dataKey`
+ * key only on `id` + `content`, so supplying or switching variants (e.g. an
+ * orientation-specific crop) never resets the viewing position.
+ *
+ * Inferred from {@link SlideImageVariantsSchema}. Fields: `srcSet?` — resolution
+ * candidates for the default `<img>` (width `w` descriptors); `sizes?` —
+ * override the carousel's auto-derived `sizes` (rarely needed); `sources?` —
+ * art-directed `<source>` overrides (e.g. a landscape crop).
  */
-export interface SlideImageVariants {
-  /** Resolution candidates for the default `<img>` (width `w` descriptors). */
-  srcSet?: string;
-  /** Override the carousel's auto-derived `sizes`. Rarely needed. */
-  sizes?: string;
-  /** Art-directed `<source>` overrides (e.g. a landscape crop). */
-  sources?: readonly SlideImageSource[];
-}
+export type SlideImageVariants = z.infer<typeof SlideImageVariantsSchema>;
 
-export interface Slide {
-  id: string | number;
-  /**
-   * Logical identity + fallback `<img src>`. The only image field that feeds
-   * `dataKey`/reconcile — keep it stable across responsive variants.
-   */
-  content: string | number | ReactElement;
-  alt?: string;
-  /** Render-only responsive sources — see {@link SlideImageVariants}. */
-  image?: SlideImageVariants;
-}
+/**
+ * A single slide. Inferred from {@link SlideSchema} — the same schema a host
+ * uses to validate external slide data, so the type and the runtime contract
+ * cannot drift.
+ *
+ * `id` + `content` are the ONLY fields that feed `dataKey`/reconcile, so
+ * `content` (logical identity + fallback `<img src>`) must stay stable across
+ * responsive variants. `image` is render-only (see {@link SlideImageVariants});
+ * `alt` is the accessible text (an empty string marks a decorative image).
+ */
+export type Slide = z.infer<typeof SlideSchema>;
 
 /**
  * Low-frequency, read-only status handed to `onCarouselStatusChange`. Two

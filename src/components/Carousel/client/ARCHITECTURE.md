@@ -1147,13 +1147,21 @@ dependencies, the architecture has held.
 - **TypeScript.** Discriminated unions for `CarouselCommand`,
   `MotionPhase`, `MoveReason`, `CarouselSegment`, `CarouselMotionIntent`.
   No `any`.
-- **Public Zod schemas.** `CarouselPropsSchema` and `CarouselSlidesDataSchema`
-  are exported (see `index.ts`) for the **host application** to validate data
-  from external sources — API responses, CMS, user config — before passing it
-  as `slidesData`. The component itself does **not** runtime-validate its own
-  props: invalid input propagates and is surfaced by the `Diagnostic` slot as
-  DEV-only warnings, keeping the failure mode visible at the source. The
-  schemas are a tool for the host, intentionally unused inside the component.
+- **Public Zod schemas.** Zod is scoped to exactly one job: validating the
+  slide-data document (`carousel-slides.json` / an API or CMS payload) before it
+  is passed as `slidesData`. `CarouselSlidesDataSchema` is the single public
+  entry point; the `Slide`-family schemas it is built from are also the **single
+  source of truth** the public `Slide` / `SlideImageVariants` / `SlideImageSource`
+  types are inferred from (`z.infer`), so the validated shape and the type cannot
+  drift. There are **no** prop/callback schemas — props are not validated. The
+  schemas are exported only from `contract/schemas` and deliberately **not**
+  re-exported from the contract barrel or the component entry: a value re-export
+  on the runtime import path would pull Zod into the app bundle, so hosts opt in
+  with an explicit deep import
+  (`import { CarouselSlidesDataSchema } from ".../client/contract/schemas"`).
+  The component itself does **not** runtime-validate: invalid input propagates
+  and is surfaced by the `Diagnostic` slot as DEV-only warnings, keeping the
+  failure mode visible at the source.
 - **React safety.** Per-frame work never touches React state. State
   machine dispatches are batched by React. Effects are pure; cleanup is
   explicit. `useIsomorphicLayoutEffect` is used for DOM measurement,

@@ -14,6 +14,23 @@ app bundle), and **`client/` imports nothing from `data-gen/`**. The only thing
 that flows between them is the JSON document `data-gen/` produces and the
 component consumes — its shape is the `Slide` contract.
 
+## Compatibility tests
+
+The [`boundary/`](./boundary) folder holds the tests that enforce this fit
+between the two halves as CI invariants. They belong to **this source repo
+only** — they are not copied into the app or shipped with either half. They run
+here, where both halves still sit side by side, to prove the split stays clean.
+They live on neutral ground (above both halves), so they can see both without
+crossing the boundary they guard:
+
+- [`boundaries.test.ts`](./boundary/boundaries.test.ts) — fails the build if
+  `client/` ever imports `data-gen/`, or if any `data-gen/` import escapes the
+  folder. This is what keeps the Node generator (and `node:fs`) out of the app
+  bundle.
+- [`slide-contract.test.ts`](./boundary/slide-contract.test.ts) — a compile-time
+  check that the slide the generator emits is always a valid component `Slide`.
+  The two halves define the slide type independently; this locks them compatible.
+
 ## Use it
 
 1. **Client.** Import the component from `client/` and feed it `slidesData`:

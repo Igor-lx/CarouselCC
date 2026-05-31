@@ -1,20 +1,26 @@
 import type { ReactElement } from "react";
 import { z } from "zod";
 
-import { CLASS_NAME_KEYS } from "./classKeys";
-
 /**
- * Public Zod schemas for host-side runtime validation of external data
- * (API responses, CMS payloads, user config) before it reaches the carousel.
+ * Zod schemas for the slide-data contract — the single source of truth for the
+ * shape of the `carousel-slides.json` document the component consumes.
  *
- * The component itself stays zero-runtime on its prop types — invalid input
- * propagates and is surfaced by the `Diagnostic` slot as DEV-only warnings,
- * keeping the failure mode visible at the source. This module is the tool
- * a host uses to reject bad data up front; the carousel does not import it.
+ * Two jobs, one definition:
+ *  - `Slide`, `SlideImageVariants` and `SlideImageSource` are inferred from these
+ *    schemas (`z.infer`, type-only — see `types.ts`), so the validated shape and
+ *    the compile-time type cannot drift.
+ *  - A host validates external slide data (an API response, a CMS payload, the
+ *    generated JSON) against `CarouselSlidesDataSchema` before passing it as
+ *    `slidesData`. This is the ONLY thing Zod is used for here — there are no
+ *    prop/callback schemas. The carousel never runtime-validates its own props:
+ *    invalid input propagates and is surfaced by the `Diagnostic` slot as
+ *    DEV-only warnings, keeping the failure mode visible at the source.
  *
- * Keeping the schemas out of the runtime path means Zod is not pulled into
- * the carousel's bundle: hosts opt in by importing
- * `@/components/Carousel/schemas` explicitly when they want validation.
+ * Importing a TYPE from the contract is erased; importing a SCHEMA (a value)
+ * pulls in Zod. So this module is deliberately NOT re-exported from the contract
+ * barrel or the component entry — that keeps Zod out of the app bundle. Hosts
+ * opt in with an explicit deep import:
+ *   import { CarouselSlidesDataSchema } from "@/components/Carousel/client/contract/schemas";
  */
 
 const ReactElementSchema = z.custom<ReactElement>((value) => {
@@ -32,98 +38,41 @@ const ContentSchema = z.union([
   ReactElementSchema,
 ]);
 
-// `satisfies` ties the schema's shape to `CLASS_NAME_KEYS` at compile time:
-// the inner object must define exactly one `z.ZodString` field per key in
-// the array, no more and no less. If the two ever drift (a key is added
-// to one source and not the other), TypeScript fails before the schema
-// is built — restoring single-source-of-truth between the runtime key
-// list and the Zod schema without pulling Zod into the runtime path.
-const ClassMapSchema = z
-  .object({
-    outerContainer: z.string(),
-    innerContainer: z.string(),
-    slideContainer: z.string(),
-    slide: z.string(),
-    slideInteractive: z.string(),
-    slideError: z.string(),
-    slideText: z.string(),
-  } satisfies Record<(typeof CLASS_NAME_KEYS)[number], z.ZodString>)
-  .partial();
-
-const SlideImageSourceSchema = z.object({
-  media: z.string(),
-  srcSet: z.string(),
-  sizes: z.string().optional(),
-  type: z.string().optional(),
+/**
+ * Source of truth for the `SlideImageSource` type (inferred in `types.ts`).
+ * Strings are trimmed and must be non-empty: an empty `media`/`srcSet` is never
+ * a valid source and is rejected at the host boundary rather than emitted as a
+ * dead `<source>`.
+ */
+export const SlideImageSourceSchema = z.object({
+  media: z.string().trim().min(1),
+  srcSet: z.string().trim().min(1),
+  sizes: z.string().trim().min(1).optional(),
+  type: z.string().trim().min(1).optional(),
 });
 
-const SlideImageVariantsSchema = z.object({
-  srcSet: z.string().optional(),
-  sizes: z.string().optional(),
-  sources: z.array(SlideImageSourceSchema).optional(),
+/**
+ * Source of truth for the `SlideImageVariants` type. `sources` is `.readonly()`
+ * so the inferred type is `readonly SlideImageSource[]` — the carousel only ever
+ * reads it.
+ */
+export const SlideImageVariantsSchema = z.object({
+  srcSet: z.string().trim().min(1).optional(),
+  sizes: z.string().trim().min(1).optional(),
+  sources: z.array(SlideImageSourceSchema).readonly().optional(),
 });
 
-const SlideSchema = z.object({
+/** Source of truth for the `Slide` type (inferred in `types.ts`). */
+export const SlideSchema = z.object({
   id: z.union([z.string(), z.number()]),
   content: ContentSchema,
   alt: z.string().optional(),
   image: SlideImageVariantsSchema.optional(),
 });
 
-const OnSlideClickSchema = z.function({
-  input: [SlideSchema],
-  output: z.void(),
-});
-
-const CarouselStatusSnapshotSchema = z.object({
-  isIdle: z.boolean(),
-  currentPageIndex: z.number(),
-  pageCount: z.number(),
-  isAtStart: z.boolean(),
-  isAtEnd: z.boolean(),
-});
-
-const OnCarouselStatusChangeSchema = z.function({
-  input: [CarouselStatusSnapshotSchema],
-  output: z.void(),
-});
-
-const UserEnvironmentSchema = z
-  .object({
-    reducedMotion: z.boolean(),
-    touch: z.boolean(),
-    dataSaver: z.boolean(),
-  })
-  .partial();
-
 /**
- * Schema for the full `CarouselProps` object. Excludes `children` and `ref`,
- * which are React-managed (not host data) and not meaningful to validate.
+ * The `slidesData` array — the shape of the `carousel-slides.json` document a
+ * host validates before handing the data to the carousel. The single public
+ * entry point for validation.
  */
-export const CarouselPropsSchema = z.object({
-  slidesData: z.array(SlideSchema),
-  visibleSlidesNr: z.number().optional(),
-  isPagePaddingOn: z.boolean().optional(),
-  durationAutoplay: z.number().optional(),
-  intervalAutoplay: z.number().optional(),
-  durationStep: z.number().optional(),
-  jumpSpeedMultiplier: z.number().optional(),
-  isContentImg: z.boolean().optional(),
-  errAltPlaceholder: z.string().optional(),
-  isAuto: z.boolean().optional(),
-  isPaginationOn: z.boolean().optional(),
-  isInteractive: z.boolean().optional(),
-  isFinite: z.boolean().optional(),
-  isControlsOn: z.boolean().optional(),
-  className: ClassMapSchema.optional(),
-  userEnvironment: UserEnvironmentSchema.optional(),
-  onSlideClick: OnSlideClickSchema.optional(),
-  onCarouselStatusChange: OnCarouselStatusChangeSchema.optional(),
-});
-
-/**
- * Schema for the `slidesData` array alone — the most common thing a host
- * application needs to validate (e.g. an API response) before handing it to
- * the carousel.
- */
-export const CarouselSlidesDataSchema = CarouselPropsSchema.shape.slidesData;
+export const CarouselSlidesDataSchema = z.array(SlideSchema);

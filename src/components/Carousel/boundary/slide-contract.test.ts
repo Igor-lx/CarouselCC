@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { Slide } from "./client/contract/types";
-import type { GeneratedSlide } from "./data-gen/types";
+import type { Slide } from "../client/contract/types";
+import type { GeneratedSlide } from "../data-gen/types";
 
 /**
  * Contract test — locks the seam between the two halves: the slide the
@@ -11,8 +11,9 @@ import type { GeneratedSlide } from "./data-gen/types";
  *
  * The guarantee is at compile time: the `const asSlide: Slide = generated`
  * assignment below fails `tsc` if `GeneratedSlide` ever drifts out of `Slide`
- * (a renamed field, a widened type). Lives at the box root (neutral ground), so
- * importing both halves' types does not cross the runtime boundary.
+ * (a renamed field, a widened type). Lives in the box's `boundary/` folder
+ * (neutral ground, above both halves), so importing both halves' types does not
+ * cross the runtime boundary.
  */
 describe("Slide contract (data-gen → client)", () => {
   it("a generated slide is assignable to the component Slide", () => {

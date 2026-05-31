@@ -38,7 +38,7 @@ import {
 import { CAROUSEL_SLOTS } from "./slots";
 import { useCarouselState } from "./state";
 import { areStatusSnapshotsEqual } from "./status/statusSnapshot";
-import { SLIDE_CLASS_KEYS } from "./contract/classKeys";
+import { SLIDE_CLASS_KEYS } from "./contract/types";
 import type {
   CarouselProps,
   CarouselStatusSnapshot,

@@ -14,11 +14,12 @@ import { describe, expect, it } from "vitest";
  *    folder (`../`), so it can be copied to a server on its own and never
  *    reaches back into `client/`, `shared`, or the app.
  *
- * Lives at the box root (neutral ground), so it may see both halves without
- * violating the boundary it guards.
+ * Lives in the box's `boundary/` folder (neutral ground, above both halves), so
+ * it may see both halves without violating the boundary it guards.
  */
 
-const boxRoot = path.dirname(fileURLToPath(import.meta.url));
+// This file sits in `Carousel/boundary/`; the box root is one level up.
+const boxRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CLIENT_DIR = path.join(boxRoot, "client");
 const DATA_GEN_DIR = path.join(boxRoot, "data-gen");
 
