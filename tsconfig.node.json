@@ -19,5 +19,9 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["vite.config.ts", "vitest.config.ts", "scripts"]
+  "include": [
+    "vite.config.ts",
+    "vitest.config.ts",
+    "src/components/Carousel/data-gen"
+  ]
 }

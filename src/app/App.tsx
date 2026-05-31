@@ -7,12 +7,11 @@ import Carousel, {
   type CarouselHandle,
   type CarouselStatusSnapshot,
   type Slide,
-} from "../components/Carousel";
-import { CarouselSlidesDataSchema } from "../components/Carousel/contract/schemas";
-import { Controls } from "../components/Carousel/modules/Controls";
-import { Pagination } from "../components/Carousel/modules/Pagination";
-import { PaginationWidget } from "../components/Carousel/modules/PaginationWidget";
-import { Diagnostic } from "../components/Carousel/modules/Diagnostic";
+} from "../components/Carousel/client";
+import { Controls } from "../components/Carousel/client/modules/Controls";
+import { Pagination } from "../components/Carousel/client/modules/Pagination";
+import { PaginationWidget } from "../components/Carousel/client/modules/PaginationWidget";
+import { Diagnostic } from "../components/Carousel/client/modules/Diagnostic";
 import { useTheme } from "../theme/useTheme";
 
 const VISIBLE_BY_BREAKPOINT = {
@@ -58,9 +57,8 @@ export default function App() {
     isTouch && isCompactLandscape ? COMPACT_LANDSCAPE_VISIBLE_SLIDES : device;
 
   // Content document, fetched at load from the static file the generator
-  // produced (one stable responsive set; the browser selects the asset). It is
-  // external data, so it is validated with the carousel's exported Zod schema
-  // before render — the integration boundary from ADR-002.
+  // produced (one stable responsive set; the browser selects the asset). The
+  // data is consumed as-is — validation is intentionally not part of this flow.
   const [slidesData, setSlidesData] = useState<Slide[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
 
@@ -72,14 +70,7 @@ export default function App() {
         return response.json();
       })
       .then((json) => {
-        if (!isCurrent) return;
-        const parsed = CarouselSlidesDataSchema.safeParse(json);
-        if (parsed.success) {
-          setSlidesData(parsed.data as Slide[]);
-        } else {
-          console.error("[App] invalid carousel slides data", parsed.error);
-          setLoadFailed(true);
-        }
+        if (isCurrent) setSlidesData(json as Slide[]);
       })
       .catch((error: unknown) => {
         if (!isCurrent) return;
