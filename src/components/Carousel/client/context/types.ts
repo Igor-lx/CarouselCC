@@ -42,14 +42,15 @@ export type CarouselNavigationView = Pick<
  * Module context partitioned by update cadence so a high-frequency change never
  * re-renders consumers of low-frequency data.
  *
- * `CarouselStructureContextValue` is the **stable / low-frequency** half:
- * `navigation` is referentially fixed for the carousel's life, `visualPosition`
- * changes only when reduced-motion toggles, and `layout` re-identifies only on a
- * boundary/config change (e.g. reaching the deck edge) — never on an ordinary
- * mid-deck step. A consumer that reads only this half (e.g. `<Controls>`, the
- * widget diagnostic) does not re-render on every click.
+ * `CarouselStableContextValue` is the **stable / low-frequency** half — "stable"
+ * meaning it changes rarely, not never: `navigation` is referentially fixed for
+ * the carousel's life, `visualPosition` changes only when reduced-motion
+ * toggles, and `layout` re-identifies only on a boundary/config change (e.g.
+ * reaching the deck edge, a data replacement) — never on an ordinary mid-deck
+ * step. A consumer that reads only this half (e.g. `<Controls>`, the widget
+ * diagnostic) does not re-render on every click.
  */
-export interface CarouselStructureContextValue {
+export interface CarouselStableContextValue {
   layout: CarouselLayoutView;
   navigation: CarouselNavigationView;
   visualPosition: VisualPositionSource | null;

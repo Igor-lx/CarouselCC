@@ -1,7 +1,7 @@
 import { memo, useMemo } from "react";
 
 import { mergeStyleMaps } from "../../../../../shared";
-import { useCarouselStructure } from "../../context";
+import { useCarouselStable } from "../../context";
 import type { CarouselSlotComponent } from "../../slots";
 import styles from "./Controls.module.scss";
 import { NavigationZone } from "./NavigationZone";
@@ -11,7 +11,7 @@ const ControlsBase = memo(function Controls({ className }: ControlsProps) {
   const {
     layout: { isAtStart, isAtEnd },
     navigation: { handlePrev, handleNext },
-  } = useCarouselStructure();
+  } = useCarouselStable();
 
   const classNames = useMemo(
     () => (className ? mergeStyleMaps(styles, className) : styles),

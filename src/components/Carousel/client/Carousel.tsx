@@ -13,7 +13,7 @@ import { CAROUSEL_DEFAULTS, useCarouselConfig } from "./config";
 import {
   CarouselDiagnosticContext,
   CarouselMotionContext,
-  CarouselStructureContext,
+  CarouselStableContext,
   useModuleContextValue,
 } from "./context";
 import {
@@ -339,7 +339,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     canSlide: layout.canSlide,
   });
 
-  const { structure: structureContextValue, motion: motionContextValue } =
+  const { stable: stableContextValue, motion: motionContextValue } =
     useModuleContextValue({
       state,
       status,
@@ -450,7 +450,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   );
 
   return (
-    <CarouselStructureContext.Provider value={structureContextValue}>
+    <CarouselStableContext.Provider value={stableContextValue}>
       <CarouselMotionContext.Provider value={motionContextValue}>
         <CarouselDiagnosticContext.Provider value={diagnosticContextValue}>
           <div
@@ -501,7 +501,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
           </div>
         </CarouselDiagnosticContext.Provider>
       </CarouselMotionContext.Provider>
-    </CarouselStructureContext.Provider>
+    </CarouselStableContext.Provider>
   );
 });
 

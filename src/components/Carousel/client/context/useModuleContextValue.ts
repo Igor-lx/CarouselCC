@@ -9,8 +9,8 @@ import type {
   CarouselIntentView,
   CarouselLayoutView,
   CarouselMotionContextValue,
+  CarouselStableContextValue,
   CarouselStatusView,
-  CarouselStructureContextValue,
 } from "./types";
 
 interface UseModuleContextValueInput {
@@ -40,7 +40,7 @@ export function useModuleContextValue({
   isAtEnd,
   isDiagnosticActive,
 }: UseModuleContextValueInput): {
-  structure: CarouselStructureContextValue;
+  stable: CarouselStableContextValue;
   motion: CarouselMotionContextValue;
 } {
   const statusView = useMemo<CarouselStatusView>(
@@ -108,9 +108,9 @@ export function useModuleContextValue({
   // Two values partitioned by update cadence (see context `types.ts`). The
   // stable half re-identifies only when navigation / layout / visualPosition
   // change (rare); the motion half re-identifies on every click/gesture/settle.
-  // Keeping them separate means structure-only consumers (e.g. <Controls>) do
-  // not re-render on routine steps.
-  const structure = useMemo<CarouselStructureContextValue>(
+  // Keeping them separate means stable-only consumers (e.g. <Controls>) do not
+  // re-render on routine steps.
+  const stable = useMemo<CarouselStableContextValue>(
     () => ({
       layout: layoutView,
       navigation: navigationView,
@@ -127,5 +127,5 @@ export function useModuleContextValue({
     [intentView, statusView],
   );
 
-  return useMemo(() => ({ structure, motion }), [motion, structure]);
+  return useMemo(() => ({ stable, motion }), [motion, stable]);
 }

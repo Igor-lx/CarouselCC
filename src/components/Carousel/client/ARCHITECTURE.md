@@ -848,7 +848,7 @@ cadence**, so a high-frequency motion change never re-renders a consumer that
 only reads stable data:
 
 ```ts
-// CarouselStructureContext — stable / low-frequency
+// CarouselStableContext — stable / low-frequency
 {
   layout: { pageCount, canSlide, isAtStart, isAtEnd, isTouch,
             isReducedMotion, isDiagnosticActive },
@@ -865,12 +865,13 @@ only reads stable data:
 ```
 
 `navigation` is referentially fixed for the carousel's life and `visualPosition`
-changes only when reduced-motion toggles, so the structure value re-identifies
-only on a real layout/boundary change — never on an ordinary mid-deck step. The
-motion value re-identifies on every click/gesture/settle. A module reads exactly
-the half it needs: `<Controls>` and the widget diagnostic read **structure
-only** (so they do not re-render on routine steps), while `<Pagination>` /
-`<PaginationWidget>` read both (`useCarouselStructure` + `useCarouselMotion`) and
+changes only when reduced-motion toggles, so the stable value re-identifies only
+on a real layout/boundary change — never on an ordinary mid-deck step ("stable"
+means rarely, not never). The motion value re-identifies on every
+click/gesture/settle. A module reads exactly the half it needs: `<Controls>` and
+the widget diagnostic read the **stable half only** (so they do not re-render on
+routine steps), while `<Pagination>` /
+`<PaginationWidget>` read both (`useCarouselStable` + `useCarouselMotion`) and
 re-render on motion transitions, which is their job. Each sub-view (`layoutView`,
 `navigationView`, `statusView`, `intentView`) is still memoised independently
 inside `useModuleContextValue`, so an unrelated change does not invalidate the
@@ -980,7 +981,7 @@ src/components/Carousel/client/
 │   ├── types.ts                   CarouselRuntimeConfig + sub-shapes
 │   └── useCarouselConfig.ts
 ├── context/
-│   ├── CarouselModuleContext.ts   structure + motion contexts (split by cadence)
+│   ├── CarouselModuleContext.ts   stable + motion contexts (split by cadence)
 │   ├── CarouselDiagnosticContext.ts  raw props/layout/slots for Diagnostic
 │   ├── useModuleContextValue.ts
 │   └── types.ts
@@ -1112,7 +1113,7 @@ dependencies, the architecture has held.
   context value for slot modules. There is no internal carousel-only context
   provider: the data flow is visible in source rather than relying on hidden
   provider scope. (The two React contexts the carousel exposes — the
-  cadence-partitioned structure / motion contexts — are the deliberate
+  cadence-partitioned stable / motion contexts — are the deliberate
   module-boundary API in §7, not an internal wiring shortcut.)
 - **State machine reads `fromVirtualIndex` from the gesture/click site,
   not internally.** Callers pass the visually-sampled origin as part of

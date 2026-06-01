@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { useCarouselStructure } from "../../context";
+import { useCarouselStable } from "../../context";
 import { collectWidgetWarnings, type WidgetDiagnosticInput } from "./checks";
 import { useGroupedWarnings } from "./useGroupedWarnings";
 
@@ -12,7 +12,7 @@ const EMPTY_WARNINGS: ReturnType<typeof collectWidgetWarnings> = [];
  * fully skipped and the widget runs with zero diagnostic overhead.
  */
 export function useWidgetDiagnostic(input: WidgetDiagnosticInput): void {
-  const { layout } = useCarouselStructure();
+  const { layout } = useCarouselStable();
   const isActive = layout.isDiagnosticActive;
 
   const warnings = useMemo(
