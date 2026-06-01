@@ -3,3 +3,4 @@ export type {
   TrackBindingApi,
   TrackCompositorMotionOptions,
 } from "./useTrackBinding";
+export { useResponsiveImageSizes } from "./useResponsiveImageSizes";

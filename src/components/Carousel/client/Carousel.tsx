@@ -24,7 +24,7 @@ import {
 import { useAutoplay } from "./autoplay/useAutoplay";
 import { useFocusRecovery } from "./focus/useFocusRecovery";
 import { useCarouselGesture } from "./gesture";
-import { useTrackBinding } from "./geometry";
+import { useResponsiveImageSizes, useTrackBinding } from "./geometry";
 import { useCarouselMotionExecution } from "./motion";
 import { useCarouselNavigation } from "./navigation";
 import { useVisualPosition } from "./position";
@@ -61,16 +61,6 @@ const collectImageResourceUrls = (
   }
   return [...urls];
 };
-
-/**
- * Default `sizes` for responsive slide images, derived from the slot count the
- * carousel owns (each slide spans ~`100/visibleSlidesCount` of the viewport).
- * The carousel owns slot geometry, so it — not the host — supplies `sizes`,
- * which prevents the `srcSet` "no sizes → assume 100vw → oversized candidate"
- * trap. A slide's own `image.sizes` overrides this when it must differ.
- */
-const resolveSlideImageSizes = (visibleSlidesCount: number): string =>
-  visibleSlidesCount > 0 ? `${Math.ceil(100 / visibleSlidesCount)}vw` : "100vw";
 
 const Carousel = memo(function Carousel(props: CarouselProps) {
   const {
@@ -153,10 +143,18 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // to it — it only warms browser caches.
   const imageResourceStore = useImageResourceStoreInstance(isContentImg);
 
-  // Carousel-owned default `sizes` for responsive slide images (see helper).
-  const imageSizes = useMemo(
-    () => resolveSlideImageSizes(layout.visibleSlidesCount),
-    [layout.visibleSlidesCount],
+  // --- DOM refs --------------------------------------------------------------
+  // Declared here (before `imageSizes`) because the responsive-`sizes` hook
+  // measures the live viewport to size its candidate hint.
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  // Carousel-owned default `sizes` for responsive slide images, measured from
+  // the real (capped + padded) slot so the browser never up-picks a candidate
+  // larger than the slot actually needs (see `useResponsiveImageSizes`).
+  const imageSizes = useResponsiveImageSizes(
+    viewportRef,
+    layout.visibleSlidesCount,
   );
 
   // Read-only warm-ability gate for the predecode: never spend a speculative
@@ -239,10 +237,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     records,
     renderWindowBufferMultiplier: config.layout.renderWindowBufferMultiplier,
   });
-
-  // --- DOM refs --------------------------------------------------------------
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
 
   // --- track DOM bridge -----------------------------------------------------
   const {
