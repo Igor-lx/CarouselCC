@@ -1,7 +1,7 @@
 import { memo, useMemo } from "react";
 
 import { mergeStyleMaps } from "../../../../../shared";
-import { useCarouselModuleContext } from "../../context";
+import { useCarouselMotion, useCarouselStructure } from "../../context";
 import type { CarouselSlotComponent } from "../../slots";
 import { PaginationDot } from "./PaginationDot";
 import styles from "./Pagination.module.scss";
@@ -9,11 +9,8 @@ import { resolvePaginationInstantSync, usePaginationSync } from "./usePagination
 import type { PaginationProps } from "./types";
 
 const PaginationBase = memo(function Pagination({ className }: PaginationProps) {
-  const {
-    intent,
-    layout,
-    navigation,
-  } = useCarouselModuleContext();
+  const { intent } = useCarouselMotion();
+  const { layout, navigation } = useCarouselStructure();
 
   const classNames = useMemo(
     () => (className ? mergeStyleMaps(styles, className) : styles),

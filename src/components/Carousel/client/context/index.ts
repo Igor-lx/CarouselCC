@@ -1,6 +1,8 @@
 export {
-  CarouselModuleContext,
-  useCarouselModuleContext,
+  CarouselStructureContext,
+  CarouselMotionContext,
+  useCarouselStructure,
+  useCarouselMotion,
 } from "./CarouselModuleContext";
 export {
   CarouselDiagnosticContext,
@@ -8,7 +10,9 @@ export {
 } from "./CarouselDiagnosticContext";
 export { useModuleContextValue } from "./useModuleContextValue";
 export type {
-  CarouselModuleContextValue,
+  CarouselStructureContextValue,
+  CarouselMotionContextValue,
+  CarouselNavigationView,
   CarouselDiagnosticContextValue,
   CarouselStatusView,
   CarouselLayoutView,

@@ -33,15 +33,37 @@ export interface CarouselIntentView {
   autoplayPaginationFactor: number;
 }
 
-export interface CarouselModuleContextValue {
-  status: CarouselStatusView;
+export type CarouselNavigationView = Pick<
+  CarouselNavigation,
+  "handlePrev" | "handleNext" | "handlePageSelect"
+>;
+
+/**
+ * Module context partitioned by update cadence so a high-frequency change never
+ * re-renders consumers of low-frequency data.
+ *
+ * `CarouselStructureContextValue` is the **stable / low-frequency** half:
+ * `navigation` is referentially fixed for the carousel's life, `visualPosition`
+ * changes only when reduced-motion toggles, and `layout` re-identifies only on a
+ * boundary/config change (e.g. reaching the deck edge) — never on an ordinary
+ * mid-deck step. A consumer that reads only this half (e.g. `<Controls>`, the
+ * widget diagnostic) does not re-render on every click.
+ */
+export interface CarouselStructureContextValue {
   layout: CarouselLayoutView;
-  intent: CarouselIntentView;
-  navigation: Pick<
-    CarouselNavigation,
-    "handlePrev" | "handleNext" | "handlePageSelect"
-  >;
+  navigation: CarouselNavigationView;
   visualPosition: VisualPositionSource | null;
+}
+
+/**
+ * The **high-frequency** half: `status` (motion phase / idle / moving …) and
+ * `intent` (target page, move reason) change on every click, gesture, and
+ * settle. Consumers that read this half (`<Pagination>`, `<PaginationWidget>`)
+ * legitimately re-render on those transitions — that is their job.
+ */
+export interface CarouselMotionContextValue {
+  status: CarouselStatusView;
+  intent: CarouselIntentView;
 }
 
 /**

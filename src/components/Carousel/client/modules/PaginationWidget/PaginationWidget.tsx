@@ -2,7 +2,7 @@ import clsx from "clsx";
 import { memo, useMemo } from "react";
 
 import { mergeStyleMaps } from "../../../../../shared";
-import { useCarouselModuleContext } from "../../context";
+import { useCarouselMotion, useCarouselStructure } from "../../context";
 import type { CarouselSlotComponent } from "../../slots";
 import { useWidgetDiagnostic } from "../Diagnostic/useWidgetDiagnostic";
 import { buildPaginationWidgetGeometry } from "./math/spatialField";
@@ -23,7 +23,8 @@ const PaginationWidgetBase = memo(function PaginationWidget({
   scaleFactor = PAGINATION_WIDGET_DEFAULTS.scaleFactor,
   className,
 }: PaginationWidgetProps) {
-  const { intent, layout, visualPosition } = useCarouselModuleContext();
+  const { intent } = useCarouselMotion();
+  const { layout, visualPosition } = useCarouselStructure();
 
   // When reduced motion is on, the binding has nothing to subscribe to and we
   // render a static snapshot. Otherwise the binding mutates dots frame-by-frame.

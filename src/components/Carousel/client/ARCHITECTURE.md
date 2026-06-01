@@ -843,26 +843,43 @@ new-layout / old-state pair to layout effects.
 Modules attach via the `slot` static convention, resolved by
 `resolveSlots` against `CAROUSEL_SLOTS = ["pagination", "controls", "diagnostic"]`.
 
-The `CarouselModuleContext` exposes a partitioned value:
+The module context is split into **two providers partitioned by update
+cadence**, so a high-frequency motion change never re-renders a consumer that
+only reads stable data:
 
 ```ts
+// CarouselStructureContext — stable / low-frequency
 {
-  status: { isIdle, isMoving, isJumping, isDragging, motionPhase },
   layout: { pageCount, canSlide, isAtStart, isAtEnd, isTouch,
             isReducedMotion, isDiagnosticActive },
-  intent: { targetPageIndex, moveReason,
-            autoplayMotionDuration, autoplayPaginationFactor },
   navigation: { handlePrev, handleNext, handlePageSelect },
   visualPosition: VisualPositionSource | null,  // null when reduced motion
 }
+
+// CarouselMotionContext — high-frequency
+{
+  status: { isIdle, isMoving, isJumping, isDragging, motionPhase },
+  intent: { targetPageIndex, moveReason,
+            autoplayMotionDuration, autoplayPaginationFactor },
+}
 ```
 
-The context is rebuilt only on input changes (each sub-view is memoised
-independently). Modules that need live per-frame updates do **not**
-depend on context for the frame value — they subscribe to
-`visualPosition` themselves and mutate their own DOM. Modules that only
-need the logical view (pagination dots, control availability) read from
-the context and re-render at the React tempo.
+`navigation` is referentially fixed for the carousel's life and `visualPosition`
+changes only when reduced-motion toggles, so the structure value re-identifies
+only on a real layout/boundary change — never on an ordinary mid-deck step. The
+motion value re-identifies on every click/gesture/settle. A module reads exactly
+the half it needs: `<Controls>` and the widget diagnostic read **structure
+only** (so they do not re-render on routine steps), while `<Pagination>` /
+`<PaginationWidget>` read both (`useCarouselStructure` + `useCarouselMotion`) and
+re-render on motion transitions, which is their job. Each sub-view (`layoutView`,
+`navigationView`, `statusView`, `intentView`) is still memoised independently
+inside `useModuleContextValue`, so an unrelated change does not invalidate the
+others.
+
+Modules that need live per-frame updates do **not** depend on context for the
+frame value — they subscribe to `visualPosition` themselves and mutate their own
+DOM. Modules that only need the logical view (pagination dots, control
+availability) read from the context and re-render at the React tempo.
 
 `Diagnostic`'s presence is surfaced as `layout.isDiagnosticActive` so
 modules with their own checks (`PaginationWidget` via
@@ -963,7 +980,7 @@ src/components/Carousel/client/
 │   ├── types.ts                   CarouselRuntimeConfig + sub-shapes
 │   └── useCarouselConfig.ts
 ├── context/
-│   ├── CarouselModuleContext.ts   module-facing value
+│   ├── CarouselModuleContext.ts   structure + motion contexts (split by cadence)
 │   ├── CarouselDiagnosticContext.ts  raw props/layout/slots for Diagnostic
 │   ├── useModuleContextValue.ts
 │   └── types.ts
@@ -1094,9 +1111,9 @@ dependencies, the architecture has held.
   the store is passed straight into each `SlideItem`), or through the module
   context value for slot modules. There is no internal carousel-only context
   provider: the data flow is visible in source rather than relying on hidden
-  provider scope. (The single React context the carousel exposes,
-  `CarouselModuleContext`, is the deliberate module-boundary API in §7, not an
-  internal wiring shortcut.)
+  provider scope. (The two React contexts the carousel exposes — the
+  cadence-partitioned structure / motion contexts — are the deliberate
+  module-boundary API in §7, not an internal wiring shortcut.)
 - **State machine reads `fromVirtualIndex` from the gesture/click site,
   not internally.** Callers pass the visually-sampled origin as part of
   the dispatch payload. The state machine never reaches into the motion

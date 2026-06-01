@@ -12,7 +12,8 @@ import { mergeStyleMaps, resolveSlots, useViewportVisibility } from "../../../sh
 import { CAROUSEL_DEFAULTS, useCarouselConfig } from "./config";
 import {
   CarouselDiagnosticContext,
-  CarouselModuleContext,
+  CarouselMotionContext,
+  CarouselStructureContext,
   useModuleContextValue,
 } from "./context";
 import {
@@ -338,19 +339,20 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     canSlide: layout.canSlide,
   });
 
-  const moduleContextValue = useModuleContextValue({
-    state,
-    status,
-    config,
-    navigation,
-    isTouch,
-    isReducedMotion: isInstantMode,
-    autoplayMotionDuration,
-    visualPosition: isInstantMode ? null : visualPosition,
-    isAtStart,
-    isAtEnd,
-    isDiagnosticActive: renderPolicy.shouldRenderDiagnostic,
-  });
+  const { structure: structureContextValue, motion: motionContextValue } =
+    useModuleContextValue({
+      state,
+      status,
+      config,
+      navigation,
+      isTouch,
+      isReducedMotion: isInstantMode,
+      autoplayMotionDuration,
+      visualPosition: isInstantMode ? null : visualPosition,
+      isAtStart,
+      isAtEnd,
+      isDiagnosticActive: renderPolicy.shouldRenderDiagnostic,
+    });
 
   // --- diagnostic context ---------------------------------------------------
   // Carries raw props + observable layout/slot state. The carousel uses the
@@ -448,56 +450,58 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   );
 
   return (
-    <CarouselModuleContext.Provider value={moduleContextValue}>
-      <CarouselDiagnosticContext.Provider value={diagnosticContextValue}>
-        <div
-          className={classNames.outerContainer}
-          role="region"
-          aria-roledescription="carousel"
-          data-carousel-root=""
-          data-touch={isTouch}
-          data-reduced-motion={isInstantMode}
-        >
+    <CarouselStructureContext.Provider value={structureContextValue}>
+      <CarouselMotionContext.Provider value={motionContextValue}>
+        <CarouselDiagnosticContext.Provider value={diagnosticContextValue}>
           <div
-            ref={viewportRef}
-            tabIndex={-1}
-            className={classNames.innerContainer}
-            data-carousel-viewport=""
-            onMouseEnter={() => handleHoverChange(true)}
-            onMouseLeave={() => handleHoverChange(false)}
-            {...dragListeners}
+            className={classNames.outerContainer}
+            role="region"
+            aria-roledescription="carousel"
+            data-carousel-root=""
+            data-touch={isTouch}
+            data-reduced-motion={isInstantMode}
           >
             <div
-              ref={trackRef}
-              className={classNames.slideContainer}
-              data-carousel-track=""
+              ref={viewportRef}
+              tabIndex={-1}
+              className={classNames.innerContainer}
+              data-carousel-viewport=""
+              onMouseEnter={() => handleHoverChange(true)}
+              onMouseLeave={() => handleHoverChange(false)}
+              {...dragListeners}
             >
-              {virtualSlides.map((slide) => (
-                <SlideItem
-                  key={slide.slideKey}
-                  slideData={slide.slideData}
-                  className={slideClassMap}
-                  style={slideStyle}
-                  isContentImg={isContentImg}
-                  errAltPlaceholder={config.errorAltPlaceholder}
-                  isInteractive={isInteractive}
-                  isActive={slide.isActive}
-                  isActual={slide.isActual}
-                  isDataSaverEnabled={isDataSaverEnabled}
-                  imageResourceStore={imageResourceStore}
-                  imageSizes={imageSizes}
-                  onSlideClick={navigation.handleSlideClick}
-                  {...slide.ariaProps}
-                />
-              ))}
+              <div
+                ref={trackRef}
+                className={classNames.slideContainer}
+                data-carousel-track=""
+              >
+                {virtualSlides.map((slide) => (
+                  <SlideItem
+                    key={slide.slideKey}
+                    slideData={slide.slideData}
+                    className={slideClassMap}
+                    style={slideStyle}
+                    isContentImg={isContentImg}
+                    errAltPlaceholder={config.errorAltPlaceholder}
+                    isInteractive={isInteractive}
+                    isActive={slide.isActive}
+                    isActual={slide.isActual}
+                    isDataSaverEnabled={isDataSaverEnabled}
+                    imageResourceStore={imageResourceStore}
+                    imageSizes={imageSizes}
+                    onSlideClick={navigation.handleSlideClick}
+                    {...slide.ariaProps}
+                  />
+                ))}
+              </div>
+              {renderPolicy.shouldRenderControls ? slots.controls : null}
             </div>
-            {renderPolicy.shouldRenderControls ? slots.controls : null}
+            {renderPolicy.shouldRenderPagination ? slots.pagination : null}
+            {renderPolicy.shouldRenderDiagnostic ? slots.diagnostic : null}
           </div>
-          {renderPolicy.shouldRenderPagination ? slots.pagination : null}
-          {renderPolicy.shouldRenderDiagnostic ? slots.diagnostic : null}
-        </div>
-      </CarouselDiagnosticContext.Provider>
-    </CarouselModuleContext.Provider>
+        </CarouselDiagnosticContext.Provider>
+      </CarouselMotionContext.Provider>
+    </CarouselStructureContext.Provider>
   );
 });
 
