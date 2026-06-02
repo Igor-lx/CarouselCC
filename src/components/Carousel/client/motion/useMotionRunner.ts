@@ -7,6 +7,7 @@ import {
 } from "../../../../shared";
 import type { CarouselRuntimeConfig } from "../config";
 import type { TrackBindingApi } from "../geometry";
+import type { MotionPlanSource } from "../position";
 import type { CarouselState } from "../state";
 import { bezierToCss } from "./bezier";
 import { canUseCompositorTrackMotion } from "./compositorEligibility";
@@ -23,6 +24,15 @@ interface UseMotionRunnerInput {
   enabled: boolean;
   startCompositorMotion: TrackBindingApi["startCompositorMotion"];
   cancelCompositorMotion: TrackBindingApi["cancelCompositorMotion"];
+  /**
+   * Compositor motion-plan mirror. The runner publishes the eased segment here
+   * when (and only when) it drives that segment on the compositor, and clears
+   * it (`null`) on every other transition (profile segment, snap, drag, idle),
+   * so compositor mirrors animate exactly the curve that is composited.
+   */
+  motionPlan: MotionPlanSource;
+  /** Live slot count, to express the plan in the page-offset domain. */
+  visibleSlidesCount: number;
   /**
    * Called by the controller when a segment naturally settles. The argument
    * is the visual position where it settled, so the reducer can distinguish
@@ -96,6 +106,8 @@ export function useMotionRunner({
   enabled,
   startCompositorMotion,
   cancelCompositorMotion,
+  motionPlan,
+  visibleSlidesCount,
   onSettle,
 }: UseMotionRunnerInput): void {
   const lastKeyRef = useRef<string>("");
@@ -162,6 +174,9 @@ export function useMotionRunner({
 
     // Any newly-committed state supersedes a pending deferred retarget.
     cancelDeferredRetarget();
+    // Any non-composited transition clears the plan; the composited easing path
+    // below re-publishes it. Mirrors then follow the per-frame stream meanwhile.
+    motionPlan.publish(null);
 
     if (!enabled) {
       cancelCompositorMotion(state.virtualIndex);
@@ -199,6 +214,7 @@ export function useMotionRunner({
 
       if (Math.abs(distance) < config.motion.epsilon) {
         cancelCompositorMotion(state.virtualIndex);
+        motionPlan.publish(null);
         controller.snap(state.virtualIndex, {
           strategy: resolvedStart.strategy,
           velocity: resolvedStart.velocity,
@@ -230,8 +246,20 @@ export function useMotionRunner({
           easing: bezierToCss(segment.easing),
         });
 
-      if (!isComposited) {
+      if (isComposited) {
+        // Mirror the exact composited easing curve for the other compositor
+        // consumers (the pagination widget), in the page-offset domain. Only
+        // when truly composited: a JS-path segment is followed per-frame.
+        const slot = visibleSlidesCount > 0 ? visibleSlidesCount : 1;
+        motionPlan.publish({
+          fromPageOffset: segment.from / slot,
+          toPageOffset: segment.to / slot,
+          duration: segment.duration,
+          easing: segment.easing,
+        });
+      } else {
         cancelCompositorMotion(resolvedStart.position);
+        motionPlan.publish(null);
       }
 
       // The controller runs regardless of compositing: it remains the SSOT for
@@ -290,9 +318,11 @@ export function useMotionRunner({
     enabled,
     isDragging,
     isInstantMode,
+    motionPlan,
     scheduleDeferredRetarget,
     settle,
     startCompositorMotion,
+    visibleSlidesCount,
     state.fromVirtualIndex,
     state.gesture.pointerVelocity,
     state.gesture.uiVelocity,
@@ -309,7 +339,8 @@ export function useMotionRunner({
       cancelDeferredRetarget();
       cancelCompositorMotion(controller.getSnapshot().value);
       controller.cancel();
+      motionPlan.publish(null);
     },
-    [cancelCompositorMotion, cancelDeferredRetarget, controller],
+    [cancelCompositorMotion, cancelDeferredRetarget, controller, motionPlan],
   );
 }

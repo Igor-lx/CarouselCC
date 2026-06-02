@@ -24,7 +24,7 @@ const PaginationWidgetBase = memo(function PaginationWidget({
   className,
 }: PaginationWidgetProps) {
   const { intent } = useCarouselMotion();
-  const { layout, visualPosition } = useCarouselStable();
+  const { layout, visualPosition, motionPlan } = useCarouselStable();
 
   // When reduced motion is on, the binding has nothing to subscribe to and we
   // render a static snapshot. Otherwise the binding mutates dots frame-by-frame.
@@ -48,6 +48,7 @@ const PaginationWidgetBase = memo(function PaginationWidget({
   const { bindDotRef, bindActiveDotRef, slotCount, activeDotCount } =
     usePaginationWidgetBinding({
       visualPosition: isMotionBound ? visualPosition : null,
+      motionPlan: isMotionBound ? motionPlan : null,
       geometry,
       activeClassName: classNames.dotActive_PW,
     });

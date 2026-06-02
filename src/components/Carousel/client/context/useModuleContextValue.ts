@@ -2,7 +2,7 @@ import { useMemo } from "react";
 
 import type { CarouselRuntimeConfig } from "../config";
 import type { CarouselNavigation } from "../navigation";
-import type { VisualPositionSource } from "../position";
+import type { MotionPlanSource, VisualPositionSource } from "../position";
 import type { motionStatus } from "../state";
 import type { CarouselState } from "../state";
 import type {
@@ -22,6 +22,7 @@ interface UseModuleContextValueInput {
   isReducedMotion: boolean;
   autoplayMotionDuration: number;
   visualPosition: VisualPositionSource | null;
+  motionPlan: MotionPlanSource | null;
   isAtStart: boolean;
   isAtEnd: boolean;
   isDiagnosticActive: boolean;
@@ -36,6 +37,7 @@ export function useModuleContextValue({
   isReducedMotion,
   autoplayMotionDuration,
   visualPosition,
+  motionPlan,
   isAtStart,
   isAtEnd,
   isDiagnosticActive,
@@ -115,8 +117,9 @@ export function useModuleContextValue({
       layout: layoutView,
       navigation: navigationView,
       visualPosition,
+      motionPlan,
     }),
-    [layoutView, navigationView, visualPosition],
+    [layoutView, navigationView, visualPosition, motionPlan],
   );
 
   const motion = useMemo<CarouselMotionContextValue>(
