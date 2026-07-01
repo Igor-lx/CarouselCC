@@ -31,10 +31,8 @@ export interface PaginationWidgetContainerCSSVars extends CSSProperties {
 
 export type PaginationWidgetClassMap = {
   [key: string]: string | undefined;
-  activeDot_PW?: string;
   container_PW?: string;
   dot_PW?: string;
-  dotActive_PW?: string;
 };
 
 export interface PaginationWidgetProps {

@@ -1,13 +1,11 @@
-import clsx from "clsx";
 import { memo, useMemo } from "react";
 
 import { mergeStyleMaps } from "../../../../../shared";
 import { useCarouselMotion, useCarouselStable } from "../../context";
 import type { CarouselSlotComponent } from "../../slots";
 import { useWidgetDiagnostic } from "../Diagnostic/useWidgetDiagnostic";
-import { buildPaginationWidgetGeometry } from "./math/spatialField";
-import { projectDot } from "./math/projection";
-import { usePaginationWidgetBinding } from "./usePaginationWidgetBinding";
+import { buildPaginationWidgetGeometry, widgetProjectionSide } from "./math/spatialField";
+import { usePaginationWidgetBinding, widgetDotWindow } from "./usePaginationWidgetBinding";
 import { PaginationWidgetDot } from "./PaginationWidgetDot";
 import { PAGINATION_WIDGET_DEFAULTS } from "./defaults";
 import styles from "./PaginationWidget.module.scss";
@@ -24,10 +22,8 @@ const PaginationWidgetBase = memo(function PaginationWidget({
   className,
 }: PaginationWidgetProps) {
   const { intent } = useCarouselMotion();
-  const { layout, visualPosition } = useCarouselStable();
+  const { layout, visualPosition, motionPlan } = useCarouselStable();
 
-  // When reduced motion is on, the binding has nothing to subscribe to and we
-  // render a static snapshot. Otherwise the binding mutates dots frame-by-frame.
   const isMotionBound = visualPosition !== null && !layout.isReducedMotion;
 
   const spatial = useMemo(
@@ -45,22 +41,24 @@ const PaginationWidgetBase = memo(function PaginationWidget({
     [className],
   );
 
-  const { bindDotRef, bindActiveDotRef, slotCount, activeDotCount } =
-    usePaginationWidgetBinding({
-      visualPosition: isMotionBound ? visualPosition : null,
-      geometry,
-      activeClassName: classNames.dotActive_PW,
-    });
-
-  const boundSlotIndexes = useMemo(
-    () => Array.from({ length: slotCount }, (_, index) => index),
-    [slotCount],
+  // The strip is a symmetric window of page-dot IDENTITIES around the current
+  // page — one DOM node per page (not per recycling slot), so each dot's
+  // projected trajectory is continuous and can be composited. The window
+  // re-centres only when the target page changes (a settled step), never
+  // per frame; the binding drives positions inside it.
+  const side = widgetProjectionSide(geometry.visibleCount);
+  const centerPage = Math.round(intent.targetPageIndex);
+  const dotIds = useMemo(
+    () => widgetDotWindow(centerPage, side),
+    [centerPage, side],
   );
 
-  const activeDotIndexes = useMemo(
-    () => Array.from({ length: activeDotCount }, (_, index) => index),
-    [activeDotCount],
-  );
+  const { bindDotRef } = usePaginationWidgetBinding({
+    visualPosition: isMotionBound ? visualPosition : null,
+    motionPlan: isMotionBound ? motionPlan : null,
+    geometry,
+    dotIds,
+  });
 
   useWidgetDiagnostic({ visibleDots, dotSize, dotGap, scaleFactor });
 
@@ -73,51 +71,15 @@ const PaginationWidgetBase = memo(function PaginationWidget({
     [geometry.visibleCount, spatial.gap, spatial.size],
   );
 
-  const staticDots = useMemo(() => {
-    if (isMotionBound) return null;
-    const offset = intent.targetPageIndex;
-    return Array.from({ length: slotCount }, (_, index) => {
-      const id = Math.round(offset) - Math.floor(slotCount / 2) + index;
-      return projectDot(id, offset, geometry);
-    });
-  }, [geometry, intent.targetPageIndex, isMotionBound, slotCount]);
-
   return (
-    <div
-      className={classNames.container_PW}
-      data-motion-bound={isMotionBound ? true : undefined}
-      style={containerStyle}
-    >
-      {isMotionBound
-        ? boundSlotIndexes.map((index) => (
-            <PaginationWidgetDot
-              key={`bound:${index}`}
-              ref={bindDotRef(index)}
-              className={classNames.dot_PW}
-            />
-          ))
-        : staticDots?.map((dot) => (
-            <div
-              key={dot.id}
-              className={clsx(classNames.dot_PW, dot.isActive && classNames.dotActive_PW)}
-              style={{
-                opacity: dot.opacity,
-                transform: `translate3d(${dot.x}px, 0, 0) scale(${dot.scale})`,
-                ...({
-                  "--dot-active-strength": dot.activeStrength,
-                } as React.CSSProperties),
-              }}
-            />
-          ))}
-      {isMotionBound
-        ? activeDotIndexes.map((index) => (
-            <div
-              key={`active:${index}`}
-              ref={bindActiveDotRef(index)}
-              className={classNames.activeDot_PW}
-            />
-          ))
-        : null}
+    <div className={classNames.container_PW} style={containerStyle}>
+      {dotIds.map((id) => (
+        <PaginationWidgetDot
+          key={id}
+          ref={bindDotRef(id)}
+          className={classNames.dot_PW}
+        />
+      ))}
     </div>
   );
 });

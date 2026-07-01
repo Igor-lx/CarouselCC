@@ -47,8 +47,9 @@ export const buildPaginationWidgetGeometry = (
   };
 };
 
+/**
+ * Half-width of the dot strip: the widget mounts `side` dots on each side of the
+ * centre page plus the centre itself (see `widgetDotWindow`).
+ */
 export const widgetProjectionSide = (visibleCount: number) =>
   Math.ceil(visibleCount / 2);
-
-export const widgetProjectionSlotCount = (visibleCount: number) =>
-  widgetProjectionSide(visibleCount) * 2 + 1;

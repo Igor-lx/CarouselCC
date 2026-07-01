@@ -1,23 +1,33 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 
 import { useIsomorphicLayoutEffect } from "../../../../../shared";
-import type { VisualPositionSource } from "../../position";
+import type { MotionPlan, MotionPlanSource, VisualPositionSource } from "../../position";
 import {
   DOT_OPACITY_EPSILON,
   DOT_POSITION_EPSILON_PX,
   DOT_SCALE_EPSILON,
 } from "./defaults";
 import {
-  widgetProjectionSide,
-  widgetProjectionSlotCount,
-} from "./math/spatialField";
+  buildProjectionKeyframes,
+  fixedIdAt,
+  type DotKeyframeSample,
+} from "./math/keyframes";
 import { writeDotProjection } from "./math/projection";
 import type {
   PaginationWidgetDotState,
   PaginationWidgetGeometry,
 } from "./types";
 
-const ACTIVE_DOT_COUNT = 2;
+/**
+ * Per composited segment, ~3 keyframes per page screen of travel is dense
+ * enough that the nonlinear projection is sub-pixel between keyframes while the
+ * WAAPI keyframe list stays small.
+ */
+const KEYFRAME_STEPS_PER_PAGE = 3;
+const MIN_KEYFRAME_STEPS = 8;
+const MAX_KEYFRAME_STEPS = 120;
+
+const ACTIVE_STRENGTH_VAR = "--dot-active-strength";
 
 const emptyDotState = (): PaginationWidgetDotState => ({
   id: 0,
@@ -32,19 +42,17 @@ const toTransform = (x: number, scale: number) =>
   `translate3d(${x}px, 0, 0) scale(${scale})`;
 
 /**
- * Cache the *inputs* to the per-frame transform, not the formatted string.
- * Comparing numeric values against epsilons lets us skip both the
- * template-literal allocation in `toTransform(...)` AND the DOM style
- * write when nothing visibly changed since the last frame — a steady-
- * state widget settles into emitting zero DOM writes per rAF.
+ * Cache the *inputs* to the per-frame write, not the formatted string. Compare
+ * numeric values against epsilons to skip both the template-literal allocation
+ * and the DOM write when nothing visibly changed — a steady-state widget emits
+ * zero per-rAF DOM writes.
  */
 interface DotWriteCache {
   x: number;
   scale: number;
   opacity: number;
+  activeStrength: number;
 }
-
-type ActiveDotWriteCache = DotWriteCache;
 
 const shouldWriteTransform = (
   last: DotWriteCache | null,
@@ -55,193 +63,216 @@ const shouldWriteTransform = (
   Math.abs(last.x - x) >= DOT_POSITION_EPSILON_PX ||
   Math.abs(last.scale - scale) >= DOT_SCALE_EPSILON;
 
-const shouldWriteOpacity = (
-  last: DotWriteCache | null,
-  opacity: number,
-): boolean => last === null || Math.abs(last.opacity - opacity) >= DOT_OPACITY_EPSILON;
+const shouldWriteOpacity = (last: number | null, value: number): boolean =>
+  last === null || Math.abs(last - value) >= DOT_OPACITY_EPSILON;
+
+const resolveKeyframeSteps = (fromOffset: number, toOffset: number): number => {
+  const pages = Math.abs(toOffset - fromOffset);
+  return Math.min(
+    MAX_KEYFRAME_STEPS,
+    Math.max(MIN_KEYFRAME_STEPS, Math.ceil(pages * KEYFRAME_STEPS_PER_PAGE)),
+  );
+};
+
+/**
+ * The page-dot ids the widget mounts for a given center page: a symmetric
+ * window `[center - side, center + side]`. One DOM node per *page identity*
+ * (not per recycling slot), so each node's projected trajectory — slide, scale,
+ * fade, glow — is continuous as the deck offset sweeps, which is exactly what a
+ * WAAPI keyframe interpolation needs.
+ */
+export const widgetDotWindow = (
+  centerPage: number,
+  side: number,
+): number[] => {
+  const ids: number[] = [];
+  for (let id = centerPage - side; id <= centerPage + side; id += 1) ids.push(id);
+  return ids;
+};
 
 interface UseBindingInput {
   visualPosition: VisualPositionSource | null;
+  /**
+   * Compositor motion-plan mirror. When it carries a plan the widget animates
+   * each dot through the Web Animations API (one composited animation per dot)
+   * instead of writing `style` every frame — collapsing the per-step main-thread
+   * style-recalc churn to zero. `null` (drag, profile segment, idle settle,
+   * reduced motion) keeps the per-frame `visualPosition` follow path.
+   */
+  motionPlan: MotionPlanSource | null;
   geometry: PaginationWidgetGeometry;
-  activeClassName?: string;
+  /** The page-dot ids currently mounted (see `widgetDotWindow`). */
+  dotIds: number[];
 }
 
 export interface PaginationWidgetBinding {
-  bindDotRef: (index: number) => (node: HTMLDivElement | null) => void;
-  bindActiveDotRef: (index: number) => (node: HTMLDivElement | null) => void;
-  slotCount: number;
-  activeDotCount: number;
+  bindDotRef: (id: number) => (node: HTMLDivElement | null) => void;
 }
 
 export function usePaginationWidgetBinding({
   visualPosition,
+  motionPlan,
   geometry,
-  activeClassName,
+  dotIds,
 }: UseBindingInput): PaginationWidgetBinding {
-  const dotRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const activeDotRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const dotCallbacksRef = useRef<
-    Array<((node: HTMLDivElement | null) => void) | null>
-  >([]);
-  const activeDotCallbacksRef = useRef<
-    Array<((node: HTMLDivElement | null) => void) | null>
-  >([]);
-  const dotCacheRef = useRef<Array<DotWriteCache | null>>([]);
-  const activeDotCacheRef = useRef<Array<ActiveDotWriteCache | null>>([]);
+  // DOM nodes keyed by page-dot id (stable identity across the strip).
+  const nodesRef = useRef<Map<number, HTMLDivElement>>(new Map());
+  const refCallbacksRef = useRef<Map<number, (node: HTMLDivElement | null) => void>>(new Map());
+  const writeCacheRef = useRef<Map<number, DotWriteCache>>(new Map());
   const projectionRef = useRef<PaginationWidgetDotState>(emptyDotState());
-  const activeProjectionRef = useRef<PaginationWidgetDotState>(emptyDotState());
-  const appliedActiveClassNameRef = useRef<string | null>(null);
 
-  const side = widgetProjectionSide(geometry.visibleCount);
-  const slotCount = widgetProjectionSlotCount(geometry.visibleCount);
-  const activeSlotIndex = side;
+  // Live compositor animations keyed by id, and the plan version they belong to.
+  // While non-null, the per-frame follow path stands aside — the same pattern
+  // the track binding uses while its WAAPI animation owns the track.
+  const animationsRef = useRef<Map<number, Animation>>(new Map());
+  const compositedVersionRef = useRef<number | null>(null);
 
-  const bindDotRef = useCallback((index: number) => {
-    const cached = dotCallbacksRef.current[index];
+  const bindDotRef = useCallback((id: number) => {
+    const cached = refCallbacksRef.current.get(id);
     if (cached) return cached;
     const callback = (node: HTMLDivElement | null) => {
-      dotRefs.current[index] = node;
+      if (node) nodesRef.current.set(id, node);
+      else nodesRef.current.delete(id);
     };
-    dotCallbacksRef.current[index] = callback;
+    refCallbacksRef.current.set(id, callback);
     return callback;
   }, []);
 
-  const bindActiveDotRef = useCallback((index: number) => {
-    const cached = activeDotCallbacksRef.current[index];
-    if (cached) return cached;
-    const callback = (node: HTMLDivElement | null) => {
-      activeDotRefs.current[index] = node;
-    };
-    activeDotCallbacksRef.current[index] = callback;
-    return callback;
-  }, []);
+  const writeDot = useCallback(
+    (id: number, node: HTMLDivElement, offset: number) => {
+      const state = writeDotProjection(projectionRef.current, id, offset, geometry);
+      const cache = writeCacheRef.current.get(id) ?? null;
 
-  useIsomorphicLayoutEffect(() => {
-    dotCacheRef.current = new Array<DotWriteCache | null>(slotCount).fill(null);
-    activeDotCacheRef.current = new Array<ActiveDotWriteCache | null>(
-      ACTIVE_DOT_COUNT,
-    ).fill(null);
-    dotRefs.current.length = slotCount;
-    dotCallbacksRef.current.length = slotCount;
-    activeDotRefs.current.length = ACTIVE_DOT_COUNT;
-    activeDotCallbacksRef.current.length = ACTIVE_DOT_COUNT;
-  }, [slotCount]);
-
-  useIsomorphicLayoutEffect(() => {
-    const previousActiveClassName = appliedActiveClassNameRef.current;
-
-    for (let index = 0; index < slotCount; index += 1) {
-      const dot = dotRefs.current[index];
-      if (!dot) continue;
-      if (previousActiveClassName && previousActiveClassName !== activeClassName) {
-        dot.classList.remove(previousActiveClassName);
+      // A fully-transparent dot that is already transparent needs no write.
+      if (state.opacity === 0 && cache !== null && cache.opacity === 0 && state.activeStrength === 0 && cache.activeStrength === 0) {
+        return;
       }
-      if (!activeClassName) continue;
-      if (index === activeSlotIndex) dot.classList.add(activeClassName);
-      else dot.classList.remove(activeClassName);
-    }
-    appliedActiveClassNameRef.current = activeClassName ?? null;
-  }, [activeClassName, activeSlotIndex, slotCount]);
 
-  const writeActiveProjection = useCallback(
-    (visualOffset: number) => {
-      // Two scalar locals instead of a per-frame `[floor, ceil]` array
-      // allocation — the active-projection write runs on every motion
-      // frame so this drops one short-lived array per RAF tick.
-      const floorId = Math.floor(visualOffset);
-      const ceilId = Math.ceil(visualOffset);
-      const cache = activeDotCacheRef.current;
+      const transformChanged = shouldWriteTransform(cache, state.x, state.scale);
+      const opacityChanged = shouldWriteOpacity(cache?.opacity ?? null, state.opacity);
+      const activeChanged = shouldWriteOpacity(cache?.activeStrength ?? null, state.activeStrength);
 
-      for (let index = 0; index < ACTIVE_DOT_COUNT; index += 1) {
-        const dot = activeDotRefs.current[index];
-        if (!dot) continue;
+      if (transformChanged) node.style.transform = toTransform(state.x, state.scale);
+      if (opacityChanged) node.style.opacity = String(state.opacity);
+      if (activeChanged) node.style.setProperty(ACTIVE_STRENGTH_VAR, String(state.activeStrength));
 
-        const id = index === 0 ? floorId : ceilId;
-        const isDuplicate = index > 0 && id === floorId;
-        const state = !isDuplicate
-          ? writeDotProjection(activeProjectionRef.current, id, visualOffset, geometry)
-          : null;
-        const x = state?.x ?? 0;
-        const scale = state?.scale ?? 0;
-        const opacity = state?.activeStrength ?? 0;
-        const last = cache[index];
-        if (opacity === 0 && last !== null && last.opacity === 0) continue;
-
-        const transformChanged = shouldWriteTransform(last, x, scale);
-        const opacityChanged = shouldWriteOpacity(last, opacity);
-
-        if (transformChanged) {
-          dot.style.transform = toTransform(x, scale);
-        }
-        if (opacityChanged) {
-          dot.style.opacity = String(opacity);
-        }
-
-        if (last === null) cache[index] = { x, scale, opacity };
-        else {
-          if (transformChanged) {
-            last.x = x;
-            last.scale = scale;
-          }
-          if (opacityChanged) last.opacity = opacity;
-        }
-      }
+      writeCacheRef.current.set(id, {
+        x: state.x,
+        scale: state.scale,
+        opacity: state.opacity,
+        activeStrength: state.activeStrength,
+      });
     },
     [geometry],
   );
 
-  const writeVisualOffset = useCallback(
-    (visualOffset: number) => {
-      const firstId = Math.round(visualOffset) - side;
-      const cache = dotCacheRef.current;
-
-      for (let index = 0; index < slotCount; index += 1) {
-        const dot = dotRefs.current[index];
-        if (!dot) continue;
-
-        const id = firstId + index;
-        const state = writeDotProjection(projectionRef.current, id, visualOffset, geometry);
-        const last = cache[index];
-
-        if (state.opacity === 0 && last !== null && last.opacity === 0) continue;
-
-        const transformChanged = shouldWriteTransform(last, state.x, state.scale);
-        const opacityChanged = shouldWriteOpacity(last, state.opacity);
-
-        if (transformChanged) {
-          dot.style.transform = toTransform(state.x, state.scale);
-        }
-        if (opacityChanged) {
-          dot.style.opacity = String(state.opacity);
-        }
-        if (last === null) {
-          cache[index] = { x: state.x, scale: state.scale, opacity: state.opacity };
-        } else {
-          if (transformChanged) {
-            last.x = state.x;
-            last.scale = state.scale;
-          }
-          if (opacityChanged) last.opacity = state.opacity;
-        }
-      }
-
-      writeActiveProjection(visualOffset);
+  const writeAll = useCallback(
+    (offset: number) => {
+      nodesRef.current.forEach((node, id) => writeDot(id, node, offset));
     },
-    [geometry, side, slotCount, writeActiveProjection],
+    [writeDot],
   );
 
+  // --- compositor fast-path -------------------------------------------------
+
+  const cancelCompositorDots = useCallback(() => {
+    animationsRef.current.forEach((animation) => animation.cancel());
+    animationsRef.current.clear();
+    compositedVersionRef.current = null;
+  }, []);
+
+  const runCompositorPlan = useCallback(
+    (plan: MotionPlan) => {
+      const steps = resolveKeyframeSteps(plan.fromPageOffset, plan.toPageOffset);
+      cancelCompositorDots();
+
+      let started = false;
+      nodesRef.current.forEach((node, id) => {
+        if (typeof node.animate !== "function") return;
+        const samples: DotKeyframeSample[] = buildProjectionKeyframes(
+          fixedIdAt(id),
+          plan.fromPageOffset,
+          plan.toPageOffset,
+          plan.easing,
+          geometry,
+          steps,
+        );
+        const keyframes = samples.map((s) => ({
+          offset: s.offset,
+          transform: toTransform(s.x, s.scale),
+          opacity: String(s.opacity),
+          [ACTIVE_STRENGTH_VAR]: String(s.activeStrength),
+        }));
+        try {
+          // `easing: linear` — the bezier is baked into the keyframe values;
+          // `fill: both` so the dot holds the settled state after finish.
+          const animation = node.animate(keyframes, {
+            duration: plan.duration,
+            easing: "linear",
+            fill: "both",
+          });
+          animationsRef.current.set(id, animation);
+          started = true;
+        } catch {
+          // Restrictive engine: leave this dot on the per-frame path.
+        }
+      });
+
+      if (!started) {
+        cancelCompositorDots();
+        return;
+      }
+      compositedVersionRef.current = plan.version;
+      // The composited keyframes now own each dot's transform/opacity; the next
+      // per-frame write (after the plan clears) must be unconditional.
+      writeCacheRef.current.clear();
+    },
+    [cancelCompositorDots, geometry],
+  );
+
+  // Per-frame follow path (SSOT). Always subscribed; stands aside while a
+  // compositor plan owns the dots.
   useIsomorphicLayoutEffect(() => {
     if (!visualPosition) return;
     return visualPosition.subscribe(
-      (frame) => writeVisualOffset(frame.pageOffset),
+      (frame) => {
+        if (compositedVersionRef.current !== null) return;
+        writeAll(frame.pageOffset);
+      },
       { emitCurrent: true },
     );
-  }, [visualPosition, writeVisualOffset]);
+  }, [visualPosition, writeAll]);
 
-  return {
-    bindDotRef,
-    bindActiveDotRef,
-    slotCount,
-    activeDotCount: ACTIVE_DOT_COUNT,
-  };
+  // Compositor fast path. A plan animates every dot; a `null` tears the
+  // animations down and re-pins the dots to the live SSOT position so the
+  // follow path resumes with no visual gap.
+  useIsomorphicLayoutEffect(() => {
+    if (!motionPlan) return;
+    const apply = (plan: MotionPlan | null) => {
+      if (plan) {
+        runCompositorPlan(plan);
+      } else {
+        cancelCompositorDots();
+        writeCacheRef.current.clear();
+        if (visualPosition) writeAll(visualPosition.getSnapshot().pageOffset);
+      }
+    };
+    apply(motionPlan.getPlan());
+    return motionPlan.subscribe(apply);
+  }, [motionPlan, runCompositorPlan, cancelCompositorDots, visualPosition, writeAll]);
+
+  // When the mounted id window changes (a step settled and the strip re-centred),
+  // a freshly-mounted dot has no style yet — pin every dot to the current SSOT
+  // position so new dots appear correctly and stale caches are dropped.
+  const dotIdsKey = useMemo(() => dotIds.join(","), [dotIds]);
+  useIsomorphicLayoutEffect(() => {
+    if (compositedVersionRef.current !== null) return;
+    writeCacheRef.current.clear();
+    if (visualPosition) writeAll(visualPosition.getSnapshot().pageOffset);
+  }, [dotIdsKey, visualPosition, writeAll]);
+
+  // Tear down compositor animations on unmount / geometry change.
+  useIsomorphicLayoutEffect(() => cancelCompositorDots, [cancelCompositorDots]);
+
+  return { bindDotRef };
 }
