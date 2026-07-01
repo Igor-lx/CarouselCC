@@ -86,6 +86,10 @@ export function useModuleContextValue({
   const intentView = useMemo<CarouselIntentView>(
     () => ({
       targetPageIndex: state.targetPageIndex,
+      targetPageOffset:
+        state.layout.visibleSlidesCount > 0
+          ? state.virtualIndex / state.layout.visibleSlidesCount
+          : 0,
       moveReason: state.moveReason,
       autoplayMotionDuration,
       autoplayPaginationFactor: config.interaction.autoplayPaginationFactor,
@@ -93,8 +97,10 @@ export function useModuleContextValue({
     [
       autoplayMotionDuration,
       config.interaction.autoplayPaginationFactor,
+      state.layout.visibleSlidesCount,
       state.moveReason,
       state.targetPageIndex,
+      state.virtualIndex,
     ],
   );
 

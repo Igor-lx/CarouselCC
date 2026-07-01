@@ -46,8 +46,15 @@ const PaginationWidgetBase = memo(function PaginationWidget({
   // projected trajectory is continuous and can be composited. The window
   // re-centres only when the target page changes (a settled step), never
   // per frame; the binding drives positions inside it.
+  //
+  // The centre is anchored in the *unbounded* page-offset domain
+  // (`intent.targetPageOffset`), NOT the normalised `targetPageIndex`: the dot
+  // projection is driven by the visual stream's `pageOffset`, which in cyclic
+  // mode grows past the deck edges. Anchoring on the wrapped page index would
+  // drift the window away from the live dots after a few steps and fade them all
+  // out.
   const side = widgetProjectionSide(geometry.visibleCount);
-  const centerPage = Math.round(intent.targetPageIndex);
+  const centerPage = Math.round(intent.targetPageOffset);
   const dotIds = useMemo(
     () => widgetDotWindow(centerPage, side),
     [centerPage, side],

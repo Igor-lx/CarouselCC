@@ -26,7 +26,16 @@ export interface CarouselLayoutView {
 }
 
 export interface CarouselIntentView {
+  /** Normalised destination page `[0, pageCount)`, for pagination labelling. */
   targetPageIndex: number;
+  /**
+   * Destination in the *unbounded* page-offset domain (`virtualIndex /
+   * visibleSlidesCount`) — the same domain the visual-position stream reports
+   * `pageOffset` in. In cyclic mode this keeps growing/shrinking past the deck
+   * edges while `targetPageIndex` wraps, so anything that must stay aligned with
+   * the live `pageOffset` (e.g. the widget's dot window) must anchor here.
+   */
+  targetPageOffset: number;
   /** `null` before the carousel has moved for the first time. */
   moveReason: MoveReason | null;
   autoplayMotionDuration: number;
