@@ -1,12 +1,13 @@
-import { memo, useMemo, useRef } from "react";
+import clsx from "clsx";
+import { memo, useMemo } from "react";
 
 import { mergeStyleMaps } from "../../../../../shared";
-import { shortestCyclicDistance } from "../../domain";
 import { useCarouselMotion, useCarouselStable } from "../../context";
 import type { CarouselSlotComponent } from "../../slots";
 import { useWidgetDiagnostic } from "../Diagnostic/useWidgetDiagnostic";
-import { buildPaginationWidgetGeometry, widgetProjectionSide } from "./math/spatialField";
-import { usePaginationWidgetBinding, widgetDotWindow } from "./usePaginationWidgetBinding";
+import { buildPaginationWidgetGeometry } from "./math/spatialField";
+import { projectDot } from "./math/projection";
+import { usePaginationWidgetBinding } from "./usePaginationWidgetBinding";
 import { PaginationWidgetDot } from "./PaginationWidgetDot";
 import { PAGINATION_WIDGET_DEFAULTS } from "./defaults";
 import styles from "./PaginationWidget.module.scss";
@@ -23,7 +24,11 @@ const PaginationWidgetBase = memo(function PaginationWidget({
   className,
 }: PaginationWidgetProps) {
   const { intent } = useCarouselMotion();
-  const { layout } = useCarouselStable();
+  const { layout, visualPosition } = useCarouselStable();
+
+  // When reduced motion is on, the binding has nothing to subscribe to and we
+  // render a static snapshot. Otherwise the binding mutates dots frame-by-frame.
+  const isMotionBound = visualPosition !== null && !layout.isReducedMotion;
 
   const spatial = useMemo(
     () => ({ size: dotSize, gap: dotGap, scaleFactor }),
@@ -40,40 +45,22 @@ const PaginationWidgetBase = memo(function PaginationWidget({
     [className],
   );
 
-  // --- the widget's own monotonic offset ------------------------------------
-  // The widget is a decoupled step indicator: it tracks *changes* to the
-  // carousel's normalised target page and advances its own offset by exactly one
-  // dot in the shortest-cyclic direction — never mirroring how far the deck
-  // actually travelled. This offset lives in the widget's private, unbounded
-  // coordinate, so (unlike the deck's wrapping page index) the dot window never
-  // drifts off the live dots.
-  const offsetRef = useRef(0);
-  const prevPageRef = useRef(intent.targetPageIndex);
-  const targetPage = intent.targetPageIndex;
-  const pageCount = layout.pageCount;
-  if (targetPage !== prevPageRef.current) {
-    const dir = Math.sign(
-      pageCount > 0
-        ? shortestCyclicDistance(prevPageRef.current, targetPage, pageCount)
-        : targetPage - prevPageRef.current,
-    );
-    if (dir !== 0) offsetRef.current += dir;
-    prevPageRef.current = targetPage;
-  }
-  const centerOffset = offsetRef.current;
+  const { bindDotRef, bindActiveDotRef, slotCount, activeDotCount } =
+    usePaginationWidgetBinding({
+      visualPosition: isMotionBound ? visualPosition : null,
+      geometry,
+      activeClassName: classNames.dotActive_PW,
+    });
 
-  const side = widgetProjectionSide(geometry.visibleCount);
-  const dotIds = useMemo(
-    () => widgetDotWindow(Math.round(centerOffset), side),
-    [centerOffset, side],
+  const boundSlotIndexes = useMemo(
+    () => Array.from({ length: slotCount }, (_, index) => index),
+    [slotCount],
   );
 
-  const { bindDotRef } = usePaginationWidgetBinding({
-    targetOffset: centerOffset,
-    isInstant: layout.isReducedMotion,
-    geometry,
-    dotIds,
-  });
+  const activeDotIndexes = useMemo(
+    () => Array.from({ length: activeDotCount }, (_, index) => index),
+    [activeDotCount],
+  );
 
   useWidgetDiagnostic({ visibleDots, dotSize, dotGap, scaleFactor });
 
@@ -86,15 +73,51 @@ const PaginationWidgetBase = memo(function PaginationWidget({
     [geometry.visibleCount, spatial.gap, spatial.size],
   );
 
+  const staticDots = useMemo(() => {
+    if (isMotionBound) return null;
+    const offset = intent.targetPageIndex;
+    return Array.from({ length: slotCount }, (_, index) => {
+      const id = Math.round(offset) - Math.floor(slotCount / 2) + index;
+      return projectDot(id, offset, geometry);
+    });
+  }, [geometry, intent.targetPageIndex, isMotionBound, slotCount]);
+
   return (
-    <div className={classNames.container_PW} style={containerStyle}>
-      {dotIds.map((id) => (
-        <PaginationWidgetDot
-          key={id}
-          ref={bindDotRef(id)}
-          className={classNames.dot_PW}
-        />
-      ))}
+    <div
+      className={classNames.container_PW}
+      data-motion-bound={isMotionBound ? true : undefined}
+      style={containerStyle}
+    >
+      {isMotionBound
+        ? boundSlotIndexes.map((index) => (
+            <PaginationWidgetDot
+              key={`bound:${index}`}
+              ref={bindDotRef(index)}
+              className={classNames.dot_PW}
+            />
+          ))
+        : staticDots?.map((dot) => (
+            <div
+              key={dot.id}
+              className={clsx(classNames.dot_PW, dot.isActive && classNames.dotActive_PW)}
+              style={{
+                opacity: dot.opacity,
+                transform: `translate3d(${dot.x}px, 0, 0) scale(${dot.scale})`,
+                ...({
+                  "--dot-active-strength": dot.activeStrength,
+                } as React.CSSProperties),
+              }}
+            />
+          ))}
+      {isMotionBound
+        ? activeDotIndexes.map((index) => (
+            <div
+              key={`active:${index}`}
+              ref={bindActiveDotRef(index)}
+              className={classNames.activeDot_PW}
+            />
+          ))
+        : null}
     </div>
   );
 });

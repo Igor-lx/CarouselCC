@@ -9,19 +9,6 @@ export const PAGINATION_WIDGET_DEFAULTS = {
 export const EDGE_DOT_DRIFT_FACTOR = 0.6;
 
 /**
- * The widget is a decoupled *step indicator*: every navigation — a single click,
- * a repeated click, a gesture release, or a many-page jump — advances it by
- * exactly ONE dot in the travel direction, on its OWN short, consistent timing.
- * It never mirrors the deck's motion profile (which can be a 4 s eased slide, an
- * inertial release, or a teleport), so its feel stays crisp and identical across
- * every navigation type.
- */
-export const WIDGET_STEP_DURATION_MS = 460;
-
-/** The widget's own easing (independent of the deck's `MOVE_BEZIER`). */
-export const WIDGET_STEP_EASING = "cubic-bezier(0.33, 0.0, 0.2, 1)";
-
-/**
  * Per-frame change-detection thresholds for the dot DOM-write path. A new
  * projection value below the matching epsilon does not trigger a style
  * assignment (or even a transform-string allocation): the dot is already
@@ -35,3 +22,18 @@ export const WIDGET_STEP_EASING = "cubic-bezier(0.33, 0.0, 0.2, 1)";
 export const DOT_POSITION_EPSILON_PX = 0.25;
 export const DOT_SCALE_EPSILON = 0.002;
 export const DOT_OPACITY_EPSILON = 0.01;
+
+/**
+ * Frame stride for the motion-bound dot writes: the binding follows the live
+ * visual position every animation frame (so its speed matches the deck exactly,
+ * including a finger drag and gesture strength), but only commits the projected
+ * dot styles to the DOM every Nth frame. This cuts the per-step style-recalc
+ * load ~N× while keeping the motion 1:1 with the carousel — the widget still
+ * samples the true position, it just paints it slightly less often.
+ *
+ * The final settle frame is always painted regardless of stride, so the dots
+ * never come to rest a fraction of a frame early. `1` writes every frame (the
+ * original behaviour); `2`–`3` is visually indistinguishable at 60–120 Hz while
+ * roughly halving / thirding the write load.
+ */
+export const WIDGET_WRITE_FRAME_STRIDE = 3;

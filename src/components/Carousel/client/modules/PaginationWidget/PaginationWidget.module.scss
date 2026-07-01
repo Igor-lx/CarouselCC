@@ -44,11 +44,6 @@
   will-change: transform, opacity;
 }
 
-// Active-page glow, folded into each dot as an overlay pseudo-element driven by
-// `--dot-active-strength` (peaks when the deck reaches this dot's page, fades
-// with distance). Per page-dot identity, so the glow is continuous and hands
-// off smoothly between the two dots straddling the current page — no separate
-// recycling overlay nodes.
 .dot_PW::after {
   position: absolute;
   inset: 0;
@@ -57,6 +52,31 @@
   box-shadow: 0 0 8px 1px var(--dot-active-color);
   opacity: var(--dot-active-strength);
   content: "";
+}
+
+.dotActive_PW {
+  z-index: 2;
+}
+
+.container_PW[data-motion-bound="true"] .dot_PW::after {
+  display: none;
+}
+
+.activeDot_PW {
+  position: absolute;
+  top: calc(50% - (var(--dot-size) / 2));
+  left: calc(50% - (var(--dot-size) / 2));
+  z-index: 3;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: 50%;
+  background-color: var(--dot-active-color);
+  box-shadow: 0 0 8px 1px var(--dot-active-color);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, 0, 0) scale(0);
+  transform-origin: center;
+  will-change: transform, opacity;
 }
 
 @media (width <= 767px) {
