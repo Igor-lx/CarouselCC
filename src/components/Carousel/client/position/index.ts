@@ -4,5 +4,3 @@ export type {
   VisualPositionListener,
   VisualPositionSource,
 } from "./types";
-export { createMotionPlanSource } from "./motionPlan";
-export type { MotionPlan, MotionPlanListener, MotionPlanSource } from "./motionPlan";

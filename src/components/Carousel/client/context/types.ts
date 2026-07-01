@@ -1,6 +1,6 @@
 import type { CarouselNavigation } from "../navigation";
 import type { CarouselState, MotionPhase, MoveReason } from "../state";
-import type { MotionPlanSource, VisualPositionSource } from "../position";
+import type { VisualPositionSource } from "../position";
 
 export interface CarouselStatusView {
   motionPhase: MotionPhase;
@@ -54,12 +54,6 @@ export interface CarouselStableContextValue {
   layout: CarouselLayoutView;
   navigation: CarouselNavigationView;
   visualPosition: VisualPositionSource | null;
-  /**
-   * Compositor motion-plan mirror (see `MotionPlanSource`). `null` when motion
-   * is instant (reduced-motion), exactly like `visualPosition`, so a consumer
-   * uses the same gate to decide composited-vs-static. Referentially stable.
-   */
-  motionPlan: MotionPlanSource | null;
 }
 
 /**

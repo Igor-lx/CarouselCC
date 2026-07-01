@@ -1,7 +1,7 @@
 import { useCallback, useRef } from "react";
 
 import { useIsomorphicLayoutEffect } from "../../../../../shared";
-import type { MotionPlan, MotionPlanSource, VisualPositionSource } from "../../position";
+import type { VisualPositionSource } from "../../position";
 import {
   DOT_OPACITY_EPSILON,
   DOT_POSITION_EPSILON_PX,
@@ -11,13 +11,6 @@ import {
   widgetProjectionSide,
   widgetProjectionSlotCount,
 } from "./math/spatialField";
-import {
-  activeIdAt,
-  buildProjectionKeyframes,
-  slotIdAt,
-  type DotIdAt,
-  type DotKeyframeSample,
-} from "./math/keyframes";
 import { writeDotProjection } from "./math/projection";
 import type {
   PaginationWidgetDotState,
@@ -25,15 +18,6 @@ import type {
 } from "./types";
 
 const ACTIVE_DOT_COUNT = 2;
-
-/**
- * Keyframes sampled per composited segment. ~3 per page screen of travel is
- * dense enough that the nonlinear projection and the slot-recycle sawtooth are
- * sub-pixel between keyframes, while keeping the WAAPI keyframe list small.
- */
-const KEYFRAME_STEPS_PER_PAGE = 3;
-const MIN_KEYFRAME_STEPS = 8;
-const MAX_KEYFRAME_STEPS = 120;
 
 const emptyDotState = (): PaginationWidgetDotState => ({
   id: 0,
@@ -76,24 +60,8 @@ const shouldWriteOpacity = (
   opacity: number,
 ): boolean => last === null || Math.abs(last.opacity - opacity) >= DOT_OPACITY_EPSILON;
 
-const resolveKeyframeSteps = (fromOffset: number, toOffset: number): number => {
-  const pages = Math.abs(toOffset - fromOffset);
-  return Math.min(
-    MAX_KEYFRAME_STEPS,
-    Math.max(MIN_KEYFRAME_STEPS, Math.ceil(pages * KEYFRAME_STEPS_PER_PAGE)),
-  );
-};
-
 interface UseBindingInput {
   visualPosition: VisualPositionSource | null;
-  /**
-   * Compositor motion-plan mirror. When it carries a plan, the widget animates
-   * its dots through the Web Animations API (one composited animation per dot)
-   * instead of writing `style` every frame — collapsing the per-step main-thread
-   * style-recalc churn to zero. `null` (drag, profile segment, idle settle, or
-   * reduced motion) keeps the per-frame `visualPosition` follow path.
-   */
-  motionPlan: MotionPlanSource | null;
   geometry: PaginationWidgetGeometry;
   activeClassName?: string;
 }
@@ -107,7 +75,6 @@ export interface PaginationWidgetBinding {
 
 export function usePaginationWidgetBinding({
   visualPosition,
-  motionPlan,
   geometry,
   activeClassName,
 }: UseBindingInput): PaginationWidgetBinding {
@@ -124,13 +91,6 @@ export function usePaginationWidgetBinding({
   const projectionRef = useRef<PaginationWidgetDotState>(emptyDotState());
   const activeProjectionRef = useRef<PaginationWidgetDotState>(emptyDotState());
   const appliedActiveClassNameRef = useRef<string | null>(null);
-
-  // Live compositor animations (one per node), and the plan version they belong
-  // to. While non-null, the per-frame follow path stands aside — exactly the
-  // pattern the track binding uses while its WAAPI animation owns the track.
-  const dotAnimationsRef = useRef<Array<Animation | null>>([]);
-  const activeAnimationsRef = useRef<Array<Animation | null>>([]);
-  const compositedVersionRef = useRef<number | null>(null);
 
   const side = widgetProjectionSide(geometry.visibleCount);
   const slotCount = widgetProjectionSlotCount(geometry.visibleCount);
@@ -165,8 +125,6 @@ export function usePaginationWidgetBinding({
     dotCallbacksRef.current.length = slotCount;
     activeDotRefs.current.length = ACTIVE_DOT_COUNT;
     activeDotCallbacksRef.current.length = ACTIVE_DOT_COUNT;
-    dotAnimationsRef.current.length = slotCount;
-    activeAnimationsRef.current.length = ACTIVE_DOT_COUNT;
   }, [slotCount]);
 
   useIsomorphicLayoutEffect(() => {
@@ -272,144 +230,13 @@ export function usePaginationWidgetBinding({
     [geometry, side, slotCount, writeActiveProjection],
   );
 
-  // --- compositor fast-path -------------------------------------------------
-
-  const cancelCompositorDots = useCallback(() => {
-    for (let i = 0; i < dotAnimationsRef.current.length; i += 1) {
-      dotAnimationsRef.current[i]?.cancel();
-      dotAnimationsRef.current[i] = null;
-    }
-    for (let i = 0; i < activeAnimationsRef.current.length; i += 1) {
-      activeAnimationsRef.current[i]?.cancel();
-      activeAnimationsRef.current[i] = null;
-    }
-    compositedVersionRef.current = null;
-  }, []);
-
-  // Reset a per-frame cache entry so the next per-frame write is unconditional
-  // (the WAAPI run left the DOM at a value the cache no longer reflects).
-  const invalidateCaches = useCallback(() => {
-    dotCacheRef.current.fill(null);
-    activeDotCacheRef.current.fill(null);
-  }, []);
-
-  const animateNode = useCallback(
-    (
-      node: HTMLDivElement,
-      idAt: DotIdAt,
-      plan: MotionPlan,
-      steps: number,
-      opacityFrom: (sample: DotKeyframeSample) => number,
-    ): Animation | null => {
-      if (typeof node.animate !== "function") return null;
-      const samples = buildProjectionKeyframes(
-        idAt,
-        plan.fromPageOffset,
-        plan.toPageOffset,
-        plan.easing,
-        geometry,
-        steps,
-      );
-      const keyframes = samples.map((s) => ({
-        offset: s.offset,
-        transform: toTransform(s.x, s.scale),
-        opacity: String(opacityFrom(s)),
-      }));
-      try {
-        // `easing: linear` because the bezier is already baked into the keyframe
-        // values; `fill: both` so the dot holds the settled state after finish.
-        return node.animate(keyframes, {
-          duration: plan.duration,
-          easing: "linear",
-          fill: "both",
-        });
-      } catch {
-        return null;
-      }
-    },
-    [geometry],
-  );
-
-  const runCompositorPlan = useCallback(
-    (plan: MotionPlan) => {
-      const steps = resolveKeyframeSteps(plan.fromPageOffset, plan.toPageOffset);
-
-      // Replace any in-flight dot animations with the new plan's.
-      cancelCompositorDots();
-
-      let started = false;
-      for (let index = 0; index < slotCount; index += 1) {
-        const node = dotRefs.current[index];
-        if (!node) continue;
-        const anim = animateNode(node, slotIdAt(index, side), plan, steps, (s) => s.opacity);
-        dotAnimationsRef.current[index] = anim;
-        if (anim) started = true;
-      }
-      for (let index = 0; index < ACTIVE_DOT_COUNT; index += 1) {
-        const node = activeDotRefs.current[index];
-        if (!node) continue;
-        const anim = animateNode(
-          node,
-          activeIdAt(index === 0 ? 0 : 1),
-          plan,
-          steps,
-          (s) => s.activeStrength,
-        );
-        activeAnimationsRef.current[index] = anim;
-        if (anim) started = true;
-      }
-
-      if (!started) {
-        // No animatable node (no `Element.animate`): stay on the per-frame path.
-        cancelCompositorDots();
-        return;
-      }
-
-      compositedVersionRef.current = plan.version;
-      // The composited keyframes now own the DOM transform/opacity; the next
-      // per-frame write (after the plan clears) must be unconditional.
-      invalidateCaches();
-    },
-    [animateNode, cancelCompositorDots, invalidateCaches, side, slotCount],
-  );
-
-  // Subscribe to the per-frame visual position — the SSOT follow path. It is
-  // always subscribed; while a compositor plan owns the dots it stands aside,
-  // exactly like the track binding suppresses its own per-frame writes.
   useIsomorphicLayoutEffect(() => {
     if (!visualPosition) return;
     return visualPosition.subscribe(
-      (frame) => {
-        if (compositedVersionRef.current !== null) return;
-        writeVisualOffset(frame.pageOffset);
-      },
+      (frame) => writeVisualOffset(frame.pageOffset),
       { emitCurrent: true },
     );
   }, [visualPosition, writeVisualOffset]);
-
-  // Subscribe to the motion plan — the compositor fast path. A plan animates the
-  // dots on the compositor; a `null` (drag, profile, settle) tears the
-  // compositor animations down and re-pins the dots to the live per-frame
-  // position so the follow path resumes seamlessly.
-  useIsomorphicLayoutEffect(() => {
-    if (!motionPlan) return;
-    const apply = (plan: MotionPlan | null) => {
-      if (plan) {
-        runCompositorPlan(plan);
-      } else {
-        cancelCompositorDots();
-        invalidateCaches();
-        // Re-pin to the current SSOT position so there is no visual gap between
-        // the (filled) WAAPI end state and the resumed per-frame writes.
-        if (visualPosition) writeVisualOffset(visualPosition.getSnapshot().pageOffset);
-      }
-    };
-    apply(motionPlan.getPlan());
-    return motionPlan.subscribe(apply);
-  }, [motionPlan, runCompositorPlan, cancelCompositorDots, invalidateCaches, visualPosition, writeVisualOffset]);
-
-  // Tear down compositor animations on unmount / geometry change.
-  useIsomorphicLayoutEffect(() => cancelCompositorDots, [cancelCompositorDots]);
 
   return {
     bindDotRef,

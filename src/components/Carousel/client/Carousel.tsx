@@ -223,7 +223,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   const {
     source: visualPosition,
     controller,
-    motionPlan,
     applyImmediatePosition,
   } = useVisualPosition({
     visibleSlidesCount: layout.visibleSlidesCount,
@@ -263,8 +262,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     enabled: layout.canSlide,
     startCompositorMotion,
     cancelCompositorMotion,
-    motionPlan,
-    visibleSlidesCount: layout.visibleSlidesCount,
   });
 
   // --- navigation -----------------------------------------------------------
@@ -346,7 +343,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
       isReducedMotion: isInstantMode,
       autoplayMotionDuration,
       visualPosition: isInstantMode ? null : visualPosition,
-      motionPlan: isInstantMode ? null : motionPlan,
       isAtStart,
       isAtEnd,
       isDiagnosticActive: renderPolicy.shouldRenderDiagnostic,

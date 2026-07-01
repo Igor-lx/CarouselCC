@@ -3,7 +3,6 @@ import { useCallback, useMemo } from "react";
 import type { MotionController } from "../../../../shared";
 import type { CarouselRuntimeConfig } from "../config";
 import type { TrackBindingApi } from "../geometry";
-import type { MotionPlanSource } from "../position";
 import type { CarouselDispatch, CarouselState } from "../state";
 import type { CarouselMotionStrategy } from "./types";
 import { resolveAutoplayMotionDuration } from "./autoplayDuration";
@@ -19,10 +18,6 @@ interface UseCarouselMotionExecutionInput {
   enabled: boolean;
   startCompositorMotion: TrackBindingApi["startCompositorMotion"];
   cancelCompositorMotion: TrackBindingApi["cancelCompositorMotion"];
-  /** Compositor motion-plan mirror the runner publishes eased segments to. */
-  motionPlan: MotionPlanSource;
-  /** Live slot count, to express the plan in the page-offset domain. */
-  visibleSlidesCount: number;
 }
 
 interface UseCarouselMotionExecutionResult {
@@ -45,8 +40,6 @@ export function useCarouselMotionExecution({
   enabled,
   startCompositorMotion,
   cancelCompositorMotion,
-  motionPlan,
-  visibleSlidesCount,
 }: UseCarouselMotionExecutionInput): UseCarouselMotionExecutionResult {
   const autoplayMotionDuration = useMemo(
     () =>
@@ -75,8 +68,6 @@ export function useCarouselMotionExecution({
     enabled,
     startCompositorMotion,
     cancelCompositorMotion,
-    motionPlan,
-    visibleSlidesCount,
     onSettle: handleMotionSettled,
   });
 

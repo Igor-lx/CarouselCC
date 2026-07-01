@@ -7,7 +7,6 @@ import {
   type MotionSample,
 } from "../../../../shared";
 import type { CarouselMotionStrategy } from "../motion/types";
-import { createMotionPlanSource, type MotionPlanSource } from "./motionPlan";
 import type {
   VisualPositionFrame,
   VisualPositionListener,
@@ -21,12 +20,6 @@ interface UseVisualPositionInput {
 export interface UseVisualPositionResult {
   source: VisualPositionSource;
   controller: MotionController<CarouselMotionStrategy>;
-  /**
-   * Compositor motion-plan mirror, fed by the motion runner. Stable for the
-   * carousel's life; consumed by compositor mirrors (the pagination widget) so
-   * they animate the same eased curve the controller samples.
-   */
-  motionPlan: MotionPlanSource;
   applyImmediatePosition: (position: number) => void;
 }
 
@@ -49,12 +42,6 @@ export function useVisualPosition({
   visibleSlidesCount,
 }: UseVisualPositionInput): UseVisualPositionResult {
   const controller = useMotionController<CarouselMotionStrategy>(0, "idle");
-
-  // Per-instance compositor motion-plan mirror. Created once (ref) so its
-  // identity is stable for the carousel's life, like `source` below.
-  const motionPlanRef = useRef<MotionPlanSource | null>(null);
-  motionPlanRef.current ??= createMotionPlanSource();
-  const motionPlan = motionPlanRef.current;
 
   const stepSizeRef = useRef(visibleSlidesCount);
   stepSizeRef.current = visibleSlidesCount;
@@ -126,5 +113,5 @@ export function useVisualPosition({
     [controller],
   );
 
-  return { source, controller, motionPlan, applyImmediatePosition };
+  return { source, controller, applyImmediatePosition };
 }
