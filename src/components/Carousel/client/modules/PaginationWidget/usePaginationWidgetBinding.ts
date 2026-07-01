@@ -1,33 +1,21 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useRef } from "react";
 
 import { useIsomorphicLayoutEffect } from "../../../../../shared";
-import type { MotionPlan, MotionPlanSource, VisualPositionSource } from "../../position";
-import {
-  DOT_OPACITY_EPSILON,
-  DOT_POSITION_EPSILON_PX,
-  DOT_SCALE_EPSILON,
-} from "./defaults";
-import {
-  buildProjectionKeyframes,
-  fixedIdAt,
-  type DotKeyframeSample,
-} from "./math/keyframes";
+import { parseBezier } from "../../motion/bezier";
+import { WIDGET_STEP_DURATION_MS, WIDGET_STEP_EASING } from "./defaults";
+import { buildProjectionKeyframes, fixedIdAt } from "./math/keyframes";
 import { writeDotProjection } from "./math/projection";
 import type {
   PaginationWidgetDotState,
   PaginationWidgetGeometry,
 } from "./types";
 
-/**
- * Per composited segment, ~3 keyframes per page screen of travel is dense
- * enough that the nonlinear projection is sub-pixel between keyframes while the
- * WAAPI keyframe list stays small.
- */
-const KEYFRAME_STEPS_PER_PAGE = 3;
-const MIN_KEYFRAME_STEPS = 8;
-const MAX_KEYFRAME_STEPS = 120;
+/** ~10 keyframes for a single-step sweep — dense enough to be sub-pixel smooth. */
+const KEYFRAME_STEPS = 10;
 
 const ACTIVE_STRENGTH_VAR = "--dot-active-strength";
+
+const WIDGET_EASING = parseBezier(WIDGET_STEP_EASING);
 
 const emptyDotState = (): PaginationWidgetDotState => ({
   id: 0,
@@ -42,66 +30,30 @@ const toTransform = (x: number, scale: number) =>
   `translate3d(${x}px, 0, 0) scale(${scale})`;
 
 /**
- * Cache the *inputs* to the per-frame write, not the formatted string. Compare
- * numeric values against epsilons to skip both the template-literal allocation
- * and the DOM write when nothing visibly changed — a steady-state widget emits
- * zero per-rAF DOM writes.
+ * The page-dot ids the widget mounts for a given centre offset: a symmetric
+ * window `[round(offset) - side, round(offset) + side]`. One DOM node per *page
+ * identity* (not per recycling slot), so each node's projected trajectory —
+ * slide, scale, fade, glow — is continuous, which is what WAAPI keyframe
+ * interpolation needs.
  */
-interface DotWriteCache {
-  x: number;
-  scale: number;
-  opacity: number;
-  activeStrength: number;
-}
-
-const shouldWriteTransform = (
-  last: DotWriteCache | null,
-  x: number,
-  scale: number,
-): boolean =>
-  last === null ||
-  Math.abs(last.x - x) >= DOT_POSITION_EPSILON_PX ||
-  Math.abs(last.scale - scale) >= DOT_SCALE_EPSILON;
-
-const shouldWriteOpacity = (last: number | null, value: number): boolean =>
-  last === null || Math.abs(last - value) >= DOT_OPACITY_EPSILON;
-
-const resolveKeyframeSteps = (fromOffset: number, toOffset: number): number => {
-  const pages = Math.abs(toOffset - fromOffset);
-  return Math.min(
-    MAX_KEYFRAME_STEPS,
-    Math.max(MIN_KEYFRAME_STEPS, Math.ceil(pages * KEYFRAME_STEPS_PER_PAGE)),
-  );
-};
-
-/**
- * The page-dot ids the widget mounts for a given center page: a symmetric
- * window `[center - side, center + side]`. One DOM node per *page identity*
- * (not per recycling slot), so each node's projected trajectory — slide, scale,
- * fade, glow — is continuous as the deck offset sweeps, which is exactly what a
- * WAAPI keyframe interpolation needs.
- */
-export const widgetDotWindow = (
-  centerPage: number,
-  side: number,
-): number[] => {
+export const widgetDotWindow = (centerId: number, side: number): number[] => {
   const ids: number[] = [];
-  for (let id = centerPage - side; id <= centerPage + side; id += 1) ids.push(id);
+  for (let id = centerId - side; id <= centerId + side; id += 1) ids.push(id);
   return ids;
 };
 
 interface UseBindingInput {
-  visualPosition: VisualPositionSource | null;
   /**
-   * Compositor motion-plan mirror. When it carries a plan the widget animates
-   * each dot through the Web Animations API (one composited animation per dot)
-   * instead of writing `style` every frame — collapsing the per-step main-thread
-   * style-recalc churn to zero. `null` (drag, profile segment, idle settle,
-   * reduced motion) keeps the per-frame `visualPosition` follow path.
+   * The widget's own destination offset — its private, monotonic coordinate
+   * (advanced by exactly one dot per navigation by the component). The binding
+   * animates the strip from its last offset to this one, on the widget's own
+   * timing. Fully decoupled from the deck's motion.
    */
-  motionPlan: MotionPlanSource | null;
+  targetOffset: number;
+  /** Reduced motion: snap without animating. */
+  isInstant: boolean;
   geometry: PaginationWidgetGeometry;
-  /** The page-dot ids currently mounted (see `widgetDotWindow`). */
+  /** The page-dot ids currently mounted (from the widget's own offset). */
   dotIds: number[];
 }
 
@@ -110,22 +62,21 @@ export interface PaginationWidgetBinding {
 }
 
 export function usePaginationWidgetBinding({
-  visualPosition,
-  motionPlan,
+  targetOffset,
+  isInstant,
   geometry,
   dotIds,
 }: UseBindingInput): PaginationWidgetBinding {
   // DOM nodes keyed by page-dot id (stable identity across the strip).
   const nodesRef = useRef<Map<number, HTMLDivElement>>(new Map());
   const refCallbacksRef = useRef<Map<number, (node: HTMLDivElement | null) => void>>(new Map());
-  const writeCacheRef = useRef<Map<number, DotWriteCache>>(new Map());
   const projectionRef = useRef<PaginationWidgetDotState>(emptyDotState());
 
-  // Live compositor animations keyed by id, and the plan version they belong to.
-  // While non-null, the per-frame follow path stands aside — the same pattern
-  // the track binding uses while its WAAPI animation owns the track.
+  // The widget's own animation state, decoupled from the deck:
+  //  - `settledOffsetRef`: where the strip currently rests / is heading. `null`
+  //    until the first paint seeds it.
+  const settledOffsetRef = useRef<number | null>(null);
   const animationsRef = useRef<Map<number, Animation>>(new Map());
-  const compositedVersionRef = useRef<number | null>(null);
 
   const bindDotRef = useCallback((id: number) => {
     const cached = refCallbacksRef.current.get(id);
@@ -138,62 +89,49 @@ export function usePaginationWidgetBinding({
     return callback;
   }, []);
 
-  const writeDot = useCallback(
+  const paintDot = useCallback(
     (id: number, node: HTMLDivElement, offset: number) => {
-      const state = writeDotProjection(projectionRef.current, id, offset, geometry);
-      const cache = writeCacheRef.current.get(id) ?? null;
-
-      // A fully-transparent dot that is already transparent needs no write.
-      if (state.opacity === 0 && cache !== null && cache.opacity === 0 && state.activeStrength === 0 && cache.activeStrength === 0) {
-        return;
-      }
-
-      const transformChanged = shouldWriteTransform(cache, state.x, state.scale);
-      const opacityChanged = shouldWriteOpacity(cache?.opacity ?? null, state.opacity);
-      const activeChanged = shouldWriteOpacity(cache?.activeStrength ?? null, state.activeStrength);
-
-      if (transformChanged) node.style.transform = toTransform(state.x, state.scale);
-      if (opacityChanged) node.style.opacity = String(state.opacity);
-      if (activeChanged) node.style.setProperty(ACTIVE_STRENGTH_VAR, String(state.activeStrength));
-
-      writeCacheRef.current.set(id, {
-        x: state.x,
-        scale: state.scale,
-        opacity: state.opacity,
-        activeStrength: state.activeStrength,
-      });
+      const s = writeDotProjection(projectionRef.current, id, offset, geometry);
+      node.style.transform = toTransform(s.x, s.scale);
+      node.style.opacity = String(s.opacity);
+      node.style.setProperty(ACTIVE_STRENGTH_VAR, String(s.activeStrength));
     },
     [geometry],
   );
 
-  const writeAll = useCallback(
+  const paintAll = useCallback(
     (offset: number) => {
-      nodesRef.current.forEach((node, id) => writeDot(id, node, offset));
+      nodesRef.current.forEach((node, id) => paintDot(id, node, offset));
     },
-    [writeDot],
+    [paintDot],
   );
 
-  // --- compositor fast-path -------------------------------------------------
-
-  const cancelCompositorDots = useCallback(() => {
+  const cancelAnimations = useCallback(() => {
     animationsRef.current.forEach((animation) => animation.cancel());
     animationsRef.current.clear();
-    compositedVersionRef.current = null;
   }, []);
 
-  const runCompositorPlan = useCallback(
-    (plan: MotionPlan) => {
-      const steps = resolveKeyframeSteps(plan.fromPageOffset, plan.toPageOffset);
-      cancelCompositorDots();
-
+  // Animate every dot from `fromOffset` to `toOffset` on the widget's own timing.
+  const animateTo = useCallback(
+    (fromOffset: number, toOffset: number) => {
+      cancelAnimations();
+      // The window is centred on the destination, so the whole travel from
+      // `fromOffset` is covered; the entering dot starts faint and grows in.
+      const steps = Math.max(
+        KEYFRAME_STEPS,
+        Math.ceil(Math.abs(toOffset - fromOffset) * KEYFRAME_STEPS),
+      );
       let started = false;
       nodesRef.current.forEach((node, id) => {
-        if (typeof node.animate !== "function") return;
-        const samples: DotKeyframeSample[] = buildProjectionKeyframes(
+        if (typeof node.animate !== "function") {
+          paintDot(id, node, toOffset);
+          return;
+        }
+        const samples = buildProjectionKeyframes(
           fixedIdAt(id),
-          plan.fromPageOffset,
-          plan.toPageOffset,
-          plan.easing,
+          fromOffset,
+          toOffset,
+          WIDGET_EASING,
           geometry,
           steps,
         );
@@ -204,75 +142,73 @@ export function usePaginationWidgetBinding({
           [ACTIVE_STRENGTH_VAR]: String(s.activeStrength),
         }));
         try {
-          // `easing: linear` — the bezier is baked into the keyframe values;
-          // `fill: both` so the dot holds the settled state after finish.
           const animation = node.animate(keyframes, {
-            duration: plan.duration,
-            easing: "linear",
+            duration: WIDGET_STEP_DURATION_MS,
+            easing: "linear", // bezier baked into the keyframe values
             fill: "both",
           });
           animationsRef.current.set(id, animation);
           started = true;
         } catch {
-          // Restrictive engine: leave this dot on the per-frame path.
+          paintDot(id, node, toOffset);
         }
       });
-
-      if (!started) {
-        cancelCompositorDots();
-        return;
-      }
-      compositedVersionRef.current = plan.version;
-      // The composited keyframes now own each dot's transform/opacity; the next
-      // per-frame write (after the plan clears) must be unconditional.
-      writeCacheRef.current.clear();
+      if (!started) paintAll(toOffset);
     },
-    [cancelCompositorDots, geometry],
+    [cancelAnimations, geometry, paintAll, paintDot],
   );
 
-  // Per-frame follow path (SSOT). Always subscribed; stands aside while a
-  // compositor plan owns the dots.
+  // Seed the first paint once dots have mounted.
   useIsomorphicLayoutEffect(() => {
-    if (!visualPosition) return;
-    return visualPosition.subscribe(
-      (frame) => {
-        if (compositedVersionRef.current !== null) return;
-        writeAll(frame.pageOffset);
-      },
-      { emitCurrent: true },
-    );
-  }, [visualPosition, writeAll]);
+    if (settledOffsetRef.current === null) {
+      settledOffsetRef.current = targetOffset;
+      paintAll(targetOffset);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Compositor fast path. A plan animates every dot; a `null` tears the
-  // animations down and re-pins the dots to the live SSOT position so the
-  // follow path resumes with no visual gap.
+  // React to the destination offset changing: animate (or snap) the WHOLE strip
+  // there from the previous offset. `animateTo` animates every currently-mounted
+  // dot — including the one that entered the window in this same commit — from
+  // `from`, so a freshly-mounted dot slides in from its origin instead of
+  // popping to the destination first. A change arriving mid-animation re-bakes
+  // from the last settled offset, so rapid navigations chain smoothly.
+  //
+  // `dotIds` is a dependency so that if the window remounts (new dot node) the
+  // effect re-runs and the new node is animated/pinned in the same pass — but
+  // it early-returns when nothing actually moved, so an unrelated re-render is a
+  // no-op.
+  const dotIdsKey = dotIds.join(",");
+  const lastPaintedOffsetRef = useRef<number | null>(null);
   useIsomorphicLayoutEffect(() => {
-    if (!motionPlan) return;
-    const apply = (plan: MotionPlan | null) => {
-      if (plan) {
-        runCompositorPlan(plan);
-      } else {
-        cancelCompositorDots();
-        writeCacheRef.current.clear();
-        if (visualPosition) writeAll(visualPosition.getSnapshot().pageOffset);
+    const from = settledOffsetRef.current;
+    if (from === null) return;
+
+    if (from === targetOffset) {
+      // No navigation — but the window may have remounted (settle re-centre).
+      // Pin any dot that has no live animation to the settled offset.
+      if (lastPaintedOffsetRef.current !== targetOffset || animationsRef.current.size === 0) {
+        nodesRef.current.forEach((node, id) => {
+          if (animationsRef.current.has(id)) return;
+          paintDot(id, node, targetOffset);
+        });
+        lastPaintedOffsetRef.current = targetOffset;
       }
-    };
-    apply(motionPlan.getPlan());
-    return motionPlan.subscribe(apply);
-  }, [motionPlan, runCompositorPlan, cancelCompositorDots, visualPosition, writeAll]);
+      return;
+    }
 
-  // When the mounted id window changes (a step settled and the strip re-centred),
-  // a freshly-mounted dot has no style yet — pin every dot to the current SSOT
-  // position so new dots appear correctly and stale caches are dropped.
-  const dotIdsKey = useMemo(() => dotIds.join(","), [dotIds]);
-  useIsomorphicLayoutEffect(() => {
-    if (compositedVersionRef.current !== null) return;
-    writeCacheRef.current.clear();
-    if (visualPosition) writeAll(visualPosition.getSnapshot().pageOffset);
-  }, [dotIdsKey, visualPosition, writeAll]);
+    settledOffsetRef.current = targetOffset;
+    lastPaintedOffsetRef.current = targetOffset;
+    if (isInstant) {
+      cancelAnimations();
+      paintAll(targetOffset);
+      return;
+    }
+    animateTo(from, targetOffset);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetOffset, dotIdsKey, isInstant, animateTo, cancelAnimations, paintAll, paintDot]);
 
-  // Tear down compositor animations on unmount / geometry change.
-  useIsomorphicLayoutEffect(() => cancelCompositorDots, [cancelCompositorDots]);
+  useIsomorphicLayoutEffect(() => cancelAnimations, [cancelAnimations]);
 
   return { bindDotRef };
 }

@@ -1,6 +1,7 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, useRef } from "react";
 
 import { mergeStyleMaps } from "../../../../../shared";
+import { shortestCyclicDistance } from "../../domain";
 import { useCarouselMotion, useCarouselStable } from "../../context";
 import type { CarouselSlotComponent } from "../../slots";
 import { useWidgetDiagnostic } from "../Diagnostic/useWidgetDiagnostic";
@@ -22,9 +23,7 @@ const PaginationWidgetBase = memo(function PaginationWidget({
   className,
 }: PaginationWidgetProps) {
   const { intent } = useCarouselMotion();
-  const { layout, visualPosition, motionPlan } = useCarouselStable();
-
-  const isMotionBound = visualPosition !== null && !layout.isReducedMotion;
+  const { layout } = useCarouselStable();
 
   const spatial = useMemo(
     () => ({ size: dotSize, gap: dotGap, scaleFactor }),
@@ -41,28 +40,37 @@ const PaginationWidgetBase = memo(function PaginationWidget({
     [className],
   );
 
-  // The strip is a symmetric window of page-dot IDENTITIES around the current
-  // page — one DOM node per page (not per recycling slot), so each dot's
-  // projected trajectory is continuous and can be composited. The window
-  // re-centres only when the target page changes (a settled step), never
-  // per frame; the binding drives positions inside it.
-  //
-  // The centre is anchored in the *unbounded* page-offset domain
-  // (`intent.targetPageOffset`), NOT the normalised `targetPageIndex`: the dot
-  // projection is driven by the visual stream's `pageOffset`, which in cyclic
-  // mode grows past the deck edges. Anchoring on the wrapped page index would
-  // drift the window away from the live dots after a few steps and fade them all
-  // out.
+  // --- the widget's own monotonic offset ------------------------------------
+  // The widget is a decoupled step indicator: it tracks *changes* to the
+  // carousel's normalised target page and advances its own offset by exactly one
+  // dot in the shortest-cyclic direction — never mirroring how far the deck
+  // actually travelled. This offset lives in the widget's private, unbounded
+  // coordinate, so (unlike the deck's wrapping page index) the dot window never
+  // drifts off the live dots.
+  const offsetRef = useRef(0);
+  const prevPageRef = useRef(intent.targetPageIndex);
+  const targetPage = intent.targetPageIndex;
+  const pageCount = layout.pageCount;
+  if (targetPage !== prevPageRef.current) {
+    const dir = Math.sign(
+      pageCount > 0
+        ? shortestCyclicDistance(prevPageRef.current, targetPage, pageCount)
+        : targetPage - prevPageRef.current,
+    );
+    if (dir !== 0) offsetRef.current += dir;
+    prevPageRef.current = targetPage;
+  }
+  const centerOffset = offsetRef.current;
+
   const side = widgetProjectionSide(geometry.visibleCount);
-  const centerPage = Math.round(intent.targetPageOffset);
   const dotIds = useMemo(
-    () => widgetDotWindow(centerPage, side),
-    [centerPage, side],
+    () => widgetDotWindow(Math.round(centerOffset), side),
+    [centerOffset, side],
   );
 
   const { bindDotRef } = usePaginationWidgetBinding({
-    visualPosition: isMotionBound ? visualPosition : null,
-    motionPlan: isMotionBound ? motionPlan : null,
+    targetOffset: centerOffset,
+    isInstant: layout.isReducedMotion,
     geometry,
     dotIds,
   });
