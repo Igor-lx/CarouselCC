@@ -228,6 +228,10 @@ export function useMotionRunner({
           to: segment.to,
           duration: segment.duration,
           easing: bezierToCss(segment.easing),
+          // Same clock the JS sampler runs this segment on — the binding pins
+          // the WAAPI startTime to it so compositor and controller stay in
+          // phase (see TrackCompositorMotionOptions.startedAt).
+          startedAt: segment.startedAt,
         });
 
       if (!isComposited) {

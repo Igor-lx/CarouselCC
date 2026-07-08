@@ -22,6 +22,17 @@ export interface TrackCompositorMotionOptions {
   to: number;
   duration: number;
   easing: string;
+  /**
+   * The segment's clock origin (`performance.now()` domain — the same value
+   * the JS sampler runs on). The WAAPI animation's `startTime` is pinned to
+   * it so the compositor traces the segment on the SAME timeline as the JS
+   * controller. Without this the animation starts when the browser gets
+   * around to it (commit + raster later), so the painted track would run
+   * phase-shifted behind the JS curve — and every later pin to a JS-derived
+   * position (repeated-click takeover, settle) would paint as a visible
+   * forward lurch.
+   */
+  startedAt: number;
 }
 
 export interface TrackBindingApi {
@@ -152,7 +163,7 @@ export function useTrackBinding({
   );
 
   const startCompositorMotion = useCallback(
-    ({ from, to, duration, easing }: TrackCompositorMotionOptions): boolean => {
+    ({ from, to, duration, easing, startedAt }: TrackCompositorMotionOptions): boolean => {
       const track = trackRef.current;
       const slot = slotSizeRef.current;
       if (
@@ -194,6 +205,21 @@ export function useTrackBinding({
       } catch {
         // Some restrictive engines expose `animate` but throw on use.
         return false;
+      }
+
+      // Pin the animation to the segment's own clock. A fresh animation is
+      // otherwise play-pending until the browser commits it (a frame or more
+      // later under commit/raster load), which would leave the whole run
+      // phase-shifted behind the JS sampler; with an explicit `startTime` the
+      // compositor and the controller trace the same curve at the same
+      // instants, so a mid-flight handoff pin lands exactly where the track
+      // is already painted. `document.timeline` times share the
+      // `performance.now()` origin the runner stamps `startedAt` with.
+      try {
+        animation.startTime = startedAt;
+      } catch {
+        // Engines that reject an explicit startTime keep the default
+        // play-pending start — the pre-fix behaviour, still correct.
       }
 
       compositorAnimationRef.current = animation;

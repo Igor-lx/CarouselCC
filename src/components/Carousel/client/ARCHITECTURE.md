@@ -751,7 +751,13 @@ Boundaries and guarantees:
   `Element.animate`, the input is degenerate (non-finite, zero duration), or
   the engine throws on `animate`. SSR and reduced-motion paths never reach it.
 - **Origin coherence.** The animation paints `from` synchronously before
-  starting, so the first compositor frame and the JS sampler's `from` agree.
+  starting, and its `startTime` is pinned to the segment's own `startedAt`
+  clock (the same `performance.now()` origin the JS sampler runs on). The
+  compositor therefore traces the segment on the same timeline as the
+  controller — a fresh animation is not left play-pending to begin a frame or
+  more late under commit/raster load — so a mid-flight handoff pin
+  (repeated-click takeover, settle) lands exactly on the painted position
+  instead of a phase-shifted one.
 - **Teardown.** `cancelCompositorMotion(position?)` freezes the track at a known
   transform (the explicit reducer/handoff `position`, or a `getComputedStyle`
   read when omitted) and cancels the animation. It is called on idle, on
