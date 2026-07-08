@@ -6,7 +6,7 @@ import {
   DOT_OPACITY_EPSILON,
   DOT_POSITION_EPSILON_PX,
   DOT_SCALE_EPSILON,
-  WIDGET_WRITE_FRAME_STRIDE,
+  WIDGET_WRITE_FRAME_SKIP,
 } from "./defaults";
 import {
   widgetProjectionSide,
@@ -232,11 +232,13 @@ export function usePaginationWidgetBinding({
   );
 
   // Follow the live visual position every frame — so the widget's speed tracks
-  // the deck exactly, including a finger drag and gesture strength — but only
-  // commit the projected styles to the DOM every `WIDGET_WRITE_FRAME_STRIDE`th
-  // frame, cutting the per-step recalc load ~N×. The resting frame (phase not
-  // "running": a settle, an idle emit, or the drag-follow between segments) is
-  // always painted so the dots never stop a fraction of a frame early.
+  // the deck exactly, including a finger drag and gesture strength — and paint
+  // every frame EXCEPT each `WIDGET_WRITE_FRAME_SKIP`th one, which is dropped.
+  // Inverted from the old "paint only every Nth frame" stride: the refresh
+  // rate stays near-native (skip=3 paints 2 of 3 frames) while still shedding
+  // a share of the style-recalc load. The resting frame (phase not "running":
+  // a settle, an idle emit, or the drag-follow between segments) is always
+  // painted so the dots never stop a fraction of a frame early.
   const frameCounterRef = useRef(0);
   useIsomorphicLayoutEffect(() => {
     if (!visualPosition) return;
@@ -245,9 +247,10 @@ export function usePaginationWidgetBinding({
       (frame) => {
         const isResting = frame.phase !== "running";
         const tick = frameCounterRef.current++;
-        if (!isResting && WIDGET_WRITE_FRAME_STRIDE > 1 && tick % WIDGET_WRITE_FRAME_STRIDE !== 0) {
-          return;
-        }
+        const isDroppedFrame =
+          WIDGET_WRITE_FRAME_SKIP > 1 &&
+          tick % WIDGET_WRITE_FRAME_SKIP === WIDGET_WRITE_FRAME_SKIP - 1;
+        if (!isResting && isDroppedFrame) return;
         writeVisualOffset(frame.pageOffset);
       },
       { emitCurrent: true },
