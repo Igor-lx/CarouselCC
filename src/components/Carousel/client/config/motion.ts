@@ -55,8 +55,14 @@ export const GO_TO_DECELERATION_DISTANCE_SHARE = 0.5;
 
 /** Cubic-bezier curves expressed as CSS strings. */
 
-//export const MOVE_BEZIER = "cubic-bezier(0.32, 0.2, 0.28, 1)";
-export const MOVE_BEZIER = "linear";
+/**
+ * Click / non-inertial gesture-release step curve. The `linear` experiment is
+ * retired: a linear step starts at full velocity in a single frame, and that
+ * velocity discontinuity reads as a jerk at motion start — most visible on a
+ * long glide. This curve enters at ~62% of the average speed and ramps, so
+ * the start is C1-soft while the step still feels responsive.
+ */
+export const MOVE_BEZIER = "cubic-bezier(0.32, 0.2, 0.28, 1)";
 export const AUTO_BEZIER = "cubic-bezier(0.28, 0.72, 0.38, 1)";
 export const SNAP_BACK_BEZIER = "cubic-bezier(0.18, 0.82, 0.28, 1)";
 
