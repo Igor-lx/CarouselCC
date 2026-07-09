@@ -7,8 +7,6 @@ interface ResolveAutoplayMotionDurationInput {
   state: CarouselState;
   config: CarouselRuntimeConfig;
   isInstantMode: boolean;
-  isDragging: boolean;
-  enabled: boolean;
 }
 
 /**
@@ -22,11 +20,8 @@ interface ResolveAutoplayMotionDurationInput {
  * a plain `useMemo` instead of a deferred state publish from the motion runner.
  * The runner stays a pure `state -> controller` bridge.
  */
-const shouldPublishAutoplayDuration = (
-  state: CarouselState,
-  enabled: boolean,
-): boolean =>
-  enabled &&
+const shouldPublishAutoplayDuration = (state: CarouselState): boolean =>
+  state.layout.canSlide &&
   state.moveReason === "autoplay" &&
   state.motionPhase !== "idle" &&
   state.motionPhase !== "dragging";
@@ -35,10 +30,8 @@ export const resolveAutoplayMotionDuration = ({
   state,
   config,
   isInstantMode,
-  isDragging,
-  enabled,
 }: ResolveAutoplayMotionDurationInput): number => {
-  if (!shouldPublishAutoplayDuration(state, enabled)) return 0;
+  if (!shouldPublishAutoplayDuration(state)) return 0;
 
   const start: MotionStart = {
     position: state.fromVirtualIndex,
@@ -54,7 +47,6 @@ export const resolveAutoplayMotionDuration = ({
     state,
     config,
     isInstantMode,
-    isDragging,
     start,
     startedAt: 0,
   }).duration;

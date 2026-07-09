@@ -16,7 +16,6 @@ import {
 } from "../../../../shared";
 
 interface UseCarouselGestureInput {
-  enabled: boolean;
   viewportRef: RefObject<HTMLDivElement | null>;
   layout: CarouselLayout;
   dispatch: CarouselDispatch;
@@ -37,7 +36,6 @@ export interface CarouselGestureResult {
 }
 
 export function useCarouselGesture({
-  enabled,
   viewportRef,
   layout,
   dispatch,
@@ -117,7 +115,7 @@ export function useCarouselGesture({
 
   const handleRelease = useCallback(
     (payload: PointerSwipeReleasePayload) => {
-      if (!enabled || originPositionRef.current === null) {
+      if (!layout.canSlide || originPositionRef.current === null) {
         originPositionRef.current = null;
         slotSizeRef.current = 0;
         return;
@@ -152,11 +150,11 @@ export function useCarouselGesture({
       originPositionRef.current = null;
       slotSizeRef.current = 0;
     },
-    [applyTrackPosition, dispatch, enabled, layout, offsetToPosition],
+    [applyTrackPosition, dispatch, layout, offsetToPosition],
   );
 
-  // When the carousel becomes non-sliding (`enabled` flips false because a
-  // resize or slidesData replace collapsed the deck to a single page), the
+  // When the carousel becomes non-sliding (a resize or slidesData replace
+  // collapsed the deck to a single page), the
   // pointer-swipe listeners are torn down without ever delivering `onRelease`.
   // The reducer recovers from the stale `dragging` phase on its own via layout
   // reconciliation, but the adapter's drag-origin refs would otherwise stay
@@ -164,13 +162,13 @@ export function useCarouselGesture({
   // `originPositionRef` is non-null, so the *next* drag would start from a
   // stale origin. Clearing the refs here keeps a later drag correct.
   useEffect(() => {
-    if (enabled) return;
+    if (layout.canSlide) return;
     originPositionRef.current = null;
     slotSizeRef.current = 0;
-  }, [enabled]);
+  }, [layout.canSlide]);
 
   const { listeners } = usePointerSwipe({
-    enabled,
+    enabled: layout.canSlide,
     measureRef: viewportRef,
     config: config.swipeConfig,
     onPressStart: startDragFromCurrentPosition,

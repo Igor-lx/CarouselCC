@@ -22,7 +22,6 @@ interface ResolveStepDurationInput {
   motionPhase: MotionPhase;
   moveReason: MoveReason | null;
   isInstant: boolean;
-  isDragging: boolean;
   segmentStartVirtualIndex: number;
   targetVirtualIndex: number;
   stepSize: number;
@@ -44,7 +43,6 @@ export const resolveStepDuration = ({
   motionPhase,
   moveReason,
   isInstant,
-  isDragging,
   segmentStartVirtualIndex,
   targetVirtualIndex,
   stepSize,
@@ -52,7 +50,6 @@ export const resolveStepDuration = ({
   autoplayDuration,
   stepDuration,
 }: ResolveStepDurationInput): number => {
-  if (isDragging) return 0;
   if (motionPhase === "step-snap") return snapBackDuration;
   if (isInstant) return 0;
 

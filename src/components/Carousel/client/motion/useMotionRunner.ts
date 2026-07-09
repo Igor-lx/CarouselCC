@@ -24,8 +24,6 @@ interface UseMotionRunnerInput {
   config: CarouselRuntimeConfig;
   controller: MotionController<CarouselMotionStrategy>;
   isInstantMode: boolean;
-  isDragging: boolean;
-  enabled: boolean;
   startCompositorMotion: TrackBindingApi["startCompositorMotion"];
   cancelCompositorMotion: TrackBindingApi["cancelCompositorMotion"];
   /** Publishes the computed motion plan to paint consumers (widget). */
@@ -95,8 +93,6 @@ export function useMotionRunner({
   config,
   controller,
   isInstantMode,
-  isDragging,
-  enabled,
   startCompositorMotion,
   cancelCompositorMotion,
   publishPlan,
@@ -113,7 +109,7 @@ export function useMotionRunner({
 
   useIsomorphicLayoutEffect(() => {
     const key = [
-      enabled,
+      state.layout.canSlide,
       state.motionPhase,
       state.moveReason,
       state.virtualIndex,
@@ -124,13 +120,12 @@ export function useMotionRunner({
       state.gesture.pointerVelocity,
       state.gesture.uiVelocity,
       isInstantMode,
-      isDragging,
     ].join(":");
 
     if (lastKeyRef.current === key) return;
     lastKeyRef.current = key;
 
-    if (!enabled) {
+    if (!state.layout.canSlide) {
       cancelCompositorMotion(state.virtualIndex);
       controller.snap(state.virtualIndex, { strategy: "idle" });
       publishPlan({ kind: "idle" });
@@ -186,7 +181,6 @@ export function useMotionRunner({
         state,
         config,
         isInstantMode,
-        isDragging,
         start: resolvedStart,
         startedAt: resolvedStartedAt,
       });
@@ -307,8 +301,6 @@ export function useMotionRunner({
     cancelCompositorMotion,
     config,
     controller,
-    enabled,
-    isDragging,
     isInstantMode,
     publishPlan,
     settle,
@@ -318,6 +310,7 @@ export function useMotionRunner({
     state.gesture.uiVelocity,
     state.isTeleportApproach,
     state.isRepeatedClickAdvance,
+    state.layout.canSlide,
     state.layout.visibleSlidesCount,
     state.motionPhase,
     state.moveReason,

@@ -9,6 +9,7 @@ export {
   useCarouselDiagnosticContext,
 } from "./CarouselDiagnosticContext";
 export { useModuleContextValue } from "./useModuleContextValue";
+export { useDiagnosticContextValue } from "./useDiagnosticContextValue";
 export type {
   CarouselStableContextValue,
   CarouselMotionContextValue,

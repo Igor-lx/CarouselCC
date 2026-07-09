@@ -505,7 +505,9 @@ Every responsibility has exactly one owner. The orchestrator
 | Gesture lifecycle | `useCarouselGesture` | Wraps the shared `usePointerSwipe`. Converts pointer events into dispatches and direct position writes. |
 | Autoplay lifecycle | `useAutoplay` | Owns the interval timer, hover/visibility/dragging pause. |
 | Focus shift | `useFocusRecovery` | Triggers when the state settles. |
-| Module API | `useModuleContextValue` | Builds the value once, memoised. |
+| Module API | `useModuleContextValue` | Builds the value once, memoised; derives the status view from `state.motionPhase` itself. |
+| Diagnostic context value | `useDiagnosticContextValue` | Mirrors raw props + observable layout/slot state for the Diagnostic slot. |
+| Host status snapshot | `useCarouselStatusReporter` | Deduplicated low-frequency `onCarouselStatusChange` emission. |
 | Module render policy | `useModuleRenderPolicy` | Single owner of slot-attachment checks (`hasControlsSlot`, `hasPaginationSlot`, `hasDiagnosticSlot`) and of the rules that gate whether the Controls, Pagination and Diagnostic slots render. |
 | Diagnostic warnings | `Diagnostic` module | Observe-only DEV warnings; never owns or replaces runtime values. |
 
@@ -1018,6 +1020,7 @@ src/components/Carousel/client/
 ├── context/
 │   ├── CarouselModuleContext.ts   stable + motion contexts (split by cadence)
 │   ├── CarouselDiagnosticContext.ts  raw props/layout/slots for Diagnostic
+│   ├── useDiagnosticContextValue.ts  assembles the diagnostic value (memoised sub-views)
 │   ├── useModuleContextValue.ts
 │   └── types.ts
 ├── domain/                        pure functions, no React
@@ -1062,7 +1065,8 @@ src/components/Carousel/client/
 ├── navigation/
 │   └── useCarouselNavigation.ts   public click handlers
 ├── status/
-│   └── statusSnapshot.ts          onCarouselStatusChange snapshot equality
+│   ├── statusSnapshot.ts          onCarouselStatusChange snapshot equality
+│   └── useCarouselStatusReporter.ts  deduplicated host status emission
 ├── slides/
 │   ├── SlideItem.tsx
 │   ├── SlideItem.types.ts

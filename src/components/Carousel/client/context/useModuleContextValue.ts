@@ -4,7 +4,7 @@ import type { CarouselRuntimeConfig } from "../config";
 import type { MotionPlanSource } from "../motion";
 import type { CarouselNavigation } from "../navigation";
 import type { VisualPositionSource } from "../position";
-import type { motionStatus } from "../state";
+import { motionStatus } from "../state";
 import type { CarouselState } from "../state";
 import type {
   CarouselIntentView,
@@ -16,7 +16,6 @@ import type {
 
 interface UseModuleContextValueInput {
   state: CarouselState;
-  status: ReturnType<typeof motionStatus>;
   config: CarouselRuntimeConfig;
   navigation: CarouselNavigation;
   isTouch: boolean;
@@ -31,7 +30,6 @@ interface UseModuleContextValueInput {
 
 export function useModuleContextValue({
   state,
-  status,
   config,
   navigation,
   isTouch,
@@ -46,22 +44,19 @@ export function useModuleContextValue({
   stable: CarouselStableContextValue;
   motion: CarouselMotionContextValue;
 } {
-  const statusView = useMemo<CarouselStatusView>(
-    () => ({
+  // Derived here from the single source (state.motionPhase) rather than
+  // taking a parallel pre-derived object — one input, no chance of the pair
+  // drifting apart.
+  const statusView = useMemo<CarouselStatusView>(() => {
+    const status = motionStatus(state.motionPhase);
+    return {
       motionPhase: state.motionPhase,
       isIdle: status.isIdle,
       isMoving: status.isMoving,
       isJumping: status.isJumping,
       isDragging: status.isDragging,
-    }),
-    [
-      state.motionPhase,
-      status.isDragging,
-      status.isIdle,
-      status.isJumping,
-      status.isMoving,
-    ],
-  );
+    };
+  }, [state.motionPhase]);
 
   const layoutView = useMemo<CarouselLayoutView>(
     () => ({

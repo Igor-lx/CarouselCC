@@ -1,6 +1,6 @@
 import {
   memo,
-  useEffect,
+  useCallback,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -13,6 +13,7 @@ import {
   CarouselDiagnosticContext,
   CarouselMotionContext,
   CarouselStableContext,
+  useDiagnosticContextValue,
   useModuleContextValue,
 } from "./context";
 import { carouselBoundaryState, slideFlexStyle } from "./domain";
@@ -36,13 +37,9 @@ import {
 } from "./slides";
 import { CAROUSEL_SLOTS } from "./slots";
 import { useCarouselState } from "./state";
-import { areStatusSnapshotsEqual } from "./status/statusSnapshot";
+import { useCarouselStatusReporter } from "./status/useCarouselStatusReporter";
 import { SLIDE_CLASS_KEYS } from "./contract/types";
-import type {
-  CarouselProps,
-  CarouselStatusSnapshot,
-  SlideClassMap,
-} from "./contract/types";
+import type { CarouselProps, SlideClassMap } from "./contract/types";
 
 const Carousel = memo(function Carousel(props: CarouselProps) {
   const {
@@ -105,7 +102,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     config,
     isInstantMode,
   });
-  const lastStatusSnapshotRef = useRef<CarouselStatusSnapshot | null>(null);
 
   // --- boundary state -------------------------------------------------------
   // Lifted above the status-snapshot effect so the snapshot can carry the
@@ -139,31 +135,16 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     layout.visibleSlidesCount,
   );
 
-  // Read-only, low-frequency status reported to the host. Fires on mount and
-  // whenever the idle flag, target page, or page count changes — never on a
-  // per-frame motion sample. The target page (not the settled page) is
-  // reported, so the snapshot reflects intent immediately on click/gesture.
-  useEffect(() => {
-    if (!onCarouselStatusChange) return;
-    const snapshot: CarouselStatusSnapshot = {
-      isIdle: status.isIdle,
-      currentPageIndex: state.targetPageIndex,
-      pageCount: layout.pageCount,
-      isAtStart,
-      isAtEnd,
-    };
-    const previous = lastStatusSnapshotRef.current;
-    if (previous && areStatusSnapshotsEqual(previous, snapshot)) return;
-    lastStatusSnapshotRef.current = snapshot;
-    onCarouselStatusChange(snapshot);
-  }, [
+  // Read-only, low-frequency status reported to the host (deduplicated;
+  // reflects intent immediately — see useCarouselStatusReporter).
+  useCarouselStatusReporter({
     onCarouselStatusChange,
-    status.isIdle,
-    state.targetPageIndex,
-    layout.pageCount,
+    isIdle: status.isIdle,
+    targetPageIndex: state.targetPageIndex,
+    pageCount: layout.pageCount,
     isAtStart,
     isAtEnd,
-  ]);
+  });
 
   // --- visual position SSOT -------------------------------------------------
   const {
@@ -215,8 +196,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     controller,
     dispatch,
     isInstantMode,
-    isDragging: status.isDragging,
-    enabled: layout.canSlide,
     startCompositorMotion,
     cancelCompositorMotion,
     publishPlan: planChannel.publish,
@@ -244,7 +223,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
 
   // --- gesture --------------------------------------------------------------
   const { listeners: dragListeners } = useCarouselGesture({
-    enabled: layout.canSlide,
     viewportRef,
     layout,
     dispatch,
@@ -262,6 +240,19 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   });
 
   // --- autoplay -------------------------------------------------------------
+  // Step handlers must be referentially stable: they sit in the deps of the
+  // autoplay interval effect, and a fresh identity per render would restart
+  // the setTimeout on every re-render — the interval would then be measured
+  // from the last render instead of the last tick.
+  const handleAutoplayStep = useCallback(
+    () => navigation.move(1, "autoplay"),
+    [navigation],
+  );
+  const handleAutoplayLoopToStart = useCallback(
+    () => navigation.goTo(0, "autoplay"),
+    [navigation],
+  );
+
   const autoplayPaused = !visible || status.isDragging || status.isMoving;
   const { handleHoverChange } = useAutoplay({
     enabled: isAuto && layout.canSlide,
@@ -270,8 +261,8 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     intervalMs: config.autoplayInterval,
     hoverPauseDelayMs: config.interaction.hoverPauseDelay,
     ignoreHover: isTouch,
-    onStep: () => navigation.move(1, "autoplay"),
-    onGoToStart: () => navigation.goTo(0, "autoplay"),
+    onStep: handleAutoplayStep,
+    onGoToStart: handleAutoplayLoopToStart,
   });
 
   // --- focus recovery after settle -----------------------------------------
@@ -294,7 +285,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   const { stable: stableContextValue, motion: motionContextValue } =
     useModuleContextValue({
       state,
-      status,
       config,
       navigation,
       isTouch,
@@ -308,80 +298,28 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     });
 
   // --- diagnostic context ---------------------------------------------------
-  // Carries raw props + observable layout/slot state. The carousel uses the
-  // resolved runtime config regardless of this context — diagnostic data never
-  // feeds back into runtime. The three sub-views are memoised independently so
-  // a change in one (e.g. a slot toggle) leaves the others referentially
-  // stable.
-  const diagnosticPropsView = useMemo(
-    () => ({
-      visibleSlidesNr,
-      durationAutoplay,
-      durationStep,
-      jumpSpeedMultiplier,
-      intervalAutoplay,
-      errAltPlaceholder,
-      userEnvironment,
-    }),
-    [
-      durationAutoplay,
-      durationStep,
-      errAltPlaceholder,
-      intervalAutoplay,
-      jumpSpeedMultiplier,
-      userEnvironment,
-      visibleSlidesNr,
-    ],
-  );
-
-  const diagnosticLayoutView = useMemo(
-    () => ({
-      rawLength: perfectPageLayoutInfo.rawLength,
-      extendedLength: perfectPageLayoutInfo.extendedLength,
-      didExtendLayout: perfectPageLayoutInfo.didExtendLayout,
-      hasPerfectPageLayout: perfectPageLayoutInfo.hasPerfectPageLayout,
-      visibleSlidesCount: layout.visibleSlidesCount,
-      canSlide: layout.canSlide,
-    }),
-    [
-      layout.canSlide,
-      layout.visibleSlidesCount,
-      perfectPageLayoutInfo.didExtendLayout,
-      perfectPageLayoutInfo.extendedLength,
-      perfectPageLayoutInfo.hasPerfectPageLayout,
-      perfectPageLayoutInfo.rawLength,
-    ],
-  );
-
-  const diagnosticSlotsView = useMemo(
-    () => ({
-      isControlsOn,
-      hasControlsSlot: renderPolicy.hasControlsSlot,
-      isPaginationOn,
-      hasPaginationSlot: renderPolicy.hasPaginationSlot,
-    }),
-    [
-      isControlsOn,
-      isPaginationOn,
-      renderPolicy.hasControlsSlot,
-      renderPolicy.hasPaginationSlot,
-    ],
-  );
-
-  // Full effective `state` is forwarded as-is. It carries its own `layout`
-  // (CarouselState.layout), so the structural-invariant validator inside
-  // `<Diagnostic />` cannot receive a state/layout pair from different
-  // render turns. The other diagnostic sub-views (props/layout/slots) stay
-  // independently memoised so unrelated changes do not invalidate them.
-  const diagnosticContextValue = useMemo(
-    () => ({
-      state,
-      props: diagnosticPropsView,
-      layout: diagnosticLayoutView,
-      slots: diagnosticSlotsView,
-    }),
-    [diagnosticLayoutView, diagnosticPropsView, diagnosticSlotsView, state],
-  );
+  // Raw props + observable layout/slot state, mirrored exactly as the runtime
+  // sees them; never feeds back into runtime (see useDiagnosticContextValue).
+  const diagnosticContextValue = useDiagnosticContextValue({
+    state,
+    visibleSlidesNr,
+    durationAutoplay,
+    durationStep,
+    jumpSpeedMultiplier,
+    intervalAutoplay,
+    errAltPlaceholder,
+    userEnvironment,
+    rawLength: perfectPageLayoutInfo.rawLength,
+    extendedLength: perfectPageLayoutInfo.extendedLength,
+    didExtendLayout: perfectPageLayoutInfo.didExtendLayout,
+    hasPerfectPageLayout: perfectPageLayoutInfo.hasPerfectPageLayout,
+    visibleSlidesCount: layout.visibleSlidesCount,
+    canSlide: layout.canSlide,
+    isControlsOn,
+    hasControlsSlot: renderPolicy.hasControlsSlot,
+    isPaginationOn,
+    hasPaginationSlot: renderPolicy.hasPaginationSlot,
+  });
 
   // --- style mapping --------------------------------------------------------
   const classNames = useMemo(

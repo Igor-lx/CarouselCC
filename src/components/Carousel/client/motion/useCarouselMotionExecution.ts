@@ -15,8 +15,6 @@ interface UseCarouselMotionExecutionInput {
   controller: MotionController<CarouselMotionStrategy>;
   dispatch: CarouselDispatch;
   isInstantMode: boolean;
-  isDragging: boolean;
-  enabled: boolean;
   startCompositorMotion: TrackBindingApi["startCompositorMotion"];
   cancelCompositorMotion: TrackBindingApi["cancelCompositorMotion"];
   publishPlan: MotionPlanChannel["publish"];
@@ -38,22 +36,13 @@ export function useCarouselMotionExecution({
   controller,
   dispatch,
   isInstantMode,
-  isDragging,
-  enabled,
   startCompositorMotion,
   cancelCompositorMotion,
   publishPlan,
 }: UseCarouselMotionExecutionInput): UseCarouselMotionExecutionResult {
   const autoplayMotionDuration = useMemo(
-    () =>
-      resolveAutoplayMotionDuration({
-        state,
-        config,
-        isInstantMode,
-        isDragging,
-        enabled,
-      }),
-    [config, enabled, isDragging, isInstantMode, state],
+    () => resolveAutoplayMotionDuration({ state, config, isInstantMode }),
+    [config, isInstantMode, state],
   );
 
   const handleMotionSettled = useCallback(
@@ -67,8 +56,6 @@ export function useCarouselMotionExecution({
     config,
     controller,
     isInstantMode,
-    isDragging,
-    enabled,
     startCompositorMotion,
     cancelCompositorMotion,
     publishPlan,

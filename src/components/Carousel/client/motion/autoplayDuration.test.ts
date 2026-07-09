@@ -32,8 +32,6 @@ const autoplayStep = (): CarouselState => ({
 const base = {
   config,
   isInstantMode: false,
-  isDragging: false,
-  enabled: true,
 };
 
 describe("resolveAutoplayMotionDuration", () => {
@@ -56,14 +54,24 @@ describe("resolveAutoplayMotionDuration", () => {
     expect(resolveAutoplayMotionDuration({ ...base, state })).toBe(0);
   });
 
-  it("returns 0 when disabled", () => {
-    expect(
-      resolveAutoplayMotionDuration({
-        ...base,
-        enabled: false,
-        state: autoplayStep(),
-      }),
-    ).toBe(0);
+  it("returns 0 when the deck cannot slide", () => {
+    // The gate is state-derived (state.layout.canSlide), not a separate flag:
+    // a deck whose length fits the viewport publishes no autoplay duration.
+    const staticLayout = buildCarouselLayout(
+      buildSlideRecords([
+        { id: 1, content: "a" },
+        { id: 2, content: "b" },
+        { id: 3, content: "c" },
+      ]),
+      3,
+      false,
+    );
+    expect(staticLayout.canSlide).toBe(false);
+    const state: CarouselState = {
+      ...autoplayStep(),
+      layout: staticLayout,
+    };
+    expect(resolveAutoplayMotionDuration({ ...base, state })).toBe(0);
   });
 
   it("returns 0 for a degenerate zero-distance step", () => {

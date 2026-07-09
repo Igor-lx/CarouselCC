@@ -58,7 +58,6 @@ interface BuildSegmentInput {
   state: CarouselState;
   config: CarouselRuntimeConfig;
   isInstantMode: boolean;
-  isDragging: boolean;
   start: MotionStart;
   startedAt: number;
 }
@@ -270,7 +269,6 @@ export function buildCarouselSegment({
   state,
   config,
   isInstantMode,
-  isDragging,
   start,
   startedAt,
 }: BuildSegmentInput): BuildSegmentResult {
@@ -340,7 +338,6 @@ export function buildCarouselSegment({
     motionPhase: state.motionPhase,
     moveReason: state.moveReason,
     isInstant: isInstantMode,
-    isDragging,
     segmentStartVirtualIndex: state.fromVirtualIndex,
     targetVirtualIndex: state.virtualIndex,
     stepSize,
