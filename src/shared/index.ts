@@ -18,6 +18,3 @@ export { ChevronIcon } from "./icons/ChevronIcon";
 export type { ChevronDirection } from "./icons/ChevronIcon";
 
 export * from "./math/numeric";
-
-export { applyThemeBoot, themeBootHtml } from "./themeBoot";
-export type { ThemeBootColors } from "./themeBoot";
