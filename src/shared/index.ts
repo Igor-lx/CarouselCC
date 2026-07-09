@@ -1,14 +1,11 @@
 export { useIsomorphicLayoutEffect } from "./hooks/useIsomorphicLayoutEffect";
-export { useMediaQuery } from "./hooks/useMediaQuery";
-export { useCompactLandscape, COMPACT_LANDSCAPE_QUERY } from "./hooks/useCompactLandscape";
 export { useIsTouchDevice } from "./hooks/useIsTouchDevice";
-export { useIsReducedMotion } from "./hooks/useIsReducedMotion";
 export { useDataSaver } from "./hooks/useDataSaver";
 export { useUserEnvironment } from "./hooks/useUserEnvironment";
 export type { UserEnvironment } from "./hooks/useUserEnvironment";
-export { useBreakpoint } from "./hooks/useBreakpoint";
-export type { Breakpoint } from "./hooks/useBreakpoint";
 export { useViewportVisibility } from "./hooks/useViewportVisibility";
+
+export * from "./media";
 
 export * from "./motion";
 export * from "./gesture";
