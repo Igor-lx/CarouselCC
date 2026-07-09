@@ -16,6 +16,15 @@
     min-height: 100%;
   }
 
+  // The root element's background is what mobile browser chrome (the bottom
+  // bar, overscroll areas) samples — set it explicitly instead of relying on
+  // body-propagation. The boot script in index.html pins the same color
+  // inline before this stylesheet arrives; ThemeProvider keeps that inline
+  // value in sync on toggles.
+  html {
+    background-color: var(--bg-global);
+  }
+
   body {
     overflow-x: hidden;
     background-color: var(--bg-global);
@@ -62,6 +71,10 @@
 
 :root {
   --theme-marker: light;
+  // Declared page scheme: user-agent surfaces (mobile bottom bar tint,
+  // overscroll glow, scrollbars, form controls) follow it instead of
+  // defaulting to a light/white chrome.
+  color-scheme: light;
 
   --transition-color: 0.25s ease;
   --transition-bg: 0.35s ease;
@@ -98,6 +111,7 @@
 
 [data-theme="dark"] {
   --theme-marker: dark;
+  color-scheme: dark;
 
   --color-global: #e5e9f0;
   --bg-global: #0d1520;

@@ -9,10 +9,19 @@ import {
   type ThemeMode,
 } from "./types";
 
+/** Storage values are untrusted: anything but an explicit known mode is AUTO
+ * (a stale/corrupted entry used to leak into `data-theme` and produce
+ * `content="undefined"` browser-chrome colors until the cache was cleared). */
+const asThemeMode = (raw: string | null): ThemeMode =>
+  raw === THEME_MODES.LIGHT ||
+  raw === THEME_MODES.DARK ||
+  raw === THEME_MODES.AUTO
+    ? raw
+    : THEME_MODES.AUTO;
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<ThemeMode>(
-    () =>
-      (localStorage.getItem(THEME_STORAGE_KEY) as ThemeMode) ?? THEME_MODES.AUTO,
+  const [theme, setTheme] = useState<ThemeMode>(() =>
+    asThemeMode(localStorage.getItem(THEME_STORAGE_KEY)),
   );
 
   const [onScreenTheme, setOnScreenTheme] = useState<OnScreenThemeMode>(
@@ -32,6 +41,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
       setOnScreenTheme(next);
       document.documentElement.setAttribute("data-theme", next);
+      // Keep the boot script's inline background in sync: mobile browser
+      // chrome samples the <html> background, and the inline value (set
+      // pre-paint by index.html) outranks the stylesheet, so it must follow
+      // every toggle.
+      document.documentElement.style.backgroundColor =
+        BROWSER_THEME_COLORS[next];
       localStorage.setItem(THEME_STORAGE_KEY, theme);
     };
 
@@ -43,20 +58,36 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [theme]);
 
   useEffect(() => {
-    const colour = BROWSER_THEME_COLORS[onScreenTheme];
-    let meta = document.querySelector('meta[name="theme-color"]');
-    if (!meta) {
-      meta = document.createElement("meta");
+    // Two media-paired metas live in index.html (parse-time correctness for
+    // the mobile bar tint). In auto mode each keeps its own scheme's color —
+    // the browser then switches with the OS theme by itself; an explicit
+    // choice overrides both to the chosen color.
+    const metas = document.querySelectorAll<HTMLMetaElement>(
+      'meta[name="theme-color"]',
+    );
+    if (metas.length === 0) {
+      const meta = document.createElement("meta");
       meta.setAttribute("name", "theme-color");
+      meta.setAttribute("content", BROWSER_THEME_COLORS[onScreenTheme]);
       document.head.appendChild(meta);
+      return;
     }
-    meta.setAttribute("content", colour);
-  }, [onScreenTheme]);
+    metas.forEach((meta) => {
+      if (theme === THEME_MODES.AUTO) {
+        const scheme = meta.getAttribute("media")?.includes("dark")
+          ? ON_SCREEN_MODES.DARK
+          : ON_SCREEN_MODES.LIGHT;
+        meta.setAttribute("content", BROWSER_THEME_COLORS[scheme]);
+      } else {
+        meta.setAttribute("content", BROWSER_THEME_COLORS[onScreenTheme]);
+      }
+    });
+  }, [theme, onScreenTheme]);
 
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
       if (event.key !== THEME_STORAGE_KEY) return;
-      setTheme((event.newValue as ThemeMode) ?? THEME_MODES.AUTO);
+      setTheme(asThemeMode(event.newValue));
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
