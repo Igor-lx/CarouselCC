@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
 import { useDataSaver } from "./useDataSaver";
-import { useIsReducedMotion } from "../media/useIsReducedMotion";
+import { useIsReducedMotion } from "./useIsReducedMotion";
 import { useIsTouchDevice } from "./useIsTouchDevice";
 
 /**

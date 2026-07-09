@@ -1,4 +1,4 @@
-import { useMediaQuery } from "./useMediaQuery";
+import { useMediaQuery } from "../media/useMediaQuery";
 
 /**
  * Reports the `prefers-reduced-motion` setting. A pure media-query signal,
