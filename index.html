@@ -3,37 +3,68 @@
   <head>
     <meta charset="UTF-8" />
     <!--
-      The theme boot (media-paired theme-color metas + the pre-paint inline
-      script) is injected below at dev/build time by the `theme-boot-inline`
-      Vite plugin from the shared module `src/shared/themeBoot.ts`, with the
-      colors defined once in `src/theme/types.ts`. It stays a PARSE-TIME
-      inline script on purpose: a runtime module import is deferred past the
-      first paint, and mobile browsers commit the bar tint (incl. the bottom
-      bar) at exactly that point on a cold load.
+      Parse-time browser-chrome colors. Two media-paired metas instead of one
+      empty meta: mobile browsers commit the bar tint (incl. the BOTTOM bar)
+      at the first paint of a cold load, before any script-driven update is
+      guaranteed to be observed — an empty `content` at parse time reads as
+      "no color" and the default white can stick for the whole session. With
+      the media pair the correct value exists the instant the head is parsed,
+      and in auto mode it even self-switches with the OS theme, no JS needed.
+
+      The colors and the storage key below deliberately DUPLICATE
+      BROWSER_THEME_COLORS / THEME_STORAGE_KEY (src/theme/types.ts): this
+      script must run synchronously during head parsing, before first paint,
+      so it cannot import anything. The duplication is locked by
+      src/theme/themeBootSync.test.ts, which reads this file and fails CI on
+      any drift.
     -->
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#bfd6f8" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d1520" />
-    <script>(function applyThemeBoot(colors, storageKey) {
-	let mode = "auto";
-	try {
-		mode = localStorage.getItem(storageKey) || "auto";
-	} catch {}
-	const isExplicit = mode === "light" || mode === "dark";
-	const theme = isExplicit ? mode : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-	const color = theme === "dark" ? colors.dark : colors.light;
-	const root = document.documentElement;
-	root.setAttribute("data-theme", theme);
-	root.style.backgroundColor = color;
-	if (isExplicit) {
-		const metas = document.querySelectorAll("meta[name=\"theme-color\"]");
-		for (let index = 0; index < metas.length; index += 1) metas[index].setAttribute("content", color);
-	}
-})({"light":"#bfd6f8","dark":"#0d1520"}, "theme-mode");</script>
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <title>CAROUSEL</title>
+    <script>
+      (() => {
+        const COLORS = { light: "#bfd6f8", dark: "#0d1520" };
+        const STORAGE_KEY = "theme-mode";
+
+        let mode = "auto";
+        try {
+          mode = localStorage.getItem(STORAGE_KEY) || "auto";
+        } catch {
+          /* storage unavailable -> auto */
+        }
+        // Validate the stored value: anything but an explicit choice is auto.
+        // (A stale/corrupted entry used to yield COLORS[garbage] === undefined
+        // -> content="undefined" -> invalid color -> white bars until the
+        // storage was cleared.)
+        const isExplicit = mode === "light" || mode === "dark";
+        const theme = isExplicit
+          ? mode
+          : window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+
+        const root = document.documentElement;
+        root.setAttribute("data-theme", theme);
+        // Paint-critical: mobile browser chrome (especially the bottom bar)
+        // also samples the PAGE BACKGROUND at first paint — which happens
+        // before the stylesheet arrives on a cold load, when <html> is still
+        // white. Pin the background inline, pre-paint. ThemeProvider keeps
+        // this inline value in sync on later toggles.
+        root.style.backgroundColor = COLORS[theme];
+
+        if (isExplicit) {
+          // An explicit user choice overrides the media-paired defaults on
+          // both metas, so the bar color no longer follows the OS scheme.
+          document
+            .querySelectorAll('meta[name="theme-color"]')
+            .forEach((meta) => meta.setAttribute("content", COLORS[theme]));
+        }
+      })();
+    </script>
     <script type="module" crossorigin src="/CarouselCC/assets/index-DB5Wqh56.js"></script>
     <link rel="stylesheet" crossorigin href="/CarouselCC/assets/index-CkLV6mu2.css">
   </head>
