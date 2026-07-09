@@ -4,13 +4,14 @@ import {
 } from "../../../../shared";
 import type {
   CarouselRuntimeConfig,
+  MotionProfileSharesSettings,
   MotionSettings,
   RepeatedClickSettings,
 } from "../config";
 import type { CarouselState } from "../state";
-import { carouselEasingString, parseBezier } from "./bezier";
-import { durationByVirtualSpan, resolveEasingDuration } from "./duration";
+import { durationByVirtualSpan, resolveStepDuration } from "./duration";
 import { buildProfile } from "./profile";
+import { resolvePeakSpeedForDuration } from "./progressCurve";
 import { sameDirectionSpeed, signedVelocity } from "./speed";
 import {
   resolveGoToProfileZones,
@@ -20,9 +21,7 @@ import {
 import type {
   CarouselMotionIntent,
   CarouselSegment,
-  EasingSegment,
   MotionStart,
-  ProfileSegment,
 } from "./types";
 
 const intentFromState = (state: CarouselState, isInstant: boolean): CarouselMotionIntent => {
@@ -45,6 +44,16 @@ const intentFromState = (state: CarouselState, isInstant: boolean): CarouselMoti
   }
 };
 
+/** Profile shape for a duration-authored step, by what initiated it. */
+const stepProfileShares = (
+  state: CarouselState,
+  motion: MotionSettings,
+): MotionProfileSharesSettings => {
+  if (state.motionPhase === "step-snap") return motion.snapBackProfile;
+  if (state.moveReason === "autoplay") return motion.autoplayProfile;
+  return motion.stepProfile;
+};
+
 interface BuildSegmentInput {
   state: CarouselState;
   config: CarouselRuntimeConfig;
@@ -65,20 +74,48 @@ export interface BuildSegmentResult {
   duration: number;
 }
 
-const buildEasing = (
+/**
+ * A duration-authored step (click, autoplay, snap-back, non-inertial gesture
+ * release): the target duration and the shape shares are known; the peak
+ * speed falls out so the profile covers the distance in that duration. A hot
+ * handoff (`start.velocity`) is preserved as the profile's start speed, so a
+ * retarget stays velocity-continuous.
+ */
+const buildStepProfile = (
   state: CarouselState,
   start: MotionStart,
-  duration: number,
   startedAt: number,
-  isGestureEasing: boolean,
-): EasingSegment => ({
-  strategy: isGestureEasing ? "gesture-easing" : "easing",
-  from: start.position,
-  to: state.virtualIndex,
-  duration,
-  startedAt,
-  easing: parseBezier(carouselEasingString(state.motionPhase, state.moveReason)),
-});
+  duration: number,
+  shares: MotionProfileSharesSettings,
+): CarouselSegment => {
+  const distance = state.virtualIndex - start.position;
+  const startSpeed = sameDirectionSpeed(start.velocity, distance);
+  const peakSpeed = resolvePeakSpeedForDuration({
+    distance,
+    duration,
+    startSpeed,
+    accelerationDistanceShare: shares.accelerationDistanceShare,
+    decelerationDistanceShare: shares.decelerationDistanceShare,
+  });
+  const profile = buildProfile({
+    from: start.position,
+    to: state.virtualIndex,
+    startSpeed,
+    peakSpeed,
+    endSpeed: 0,
+    accelerationDistanceShare: shares.accelerationDistanceShare,
+    decelerationDistanceShare: shares.decelerationDistanceShare,
+  });
+
+  return {
+    strategy: "step",
+    from: start.position,
+    to: state.virtualIndex,
+    duration: profile.duration,
+    startedAt,
+    profile,
+  };
+};
 
 /**
  * Fast acceleration profile for a repeated click - a same-direction click
@@ -92,7 +129,7 @@ const buildRepeatedProfile = (
   startedAt: number,
   repeated: RepeatedClickSettings,
   normalMoveSpeed: number,
-): ProfileSegment => {
+): CarouselSegment => {
   const distance = state.virtualIndex - start.position;
   const peakVelocity = signedVelocity(
     normalMoveSpeed * repeated.speedMultiplier,
@@ -124,7 +161,7 @@ const buildGestureProfile = (
   startedAt: number,
   release: InertialReleaseConfig,
   releaseSpeed: number,
-): ProfileSegment => {
+): CarouselSegment => {
   const distance = state.virtualIndex - start.position;
   const profile = buildProfile({
     from: start.position,
@@ -170,7 +207,7 @@ const buildGoToProfile = (
   stepSize: number,
   peakSpeed: number,
   phase: GoToProfilePhase,
-): ProfileSegment => {
+): CarouselSegment => {
   const distance = state.virtualIndex - start.position;
   const absDistance = Math.abs(distance);
   const startSpeed = sameDirectionSpeed(start.velocity, distance);
@@ -296,7 +333,10 @@ export function buildCarouselSegment({
     return { segment, duration: segment.duration };
   }
 
-  const duration = resolveEasingDuration({
+  // Duration-authored step: click, autoplay, snap-back, and a non-inertial
+  // gesture release. The step kind picks the profile shares; the peak speed
+  // is derived so the profile covers the distance in the resolved duration.
+  const duration = resolveStepDuration({
     motionPhase: state.motionPhase,
     moveReason: state.moveReason,
     isInstant: isInstantMode,
@@ -309,15 +349,12 @@ export function buildCarouselSegment({
     stepDuration: config.stepDuration,
   });
 
-  if (intent === "gesture-release") {
-    return {
-      segment: buildEasing(state, start, duration, startedAt, true),
-      duration,
-    };
-  }
-
-  return {
-    segment: buildEasing(state, start, duration, startedAt, false),
+  const segment = buildStepProfile(
+    state,
+    start,
+    startedAt,
     duration,
-  };
+    stepProfileShares(state, config.motion),
+  );
+  return { segment, duration: segment.duration };
 }

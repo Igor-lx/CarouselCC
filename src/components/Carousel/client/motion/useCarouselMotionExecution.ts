@@ -5,6 +5,7 @@ import type { CarouselRuntimeConfig } from "../config";
 import type { TrackBindingApi } from "../geometry";
 import type { CarouselDispatch, CarouselState } from "../state";
 import type { CarouselMotionStrategy } from "./types";
+import type { MotionPlanChannel } from "./planChannel";
 import { resolveAutoplayMotionDuration } from "./autoplayDuration";
 import { useMotionRunner } from "./useMotionRunner";
 
@@ -18,6 +19,7 @@ interface UseCarouselMotionExecutionInput {
   enabled: boolean;
   startCompositorMotion: TrackBindingApi["startCompositorMotion"];
   cancelCompositorMotion: TrackBindingApi["cancelCompositorMotion"];
+  publishPlan: MotionPlanChannel["publish"];
 }
 
 interface UseCarouselMotionExecutionResult {
@@ -40,6 +42,7 @@ export function useCarouselMotionExecution({
   enabled,
   startCompositorMotion,
   cancelCompositorMotion,
+  publishPlan,
 }: UseCarouselMotionExecutionInput): UseCarouselMotionExecutionResult {
   const autoplayMotionDuration = useMemo(
     () =>
@@ -68,6 +71,7 @@ export function useCarouselMotionExecution({
     enabled,
     startCompositorMotion,
     cancelCompositorMotion,
+    publishPlan,
     onSettle: handleMotionSettled,
   });
 

@@ -13,18 +13,6 @@ export const REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE = 0.3;
 export const REPEATED_CLICK_DECELERATION_DISTANCE_SHARE = 0.35;
 
 /**
- * Frames the motion runner lets the in-flight segment keep painting before it
- * rebuilds for a same-direction repeated click. The rebuild (handoff sample +
- * profile build + controller start) is the heaviest work the runner does and
- * would otherwise land in the same tick as the click event. Because a repeated
- * click only happens while the deck is already moving, deferring the rebuild a
- * few frames is invisible — the old segment carries the motion meanwhile — and
- * it lifts that compute spike off the input tick. `0` restores the original
- * synchronous rebuild.
- */
-export const REPEATED_CLICK_RETARGET_FRAME_DELAY = 3;
-
-/**
  * Number of page screens animated before a far-GO_TO teleport. After the
  * teleport the carousel shows only the final approach page. GO_TO spans that
  * fit within preflight + final approach animate directly without teleport.
@@ -53,18 +41,30 @@ export const GO_TO_FINAL_APPROACH_PAGE_SPAN = 1;
 export const GO_TO_ACCELERATION_DISTANCE_SHARE = 0.5;
 export const GO_TO_DECELERATION_DISTANCE_SHARE = 0.5;
 
-/** Cubic-bezier curves expressed as CSS strings. */
-
 /**
- * Click / non-inertial gesture-release step curve. The `linear` experiment is
- * retired: a linear step starts at full velocity in a single frame, and that
- * velocity discontinuity reads as a jerk at motion start — most visible on a
- * long glide. This curve enters at ~62% of the average speed and ramps, so
- * the start is C1-soft while the step still feels responsive.
+ * Motion-profile distance shares for the duration-authored steps. Every
+ * carousel motion is a single accel/cruise/decel profile (there are no
+ * cubic-bezier curves anywhere): the shares below shape each step kind, the
+ * engine derives the peak speed from distance + duration, and the resulting
+ * percent-progress curve drives both the track and the pagination widget
+ * through one WAAPI easing.
+ *
+ * A share is the fraction of the travelled DISTANCE spent ramping; what is
+ * left is constant-speed cruise. These are feel constants (visual contract) —
+ * tune under UX review.
  */
-export const MOVE_BEZIER = "cubic-bezier(0.32, 0.2, 0.28, 1)";
-export const AUTO_BEZIER = "cubic-bezier(0.28, 0.72, 0.38, 1)";
-export const SNAP_BACK_BEZIER = "cubic-bezier(0.18, 0.82, 0.28, 1)";
+
+/** Click step and non-inertial gesture release: soft symmetric-ish ramp. */
+export const STEP_ACCELERATION_DISTANCE_SHARE = 0.35;
+export const STEP_DECELERATION_DISTANCE_SHARE = 0.4;
+
+/** Autoplay step: front-loaded — moves out early, long calm settle. */
+export const AUTOPLAY_ACCELERATION_DISTANCE_SHARE = 0.1;
+export const AUTOPLAY_DECELERATION_DISTANCE_SHARE = 0.6;
+
+/** Snap-back after a no-intent drag release: near-immediate ease-out tail. */
+export const SNAP_BACK_ACCELERATION_DISTANCE_SHARE = 0.08;
+export const SNAP_BACK_DECELERATION_DISTANCE_SHARE = 0.7;
 
 /** Duration of a snap-back when the user drag-releases without intent. */
 export const SNAP_BACK_DURATION = 1300;

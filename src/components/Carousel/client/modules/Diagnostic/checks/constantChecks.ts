@@ -1,7 +1,8 @@
 import { isFiniteNumber } from "../../../../../../shared";
 import {
+  AUTOPLAY_ACCELERATION_DISTANCE_SHARE,
+  AUTOPLAY_DECELERATION_DISTANCE_SHARE,
   AUTOPLAY_PAGINATION_FACTOR,
-  AUTO_BEZIER,
   CAROUSEL_INERTIAL_RELEASE_CONFIG,
   CAROUSEL_SWIPE_CONFIG,
   DRAG_RELEASE_EPSILON,
@@ -14,17 +15,17 @@ import {
   IMAGE_RETRY_MAX_ATTEMPTS,
   IMAGE_RETRY_MAX_DELAY_MS,
   MOTION_EPSILON,
-  MOVE_BEZIER,
   REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
   REPEATED_CLICK_DECELERATION_DISTANCE_SHARE,
-  REPEATED_CLICK_RETARGET_FRAME_DELAY,
   REPEATED_CLICK_SPEED_MULTIPLIER,
   RENDER_WINDOW_BUFFER_MULTIPLIER,
-  SNAP_BACK_BEZIER,
+  SNAP_BACK_ACCELERATION_DISTANCE_SHARE,
+  SNAP_BACK_DECELERATION_DISTANCE_SHARE,
   SNAP_BACK_DURATION,
+  STEP_ACCELERATION_DISTANCE_SHARE,
+  STEP_DECELERATION_DISTANCE_SHARE,
   VISIBILITY_THRESHOLD,
 } from "../../../config";
-import { isParsedBezierValid, parseBezier } from "../../../motion/bezier";
 import { normalizeMotionProfileShares } from "../../../motion/profile";
 import type { CarouselDiagnosticWarning } from "../types";
 
@@ -83,15 +84,6 @@ const numericRules: NumericRule[] = [
   },
   {
     layer: "Motion",
-    field: "REPEATED_CLICK_RETARGET_FRAME_DELAY",
-    value: REPEATED_CLICK_RETARGET_FRAME_DELAY,
-    severity: "LOGICAL",
-    expected: "Expected a non-negative finite integer number of frames",
-    consequence: "A negative or fractional retarget delay never fires, so a repeated click would not rebuild its segment",
-    predicate: isNonNegativeInteger,
-  },
-  {
-    layer: "Motion",
     field: "REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE",
     value: REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
     severity: "CRITICAL",
@@ -146,6 +138,27 @@ const numericRules: NumericRule[] = [
     consequence: "Deceleration zone share outside [0,1] leads to malformed GO_TO profile zones",
     predicate: inRangeInclusive(0, 1),
   },
+  // Duration-authored step profiles (click / autoplay / snap-back shapes)
+  ...(
+    [
+      ["STEP_ACCELERATION_DISTANCE_SHARE", STEP_ACCELERATION_DISTANCE_SHARE],
+      ["STEP_DECELERATION_DISTANCE_SHARE", STEP_DECELERATION_DISTANCE_SHARE],
+      ["AUTOPLAY_ACCELERATION_DISTANCE_SHARE", AUTOPLAY_ACCELERATION_DISTANCE_SHARE],
+      ["AUTOPLAY_DECELERATION_DISTANCE_SHARE", AUTOPLAY_DECELERATION_DISTANCE_SHARE],
+      ["SNAP_BACK_ACCELERATION_DISTANCE_SHARE", SNAP_BACK_ACCELERATION_DISTANCE_SHARE],
+      ["SNAP_BACK_DECELERATION_DISTANCE_SHARE", SNAP_BACK_DECELERATION_DISTANCE_SHARE],
+    ] as Array<[string, number]>
+  ).map(
+    ([field, value]): NumericRule => ({
+      layer: "Motion",
+      field,
+      value,
+      severity: "CRITICAL",
+      expected: "Expected a finite number in the range [0, 1]",
+      consequence: "Profile zone share outside [0,1] leads to malformed motion profile zones",
+      predicate: inRangeInclusive(0, 1),
+    }),
+  ),
 
   // Epsilons (must be small positive)
   {
@@ -347,27 +360,39 @@ const numericRules: NumericRule[] = [
   },
 ];
 
-const collectBezierWarnings = (): CarouselDiagnosticWarning[] => {
-  const entries: Array<[string, string]> = [
-    ["MOVE_BEZIER", MOVE_BEZIER],
-    ["AUTO_BEZIER", AUTO_BEZIER],
-    ["SNAP_BACK_BEZIER", SNAP_BACK_BEZIER],
-  ];
-  const out: CarouselDiagnosticWarning[] = [];
-  for (const [field, raw] of entries) {
-    const parsed = parseBezier(raw);
-    if (isParsedBezierValid(parsed)) continue;
-    out.push({
-      severity: "CRITICAL",
-      layer: "Motion",
-      field,
-      actual: raw,
-      expected: 'Expected a valid CSS cubic-bezier(x1, y1, x2, y2) or "linear" string',
-      consequence:
-        "Bezier sampler produces NaN, motion progresses to NaN and the track transform is invalid",
-    });
-  }
-  return out;
+/**
+ * Overallocated accel+decel shares (> 1) are normalized by the runtime
+ * profile builder to equal halves with no cruise zone; report each pair that
+ * triggers the normalization, with the shape runtime will actually use.
+ */
+const collectProfileShareRelation = (
+  field: string,
+  accelerationDistanceShare: number,
+  decelerationDistanceShare: number,
+  consequence: string,
+): CarouselDiagnosticWarning | null => {
+  const normalized = normalizeMotionProfileShares(
+    accelerationDistanceShare,
+    decelerationDistanceShare,
+  );
+  if (!normalized.wasNormalized) return null;
+  return {
+    severity: "LOGICAL",
+    layer: "Motion",
+    field,
+    actual: {
+      accelerationDistanceShare,
+      decelerationDistanceShare,
+      sum: accelerationDistanceShare + decelerationDistanceShare,
+    },
+    normalizedTo: {
+      accelerationDistanceShare: normalized.accelerationShare,
+      decelerationDistanceShare: normalized.decelerationShare,
+      cruiseDistanceShare: normalized.cruiseShare,
+    },
+    expected: "Expected accelerationShare + decelerationShare <= 1 for an explicit cruise zone",
+    consequence,
+  };
 };
 
 const collectRepeatedShareRelation = (): CarouselDiagnosticWarning | null => {
@@ -461,8 +486,30 @@ export const collectConstantWarnings = (): CarouselDiagnosticWarning[] => {
   if (sumRelation) out.push(sumRelation);
   const goToShareRelation = collectGoToShareRelation();
   if (goToShareRelation) out.push(goToShareRelation);
+  const profileRelations = [
+    collectProfileShareRelation(
+      "STEP_ACCELERATION_DISTANCE_SHARE + STEP_DECELERATION_DISTANCE_SHARE",
+      STEP_ACCELERATION_DISTANCE_SHARE,
+      STEP_DECELERATION_DISTANCE_SHARE,
+      "Click-step runtime profile normalizes overallocated shares to 50% acceleration and 50% deceleration",
+    ),
+    collectProfileShareRelation(
+      "AUTOPLAY_ACCELERATION_DISTANCE_SHARE + AUTOPLAY_DECELERATION_DISTANCE_SHARE",
+      AUTOPLAY_ACCELERATION_DISTANCE_SHARE,
+      AUTOPLAY_DECELERATION_DISTANCE_SHARE,
+      "Autoplay-step runtime profile normalizes overallocated shares to 50% acceleration and 50% deceleration",
+    ),
+    collectProfileShareRelation(
+      "SNAP_BACK_ACCELERATION_DISTANCE_SHARE + SNAP_BACK_DECELERATION_DISTANCE_SHARE",
+      SNAP_BACK_ACCELERATION_DISTANCE_SHARE,
+      SNAP_BACK_DECELERATION_DISTANCE_SHARE,
+      "Snap-back runtime profile normalizes overallocated shares to 50% acceleration and 50% deceleration",
+    ),
+  ];
+  for (const relation of profileRelations) {
+    if (relation) out.push(relation);
+  }
   const retryDelayRelation = collectRetryDelayRelation();
   if (retryDelayRelation) out.push(retryDelayRelation);
-  out.push(...collectBezierWarnings());
   return out;
 };

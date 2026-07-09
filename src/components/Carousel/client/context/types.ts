@@ -1,3 +1,4 @@
+import type { MotionPlanSource } from "../motion";
 import type { CarouselNavigation } from "../navigation";
 import type { CarouselState, MotionPhase, MoveReason } from "../state";
 import type { VisualPositionSource } from "../position";
@@ -56,6 +57,14 @@ export interface CarouselStableContextValue {
   layout: CarouselLayoutView;
   navigation: CarouselNavigationView;
   visualPosition: VisualPositionSource | null;
+  /**
+   * The engine's motion-plan stream (see `motion/planChannel.ts`): each
+   * non-drag motion is computed once and published as duration + percent
+   * progress curve; a paint consumer (PaginationWidget) builds its own WAAPI
+   * animation from it. `null` when reduced motion is on — modules fall back
+   * to their static rendering.
+   */
+  motionPlan: MotionPlanSource | null;
 }
 
 /**

@@ -43,7 +43,7 @@ export const resolveAutoplayMotionDuration = ({
   const start: MotionStart = {
     position: state.fromVirtualIndex,
     velocity: 0,
-    strategy: "easing",
+    strategy: "step",
   };
 
   if (Math.abs(state.virtualIndex - start.position) < config.motion.epsilon) {

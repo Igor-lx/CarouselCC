@@ -17,9 +17,24 @@ export interface PropDerivedSettings {
   errorAltPlaceholder: string;
 }
 
+/**
+ * Distance shares of one accel/cruise/decel motion profile — the universal
+ * shape every carousel motion is expressed in (there are no easing curves).
+ */
+export interface MotionProfileSharesSettings {
+  accelerationDistanceShare: number;
+  decelerationDistanceShare: number;
+}
+
 export interface MotionSettings {
   snapBackDuration: number;
   epsilon: number;
+  /** Click step / non-inertial gesture release profile shape. */
+  stepProfile: MotionProfileSharesSettings;
+  /** Autoplay step profile shape. */
+  autoplayProfile: MotionProfileSharesSettings;
+  /** No-intent drag-release snap-back profile shape. */
+  snapBackProfile: MotionProfileSharesSettings;
   /** @see GO_TO_PREFLIGHT_PAGE_SPAN */
   goToPreflightPageSpan: number;
   /** @see GO_TO_FINAL_APPROACH_PAGE_SPAN */
@@ -34,12 +49,6 @@ export interface RepeatedClickSettings {
   speedMultiplier: number;
   accelerationDistanceShare: number;
   decelerationDistanceShare: number;
-  /**
-   * Frames the runner keeps the in-flight segment before rebuilding for a
-   * same-direction repeated click, moving that compute off the click tick.
-   * @see REPEATED_CLICK_RETARGET_FRAME_DELAY
-   */
-  retargetFrameDelay: number;
 }
 
 export interface InteractionSettings {

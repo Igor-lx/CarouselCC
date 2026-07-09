@@ -48,7 +48,7 @@ export interface CarouselState {
   /**
    * True when this segment was started by a click that arrived while the
    * carousel was already moving in the same direction. It selects the fast
-   * acceleration profile instead of plain bezier easing - the segment still
+   * acceleration profile instead of the normal step profile - the segment still
    * drives straight to the page boundary and decays to zero speed.
    */
   isRepeatedClickAdvance: boolean;

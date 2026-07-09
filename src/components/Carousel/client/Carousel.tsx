@@ -25,7 +25,11 @@ import { useAutoplay } from "./autoplay/useAutoplay";
 import { useFocusRecovery } from "./focus/useFocusRecovery";
 import { useCarouselGesture } from "./gesture";
 import { useResponsiveImageSizes, useTrackBinding } from "./geometry";
-import { useCarouselMotionExecution } from "./motion";
+import {
+  createMotionPlanChannel,
+  useCarouselMotionExecution,
+  type MotionPlanChannel,
+} from "./motion";
 import { useCarouselNavigation } from "./navigation";
 import { useVisualPosition } from "./position";
 import { useModuleRenderPolicy } from "./render-policy/useModuleRenderPolicy";
@@ -251,6 +255,17 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     visualPosition,
   });
 
+  // --- motion plan channel ---------------------------------------------------
+  // The engine computes every non-drag motion once (duration + percent
+  // progress curve) and publishes it here; paint consumers (the pagination
+  // widget) build their own WAAPI animation from the plan. A plain observable
+  // — publishing never re-renders React.
+  const planChannelRef = useRef<MotionPlanChannel | null>(null);
+  if (planChannelRef.current === null) {
+    planChannelRef.current = createMotionPlanChannel();
+  }
+  const planChannel = planChannelRef.current;
+
   // --- motion execution: state -> controller, autoplay duration signal -----
   const { autoplayMotionDuration } = useCarouselMotionExecution({
     state,
@@ -262,6 +277,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     enabled: layout.canSlide,
     startCompositorMotion,
     cancelCompositorMotion,
+    publishPlan: planChannel.publish,
   });
 
   // --- navigation -----------------------------------------------------------
@@ -343,6 +359,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
       isReducedMotion: isInstantMode,
       autoplayMotionDuration,
       visualPosition: isInstantMode ? null : visualPosition,
+      motionPlan: isInstantMode ? null : planChannel.source,
       isAtStart,
       isAtEnd,
       isDiagnosticActive: renderPolicy.shouldRenderDiagnostic,

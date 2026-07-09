@@ -1,8 +1,18 @@
 import type { MotionProfile } from "./profile";
 
+/**
+ * Every carousel motion is one accel/cruise/decel profile — there is no
+ * second segment shape and no easing-curve path. The strategy names what
+ * initiated the segment:
+ * - `"step"`     — duration-authored steps: click, autoplay, snap-back, and a
+ *                  non-inertial gesture release;
+ * - `"gesture"`  — inertial gesture release (speed-authored from the flick);
+ * - `"repeated"` — repeated-click fast advance;
+ * - `"jump"`     — every GO_TO slice (direct, preflight, approach);
+ * - `"idle"`     — the resting controller sample.
+ */
 export type CarouselMotionStrategy =
-  | "easing"
-  | "gesture-easing"
+  | "step"
   | "gesture"
   | "repeated"
   | "jump"
@@ -20,32 +30,14 @@ export type CarouselMotionIntent =
   | "gesture-release"
   | "unknown-step";
 
-export interface CubicBezier {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-}
-
-interface SegmentBase {
-  strategy: CarouselMotionStrategy;
+export interface CarouselSegment {
+  strategy: Exclude<CarouselMotionStrategy, "idle">;
   from: number;
   to: number;
   duration: number;
   startedAt: number;
-}
-
-export interface EasingSegment extends SegmentBase {
-  strategy: "easing" | "gesture-easing";
-  easing: CubicBezier;
-}
-
-export interface ProfileSegment extends SegmentBase {
-  strategy: "gesture" | "repeated" | "jump";
   profile: MotionProfile;
 }
-
-export type CarouselSegment = EasingSegment | ProfileSegment;
 
 export interface MotionStart {
   position: number;

@@ -18,7 +18,7 @@ export const durationByVirtualSpan = ({
   return baseDuration * span;
 };
 
-interface ResolveEasingDurationInput {
+interface ResolveStepDurationInput {
   motionPhase: MotionPhase;
   moveReason: MoveReason | null;
   isInstant: boolean;
@@ -32,14 +32,15 @@ interface ResolveEasingDurationInput {
 }
 
 /**
- * Resolve durations only for duration-authored bezier segments: the click
- * step, the autoplay step, the snap-back, and a non-inertial gesture release.
+ * Resolve durations only for the duration-authored steps: the click step, the
+ * autoplay step, the snap-back, and a non-inertial gesture release. The
+ * factory then derives the profile's peak speed from this duration.
  *
- * Profile segments are intentionally absent from this resolver - repeated
- * click, inertial gesture release, and every GO_TO / teleport segment own a
- * speed model that derives duration from distance + zone speeds.
+ * Speed-authored motions are intentionally absent from this resolver -
+ * repeated click, inertial gesture release, and every GO_TO / teleport
+ * segment derive their duration from distance + zone speeds instead.
  */
-export const resolveEasingDuration = ({
+export const resolveStepDuration = ({
   motionPhase,
   moveReason,
   isInstant,
@@ -50,7 +51,7 @@ export const resolveEasingDuration = ({
   snapBackDuration,
   autoplayDuration,
   stepDuration,
-}: ResolveEasingDurationInput): number => {
+}: ResolveStepDurationInput): number => {
   if (isDragging) return 0;
   if (motionPhase === "step-snap") return snapBackDuration;
   if (isInstant) return 0;

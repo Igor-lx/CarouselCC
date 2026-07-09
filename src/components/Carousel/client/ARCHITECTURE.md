@@ -5,16 +5,18 @@ gesture, fast repeated-click acceleration, autoplay, dot pagination, an alternat
 touch pagination widget, edge controls, and a dev-only diagnostic slot.
 
 The component is a single composition root (`Carousel.tsx`) plus four pluggable
-slot modules. A single visual-position SSOT (the JS motion controller) owns
-"where the track is" and publishes per-RAF samples outside React; React only
-re-renders on logical state transitions (click, gesture release, autoplay tick,
-settle). The track's horizontal `transform` is written from that stream — except
-for duration-authored cubic-bezier steps (every `EasingSegment`: click,
-autoplay, snap-back, and a non-inertial gesture release), which are additionally
-handed to the compositor thread via the Web Animations API so the deck
-translation does not compete with main-thread work. The JS controller stays the
-SSOT for every other consumer (pagination widget, status, handoff, settle) even
-while the compositor drives the pixels. See §4.5.
+slot modules. Every motion is ONE model: an accel/cruise/decel **profile**
+(constants-authored distance shares — there are no easing curves anywhere). The
+engine computes each motion once, normalizes its temporal shape into a
+percent-progress curve, serialises it to a CSS `linear()` easing, and every
+paint consumer builds its own WAAPI animation from that shared plan — the track
+over its pixel distance, the pagination widget over one dot step — same
+duration, same easing, same clock, so they run in phase on the compositor with
+zero per-frame work. Per-frame JS drawing happens ONLY while a finger drags the
+deck (both track and widget follow the visual stream), and as a total fallback
+where `linear()` easing is unsupported. The JS motion controller still samples
+every segment: it stays the visual-position SSOT for handoff, settle, status,
+and the drag/fallback stream. See §4.5.
 
 This document is the source of truth for the component. It starts from the
 public contract — every prop, every dependency between props, every default —
@@ -338,13 +340,10 @@ These are the user-facing behaviours the implementation guarantees.
   segment and settles. There is no separate admission buffer and no
   special path through `useCarouselNavigation`; the destination rule lives
   entirely inside `stepOrigin` + the `effectiveMoveStep` doubling in
-  `state/transitions.ts`. The *motion* side adds one optimization: because a
-  repeated click rebuilds a profile segment (the heaviest runner work, and not
-  compositor-eligible) in the same tick as the keypress, and because the deck
-  is already moving, the runner holds the current segment a configurable few
-  frames before rebuilding — lifting that compute off the input tick while the
-  old segment carries the motion. The handoff is still a single atomic
-  `captureHandoff`, taken at the deferred boundary (§4.2).
+  `state/transitions.ts`. The retarget rebuild happens synchronously in the
+  same commit — the previous compositor animation keeps painting the pixels
+  until the new one replaces it, so the rebuild cost never shows on screen.
+  The handoff is a single atomic `captureHandoff` (§4.2).
 - **Drag / swipe.** Touch only (pointer events with `pointerType === "touch"`).
   EMA-smoothed velocity, edge resistance with a configurable curvature.
   Release resolves to a swipe direction via either a quick-flick (raw
@@ -468,7 +467,8 @@ dot counts, thresholds) are feel/tuning and change frequently; duplicating them
 here only invites doc/code drift. The single source of truth is `config/`:
 
 - `config/defaults.ts` — public-prop defaults.
-- `config/motion.ts` — easing curves, repeated-click and GO_TO factors.
+- `config/motion.ts` — motion-profile distance shares (step / autoplay /
+  snap-back / repeated-click / GO_TO) and the GO_TO teleport spans.
 - `config/interaction.ts` — hover delay, visibility threshold, autoplay dot factor.
 - `config/gesture.ts` — swipe + inertial-release config.
 - `config/constants.ts` — epsilons, render-window buffer.
@@ -589,28 +589,21 @@ phase }`.
 
 ### 4.1 Segments
 
-`CarouselSegment` (`motion/types.ts`) is a discriminated union of two shapes:
+`CarouselSegment` (`motion/types.ts`) has exactly ONE shape: a smoothstep-driven
+acceleration / cruise / deceleration **profile**. There are no easing curves —
+every motion is authored through the same constants model (distance shares for
+ramp-up and ramp-down; the remainder is cruise). If acceleration and
+deceleration shares sum above `1`, runtime normalizes the profile to equal
+halves with no cruise zone. Two authoring modes feed the same builder:
 
-- **`EasingSegment`** — a cubic-bezier eased translation with a known
-  duration, carrying its `easing` control points. Two strategies:
-  - `"easing"` — click step (`MOVE_BEZIER`), autoplay step (`AUTO_BEZIER`),
-    and snap-back (`SNAP_BACK_BEZIER`).
-  - `"gesture-easing"` — a non-inertial gesture release.
-
-    Both easing strategies are compositor-eligible: a single keyframe pair plus
-    a CSS easing string reproduce either one exactly, so the track translation
-    can run on the compositor thread via WAAPI (§4.5). A gesture release hands
-    off from a *static* position (the finger is already up), painted
-    synchronously as the first compositor frame, so there is no live-drag
-    continuity that would force it onto the JS path.
-- **`ProfileSegment`** — a smoothstep-driven acceleration / cruise /
-  deceleration profile, carrying a `profile` rather than an easing curve.
-  Speed-authored: start / peak / end speeds plus zone distances derive the
-  segment duration. If acceleration and deceleration shares sum above `1`,
-  runtime normalizes the profile to equal acceleration/deceleration halves with
-no cruise zone. A single
-  CSS easing curve cannot reproduce its shape, so it always runs on the JS
-  sampler. Three strategies:
+- **Duration-authored** (strategy `"step"`): click step, autoplay step,
+  snap-back, and a non-inertial gesture release. The step kind picks its shares
+  (`motion.stepProfile` / `motion.autoplayProfile` / `motion.snapBackProfile`),
+  and the peak speed falls out of distance + duration
+  (`resolvePeakSpeedForDuration`). A hot handoff's velocity becomes the
+  profile's start speed, so retargets stay velocity-continuous.
+- **Speed-authored**: start / peak / end speeds plus zone distances derive the
+  segment duration.
   - `"jump"` — **every GO_TO**, at `jumpSpeedMultiplier × normalStepSpeed`. A
     short jump uses one segment with local first-screen acceleration and local
     final-screen deceleration; a far jump uses a preflight segment, a position
@@ -621,25 +614,22 @@ no cruise zone. A single
   - `"gesture"` — **inertial gesture release**, peak speed derived from
     EMA-smoothed release velocity × `inertiaBoost`.
 
+Every segment's temporal shape is then normalized into the percent domain
+(`profileProgressStops`: uniform time samples of distance-progress 0→1) and
+serialised to a CSS `linear()` easing (`stopsToLinearEasing`) — the single
+consumer-agnostic artefact both the track and the pagination widget animate
+with (§4.5).
+
 ### 4.2 Handoff invariant
 
 `useMotionRunner` is the only place the controller is started. It runs on state
 changes inside a layout effect: when `motionPhase` becomes a non-idle value it
 samples the motion origin, builds the segment, and starts the controller
-**synchronously** in that same turn. For an easing step there is no
-deferred-frame window: the compositor (§4.5), not a delay, keeps a retarget from
-reading as a stall, because the visible track pixels are driven off the main
-thread while the JS retarget happens.
-
-The one deliberate exception is a same-direction **repeated click**. Its segment
-is a profile (not compositor-eligible), so its rebuild — the heaviest runner
-work — cannot be masked by the compositor and would otherwise land in the same
-tick as the keypress. Since the deck is already moving, the runner holds the
-in-flight segment a configurable few frames (`repeatedClick.retargetFrameDelay`)
-and rebuilds at that boundary, moving the compute off the input tick while the
-current segment carries the motion. This is a timing deferral only: the handoff
-is still one atomic `captureHandoff`, taken from whatever curve is painting at
-the boundary — never a split of position and velocity.
+**synchronously** in that same turn. There is no deferred-frame window
+anywhere: the compositor (§4.5), not a delay, keeps a retarget from reading as
+a stall — the previous WAAPI animation carries the visible pixels until the new
+one replaces it in the same commit, so even the heaviest rebuild (a
+repeated-click profile) never shows on screen.
 
 When a previous segment is still running (repeated click, opposite-direction
 click, any interruption), the new segment starts from a **single atomic handoff
@@ -715,40 +705,49 @@ page-screen budgets, so `GO_TO_DECELERATION_DISTANCE_SHARE = 1` means "slow
 down over the whole final page screen", not "slow down over the whole jump".
 This is the only intentional visual teleport.
 
-### 4.5 Compositor track motion (WAAPI)
+### 4.5 Compositor motion (WAAPI) and the motion plan
 
 The original jank was main-thread contention: writing the track `transform`
 from JS on every RAF tick competes with React commits, image decode, and paint,
-so a busy frame skips the track write and the deck stutters. The fix is to take
-the track translation off the main thread for the segments that allow it.
+so a busy frame skips the write and the deck stutters. The fix is to take the
+painting off the main thread for EVERY engine-planned motion — only a live
+finger drag (and the no-support fallback) stays per-frame.
 
-An `EasingSegment` is a single cubic-bezier translation of the whole track from
-`from` to `to` over `duration` — exactly what a two-keyframe
-`Element.animate([{transform}, {transform}], { duration, easing })` expresses.
-For those segments `useMotionRunner` calls `startCompositorMotion` on the track
-binding; the easing curve is serialised to a CSS easing string by `bezierToCss`
-(`motion/bezier.ts`). The browser then runs the translation on the compositor
-thread, independent of main-thread load.
+The bridge is the CSS `linear()` easing function: an arbitrary
+accel/cruise/decel profile cannot be one cubic-bezier, but its temporal shape
+IS a percent-progress curve, and `linear()` reproduces any such curve as a
+piecewise-linear timing function. The runner samples the profile into uniform
+progress stops (`profileProgressStops`), serialises them
+(`stopsToLinearEasing`), and hands the same plan to every paint consumer:
+
+- **Track** — `startCompositorMotion({from, to, duration, easing, startedAt})`:
+  a two-keyframe transform animation whose easing is the profile curve.
+- **Pagination widget** — the plan channel (`motion/planChannel.ts`, exposed on
+  the stable module context as `motionPlan`): `{direction, duration, easing,
+  stops, startedAt, targetKey, isContinuation}`. The widget builds keyframed
+  WAAPI animations for its one dot step (§8.2) with the same easing and clock.
+
+Because the curve lives in the percent domain, consumers travelling different
+distances (N page screens of track pixels vs one dot step) run the identical
+temporal shape — synchronized by construction.
 
 The JS controller still runs for **every** segment, composited or not — it
-stays the visual-position SSOT for the pagination widget, status snapshots,
-handoff, and settle. The only thing compositing changes is *who paints the
-track*: while a compositor animation is live, `useTrackBinding.writePosition`
-suppresses its own per-frame `transform` write for `source === "frame"` (the
-subscriber path) so the JS samples and the WAAPI keyframes do not fight. The
-controller's samples keep flowing to all other subscribers unchanged.
+stays the visual-position SSOT for status snapshots, handoff, settle, and the
+follow-mode stream. The only thing compositing changes is *who paints*: while a
+compositor animation is live, `useTrackBinding.writePosition` suppresses its
+own per-frame `transform` write for `source === "frame"` (the subscriber path)
+so the JS samples and the WAAPI keyframes do not fight.
 
 Boundaries and guarantees:
 
-- **Eligibility.** Exactly the `EasingSegment` strategies (`"easing"` and
-  `"gesture-easing"`) are handed to the compositor (`canUseCompositorTrackMotion`
-  — the eligibility check is "is this an `EasingSegment`"). The `ProfileSegment`
-  strategies (`gesture` inertial release, `repeated`, `jump`) stay JS-driven —
-  their accel/cruise/decel shapes, teleport discontinuities, or inertial
-  velocity cannot be reproduced by one CSS easing curve.
+- **Eligibility.** Every non-drag, non-instant segment is compositor-eligible.
+  The single gate is engine support for `linear()` easing
+  (`isLinearEasingSupported`, one cached `CSS.supports` check); without it the
+  runner publishes a `follow` plan and every consumer runs the pre-engine
+  per-frame path.
 - **Graceful fallback.** `startCompositorMotion` returns `false` (and the
-  caller keeps the JS per-frame write) when there is no measured slot size, no
-  `Element.animate`, the input is degenerate (non-finite, zero duration), or
+  caller falls back to per-frame writes) when there is no measured slot size,
+  no `Element.animate`, the input is degenerate (non-finite, zero duration), or
   the engine throws on `animate`. SSR and reduced-motion paths never reach it.
 - **Origin coherence.** The animation paints `from` synchronously before
   starting, and its `startTime` is pinned to the segment's own `startedAt`
@@ -757,20 +756,22 @@ Boundaries and guarantees:
   controller — a fresh animation is not left play-pending to begin a frame or
   more late under commit/raster load — so a mid-flight handoff pin
   (repeated-click takeover, settle) lands exactly on the painted position
-  instead of a phase-shifted one.
+  instead of a phase-shifted one. The widget pins its animations to the same
+  clock, keeping deck and widget in phase.
 - **Teardown.** `cancelCompositorMotion(position?)` freezes the track at a known
   transform (the explicit reducer/handoff `position`, or a `getComputedStyle`
   read when omitted) and cancels the animation. It is called on idle, on
   drag-takeover (frozen at the live sample so the finger owns the track again),
-  on a non-eligible segment, and on a geometry change (`syncGeometry` re-bases
+  on a fallback segment, and on a geometry change (`syncGeometry` re-bases
   the transform math, so any animation keyed off the old baseline is torn down
   and the track re-pinned). The binding also cancels a dangling animation on
   unmount.
 
 This keeps the architecture intact: the motion controller remains DOM-agnostic
-and authoritative; WAAPI lives entirely in `geometry/useTrackBinding.ts`; the
-runner decides eligibility but owns no DOM. The compositor is a paint
-optimization layered under the SSOT, not a second source of truth.
+and authoritative; track WAAPI lives entirely in `geometry/useTrackBinding.ts`,
+widget WAAPI entirely in its binding; the runner computes the math once but
+owns no DOM. The compositor is a paint optimization layered under the SSOT,
+not a second source of truth.
 
 ---
 
@@ -860,6 +861,7 @@ only reads stable data:
             isReducedMotion, isDiagnosticActive },
   navigation: { handlePrev, handleNext, handlePageSelect },
   visualPosition: VisualPositionSource | null,  // null when reduced motion
+  motionPlan: MotionPlanSource | null,          // engine plan stream (§4.5)
 }
 
 // CarouselMotionContext — high-frequency
@@ -883,10 +885,12 @@ re-render on motion transitions, which is their job. Each sub-view (`layoutView`
 inside `useModuleContextValue`, so an unrelated change does not invalidate the
 others.
 
-Modules that need live per-frame updates do **not** depend on context for the
-frame value — they subscribe to `visualPosition` themselves and mutate their own
-DOM. Modules that only need the logical view (pagination dots, control
-availability) read from the context and re-render at the React tempo.
+Modules that paint motion do **not** depend on context re-renders for it: the
+widget subscribes to `motionPlan` (engine-planned WAAPI steps) and, in follow
+mode only, to `visualPosition` (per-frame drag stream) — both are stable
+observable objects, so publishing never re-renders React. Modules that only
+need the logical view (pagination dots, control availability) read from the
+context and re-render at the React tempo.
 
 `Diagnostic`'s presence is surfaced as `layout.isDiagnosticActive` so
 modules with their own checks (`PaginationWidget` via
@@ -914,12 +918,29 @@ dots — the component carries no internal `pageCount <= 1` guard of its own.
 
 ### 8.2 `<PaginationWidget />`
 
-Touch dot pagination. A fixed-width odd-count strip with
-exponentially shrinking side dots. Two `activeDot` overlays interpolate
-across adjacent page indexes to track the visual progress, not the
-logical target. Subscribes to `visualPosition` and mutates dot
-`transform` / `opacity` per RAF tick. When reduced motion is on, the
-widget falls back to a single static dot reflecting the logical target.
+Touch dot pagination. A fixed-width odd-count strip with exponentially
+shrinking side dots; `activeDot` overlays carry the moving highlight.
+
+The widget is a **decoupled one-step indicator**: it owns an unbounded step
+counter and never mirrors the deck's absolute position — a navigation command
+is one step forward or back, whether the deck travels one page or teleports
+ten. Its motion follows the engine's plans (§4.5):
+
+- **WAAPI step** (any planned motion): each dot gets a keyframed animation of
+  its spatial path across the step (`math/trajectory.ts` samples the
+  projection curve), with the plan's `linear()` easing and `startedAt` clock —
+  the same temporal curve the deck runs, over the widget's own distance.
+  Retargets re-plan from the mid-flight offset (sampled from the plan's
+  progress stops, never the DOM); a repeated click advances the step target by
+  one; a far GO_TO is one step spanning the whole preflight + approach
+  duration (the approach plan arrives flagged `isContinuation` and is
+  ignored).
+- **Follow mode** (finger on the deck, or the `linear()` fallback): per-frame
+  writes from the `visualPosition` stream, delta-based in the widget's own
+  step domain, with epsilon write gates and frame-skip pacing.
+
+When reduced motion is on, the widget falls back to a static React-rendered
+strip reflecting the logical target.
 
 ### 8.3 `<Controls />`
 
@@ -980,7 +1001,7 @@ src/components/Carousel/client/
 ├── config/                        config resolution
 │   ├── defaults.ts                public-prop defaults
 │   ├── constants.ts               tunable runtime constants (epsilons, buffers)
-│   ├── motion.ts                  bezier strings, repeated-click + GO_TO factors
+│   ├── motion.ts                  profile distance shares (step/autoplay/snap-back/repeated/GO_TO)
 │   ├── gesture.ts                 drag config + inertial release config
 │   ├── interaction.ts             hover delay, visibility threshold, autoplay pagination factor
 │   ├── buildRawConfig.ts          merges raw input with defaults
@@ -1007,17 +1028,17 @@ src/components/Carousel/client/
 │   ├── reducer.ts                 single switch over Commands
 │   └── useCarouselState.ts        binds the reducer to React
 ├── motion/
-│   ├── types.ts                   Segment, MotionIntent, MotionStart
-│   ├── bezier.ts                  cubic-bezier sampler + cache + carousel curves + CSS easing serialisation
+│   ├── types.ts                   CarouselSegment (one profile shape), MotionIntent, MotionStart
 │   ├── profile.ts                 smoothstep profile (accel/cruise/decel)
+│   ├── progressCurve.ts           profile → percent stops → linear() easing; duration-authored peak solver
+│   ├── planChannel.ts             engine → paint-consumer motion-plan observable
 │   ├── speed.ts                   sameDirectionSpeed, signedVelocity
 │   ├── timing.ts                  GO_TO speed + teleport geometry (resolveGoToPlan)
-│   ├── duration.ts                bezier-segment duration math
+│   ├── duration.ts                duration-authored step duration resolution
 │   ├── segmentFactory.ts          builds the Segment for the next motion step
 │   ├── sampler.ts                 segment → MotionSampleData at timestamp
-│   ├── compositorEligibility.ts   is a segment an EasingSegment (WAAPI-eligible)
 │   ├── autoplayDuration.ts        pure autoplay-step duration derivation
-│   ├── useMotionRunner.ts         state → segment → controller
+│   ├── useMotionRunner.ts         state → segment → controller + WAAPI + plan
 │   └── useCarouselMotionExecution.ts  runner + autoplay-duration derivation
 ├── position/
 │   ├── types.ts                   VisualPositionFrame, VisualPositionSource
@@ -1108,8 +1129,9 @@ dependencies, the architecture has held.
   fight. The alternative (drive the track from JS like everything else) keeps a
   single expression but puts the heaviest per-frame write back on the main
   thread, where it drops frames under React-commit / image-decode / paint
-  contention — the original jank this rework removes. Eligibility is exactly the
-  `EasingSegment` strategies and fallback is total (any failure reverts to the
+  contention — the original jank this rework removes. Every engine-planned
+  segment is eligible (the profile curve rides a `linear()` easing) and
+  fallback is total (missing `linear()` support or any failure reverts to the
   JS write), so the duplication never becomes a correctness fork: the JS
   controller stays the single authority on where the deck is.
 - **Per-instance singletons flow explicitly, not via internal context.** The
@@ -1200,22 +1222,18 @@ dependencies, the architecture has held.
   profile-level rule for overallocated acceleration/deceleration shares. The
   diagnostic layer surfaces violations separately, without ever feeding back
   into runtime.
-- **Performance.** Bezier and profile samplers cache their work where the
-  inputs are known (parsed beziers, computed strips). Every `EasingSegment`
-  track motion is handed to the compositor thread via WAAPI (§4.5), so the
-  dominant per-frame cost — writing the track `transform` — leaves the main
-  thread for click / autoplay / snap-back / non-inertial gesture-release steps.
-  The track binding short-circuits writes that would re-apply the same
-  transform, and suppresses its per-frame write entirely (before even building
-  the transform string) while a compositor animation owns the track. The
-  PaginationWidget binding short-circuits per dot against numeric position /
-  scale / opacity epsilons (`PaginationWidget/defaults.ts`), so an imperceptible
-  delta neither writes the DOM nor allocates a transform string. The motion
+- **Performance.** Every engine-planned motion — click, autoplay, snap-back,
+  gesture release, repeated click, every GO_TO slice — runs on the compositor
+  thread via WAAPI with the profile's `linear()` easing (§4.5): the engine
+  computes the math once per motion (profile + 32 progress stops + keyframes)
+  and no per-frame JS work happens while it plays, for the track OR the
+  pagination widget. Per-frame writes remain only for the finger-drag follow
+  mode and the no-`linear()` fallback, where the track binding short-circuits
+  writes that would re-apply the same transform and the widget binding
+  short-circuits per dot against numeric position / scale / opacity epsilons
+  (`PaginationWidget/defaults.ts`) with frame-skip pacing. The motion
   controller emits only on actual sample change (per RAF tick of an active
-  segment; one synchronous emit on segment start; no emits while idle). A
-  repeated-click profile retarget — the heaviest rebuild and not
-  compositor-eligible — is deferred a few frames off the input tick (§4.2), so
-  the recompute does not contend with the click event itself. Image
+  segment; one synchronous emit on segment start; no emits while idle). Image
   prioritization is delegated to native `<img>` hints; the idle predecode adds
   no per-frame work and uses the async `decode()`, so it never blocks the main
   thread, and it is gated to idle so it does not contend with motion.

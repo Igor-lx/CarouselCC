@@ -116,3 +116,24 @@ export const resolveGoToApproachDistance = (
   stepSize: number,
   motion: MotionSettings,
 ): number => resolveGoToProfileZones(stepSize, motion).approachDistance;
+
+/**
+ * Duration of the post-teleport approach segment, computable BEFORE the
+ * approach exists: it always enters at the jump cruise speed, cruises, then
+ * decays over the local deceleration budget. Zone times: cruise
+ * `(1-d)·A/p` plus deceleration `2·d·A/p` (average speed `p/2`), i.e.
+ * `A·(1+d)/p`. Lets the engine plan the TOTAL far-GO_TO time at preflight
+ * start, so a one-step consumer (the pagination widget) can run the whole
+ * command as a single motion.
+ */
+export const resolveGoToApproachDuration = (
+  stepSize: number,
+  motion: MotionSettings,
+  peakSpeed: number,
+): number => {
+  const zones = resolveGoToProfileZones(stepSize, motion);
+  const approach = zones.approachDistance;
+  if (!(approach > 0) || !(peakSpeed > 0)) return 0;
+  const decelShare = Math.min(1, zones.decelerationDistance / approach);
+  return (approach * (1 + decelShare)) / peakSpeed;
+};

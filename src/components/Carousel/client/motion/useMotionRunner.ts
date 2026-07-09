@@ -8,10 +8,17 @@ import {
 import type { CarouselRuntimeConfig } from "../config";
 import type { TrackBindingApi } from "../geometry";
 import type { CarouselState } from "../state";
-import { bezierToCss } from "./bezier";
-import { canUseCompositorTrackMotion } from "./compositorEligibility";
+import type { MotionPlanChannel, MotionPlanDirection } from "./planChannel";
+import { buildProfile } from "./profile";
+import {
+  isLinearEasingSupported,
+  profileProgressStops,
+  resolvePeakSpeedForDuration,
+  stopsToLinearEasing,
+} from "./progressCurve";
 import { buildCarouselSegment } from "./segmentFactory";
 import { sampleCarouselSegment } from "./sampler";
+import { resolveGoToApproachDuration, resolveJumpPeakSpeed } from "./timing";
 import type { CarouselMotionStrategy, MotionStart } from "./types";
 
 interface UseMotionRunnerInput {
@@ -23,6 +30,8 @@ interface UseMotionRunnerInput {
   enabled: boolean;
   startCompositorMotion: TrackBindingApi["startCompositorMotion"];
   cancelCompositorMotion: TrackBindingApi["cancelCompositorMotion"];
+  /** Publishes the computed motion plan to paint consumers (widget). */
+  publishPlan: MotionPlanChannel["publish"];
   /**
    * Called by the controller when a segment naturally settles. The argument
    * is the visual position where it settled, so the reducer can distinguish
@@ -35,8 +44,8 @@ interface UseMotionRunnerInput {
 const now = (): number =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
 
-const requestFrame = (callback: () => void): number | null =>
-  typeof window === "undefined" ? null : window.requestAnimationFrame(callback);
+const directionOf = (delta: number): MotionPlanDirection =>
+  delta > 0 ? 1 : delta < 0 ? -1 : 0;
 
 /**
  * Origin of a post-drag release segment. Drag writes are published into the
@@ -56,36 +65,31 @@ const buildStartFromState = (
 ): MotionStart => ({
   position: state.fromVirtualIndex,
   velocity: fallbackVelocity,
-  strategy: "easing",
+  strategy: "step",
 });
 
 /**
  * The motion runner is the only bridge between logical state and the motion
- * controller.
+ * controller — and the single place the motion math is computed.
  *
- * The JS motion controller stays the visual-position SSOT for every consumer:
- * gesture/profile math, the pagination widget, status snapshots, handoff, and
- * settle all read its sampled timeline. An `EasingSegment` (click, autoplay,
- * snap-back, non-inertial gesture release) *additionally* runs the identical
- * translation through the Web Animations API, so the deck translation lives on
- * the compositor thread while the JS sampler keeps publishing the authoritative
- * numbers to the non-track subscribers (see `canUseCompositorTrackMotion`). The
- * track binding skips its own per-frame transform write while a compositor
- * animation is live, so the two never fight. `ProfileSegment`s (inertial
- * gesture release, repeated-click, GO_TO jump) run fully on the JS sampler.
+ * Every motion is one accel/cruise/decel profile. The runner builds the
+ * segment, serialises its percent-progress curve to a CSS `linear()` easing,
+ * and hands the SAME plan to every paint consumer: the track gets it through
+ * `startCompositorMotion` (a WAAPI animation over the segment's pixel
+ * distance), the pagination widget gets it through the plan channel (a WAAPI
+ * animation over one dot step). Same duration, same easing, same `startedAt`
+ * clock — synchronized by construction, zero per-frame work while animating.
  *
- * In-flight handoffs are taken as a single atomic `controller.captureHandoff(t)`
- * — a coherent `(position, velocity)` from one sample of the old curve. Every
- * segment drives directly to `state.virtualIndex`; there is no intermediate
- * destination or chained follow-up segment.
+ * The JS motion controller still samples every segment: it stays the
+ * visual-position SSOT for handoff, settle, status, and the per-frame FOLLOW
+ * mode (finger drag, or the fallback when `linear()` easing is unsupported —
+ * in both, consumers track the visual stream frame by frame).
  *
- * Same-direction repeated clicks rebuild a `ProfileSegment`, which is the
- * heaviest work the runner does and cannot be masked by the compositor. Since
- * such a click only arrives while the deck is already moving, the rebuild is
- * held `repeatedClick.retargetFrameDelay` frames — the current segment keeps
- * painting meanwhile — so that compute leaves the input tick. The handoff is
- * still captured atomically, but at the deferred boundary, from whatever curve
- * is actually painting then.
+ * In-flight handoffs are taken as a single atomic `controller.captureHandoff`
+ * — a coherent `(position, velocity)` from one sample of the old curve — and
+ * a retarget rebuilds synchronously in the commit: the previous WAAPI
+ * animation keeps painting until the new one replaces it, so the rebuild cost
+ * never shows on screen.
  */
 export function useMotionRunner({
   state,
@@ -96,43 +100,10 @@ export function useMotionRunner({
   enabled,
   startCompositorMotion,
   cancelCompositorMotion,
+  publishPlan,
   onSettle,
 }: UseMotionRunnerInput): void {
   const lastKeyRef = useRef<string>("");
-  const retargetFrameRef = useRef<number | null>(null);
-  const retargetTokenRef = useRef(0);
-
-  const cancelDeferredRetarget = useCallback(() => {
-    retargetTokenRef.current += 1;
-    if (retargetFrameRef.current !== null && typeof window !== "undefined") {
-      window.cancelAnimationFrame(retargetFrameRef.current);
-    }
-    retargetFrameRef.current = null;
-  }, []);
-
-  const scheduleDeferredRetarget = useCallback(
-    (frames: number, run: () => void) => {
-      cancelDeferredRetarget();
-      if (typeof window === "undefined") {
-        run();
-        return;
-      }
-      const token = retargetTokenRef.current;
-      let framesLeft = frames;
-      const tick = () => {
-        if (retargetTokenRef.current !== token) return;
-        framesLeft -= 1;
-        if (framesLeft > 0) {
-          retargetFrameRef.current = requestFrame(tick);
-          return;
-        }
-        retargetFrameRef.current = null;
-        run();
-      };
-      retargetFrameRef.current = requestFrame(tick);
-    },
-    [cancelDeferredRetarget],
-  );
 
   const settle = useCallback(
     (sample: MotionSample<CarouselMotionStrategy>) => {
@@ -160,18 +131,17 @@ export function useMotionRunner({
     if (lastKeyRef.current === key) return;
     lastKeyRef.current = key;
 
-    // Any newly-committed state supersedes a pending deferred retarget.
-    cancelDeferredRetarget();
-
     if (!enabled) {
       cancelCompositorMotion(state.virtualIndex);
       controller.snap(state.virtualIndex, { strategy: "idle" });
+      publishPlan({ kind: "idle" });
       return;
     }
 
     if (state.motionPhase === "idle") {
       cancelCompositorMotion(state.virtualIndex);
       controller.snap(state.virtualIndex, { strategy: "idle" });
+      publishPlan({ kind: "idle" });
       return;
     }
 
@@ -179,6 +149,7 @@ export function useMotionRunner({
       // A drag re-takes the track directly through the visual-position stream;
       // freeze the compositor at the live sample so the finger owns it again.
       cancelCompositorMotion(controller.getSnapshot().value);
+      publishPlan({ kind: "follow" });
       return;
     }
 
@@ -187,6 +158,10 @@ export function useMotionRunner({
       controller.snap(state.virtualIndex, {
         strategy: "idle",
         onComplete: settle,
+      });
+      publishPlan({
+        kind: "instant",
+        direction: directionOf(state.virtualIndex - state.fromVirtualIndex),
       });
       return;
     }
@@ -204,6 +179,7 @@ export function useMotionRunner({
           velocity: resolvedStart.velocity,
           onComplete: settle,
         });
+        publishPlan({ kind: "idle" });
         return;
       }
 
@@ -216,21 +192,18 @@ export function useMotionRunner({
         startedAt: resolvedStartedAt,
       });
 
-      // Try to drive an eligible easing segment on the compositor. When it
-      // takes, the track binding suppresses its own per-frame writes; when it
-      // does not (profile segment, no slot measured, no `Element.animate`),
-      // make sure no stale compositor animation is left running over the JS
-      // path.
+      // One percent-progress curve per segment: the track consumes it below,
+      // the widget receives the same curve through the plan.
+      const stops = profileProgressStops(segment.profile, segment.to - segment.from);
+      const easing = stopsToLinearEasing(stops);
+
       const isComposited =
-        canUseCompositorTrackMotion(segment) &&
+        isLinearEasingSupported() &&
         startCompositorMotion({
           from: segment.from,
           to: segment.to,
           duration: segment.duration,
-          easing: bezierToCss(segment.easing),
-          // Same clock the JS sampler runs this segment on — the binding pins
-          // the WAAPI startTime to it so compositor and controller stay in
-          // phase (see TrackCompositorMotionOptions.startedAt).
+          easing,
           startedAt: segment.startedAt,
         });
 
@@ -239,19 +212,77 @@ export function useMotionRunner({
       }
 
       // The controller runs regardless of compositing: it remains the SSOT for
-      // pagination, status, handoff, and settle. When composited, its
-      // per-frame samples simply do not reach the track DOM.
+      // status, handoff, settle, and the follow-mode stream. When composited,
+      // its per-frame samples simply do not reach the track DOM.
       controller.start({
         segment,
         sampler: sampleCarouselSegment,
         onComplete: settle,
       });
+
+      if (!isComposited) {
+        // JS fallback: consumers follow the visual stream per frame.
+        publishPlan({ kind: "follow" });
+        return;
+      }
+
+      // A far-GO_TO preflight plans the WHOLE command for one-step consumers:
+      // total duration spans preflight + approach, and the curve is the same
+      // GO_TO shape re-authored over one unit step. The approach slice then
+      // arrives flagged as a continuation and is ignored by them.
+      const isPreflight = state.teleportVirtualIndex !== null;
+      let planDuration = segment.duration;
+      let planStops: readonly number[] = stops;
+      let planEasing = easing;
+
+      if (isPreflight) {
+        const stepSize = state.layout.visibleSlidesCount;
+        const jumpPeak = resolveJumpPeakSpeed(
+          stepSize,
+          config.stepDuration,
+          config.jumpSpeedMultiplier,
+        );
+        const totalDuration =
+          segment.duration +
+          resolveGoToApproachDuration(stepSize, config.motion, jumpPeak);
+        const unitPeak = resolvePeakSpeedForDuration({
+          distance: 1,
+          duration: totalDuration,
+          startSpeed: 0,
+          accelerationDistanceShare: config.motion.goToAccelerationDistanceShare,
+          decelerationDistanceShare: config.motion.goToDecelerationDistanceShare,
+        });
+        const unitProfile = buildProfile({
+          from: 0,
+          to: 1,
+          startSpeed: 0,
+          peakSpeed: unitPeak,
+          endSpeed: 0,
+          accelerationDistanceShare: config.motion.goToAccelerationDistanceShare,
+          decelerationDistanceShare: config.motion.goToDecelerationDistanceShare,
+        });
+        planStops = profileProgressStops(unitProfile, 1);
+        planEasing = stopsToLinearEasing(planStops);
+        planDuration = unitProfile.duration;
+      }
+
+      publishPlan({
+        kind: "waapi",
+        direction: directionOf(segment.to - segment.from),
+        duration: planDuration,
+        easing: planEasing,
+        stops: planStops,
+        startedAt: resolvedStartedAt,
+        targetKey: state.teleportVirtualIndex ?? state.virtualIndex,
+        isContinuation: state.isTeleportApproach,
+      });
     };
 
-    // Atomic in-flight handoff: position + velocity + time from one sample of
-    // the curve that is painting *now* (which, when deferred, is the boundary).
-    const startActiveRetarget = () => {
-      if (!controller.isActive()) return;
+    if (controller.isActive()) {
+      // Atomic in-flight handoff: position + velocity + time from one sample
+      // of the curve that is painting now. The rebuild happens synchronously
+      // in this commit — the old compositor animation carries the pixels
+      // until the new one replaces it.
       const handoff = controller.captureHandoff(now());
       startResolvedMotion(
         {
@@ -261,15 +292,6 @@ export function useMotionRunner({
         },
         handoff.timestamp,
       );
-    };
-
-    if (controller.isActive()) {
-      const retargetDelay = config.repeatedClick.retargetFrameDelay;
-      if (state.isRepeatedClickAdvance && retargetDelay > 0) {
-        scheduleDeferredRetarget(retargetDelay, startActiveRetarget);
-        return;
-      }
-      startActiveRetarget();
       return;
     }
 
@@ -288,13 +310,12 @@ export function useMotionRunner({
     startResolvedMotion(buildStartFromState(state, handoff.velocity), startedAt);
   }, [
     cancelCompositorMotion,
-    cancelDeferredRetarget,
     config,
     controller,
     enabled,
     isDragging,
     isInstantMode,
-    scheduleDeferredRetarget,
+    publishPlan,
     settle,
     startCompositorMotion,
     state.fromVirtualIndex,
@@ -302,6 +323,7 @@ export function useMotionRunner({
     state.gesture.uiVelocity,
     state.isTeleportApproach,
     state.isRepeatedClickAdvance,
+    state.layout.visibleSlidesCount,
     state.motionPhase,
     state.moveReason,
     state.teleportVirtualIndex,
@@ -310,10 +332,9 @@ export function useMotionRunner({
 
   useEffect(
     () => () => {
-      cancelDeferredRetarget();
       cancelCompositorMotion(controller.getSnapshot().value);
       controller.cancel();
     },
-    [cancelCompositorMotion, cancelDeferredRetarget, controller],
+    [cancelCompositorMotion, controller],
   );
 }
