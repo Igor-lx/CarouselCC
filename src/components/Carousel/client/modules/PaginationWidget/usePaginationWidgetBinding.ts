@@ -12,7 +12,6 @@ import {
   DOT_OPACITY_EPSILON,
   DOT_POSITION_EPSILON_PX,
   DOT_SCALE_EPSILON,
-  WIDGET_WRITE_FRAME_SKIP,
 } from "./defaults";
 import {
   widgetProjectionSide,
@@ -44,7 +43,7 @@ import type {
  * - **Follow mode** (finger on the deck, or the JS fallback when `linear()`
  *   is unsupported): per-frame writes driven by the visual-position stream,
  *   delta-based (`offset` moves by the deck's page-offset delta), with the
- *   frame-skip pacing and epsilon write gates.
+ *   epsilon write gates filtering imperceptible deltas.
  * - **Idle / instant**: finalize to an integer offset and paint statically.
  */
 
@@ -153,7 +152,6 @@ export function usePaginationWidgetBinding({
   const followBaseRef = useRef<{ pageOffset: number; offset: number } | null>(
     null,
   );
-  const frameCounterRef = useRef(0);
 
   const side = widgetProjectionSide(geometry.visibleCount);
   const dotCount = widgetProjectionSlotCount(geometry.visibleCount) + DOT_COVERAGE_MARGIN;
@@ -480,12 +478,12 @@ export function usePaginationWidgetBinding({
     offsetRef.current = start;
     writeOffset(start);
     followBaseRef.current = null;
-    frameCounterRef.current = 0;
 
     followUnsubRef.current = visualPosition.subscribe(
       (frame) => {
         // Delta-follow: the widget advances by the deck's page-offset delta,
-        // staying in its own decoupled step domain.
+        // staying in its own decoupled step domain. Every frame is written;
+        // the epsilon gates in `writeOffset` filter imperceptible deltas.
         if (followBaseRef.current === null) {
           followBaseRef.current = {
             pageOffset: frame.pageOffset,
@@ -495,13 +493,6 @@ export function usePaginationWidgetBinding({
         const base = followBaseRef.current;
         const next = base.offset + (frame.pageOffset - base.pageOffset);
         offsetRef.current = next;
-
-        const isResting = frame.phase !== "running";
-        const tick = frameCounterRef.current++;
-        const isDroppedFrame =
-          WIDGET_WRITE_FRAME_SKIP > 1 &&
-          tick % WIDGET_WRITE_FRAME_SKIP === WIDGET_WRITE_FRAME_SKIP - 1;
-        if (!isResting && isDroppedFrame) return;
         writeOffset(next);
       },
       { emitCurrent: true },

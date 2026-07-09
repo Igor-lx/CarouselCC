@@ -937,7 +937,7 @@ ten. Its motion follows the engine's plans (§4.5):
   ignored).
 - **Follow mode** (finger on the deck, or the `linear()` fallback): per-frame
   writes from the `visualPosition` stream, delta-based in the widget's own
-  step domain, with epsilon write gates and frame-skip pacing.
+  step domain, with epsilon write gates.
 
 When reduced motion is on, the widget falls back to a static React-rendered
 strip reflecting the logical target.
@@ -1231,7 +1231,7 @@ dependencies, the architecture has held.
   mode and the no-`linear()` fallback, where the track binding short-circuits
   writes that would re-apply the same transform and the widget binding
   short-circuits per dot against numeric position / scale / opacity epsilons
-  (`PaginationWidget/defaults.ts`) with frame-skip pacing. The motion
+  (`PaginationWidget/defaults.ts`). The motion
   controller emits only on actual sample change (per RAF tick of an active
   segment; one synchronous emit on segment start; no emits while idle). Image
   prioritization is delegated to native `<img>` hints; the idle predecode adds
