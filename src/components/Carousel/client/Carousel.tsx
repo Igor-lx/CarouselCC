@@ -15,11 +15,7 @@ import {
   CarouselStableContext,
   useModuleContextValue,
 } from "./context";
-import {
-  carouselBoundaryState,
-  slideFlexStyle,
-  type CarouselSlideRecord,
-} from "./domain";
+import { carouselBoundaryState, slideFlexStyle } from "./domain";
 import { useAutoplay } from "./autoplay/useAutoplay";
 import { useFocusRecovery } from "./focus/useFocusRecovery";
 import { useCarouselGesture } from "./gesture";
@@ -35,6 +31,7 @@ import { useModuleRenderPolicy } from "./render-policy/useModuleRenderPolicy";
 import {
   SlideItem,
   useCarouselSlideDeck,
+  useImageResourceRetention,
   useImageResourceStoreInstance,
   useSlideRenderModel,
 } from "./slides";
@@ -47,22 +44,6 @@ import type {
   CarouselStatusSnapshot,
   SlideClassMap,
 } from "./contract/types";
-
-const EMPTY_IMAGE_URLS: readonly string[] = Object.freeze([]);
-
-/** Every distinct image URL in the live deck — the set the store retains. */
-const collectImageResourceUrls = (
-  records: CarouselSlideRecord[],
-  isContentImg: boolean,
-): readonly string[] => {
-  if (!isContentImg) return EMPTY_IMAGE_URLS;
-  const urls = new Set<string>();
-  for (const record of records) {
-    const { content } = record.slideData;
-    if (typeof content === "string") urls.add(content);
-  }
-  return [...urls];
-};
 
 const Carousel = memo(function Carousel(props: CarouselProps) {
   const {
@@ -158,17 +139,13 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     layout.visibleSlidesCount,
   );
 
-  // Keep the store's per-URL entries bounded to the live deck. Retained entries
-  // are lightweight (render status + retry bookkeeping); a data replacement
-  // drops any URL no longer present.
-  const imageResourceUrls = useMemo(
-    () => collectImageResourceUrls(records, isContentImg),
-    [isContentImg, records],
-  );
-
-  useEffect(() => {
-    imageResourceStore?.prune(imageResourceUrls);
-  }, [imageResourceStore, imageResourceUrls]);
+  // Keep the store's per-URL entries (and their retry timers) bounded to the
+  // live deck — see useImageResourceRetention.
+  useImageResourceRetention({
+    store: imageResourceStore,
+    records,
+    isContentImg,
+  });
 
   // Read-only, low-frequency status reported to the host. Fires on mount and
   // whenever the idle flag, target page, or page count changes — never on a

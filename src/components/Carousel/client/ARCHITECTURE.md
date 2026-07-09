@@ -1070,6 +1070,7 @@ src/components/Carousel/client/
 │   │   ├── createImageResourceStore.ts  framework-agnostic store
 │   │   ├── useImageResource.ts    per-slide useSyncExternalStore binding (store passed in)
 │   │   ├── useImageResourceStoreInstance.ts  lifecycle owner
+│   │   ├── useImageResourceRetention.ts  prunes entries + retry timers to the live deck
 │   │   └── types.ts
 │   ├── useCarouselSlideDeck.ts    layout, records, perfect-page info
 │   └── useSlideRenderModel.ts     virtual slides + render window
