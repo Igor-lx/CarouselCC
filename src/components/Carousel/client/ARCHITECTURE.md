@@ -937,7 +937,9 @@ ten. Its motion follows the engine's plans (§4.5):
   ignored).
 - **Follow mode** (finger on the deck, or the `linear()` fallback): per-frame
   writes from the `visualPosition` stream, delta-based in the widget's own
-  step domain, with epsilon write gates.
+  step domain, with epsilon write gates; on legacy engines without `linear()`
+  each Nth dot write is dropped (`FALLBACK_WRITE_FRAME_SKIP`) since the
+  fallback stream carries every motion, not just a short drag.
 
 When reduced motion is on, the widget falls back to a static React-rendered
 strip reflecting the logical target.

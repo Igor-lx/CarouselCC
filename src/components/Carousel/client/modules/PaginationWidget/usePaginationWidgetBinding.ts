@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 
 import { useIsomorphicLayoutEffect } from "../../../../../shared";
 import {
+  isLinearEasingSupported,
   sampleProgressStops,
   type CarouselMotionPlan,
   type MotionPlanSource,
@@ -12,6 +13,7 @@ import {
   DOT_OPACITY_EPSILON,
   DOT_POSITION_EPSILON_PX,
   DOT_SCALE_EPSILON,
+  FALLBACK_WRITE_FRAME_SKIP,
 } from "./defaults";
 import {
   widgetProjectionSide,
@@ -152,6 +154,7 @@ export function usePaginationWidgetBinding({
   const followBaseRef = useRef<{ pageOffset: number; offset: number } | null>(
     null,
   );
+  const frameCounterRef = useRef(0);
 
   const side = widgetProjectionSide(geometry.visibleCount);
   const dotCount = widgetProjectionSlotCount(geometry.visibleCount) + DOT_COVERAGE_MARGIN;
@@ -478,12 +481,17 @@ export function usePaginationWidgetBinding({
     offsetRef.current = start;
     writeOffset(start);
     followBaseRef.current = null;
+    frameCounterRef.current = 0;
+    // Legacy-engine relief: without `linear()` support the follow stream
+    // carries EVERY motion (not just a short finger drag), so each Nth dot
+    // write is dropped there. Modern engines always paint at full rate.
+    const useFrameSkip = !isLinearEasingSupported();
 
     followUnsubRef.current = visualPosition.subscribe(
       (frame) => {
         // Delta-follow: the widget advances by the deck's page-offset delta,
-        // staying in its own decoupled step domain. Every frame is written;
-        // the epsilon gates in `writeOffset` filter imperceptible deltas.
+        // staying in its own decoupled step domain; the epsilon gates in
+        // `writeOffset` filter imperceptible deltas.
         if (followBaseRef.current === null) {
           followBaseRef.current = {
             pageOffset: frame.pageOffset,
@@ -493,6 +501,16 @@ export function usePaginationWidgetBinding({
         const base = followBaseRef.current;
         const next = base.offset + (frame.pageOffset - base.pageOffset);
         offsetRef.current = next;
+
+        if (useFrameSkip && frame.phase === "running") {
+          const tick = frameCounterRef.current++;
+          if (
+            FALLBACK_WRITE_FRAME_SKIP > 1 &&
+            tick % FALLBACK_WRITE_FRAME_SKIP === FALLBACK_WRITE_FRAME_SKIP - 1
+          ) {
+            return; // offset already advanced; the next kept frame catches up
+          }
+        }
         writeOffset(next);
       },
       { emitCurrent: true },
