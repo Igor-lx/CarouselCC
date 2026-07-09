@@ -110,7 +110,7 @@ referentially-stable object.
 
 | Prop              | Type             | Effect |
 | ----------------- | ---------------- | ------ |
-| `userEnvironment` | `{ reducedMotion?: boolean; touch?: boolean; dataSaver?: boolean }` | All fields optional. `reducedMotion`: every transition snaps instantly, gesture is disabled, the PaginationWidget runs static. `touch`: gesture eligibility, `data-touch` attribute, autoplay hover-pause exemption. `dataSaver`: off-band slide images load lazily and at low fetch priority, and idle predecode is skipped. An unset field resolves to `false`; the omission is reported by the `Diagnostic` slot (DEV-only) — never silently repaired. |
+| `userEnvironment` | `{ reducedMotion?: boolean; touch?: boolean; dataSaver?: boolean }` | All fields optional. `reducedMotion`: every transition snaps instantly, gesture is disabled, the PaginationWidget runs static. `touch`: gesture eligibility, `data-touch` attribute, autoplay hover-pause exemption. `dataSaver`: off-band slide images load lazily and at low fetch priority. An unset field resolves to `false`; the omission is reported by the `Diagnostic` slot (DEV-only) — never silently repaired. |
 
 #### Motion timing
 
@@ -195,10 +195,6 @@ Contract guarantees:
   is present the slide renders a `<picture>` (each `source` → a `<source>`), with
   the default `<img srcset={image.srcSet}>` as the fallback. Place portrait/normal
   candidates in `image.srcSet`; reserve `sources` for art-directed crops.
-- **Predecode follows the selection.** The idle predecode mirrors the same
-  `srcSet`/`sizes` and resolves the active `<source>` via `matchMedia`, so it
-  warms exactly the candidate the rendered element will pick (see the
-  image-preparation bullet in §1.6).
 
 #### Host how-to: one source image → responsive `slidesData`
 
@@ -392,37 +388,28 @@ These are the user-facing behaviours the implementation guarantees.
   are safe no-ops at the edges; hosts can also surface that state on the
   button itself by wiring `disabled` to the matching `isAtStart` / `isAtEnd`
   flag from the status snapshot.
-- **Image preparation.** Two cooperating, lightweight pieces — no warm-up
-  state machine, no decode queue, no coupling to the render-status store.
-  1. **Native selection + prioritization on the rendered element.** A slide's
-     responsive variants (`Slide.image`, §1.4) render as `srcSet` / `<picture>`,
-     so the browser picks the right asset per resolution/DPR and orientation —
-     the carousel supplies `sizes` from its slot count. Each `<img>` also carries
-     band-derived hints: the active band fetches eagerly and at high
-     `fetchpriority`; off-band slides fall back to default. Under
-     `userEnvironment.dataSaver` (derived from `prefers-reduced-data` / the
-     Network Information API `saveData` flag, e.g. through `useUserEnvironment`)
-     off-band slides instead load lazily and at low priority.
-  2. **Idle predecode** (`useSlideImagePreload`). While the carousel is idle it
-     warms the browser's fetch + decoded-image caches for the off-band
-     neighbour slides a single step can reveal (a bounded page span on each
-     side, nearest-first), so a slide entering the render window during the next
-     motion paints from a warm cache instead of fetching/decoding on the frame
-     it mounts. It creates short-lived offscreen `Image()`s **mirroring the same
-     responsive descriptor** (`srcSet` + `sizes`, and the matching `<source>`
-     resolved via `matchMedia`), so it warms exactly the candidate the rendered
-     element will pick — never every variant. It calls the async `decode()` (off
-     the main thread), retains them only while their URL stays in the neighbour
-     window (bounded regardless of deck size), and is skipped entirely under
-     `dataSaver`. It publishes no render status — each rendered
-     `<img>` remains the sole authority on its own outcome; the predecode only
-     pre-warms the platform caches that element will hit. It takes a read-only
-     `isWarmable(url)` gate (injected by the root from the store's status) so it
-     never spends a fetch on a URL the visible layer already saw fail, yet stays
-     store-agnostic. Warming runs only on idle and is left untouched during
-     motion, so a step never drops and re-warms what it is about to use.
+- **Image preparation.** One lightweight mechanism — no warm-up state
+  machine, no decode queue, no coupling to the render-status store: **native
+  selection + prioritization on the rendered element**. A slide's responsive
+  variants (`Slide.image`, §1.4) render as `srcSet` / `<picture>`, so the
+  browser picks the right asset per resolution/DPR and orientation — the
+  carousel supplies `sizes` from its slot count. Each `<img>` also carries
+  band-derived hints: the active band fetches eagerly and at high
+  `fetchpriority`; off-band slides fall back to default. Under
+  `userEnvironment.dataSaver` (derived from `prefers-reduced-data` / the
+  Network Information API `saveData` flag, e.g. through `useUserEnvironment`)
+  off-band slides instead load lazily and at low priority. Ahead-of-motion
+  readiness comes from the render window itself: every slide a single click
+  or a repeated click can reveal is already MOUNTED while idle
+  (`RENDER_WINDOW_BUFFER_MULTIPLIER` covers the same span the reducer's
+  repeated-click lookahead can reach), so its `<img>` fetches long before any
+  motion starts. (A former idle-predecode hook that mirrored descriptors into
+  offscreen `Image()`s was removed as fully redundant once the buffer grew to
+  cover its span; if decode pop-in is ever observed on weak devices, the lean
+  reintroduction is `img.decode()` over the mounted off-band images, not
+  descriptor mirroring.)
 
-  Neither piece changes navigation, layout, motion state, or slide-render
+  This changes no navigation, layout, motion state, or slide-render
   semantics. The image-resource store — its render-status SSOT and error /
   retry — is unaffected and always runs; that is correctness, not optimization.
 - **Image errors and retry.** A slide whose image fails to load renders a
@@ -514,7 +501,6 @@ Every responsibility has exactly one owner. The orchestrator
 | Render window | `useSlideRenderModel` | Memoised; expands during motion, snaps on idle. |
 | Image resources | image-resource store (`createImageResourceStore`) | Per-URL render status and retry policy. One instance per carousel; the single authority on image renderability. |
 | Image prioritization | `SlideItem` | Native `<img loading>` / `fetchpriority` hints derived from the slide's band and the data-saver signal. |
-| Image predecode | `useSlideImagePreload` | Idle, store-decoupled warming (fetch + async `decode()`) of off-band neighbour slides, mirroring each slide's responsive descriptor (`srcSet`/`sizes` + matched `<source>`); bounded to the neighbour window, skipped under data-saver. |
 | Slide image binding | `useImageResource` | Registers a `SlideItem` as a visible owner of its URL and subscribes to the URL's snapshot via `useSyncExternalStore`. |
 | Gesture lifecycle | `useCarouselGesture` | Wraps the shared `usePointerSwipe`. Converts pointer events into dispatches and direct position writes. |
 | Autoplay lifecycle | `useAutoplay` | Owns the interval timer, hover/visibility/dragging pause. |
@@ -1085,7 +1071,6 @@ src/components/Carousel/client/
 │   │   ├── useImageResource.ts    per-slide useSyncExternalStore binding (store passed in)
 │   │   ├── useImageResourceStoreInstance.ts  lifecycle owner
 │   │   └── types.ts
-│   ├── useSlideImagePreload.ts    idle descriptor-aware off-band fetch + async decode (store-decoupled)
 │   ├── useCarouselSlideDeck.ts    layout, records, perfect-page info
 │   └── useSlideRenderModel.ts     virtual slides + render window
 ├── slots/
@@ -1258,6 +1243,6 @@ dependencies, the architecture has held.
   (`PaginationWidget/defaults.ts`). The motion
   controller emits only on actual sample change (per RAF tick of an active
   segment; one synchronous emit on segment start; no emits while idle). Image
-  prioritization is delegated to native `<img>` hints; the idle predecode adds
-  no per-frame work and uses the async `decode()`, so it never blocks the main
-  thread, and it is gated to idle so it does not contend with motion.
+  prioritization is delegated to native `<img>` hints, and the pre-mounted
+  render-window buffer has every reachable slide fetching while idle, so no
+  speculative warm-up machinery runs at all.

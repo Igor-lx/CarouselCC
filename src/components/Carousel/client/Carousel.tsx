@@ -1,6 +1,5 @@
 import {
   memo,
-  useCallback,
   useEffect,
   useImperativeHandle,
   useMemo,
@@ -37,7 +36,6 @@ import {
   SlideItem,
   useCarouselSlideDeck,
   useImageResourceStoreInstance,
-  useSlideImagePreload,
   useSlideRenderModel,
 } from "./slides";
 import { CAROUSEL_SLOTS } from "./slots";
@@ -143,8 +141,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // `isContentImg` off it is `null` and no image machinery runs. It is passed
   // explicitly to each `SlideItem` (no context) so the data flow stays visible
   // in source. Each slide subscribes to its own URL; the store is the single
-  // authority on render status and retry. The idle predecode below never writes
-  // to it — it only warms browser caches.
+  // authority on render status and retry.
   const imageResourceStore = useImageResourceStoreInstance(isContentImg);
 
   // --- DOM refs --------------------------------------------------------------
@@ -161,16 +158,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     layout.visibleSlidesCount,
   );
 
-  // Read-only warm-ability gate for the predecode: never spend a speculative
-  // fetch on a URL the visible layer has already seen fail. Injected as a plain
-  // predicate so the predecode stays store-agnostic.
-  const isImageWarmable = useCallback(
-    (url: string) =>
-      imageResourceStore === null ||
-      imageResourceStore.getSnapshot(url).status !== "error",
-    [imageResourceStore],
-  );
-
   // Keep the store's per-URL entries bounded to the live deck. Retained entries
   // are lightweight (render status + retry bookkeeping); a data replacement
   // drops any URL no longer present.
@@ -182,20 +169,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   useEffect(() => {
     imageResourceStore?.prune(imageResourceUrls);
   }, [imageResourceStore, imageResourceUrls]);
-
-  // Lightweight idle predecode: warm the fetch + decoded-image caches for the
-  // off-band neighbour slides a step can reveal, so motion into them does not
-  // fetch/decode on the frame the slide mounts. Decoupled from the store.
-  useSlideImagePreload({
-    records,
-    layout,
-    currentVirtualIndex: state.virtualIndex,
-    imageSizes,
-    isIdle: status.isIdle,
-    isContentImg,
-    isDataSaverEnabled,
-    isWarmable: isImageWarmable,
-  });
 
   // Read-only, low-frequency status reported to the host. Fires on mount and
   // whenever the idle flag, target page, or page count changes — never on a
