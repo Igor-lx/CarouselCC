@@ -27,8 +27,7 @@
     max-width: 100%;
     row-gap: var(--pagination-gap);
     background-color: var(--bg);
-    transition:
-      background-color var(--transition-bg),
+    transition: background-color var(--transition-bg),
       border-color var(--transition-border);
     overflow: hidden;
     user-select: none;
@@ -57,6 +56,12 @@
     }
   }
 
+  // MEASUREMENT CONTRACT: the track (and the viewport above it) must carry
+  // NO border and NO padding. Slide widths resolve their percentage against
+  // this element's content box, while the JS slot math (`measureSlotSize`)
+  // reads the viewport's offsetWidth (border box) — any border/padding here
+  // makes the real slide step smaller than the transform step, so motion
+  // overshoots by a couple of pixels and jerks back into place on settle.
   .slideContainer {
     position: relative;
     display: flex;
@@ -73,13 +78,23 @@
     aspect-ratio: var(--slide-aspect);
     padding: 0;
     margin: 0;
-    border: 1px solid transparent;
+    border: none;
     border-radius: var(--slide-radius);
     background: none;
     font: inherit;
     color: inherit;
     text-align: inherit;
-    transition: border-color 0.5s ease;
+    // The slide frame (hover / error / text) is an OUTLINE drawn just inside
+    // the box, not a border on its edge: the outer slides sit flush against
+    // the viewport's overflow clip, so an edge border lands exactly on the
+    // clip boundary and sub-pixel rounding shaves it (the bottom row, the
+    // first slide's left edge, the radius corners). An inset outline is
+    // immune to that clip, follows the border-radius, paints ABOVE the image
+    // (outlines are the last paint phase — same reason :focus-visible already
+    // works over photos), and never shifts layout.
+    outline: 1px solid transparent;
+    outline-offset: -2px;
+    transition: outline-color 0.5s ease;
     overflow: hidden;
     box-sizing: border-box;
     contain: paint;
@@ -87,7 +102,7 @@
 
     &:focus-visible {
       outline: 1px solid #9cc4f0;
-      outline-offset: -1px;
+      outline-offset: -2px;
     }
 
     // <picture> must not introduce its own (inline, auto-height) box: with a
@@ -110,15 +125,11 @@
 
   .slideInteractive {
     cursor: pointer;
-
-    &:hover {
-      border-color: transparent;
-    }
   }
 
   .outerContainer[data-touch="false"] {
     .slideInteractive:hover {
-      border-color: rgb(18, 237, 54);
+      outline-color: rgb(231, 12, 12);
     }
   }
 
@@ -127,7 +138,7 @@
     align-items: center;
     justify-content: center;
     padding: 20px;
-    border-color: rgb(246 139 139);
+    outline-color: rgb(246 139 139);
     color: rgb(246 100 100);
   }
 
@@ -138,7 +149,7 @@
     padding: 20px;
     background-color: rgb(1 35 56);
     color: whitesmoke;
-    border-color: rgb(139 246 152);
+    outline-color: rgb(139 246 152);
     font-size: 30px;
   }
 
