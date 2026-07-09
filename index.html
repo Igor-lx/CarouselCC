@@ -2,7 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="theme-color" content="" />
+    <!--
+      Parse-time browser-chrome colors. Two media-paired metas instead of one
+      empty meta: mobile browsers commit the bar tint (incl. the BOTTOM bar)
+      at the first paint of a cold load, before any script-driven update is
+      guaranteed to be observed — an empty `content` at parse time reads as
+      "no color" and the default white can stick for the whole session. With
+      the media pair the correct value exists the instant the head is parsed,
+      and in auto mode it even self-switches with the OS theme, no JS needed.
+      Values must stay in sync with BROWSER_THEME_COLORS (src/theme/types.ts).
+    -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#bfd6f8" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d1520" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
@@ -10,39 +21,48 @@
     <title>CAROUSEL</title>
     <script>
       (() => {
-        const BROWSER_THEME_COLORS = { light: "#bfd6f8", dark: "#0d1520" };
+        // Must mirror BROWSER_THEME_COLORS in src/theme/types.ts (this inline
+        // boot script cannot import modules).
+        const COLORS = { light: "#bfd6f8", dark: "#0d1520" };
         const STORAGE_KEY = "theme-mode";
 
+        let mode = "auto";
         try {
-          const mode = localStorage.getItem(STORAGE_KEY) || "auto";
-          let theme = mode;
-
-          if (mode === "auto") {
-            theme = window.matchMedia("(prefers-color-scheme: dark)").matches
-              ? "dark"
-              : "light";
-          }
-
-          document.documentElement.setAttribute("data-theme", theme);
-
-          const meta = document.querySelector('meta[name="theme-color"]');
-          if (meta) {
-            meta.setAttribute("content", BROWSER_THEME_COLORS[theme]);
-          }
+          mode = localStorage.getItem(STORAGE_KEY) || "auto";
         } catch {
-          const fallback = window.matchMedia("(prefers-color-scheme: dark)")
-            .matches
+          /* storage unavailable -> auto */
+        }
+        // Validate the stored value: anything but an explicit choice is auto.
+        // (A stale/corrupted entry used to yield COLORS[garbage] === undefined
+        // -> content="undefined" -> invalid color -> white bars until the
+        // storage was cleared.)
+        const isExplicit = mode === "light" || mode === "dark";
+        const theme = isExplicit
+          ? mode
+          : window.matchMedia("(prefers-color-scheme: dark)").matches
             ? "dark"
             : "light";
-          document.documentElement.setAttribute("data-theme", fallback);
+
+        const root = document.documentElement;
+        root.setAttribute("data-theme", theme);
+        // Paint-critical: mobile browser chrome (especially the bottom bar)
+        // also samples the PAGE BACKGROUND at first paint — which happens
+        // before the stylesheet arrives on a cold load, when <html> is still
+        // white. Pin the background inline, pre-paint. ThemeProvider keeps
+        // this inline value in sync on later toggles.
+        root.style.backgroundColor = COLORS[theme];
+
+        if (isExplicit) {
+          // An explicit user choice overrides the media-paired defaults on
+          // both metas, so the bar color no longer follows the OS scheme.
           document
-            .querySelector('meta[name="theme-color"]')
-            ?.setAttribute("content", BROWSER_THEME_COLORS[fallback]);
+            .querySelectorAll('meta[name="theme-color"]')
+            .forEach((meta) => meta.setAttribute("content", COLORS[theme]));
         }
       })();
     </script>
-    <script type="module" crossorigin src="/CarouselCC/assets/index-CCtx8IAc.js"></script>
-    <link rel="stylesheet" crossorigin href="/CarouselCC/assets/index-CxbIGXFX.css">
+    <script type="module" crossorigin src="/CarouselCC/assets/index-CT0JmKZ6.js"></script>
+    <link rel="stylesheet" crossorigin href="/CarouselCC/assets/index-CkLV6mu2.css">
   </head>
   <body>
     <div id="root"></div>
