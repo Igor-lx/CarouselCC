@@ -6,7 +6,8 @@ import {
   trackPixelTransform,
 } from "../domain";
 import { useIsomorphicLayoutEffect } from "../../../../shared";
-import type { VisualPositionSource } from "../position";
+import { isWaapiSupported } from "../motion/progressCurve";
+import { isDroppedFallbackFrame, type VisualPositionSource } from "../position";
 
 const RESIZE_EPSILON_PX = 0.5;
 
@@ -21,7 +22,14 @@ export interface TrackCompositorMotionOptions {
   from: number;
   to: number;
   duration: number;
-  easing: string;
+  /**
+   * Uniform time-samples of the segment's percent-progress curve. Encoded as
+   * WAAPI keyframes (one transform per stop, evenly distributed, linear
+   * interpolation between them) — the profile's temporal shape rides the
+   * keyframe grid itself, so no easing function is needed and any engine with
+   * `Element.animate` runs the exact curve.
+   */
+  stops: readonly number[];
   /**
    * The segment's clock origin (`performance.now()` domain — the same value
    * the JS sampler runs on). The WAAPI animation's `startTime` is pinned to
@@ -163,7 +171,7 @@ export function useTrackBinding({
   );
 
   const startCompositorMotion = useCallback(
-    ({ from, to, duration, easing, startedAt }: TrackCompositorMotionOptions): boolean => {
+    ({ from, to, duration, stops, startedAt }: TrackCompositorMotionOptions): boolean => {
       const track = trackRef.current;
       const slot = slotSizeRef.current;
       if (
@@ -172,6 +180,7 @@ export function useTrackBinding({
         !Number.isFinite(from) ||
         !Number.isFinite(to) ||
         !(duration > 0) ||
+        stops.length < 2 ||
         typeof track.animate !== "function"
       ) {
         return false;
@@ -180,16 +189,19 @@ export function useTrackBinding({
       // Replace any in-flight compositor animation, anchored at the new origin.
       cancelCompositorMotion(from);
 
-      const fromTransform = trackPixelTransform(
-        from,
-        renderWindowStartRef.current,
-        slot,
-      );
-      const toTransform = trackPixelTransform(
-        to,
-        renderWindowStartRef.current,
-        slot,
-      );
+      // One keyframe per progress stop: the temporal curve is carried by the
+      // keyframe values themselves (evenly distributed offsets, default linear
+      // interpolation between them), so no easing function is involved.
+      const span = to - from;
+      const keyframes: Keyframe[] = stops.map((progress) => ({
+        transform: trackPixelTransform(
+          from + span * progress,
+          renderWindowStartRef.current,
+          slot,
+        ),
+      }));
+      const fromTransform = keyframes[0]!.transform as string;
+      const toTransform = keyframes[keyframes.length - 1]!.transform as string;
 
       // Paint the origin synchronously so the first compositor frame and the
       // JS sampler's `from` plateau agree, then start the keyframe animation.
@@ -198,10 +210,7 @@ export function useTrackBinding({
 
       let animation: Animation;
       try {
-        animation = track.animate(
-          [{ transform: fromTransform }, { transform: toTransform }],
-          { duration, easing, fill: "both" },
-        );
+        animation = track.animate(keyframes, { duration, fill: "both" });
       } catch {
         // Some restrictive engines expose `animate` but throw on use.
         return false;
@@ -300,14 +309,21 @@ export function useTrackBinding({
     };
   }, [syncGeometry, trackRef]);
 
-  useIsomorphicLayoutEffect(
-    () =>
-      visualPosition.subscribe(
-        (frame) => writePosition(frame.position),
-        { emitCurrent: true },
-      ),
-    [visualPosition, writePosition],
-  );
+  // Per-frame subscriber: the paint path for drag and the legacy fallback.
+  // On engines with no WAAPI, engine-driven segments are painted here frame
+  // by frame — drop the shared Nth running frame (`isDroppedFallbackFrame`)
+  // so the track and the widget shed exactly the same frames. Drag frames
+  // are published with a non-running phase and always paint.
+  useIsomorphicLayoutEffect(() => {
+    const applyFallbackSkip = !isWaapiSupported();
+    return visualPosition.subscribe(
+      (frame) => {
+        if (applyFallbackSkip && isDroppedFallbackFrame(frame)) return;
+        writePosition(frame.position);
+      },
+      { emitCurrent: true },
+    );
+  }, [visualPosition, writePosition]);
 
   // Cold read for a new segment's origin (gesture press, navigation click):
   // return where the track is *actually painted*.

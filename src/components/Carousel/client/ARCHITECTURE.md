@@ -8,13 +8,14 @@ The component is a single composition root (`Carousel.tsx`) plus four pluggable
 slot modules. Every motion is ONE model: an accel/cruise/decel **profile**
 (constants-authored distance shares — there are no easing curves anywhere). The
 engine computes each motion once, normalizes its temporal shape into a
-percent-progress curve, serialises it to a CSS `linear()` easing, and every
-paint consumer builds its own WAAPI animation from that shared plan — the track
-over its pixel distance, the pagination widget over one dot step — same
-duration, same easing, same clock, so they run in phase on the compositor with
-zero per-frame work. Per-frame JS drawing happens ONLY while a finger drags the
-deck (both track and widget follow the visual stream), and as a total fallback
-where `linear()` easing is unsupported. The JS motion controller still samples
+percent-progress curve (uniform stops), and every paint consumer encodes those
+stops as its own WAAPI keyframes — the track over its pixel distance, the
+pagination widget over one dot step — same duration, same curve, same clock, so
+they run in phase on the compositor with zero per-frame work, on any engine
+with `Element.animate`. Per-frame JS drawing happens ONLY while a finger drags
+the deck (both track and widget follow the visual stream), and as a total
+fallback on engines with no WAAPI at all — where both consumers also drop the
+same Nth frames via one shared pacing rule. The JS motion controller still samples
 every segment: it stays the visual-position SSOT for handoff, settle, status,
 and the drag/fallback stream. See §4.5.
 
@@ -616,9 +617,9 @@ halves with no cruise zone. Two authoring modes feed the same builder:
 
 Every segment's temporal shape is then normalized into the percent domain
 (`profileProgressStops`: uniform time samples of distance-progress 0→1) and
-serialised to a CSS `linear()` easing (`stopsToLinearEasing`) — the single
-consumer-agnostic artefact both the track and the pagination widget animate
-with (§4.5).
+delivered to consumers as-is — each encodes the stops into its own WAAPI
+keyframes, the single consumer-agnostic artefact both the track and the
+pagination widget animate with (§4.5).
 
 ### 4.2 Handoff invariant
 
@@ -713,19 +714,22 @@ so a busy frame skips the write and the deck stutters. The fix is to take the
 painting off the main thread for EVERY engine-planned motion — only a live
 finger drag (and the no-support fallback) stays per-frame.
 
-The bridge is the CSS `linear()` easing function: an arbitrary
-accel/cruise/decel profile cannot be one cubic-bezier, but its temporal shape
-IS a percent-progress curve, and `linear()` reproduces any such curve as a
-piecewise-linear timing function. The runner samples the profile into uniform
-progress stops (`profileProgressStops`), serialises them
-(`stopsToLinearEasing`), and hands the same plan to every paint consumer:
+The bridge is keyframe encoding: an arbitrary accel/cruise/decel profile
+cannot be one cubic-bezier, but its temporal shape IS a percent-progress
+curve, and a keyframe list reproduces any such curve piecewise-linearly — one
+keyframe per uniform time stop, default linear interpolation between them, no
+easing function involved. That deliberately avoids the CSS `linear()` easing
+(which expresses the same curve but only on 2023+ engines): keyframes run on
+ANY engine with `Element.animate` (~2015+). The runner samples the profile
+into uniform progress stops (`profileProgressStops`) and hands the same plan
+to every paint consumer:
 
-- **Track** — `startCompositorMotion({from, to, duration, easing, startedAt})`:
-  a two-keyframe transform animation whose easing is the profile curve.
+- **Track** — `startCompositorMotion({from, to, duration, stops, startedAt})`:
+  one transform keyframe per stop over the segment's pixel distance.
 - **Pagination widget** — the plan channel (`motion/planChannel.ts`, exposed on
-  the stable module context as `motionPlan`): `{direction, duration, easing,
-  stops, startedAt, targetKey, isContinuation}`. The widget builds keyframed
-  WAAPI animations for its one dot step (§8.2) with the same easing and clock.
+  the stable module context as `motionPlan`): `{direction, duration, stops,
+  startedAt, targetKey, isContinuation}`. The widget folds the stops into its
+  keyframed dot trajectories for one step (§8.2), on the same clock.
 
 Because the curve lives in the percent domain, consumers travelling different
 distances (N page screens of track pixels vs one dot step) run the identical
@@ -741,10 +745,12 @@ so the JS samples and the WAAPI keyframes do not fight.
 Boundaries and guarantees:
 
 - **Eligibility.** Every non-drag, non-instant segment is compositor-eligible.
-  The single gate is engine support for `linear()` easing
-  (`isLinearEasingSupported`, one cached `CSS.supports` check); without it the
-  runner publishes a `follow` plan and every consumer runs the pre-engine
-  per-frame path.
+  The single gate is `Element.animate` itself (`isWaapiSupported`, cached);
+  without it the runner publishes a fallback `follow` plan and every consumer
+  runs the pre-engine per-frame path — where the track and the widget also
+  drop the same Nth running frames (`FALLBACK_WRITE_FRAME_SKIP`, one shared
+  constant; the rule is `position/fallbackPacing.ts` evaluated on
+  source-numbered frames, so the two can never desynchronize).
 - **Graceful fallback.** `startCompositorMotion` returns `false` (and the
   caller falls back to per-frame writes) when there is no measured slot size,
   no `Element.animate`, the input is degenerate (non-finite, zero duration), or
@@ -928,18 +934,20 @@ ten. Its motion follows the engine's plans (§4.5):
 
 - **WAAPI step** (any planned motion): each dot gets a keyframed animation of
   its spatial path across the step (`math/trajectory.ts` samples the
-  projection curve), with the plan's `linear()` easing and `startedAt` clock —
-  the same temporal curve the deck runs, over the widget's own distance.
+  projection curve at the plan's temporal stops), pinned to the shared
+  `startedAt` clock — the same temporal curve the deck runs, over the
+  widget's own distance.
   Retargets re-plan from the mid-flight offset (sampled from the plan's
   progress stops, never the DOM); a repeated click advances the step target by
   one; a far GO_TO is one step spanning the whole preflight + approach
   duration (the approach plan arrives flagged `isContinuation` and is
   ignored).
-- **Follow mode** (finger on the deck, or the `linear()` fallback): per-frame
+- **Follow mode** (finger on the deck, or the no-WAAPI fallback): per-frame
   writes from the `visualPosition` stream, delta-based in the widget's own
-  step domain, with epsilon write gates; on legacy engines without `linear()`
-  each Nth dot write is dropped (`FALLBACK_WRITE_FRAME_SKIP`) since the
-  fallback stream carries every motion, not just a short drag.
+  step domain, with epsilon write gates. In the fallback flavour each Nth
+  running frame is dropped via the shared pacing rule — the same frames the
+  track drops — since the fallback stream carries every motion, not just a
+  short drag.
 
 When reduced motion is on, the widget falls back to a static React-rendered
 strip reflecting the logical target.
@@ -1032,7 +1040,7 @@ src/components/Carousel/client/
 ├── motion/
 │   ├── types.ts                   CarouselSegment (one profile shape), MotionIntent, MotionStart
 │   ├── profile.ts                 smoothstep profile (accel/cruise/decel)
-│   ├── progressCurve.ts           profile → percent stops → linear() easing; duration-authored peak solver
+│   ├── progressCurve.ts           profile → percent stops (WAAPI keyframe transport); peak solver; WAAPI gate
 │   ├── planChannel.ts             engine → paint-consumer motion-plan observable
 │   ├── speed.ts                   sameDirectionSpeed, signedVelocity
 │   ├── timing.ts                  GO_TO speed + teleport geometry (resolveGoToPlan)
@@ -1132,8 +1140,8 @@ dependencies, the architecture has held.
   single expression but puts the heaviest per-frame write back on the main
   thread, where it drops frames under React-commit / image-decode / paint
   contention — the original jank this rework removes. Every engine-planned
-  segment is eligible (the profile curve rides a `linear()` easing) and
-  fallback is total (missing `linear()` support or any failure reverts to the
+  segment is eligible (the profile curve rides stop-encoded keyframes) and
+  fallback is total (no `Element.animate`, or any failure, reverts to the
   JS write), so the duplication never becomes a correctness fork: the JS
   controller stays the single authority on where the deck is.
 - **Per-instance singletons flow explicitly, not via internal context.** The
@@ -1226,11 +1234,13 @@ dependencies, the architecture has held.
   into runtime.
 - **Performance.** Every engine-planned motion — click, autoplay, snap-back,
   gesture release, repeated click, every GO_TO slice — runs on the compositor
-  thread via WAAPI with the profile's `linear()` easing (§4.5): the engine
-  computes the math once per motion (profile + 32 progress stops + keyframes)
-  and no per-frame JS work happens while it plays, for the track OR the
-  pagination widget. Per-frame writes remain only for the finger-drag follow
-  mode and the no-`linear()` fallback, where the track binding short-circuits
+  thread via WAAPI with the profile stop-encoded into keyframes (§4.5): the
+  engine computes the math once per motion (profile + 32 progress stops +
+  keyframes) and no per-frame JS work happens while it plays, for the track OR
+  the pagination widget. Per-frame writes remain only for the finger-drag
+  follow mode and the no-WAAPI fallback (where both consumers drop the same
+  Nth running frames via the shared pacing rule), and the track binding
+  short-circuits
   writes that would re-apply the same transform and the widget binding
   short-circuits per dot against numeric position / scale / opacity epsilons
   (`PaginationWidget/defaults.ts`). The motion

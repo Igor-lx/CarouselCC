@@ -5,7 +5,6 @@ import {
   profileProgressStops,
   resolvePeakSpeedForDuration,
   sampleProgressStops,
-  stopsToLinearEasing,
 } from "./progressCurve";
 
 const stepProfile = (shares = { a: 0.35, d: 0.4 }, startSpeed = 0, duration = 2000) => {
@@ -98,16 +97,6 @@ describe("profileProgressStops", () => {
       decelerationDistanceShare: 0.3,
     });
     expect(profileProgressStops(profile, 0)).toEqual([0, 1]);
-  });
-});
-
-describe("stopsToLinearEasing", () => {
-  it("serialises uniform stops into a linear() list", () => {
-    expect(stopsToLinearEasing([0, 0.25, 1])).toBe("linear(0, 0.25, 1)");
-  });
-
-  it("rounds to four decimals", () => {
-    expect(stopsToLinearEasing([0, 0.123456, 1])).toBe("linear(0, 0.1235, 1)");
   });
 });
 

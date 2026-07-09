@@ -7,20 +7,17 @@ import type {
 /**
  * WAAPI keyframe sampling for a widget step.
  *
- * The engine's plan carries the TEMPORAL shape (duration + percent-progress
- * easing). A dot's SPATIAL path across a step — position, scale, opacity as a
- * function of step progress — is nonlinear (per-slot interpolation, edge
- * drift, fades), so it cannot be one from/to keyframe pair. Instead the path
- * is sampled at uniform progress offsets into a keyframe list; the browser
- * interpolates linearly between keyframes while the animation's easing (the
- * plan's `linear()` curve) drives progress through them. Temporal profile and
- * spatial path stay cleanly separated: easing = when, keyframes = where.
+ * The engine's plan carries the TEMPORAL shape as percent-progress stops
+ * (uniform time samples). A dot's SPATIAL path across a step — position,
+ * scale, opacity as a function of step progress — is nonlinear (per-slot
+ * interpolation, edge drift, fades). Both fold into ONE keyframe list: the
+ * i-th keyframe (at uniform time offset) is the spatial projection evaluated
+ * at the temporal progress `stops[i]`. The browser interpolates linearly
+ * between keyframes — the exact same piecewise-linear delivery the track
+ * uses — so no easing function is needed and any `Element.animate` engine
+ * runs the full profile. Sampling on the stops grid keeps the temporal curve
+ * exact (no resampling).
  */
-
-/** Uniform samples per step path. Enough that the exponential edge drift and
- * the fade bands stay visually smooth; a one-time cost per motion, not
- * per-frame work. */
-const TRAJECTORY_INTERVALS = 24;
 
 /** A type alias (not an interface) so it stays assignable to the DOM
  * `Keyframe` type's index signature. */
@@ -46,13 +43,13 @@ const sampleTrajectory = (
   fromOffset: number,
   toOffset: number,
   geometry: PaginationWidgetGeometry,
+  stops: readonly number[],
   opacityOf: (state: PaginationWidgetDotState) => number,
-  intervals: number,
 ): DotTrajectoryKeyframe[] => {
-  const frames: DotTrajectoryKeyframe[] = new Array(intervals + 1);
-  for (let i = 0; i <= intervals; i += 1) {
-    const progress = i / intervals;
-    const offset = fromOffset + (toOffset - fromOffset) * progress;
+  const span = toOffset - fromOffset;
+  const frames: DotTrajectoryKeyframe[] = new Array(stops.length);
+  for (let i = 0; i < stops.length; i += 1) {
+    const offset = fromOffset + span * stops[i]!;
     const state = writeDotProjection(scratch, id, offset, geometry);
     frames[i] = {
       transform: toTransform(state.x, state.scale),
@@ -63,22 +60,15 @@ const sampleTrajectory = (
 };
 
 /** Keyframes of a regular dot (`id`) as the widget offset travels
- * `fromOffset -> toOffset`. */
+ * `fromOffset -> toOffset` along the temporal `stops`. */
 export const sampleDotTrajectory = (
   id: number,
   fromOffset: number,
   toOffset: number,
   geometry: PaginationWidgetGeometry,
-  intervals: number = TRAJECTORY_INTERVALS,
+  stops: readonly number[],
 ): DotTrajectoryKeyframe[] =>
-  sampleTrajectory(
-    id,
-    fromOffset,
-    toOffset,
-    geometry,
-    (state) => state.opacity,
-    intervals,
-  );
+  sampleTrajectory(id, fromOffset, toOffset, geometry, stops, (state) => state.opacity);
 
 /** Keyframes of an active-highlight overlay for integer page `id`: same
  * spatial path, but its opacity is the active strength (1 at the exact page,
@@ -88,15 +78,15 @@ export const sampleActiveDotTrajectory = (
   fromOffset: number,
   toOffset: number,
   geometry: PaginationWidgetGeometry,
-  intervals: number = TRAJECTORY_INTERVALS,
+  stops: readonly number[],
 ): DotTrajectoryKeyframe[] =>
   sampleTrajectory(
     id,
     fromOffset,
     toOffset,
     geometry,
+    stops,
     (state) => state.activeStrength,
-    intervals,
   );
 
 /** Integer overlay ids whose active strength can be non-zero anywhere along

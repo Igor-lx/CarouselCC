@@ -2,18 +2,19 @@ import { useCallback, useEffect, useRef } from "react";
 
 import { useIsomorphicLayoutEffect } from "../../../../../shared";
 import {
-  isLinearEasingSupported,
   sampleProgressStops,
   type CarouselMotionPlan,
   type MotionPlanSource,
   type WaapiMotionPlan,
 } from "../../motion";
-import type { VisualPositionSource } from "../../position";
+import {
+  isDroppedFallbackFrame,
+  type VisualPositionSource,
+} from "../../position";
 import {
   DOT_OPACITY_EPSILON,
   DOT_POSITION_EPSILON_PX,
   DOT_SCALE_EPSILON,
-  FALLBACK_WRITE_FRAME_SKIP,
 } from "./defaults";
 import {
   widgetProjectionSide,
@@ -37,15 +38,16 @@ import type {
  *   never mirrors the deck's absolute position: a navigation command is one
  *   step forward or back, whether the deck travels one page or teleports ten.
  * - **WAAPI mode** (any engine-planned motion): the plan carries duration +
- *   the percent-progress `linear()` easing of the deck's profile. Every dot
- *   gets a keyframed WAAPI animation of its spatial path across the step,
- *   with that shared easing and the shared `startedAt` clock — so widget and
- *   deck run the same temporal curve over different distances, in phase,
- *   with zero per-frame work.
- * - **Follow mode** (finger on the deck, or the JS fallback when `linear()`
- *   is unsupported): per-frame writes driven by the visual-position stream,
- *   delta-based (`offset` moves by the deck's page-offset delta), with the
- *   epsilon write gates filtering imperceptible deltas.
+ *   the percent-progress stops of the deck's profile. Every dot gets ONE
+ *   keyframe list folding both curves — the i-th keyframe is the dot's
+ *   spatial projection at temporal progress `stops[i]` — pinned to the shared
+ *   `startedAt` clock, so widget and deck run the same temporal curve over
+ *   different distances, in phase, with zero per-frame work.
+ * - **Follow mode** (finger on the deck, or the no-WAAPI legacy fallback):
+ *   per-frame writes driven by the visual-position stream, delta-based
+ *   (`offset` moves by the deck's page-offset delta), with epsilon write
+ *   gates; in the fallback flavour the shared frame-skip rule drops the same
+ *   frames the track drops.
  * - **Idle / instant**: finalize to an integer offset and paint statically.
  */
 
@@ -154,7 +156,6 @@ export function usePaginationWidgetBinding({
   const followBaseRef = useRef<{ pageOffset: number; offset: number } | null>(
     null,
   );
-  const frameCounterRef = useRef(0);
 
   const side = widgetProjectionSide(geometry.visibleCount);
   const dotCount = widgetProjectionSlotCount(geometry.visibleCount) + DOT_COVERAGE_MARGIN;
@@ -376,15 +377,23 @@ export function usePaginationWidgetBinding({
       const lowId =
         Math.floor(Math.min(from, target)) - side - DOT_COVERAGE_MARGIN / 2;
 
+      // Temporal curve and spatial path fold into one keyframe list per dot
+      // (the i-th keyframe is the projection at the plan's progress stop i),
+      // so no easing function is involved — same delivery as the track.
       for (let index = 0; index < dotCount; index += 1) {
         const dot = dotRefs.current[index];
         if (!dot) continue;
-        const keyframes = sampleDotTrajectory(lowId + index, from, target, geometry);
+        const keyframes = sampleDotTrajectory(
+          lowId + index,
+          from,
+          target,
+          geometry,
+          plan.stops,
+        );
         let animation: Animation;
         try {
           animation = dot.animate(keyframes, {
             duration: plan.duration,
-            easing: plan.easing,
             fill: "both",
           });
         } catch {
@@ -409,11 +418,16 @@ export function usePaginationWidgetBinding({
           overlay.style.opacity = "0";
           continue;
         }
-        const keyframes = sampleActiveDotTrajectory(id, from, target, geometry);
+        const keyframes = sampleActiveDotTrajectory(
+          id,
+          from,
+          target,
+          geometry,
+          plan.stops,
+        );
         try {
           const animation = overlay.animate(keyframes, {
             duration: plan.duration,
-            easing: plan.easing,
             fill: "both",
           });
           try {
@@ -472,56 +486,49 @@ export function usePaginationWidgetBinding({
     followBaseRef.current = null;
   }, []);
 
-  const startFollowing = useCallback(() => {
-    if (followUnsubRef.current || !visualPosition) return;
-    // Take over from wherever the strip visually is right now.
-    const start = currentOffset();
-    cancelStepAnimations();
-    invalidateWriteCaches();
-    offsetRef.current = start;
-    writeOffset(start);
-    followBaseRef.current = null;
-    frameCounterRef.current = 0;
-    // Legacy-engine relief: without `linear()` support the follow stream
-    // carries EVERY motion (not just a short finger drag), so each Nth dot
-    // write is dropped there. Modern engines always paint at full rate.
-    const useFrameSkip = !isLinearEasingSupported();
+  const startFollowing = useCallback(
+    (isFallback: boolean) => {
+      if (followUnsubRef.current || !visualPosition) return;
+      // Take over from wherever the strip visually is right now.
+      const start = currentOffset();
+      cancelStepAnimations();
+      invalidateWriteCaches();
+      offsetRef.current = start;
+      writeOffset(start);
+      followBaseRef.current = null;
 
-    followUnsubRef.current = visualPosition.subscribe(
-      (frame) => {
-        // Delta-follow: the widget advances by the deck's page-offset delta,
-        // staying in its own decoupled step domain; the epsilon gates in
-        // `writeOffset` filter imperceptible deltas.
-        if (followBaseRef.current === null) {
-          followBaseRef.current = {
-            pageOffset: frame.pageOffset,
-            offset: offsetRef.current,
-          };
-        }
-        const base = followBaseRef.current;
-        const next = base.offset + (frame.pageOffset - base.pageOffset);
-        offsetRef.current = next;
-
-        if (useFrameSkip && frame.phase === "running") {
-          const tick = frameCounterRef.current++;
-          if (
-            FALLBACK_WRITE_FRAME_SKIP > 1 &&
-            tick % FALLBACK_WRITE_FRAME_SKIP === FALLBACK_WRITE_FRAME_SKIP - 1
-          ) {
-            return; // offset already advanced; the next kept frame catches up
+      followUnsubRef.current = visualPosition.subscribe(
+        (frame) => {
+          // Delta-follow: the widget advances by the deck's page-offset delta,
+          // staying in its own decoupled step domain; the epsilon gates in
+          // `writeOffset` filter imperceptible deltas.
+          if (followBaseRef.current === null) {
+            followBaseRef.current = {
+              pageOffset: frame.pageOffset,
+              offset: offsetRef.current,
+            };
           }
-        }
-        writeOffset(next);
-      },
-      { emitCurrent: true },
-    );
-  }, [
-    cancelStepAnimations,
-    currentOffset,
-    invalidateWriteCaches,
-    visualPosition,
-    writeOffset,
-  ]);
+          const base = followBaseRef.current;
+          const next = base.offset + (frame.pageOffset - base.pageOffset);
+          offsetRef.current = next;
+
+          // Legacy-fallback relief: the SAME source-numbered rule the track
+          // uses, so both drop exactly the same frames. Drag follows
+          // (isFallback false) always paint at full rate.
+          if (isFallback && isDroppedFallbackFrame(frame)) return;
+          writeOffset(next);
+        },
+        { emitCurrent: true },
+      );
+    },
+    [
+      cancelStepAnimations,
+      currentOffset,
+      invalidateWriteCaches,
+      visualPosition,
+      writeOffset,
+    ],
+  );
 
   // ---- plan routing -----------------------------------------------------------
 
@@ -534,7 +541,7 @@ export function usePaginationWidgetBinding({
           return;
         }
         case "follow": {
-          startFollowing();
+          startFollowing(plan.isFallback);
           return;
         }
         case "instant": {

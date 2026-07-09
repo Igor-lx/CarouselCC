@@ -6,7 +6,7 @@ import {
 } from "./profile";
 
 /**
- * Progress-curve serialisation — the bridge that lets ANY accel/cruise/decel
+ * Progress-curve sampling — the bridge that lets ANY accel/cruise/decel
  * motion profile run on the compositor thread.
  *
  * The engine computes a `MotionProfile` once (zones, speeds, duration). This
@@ -16,10 +16,12 @@ import {
  * screens of pixels, the pagination widget onto one dot step — which is what
  * keeps every consumer synchronized while travelling different distances.
  *
- * The samples serialise to a CSS `linear()` easing (piecewise-linear timing
- * function), so one `Element.animate` per consumer reproduces the profile on
- * the compositor. Engines without `linear()` support throw on `animate`,
- * callers fall back to the JS per-frame path (`isLinearEasingSupported`).
+ * The stops are delivered to the compositor as WAAPI KEYFRAMES (one keyframe
+ * per stop, evenly distributed, default linear interpolation between them) —
+ * deliberately NOT as a CSS `linear()` easing, which would express the same
+ * piecewise-linear curve but only on 2023+ engines. Keyframes make every
+ * engine with `Element.animate` (~2015+) run the exact same curve; only
+ * engines with no WAAPI at all fall back to the JS per-frame path.
  */
 
 /**
@@ -29,8 +31,6 @@ import {
  * Implementation granularity, not a feel knob.
  */
 const PROGRESS_STOP_INTERVALS = 32;
-
-const round4 = (value: number) => Math.round(value * 10_000) / 10_000;
 
 /**
  * Uniform distance-progress samples of a profile: index `i` is the progress
@@ -61,20 +61,11 @@ export const profileProgressStops = (
 };
 
 /**
- * Serialise uniform progress stops into a CSS `linear()` easing string.
- * Positions are omitted: per spec, position-less stops distribute evenly
- * across 0%..100%, which is exactly the uniform time grid the stops were
- * sampled on.
- */
-export const stopsToLinearEasing = (stops: readonly number[]): string =>
-  `linear(${stops.map(round4).join(", ")})`;
-
-/**
  * Piecewise-linear read of a stops array at `timeFraction` (0..1) — the same
- * interpolation the browser applies to the serialized `linear()` easing. Used
- * by consumers that need the current progress of a running compositor
- * animation without reading the DOM (e.g. the widget re-planning a step from
- * its mid-flight position).
+ * interpolation the browser applies between the keyframes built from the
+ * stops. Used by consumers that need the current progress of a running
+ * compositor animation without reading the DOM (e.g. the widget re-planning
+ * a step from its mid-flight position).
  */
 export const sampleProgressStops = (
   stops: readonly number[],
@@ -138,15 +129,18 @@ export const resolvePeakSpeedForDuration = ({
   return Math.max(0, root);
 };
 
-let linearEasingSupport: boolean | null = null;
+let waapiSupport: boolean | null = null;
 
-/** Cached feature check for the CSS `linear()` easing function. */
-export const isLinearEasingSupported = (): boolean => {
-  if (linearEasingSupport === null) {
-    linearEasingSupport =
-      typeof CSS !== "undefined" &&
-      typeof CSS.supports === "function" &&
-      CSS.supports("animation-timing-function", "linear(0, 0.5, 1)");
+/**
+ * Cached capability check for the Web Animations API — the ONLY gate between
+ * the compositor path and the per-frame JS fallback. Keyframe-encoded curves
+ * need nothing newer than `Element.animate` itself.
+ */
+export const isWaapiSupported = (): boolean => {
+  if (waapiSupport === null) {
+    waapiSupport =
+      typeof Element !== "undefined" &&
+      typeof Element.prototype.animate === "function";
   }
-  return linearEasingSupport;
+  return waapiSupport;
 };

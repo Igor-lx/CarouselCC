@@ -32,6 +32,12 @@ export interface IdleMotionPlan extends MotionPlanBase {
  */
 export interface FollowMotionPlan extends MotionPlanBase {
   kind: "follow";
+  /**
+   * `true` when the follow is the no-WAAPI legacy fallback (an engine-driven
+   * segment painted per frame), `false` for a live finger drag. Consumers use
+   * it to apply legacy-only relief (frame-skip) without throttling the drag.
+   */
+  isFallback: boolean;
 }
 
 /** Reduced-motion / layout-reconcile snap: jump to the outcome, no animation. */
@@ -48,10 +54,9 @@ export interface WaapiMotionPlan extends MotionPlanBase {
    * spans preflight + approach, so a one-step consumer runs the whole command
    * as a single motion while the deck runs its two bounded segments. */
   duration: number;
-  /** CSS `linear()` serialisation of the percent-progress curve. */
-  easing: string;
-  /** The raw uniform progress stops behind `easing` — for reflow-free
-   * mid-flight sampling (`sampleProgressStops`). */
+  /** Uniform time-samples of the percent-progress curve. Consumers encode
+   * them as WAAPI keyframes (one per stop, evenly distributed) and use
+   * `sampleProgressStops` for reflow-free mid-flight reads. */
   stops: readonly number[];
   /** Segment clock origin (`performance.now()` domain) — pin WAAPI
    * `startTime` to it so every consumer runs in phase. */
@@ -113,11 +118,14 @@ export function createMotionPlanChannel(): MotionPlanChannel {
       },
     },
     publish(plan) {
-      // Steady-state dedupe: consecutive idle/follow publishes are no-ops for
-      // every consumer; waapi/instant always notify (each is a new motion).
+      // Steady-state dedupe: consecutive idle publishes (and follow publishes
+      // of the same flavour) are no-ops for every consumer; waapi/instant
+      // always notify (each is a new motion).
+      if (plan.kind === "idle" && current.kind === "idle") return;
       if (
-        (plan.kind === "idle" || plan.kind === "follow") &&
-        current.kind === plan.kind
+        plan.kind === "follow" &&
+        current.kind === "follow" &&
+        current.isFallback === plan.isFallback
       ) {
         return;
       }

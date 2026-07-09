@@ -7,7 +7,6 @@ const waapiPlan = (targetKey: number) =>
     kind: "waapi",
     direction: 1,
     duration: 1000,
-    easing: "linear(0, 0.5, 1)",
     stops: [0, 0.5, 1],
     startedAt: 0,
     targetKey,
@@ -51,15 +50,24 @@ describe("createMotionPlanChannel", () => {
     expect(source.getSnapshot().planId).toBe(0);
   });
 
-  it("dedupes consecutive follow publishes but not waapi ones", () => {
+  it("dedupes consecutive same-flavour follow publishes but not waapi ones", () => {
     const { source, publish } = createMotionPlanChannel();
     const listener = vi.fn();
     source.subscribe(listener);
-    publish({ kind: "follow" });
-    publish({ kind: "follow" });
+    publish({ kind: "follow", isFallback: false });
+    publish({ kind: "follow", isFallback: false });
     expect(listener).toHaveBeenCalledTimes(1);
     publish(waapiPlan(3));
     publish(waapiPlan(3));
     expect(listener).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not dedupe follow publishes whose fallback flavour differs", () => {
+    const { source, publish } = createMotionPlanChannel();
+    const listener = vi.fn();
+    source.subscribe(listener);
+    publish({ kind: "follow", isFallback: false });
+    publish({ kind: "follow", isFallback: true });
+    expect(listener).toHaveBeenCalledTimes(2);
   });
 });

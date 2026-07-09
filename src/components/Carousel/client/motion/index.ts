@@ -7,7 +7,7 @@ export type {
   MotionPlanSource,
   WaapiMotionPlan,
 } from "./planChannel";
-export { isLinearEasingSupported, sampleProgressStops } from "./progressCurve";
+export { isWaapiSupported, sampleProgressStops } from "./progressCurve";
 export type {
   CarouselMotionStrategy,
   CarouselMotionIntent,

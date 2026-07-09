@@ -11,6 +11,14 @@ export interface VisualPositionFrame {
   timestamp: number;
   phase: ControllerPhase;
   progress: number;
+  /**
+   * Index of this emit within the current `"running"` streak; `0` for every
+   * resting frame (which also resets the streak). Stamped by the single
+   * visual-position source so every subscriber sees the same numbering —
+   * the basis of the shared fallback frame-skip (`isDroppedFallbackFrame`):
+   * consumers that pace themselves with it drop exactly the same frames.
+   */
+  runningFrameIndex: number;
 }
 
 export type VisualPositionListener = (frame: VisualPositionFrame) => void;

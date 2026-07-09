@@ -16,5 +16,19 @@ export const RENDER_WINDOW_BUFFER_MULTIPLIER = 2;
 /** Tolerance for motion sample position/velocity comparisons. */
 export const MOTION_EPSILON = 0.0001;
 
+/**
+ * Legacy-fallback paint pacing. On engines with no Web Animations API the
+ * per-frame JS path carries EVERY engine-driven motion (pre-WAAPI style), on
+ * typically slow hardware — so every Nth running frame is dropped. ONE shared
+ * constant for every consumer: the track and the pagination widget both
+ * decide through `isDroppedFallbackFrame` on the same source-numbered frames,
+ * so they always skip exactly the same frames and stay visually locked.
+ *
+ * Resting frames (settle, idle emits) and finger-drag frames are never
+ * dropped. `4` paints 3 of 4 running frames; values below `2` disable
+ * dropping. Never consulted on WAAPI-capable engines.
+ */
+export const FALLBACK_WRITE_FRAME_SKIP = 4;
+
 /** Tolerance for "drag already on target" snap detection on release. */
 export const DRAG_RELEASE_EPSILON = 0.001;

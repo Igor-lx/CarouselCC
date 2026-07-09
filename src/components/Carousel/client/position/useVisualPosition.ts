@@ -26,6 +26,7 @@ export interface UseVisualPositionResult {
 const toFrame = (
   sample: MotionSample<CarouselMotionStrategy>,
   visibleSlidesCount: number,
+  runningFrameIndex: number,
 ): VisualPositionFrame => ({
   position: sample.value,
   pageOffset: sample.value / visibleSlidesCount,
@@ -36,6 +37,7 @@ const toFrame = (
   timestamp: sample.timestamp,
   phase: sample.phase,
   progress: sample.progress,
+  runningFrameIndex,
 });
 
 export function useVisualPosition({
@@ -46,9 +48,27 @@ export function useVisualPosition({
   const stepSizeRef = useRef(visibleSlidesCount);
   stepSizeRef.current = visibleSlidesCount;
 
+  // Streak counter behind `VisualPositionFrame.runningFrameIndex`: running
+  // emits are numbered 0, 1, 2, …; any resting emit resets the streak. Stamped
+  // here, at the single source, so every subscriber sees identical numbering
+  // (the shared fallback frame-skip depends on that).
+  const runningStreakRef = useRef(0);
+  const nextRunningFrameIndex = useCallback(
+    (phase: MotionSample["phase"]): number => {
+      if (phase !== "running") {
+        runningStreakRef.current = 0;
+        return 0;
+      }
+      const index = runningStreakRef.current;
+      runningStreakRef.current += 1;
+      return index;
+    },
+    [],
+  );
+
   const listenersRef = useRef<Set<VisualPositionListener>>(new Set());
   const lastFrameRef = useRef<VisualPositionFrame>(
-    toFrame(controller.getSnapshot(), visibleSlidesCount),
+    toFrame(controller.getSnapshot(), visibleSlidesCount, 0),
   );
 
   const emit = useCallback((frame: VisualPositionFrame) => {
@@ -59,12 +79,12 @@ export function useVisualPosition({
   useEffect(() => {
     const unsubscribe = controller.subscribe(
       (sample) => {
-        emit(toFrame(sample, stepSizeRef.current));
+        emit(toFrame(sample, stepSizeRef.current, nextRunningFrameIndex(sample.phase)));
       },
       { emitCurrent: false },
     );
     return unsubscribe;
-  }, [controller, emit]);
+  }, [controller, emit, nextRunningFrameIndex]);
 
   const getSnapshot = useCallback<VisualPositionSource["getSnapshot"]>(
     () => lastFrameRef.current,
@@ -81,8 +101,9 @@ export function useVisualPosition({
   );
 
   useIsomorphicLayoutEffect(() => {
-    emit(toFrame(controller.getSnapshot(), stepSizeRef.current));
-  }, [controller, emit, visibleSlidesCount]);
+    const snapshot = controller.getSnapshot();
+    emit(toFrame(snapshot, stepSizeRef.current, nextRunningFrameIndex(snapshot.phase)));
+  }, [controller, emit, nextRunningFrameIndex, visibleSlidesCount]);
 
   const subscribe = useCallback<VisualPositionSource["subscribe"]>(
     (listener, options) => {

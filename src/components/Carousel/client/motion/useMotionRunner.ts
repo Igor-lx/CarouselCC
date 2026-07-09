@@ -11,10 +11,8 @@ import type { CarouselState } from "../state";
 import type { MotionPlanChannel, MotionPlanDirection } from "./planChannel";
 import { buildProfile } from "./profile";
 import {
-  isLinearEasingSupported,
   profileProgressStops,
   resolvePeakSpeedForDuration,
-  stopsToLinearEasing,
 } from "./progressCurve";
 import { buildCarouselSegment } from "./segmentFactory";
 import { sampleCarouselSegment } from "./sampler";
@@ -73,17 +71,18 @@ const buildStartFromState = (
  * controller — and the single place the motion math is computed.
  *
  * Every motion is one accel/cruise/decel profile. The runner builds the
- * segment, serialises its percent-progress curve to a CSS `linear()` easing,
- * and hands the SAME plan to every paint consumer: the track gets it through
- * `startCompositorMotion` (a WAAPI animation over the segment's pixel
- * distance), the pagination widget gets it through the plan channel (a WAAPI
- * animation over one dot step). Same duration, same easing, same `startedAt`
- * clock — synchronized by construction, zero per-frame work while animating.
+ * segment, samples its percent-progress curve into uniform stops, and hands
+ * the SAME plan to every paint consumer: the track gets it through
+ * `startCompositorMotion` (stop-encoded WAAPI keyframes over the segment's
+ * pixel distance), the pagination widget gets it through the plan channel
+ * (stop-encoded keyframes over one dot step). Same duration, same curve, same
+ * `startedAt` clock — synchronized by construction, zero per-frame work while
+ * animating, and runnable on any engine with `Element.animate`.
  *
  * The JS motion controller still samples every segment: it stays the
  * visual-position SSOT for handoff, settle, status, and the per-frame FOLLOW
- * mode (finger drag, or the fallback when `linear()` easing is unsupported —
- * in both, consumers track the visual stream frame by frame).
+ * mode (finger drag, or the no-WAAPI legacy fallback — in both, consumers
+ * track the visual stream frame by frame).
  *
  * In-flight handoffs are taken as a single atomic `controller.captureHandoff`
  * — a coherent `(position, velocity)` from one sample of the old curve — and
@@ -149,7 +148,7 @@ export function useMotionRunner({
       // A drag re-takes the track directly through the visual-position stream;
       // freeze the compositor at the live sample so the finger owns it again.
       cancelCompositorMotion(controller.getSnapshot().value);
-      publishPlan({ kind: "follow" });
+      publishPlan({ kind: "follow", isFallback: false });
       return;
     }
 
@@ -193,19 +192,18 @@ export function useMotionRunner({
       });
 
       // One percent-progress curve per segment: the track consumes it below,
-      // the widget receives the same curve through the plan.
+      // the widget receives the same curve through the plan. Each consumer
+      // encodes the stops as its own WAAPI keyframes — no easing function is
+      // involved, so any engine with `Element.animate` runs the curve.
       const stops = profileProgressStops(segment.profile, segment.to - segment.from);
-      const easing = stopsToLinearEasing(stops);
 
-      const isComposited =
-        isLinearEasingSupported() &&
-        startCompositorMotion({
-          from: segment.from,
-          to: segment.to,
-          duration: segment.duration,
-          easing,
-          startedAt: segment.startedAt,
-        });
+      const isComposited = startCompositorMotion({
+        from: segment.from,
+        to: segment.to,
+        duration: segment.duration,
+        stops,
+        startedAt: segment.startedAt,
+      });
 
       if (!isComposited) {
         cancelCompositorMotion(resolvedStart.position);
@@ -221,8 +219,8 @@ export function useMotionRunner({
       });
 
       if (!isComposited) {
-        // JS fallback: consumers follow the visual stream per frame.
-        publishPlan({ kind: "follow" });
+        // Legacy fallback: consumers follow the visual stream per frame.
+        publishPlan({ kind: "follow", isFallback: true });
         return;
       }
 
@@ -233,7 +231,6 @@ export function useMotionRunner({
       const isPreflight = state.teleportVirtualIndex !== null;
       let planDuration = segment.duration;
       let planStops: readonly number[] = stops;
-      let planEasing = easing;
 
       if (isPreflight) {
         const stepSize = state.layout.visibleSlidesCount;
@@ -262,7 +259,6 @@ export function useMotionRunner({
           decelerationDistanceShare: config.motion.goToDecelerationDistanceShare,
         });
         planStops = profileProgressStops(unitProfile, 1);
-        planEasing = stopsToLinearEasing(planStops);
         planDuration = unitProfile.duration;
       }
 
@@ -270,7 +266,6 @@ export function useMotionRunner({
         kind: "waapi",
         direction: directionOf(segment.to - segment.from),
         duration: planDuration,
-        easing: planEasing,
         stops: planStops,
         startedAt: resolvedStartedAt,
         targetKey: state.teleportVirtualIndex ?? state.virtualIndex,

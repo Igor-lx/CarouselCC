@@ -6,6 +6,7 @@ import {
   CAROUSEL_INERTIAL_RELEASE_CONFIG,
   CAROUSEL_SWIPE_CONFIG,
   DRAG_RELEASE_EPSILON,
+  FALLBACK_WRITE_FRAME_SKIP,
   GO_TO_ACCELERATION_DISTANCE_SHARE,
   GO_TO_DECELERATION_DISTANCE_SHARE,
   GO_TO_FINAL_APPROACH_PAGE_SPAN,
@@ -178,6 +179,17 @@ const numericRules: NumericRule[] = [
     expected: "Expected a small positive finite number (e.g. 1e-3)",
     consequence: "Drag release cannot identify 'already on target' and may animate trivially",
     predicate: greaterThan(0),
+  },
+
+  {
+    layer: "Motion",
+    field: "FALLBACK_WRITE_FRAME_SKIP",
+    value: FALLBACK_WRITE_FRAME_SKIP,
+    severity: "LOGICAL",
+    expected: "Expected a non-negative finite integer (values below 2 disable dropping)",
+    consequence:
+      "Legacy-fallback frame pacing becomes incoherent and track/widget writes desynchronize",
+    predicate: isNonNegativeInteger,
   },
 
   // Layout
