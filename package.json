@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "gen:carousel": "tsx src/components/Carousel/data-gen/cli.ts carousel-data.config.json",
+    "gen:carousel": "tsx src/components/Carousel/data-gen/cli.ts carousel-data.config1.json && tsx src/components/Carousel/data-gen/cli.ts carousel-data.config2.json",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },
