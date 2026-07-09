@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
 import appStyles from "./App.module.scss";
-import { useCompactLandscape } from "./useCompactLandscape";
-import { useBreakpoint, useUserEnvironment } from "../shared";
+import {
+  useBreakpoint,
+  useCompactLandscape,
+  useUserEnvironment,
+} from "../shared";
 import Carousel, {
   type CarouselHandle,
   type CarouselStatusSnapshot,

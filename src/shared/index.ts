@@ -1,4 +1,6 @@
 export { useIsomorphicLayoutEffect } from "./hooks/useIsomorphicLayoutEffect";
+export { useMediaQuery } from "./hooks/useMediaQuery";
+export { useCompactLandscape, COMPACT_LANDSCAPE_QUERY } from "./hooks/useCompactLandscape";
 export { useIsTouchDevice } from "./hooks/useIsTouchDevice";
 export { useIsReducedMotion } from "./hooks/useIsReducedMotion";
 export { useDataSaver } from "./hooks/useDataSaver";
