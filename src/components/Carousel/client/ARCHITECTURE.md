@@ -206,11 +206,12 @@ For each logical slide you need, starting from a single high-resolution source:
 
 1. **Produce the variant files.** Two axes — resolution and (optionally)
    orientation crop:
-   - portrait/normal: a small (`≈480w`) and a large (`≈720w`) width;
-   - landscape crop (only if a wide-and-short slot would otherwise crop a tall
-     image): the same two widths, re-cropped for the wide slot.
+   - the full image (`full/`): a resolution ladder (the demo cuts 480/720/1080/1600w);
+   - an art-directed crop (only if some viewport class would otherwise
+     mis-fit the full aspect — the demo crops `portrait/` 9:16 for portrait
+     viewports).
 
-   The demo serves them from `public/carousel/<orientation>/<width>/carouselN.webp`
+   The demo serves them from `public/carousel/<set>/<width>/carouselN.webp`
    (so they have stable URLs, not bundler-hashed ones). In production they'd
    typically sit on a CDN. Any layout works — the host owns file organisation.
 2. **Generate the content document with the `data-gen` kit.** The carousel ships
@@ -226,14 +227,25 @@ For each logical slide you need, starting from a single high-resolution source:
      "urlBase": "/CarouselCC/carousel/",
      "output": "public/carousel-slides.json",
      "variants": [
-       { "subdir": "portrait/480", "width": 480 },
-       { "subdir": "portrait/720", "width": 720 }
+       { "subdir": "full/480", "width": 480 },
+       { "subdir": "full/720", "width": 720 },
+       { "subdir": "full/1080", "width": 1080 },
+       { "subdir": "full/1600", "width": 1600 }
      ],
      "sources": [
-       { "media": "(orientation: landscape) and (max-height: 520px)", "type": "image/webp",
-         "variants": [ { "subdir": "landscape/480", "width": 480 }, { "subdir": "landscape/720", "width": 720 } ] }
+       { "media": "(orientation: portrait)", "type": "image/webp",
+         "variants": [ { "subdir": "portrait/480", "width": 480 }, { "subdir": "portrait/720", "width": 720 } ] }
      ]
    }
+
+   One geometry contract binds the data to the styles: the slide box's
+   `--slide-aspect` (SCSS) must equal the aspect of the set the browser
+   selects, under the SAME media condition — the demo pairs the default
+   16:9 set with `--slide-aspect: 16 / 9` and the portrait 9:16 source with
+   an `(orientation: portrait)` override. Box aspect === asset aspect is
+   what makes `object-fit: cover` a no-op (the image fills the slide with
+   nothing cropped), and the carousel derives its height from slot width ×
+   aspect instead of a fixed height, so it fits any window.
    ```
    ```bash
    npm run gen:carousel   # tsx Carousel/data-gen/cli.ts carousel-data.config.json

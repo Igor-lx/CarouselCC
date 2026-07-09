@@ -15,7 +15,7 @@ A JSON array of slides:
 [
   {
     "id": "…",                          // stable; preserved across regenerations
-    "content": "<base>/portrait/480/carousel1.webp", // identity + <img> fallback
+    "content": "<base>/full/480/carousel1.webp",   // identity + <img> fallback
     "alt": "",                          // scaffolded empty; fill by hand
     "image": {
       "srcSet": "…480w, …720w",
@@ -37,10 +37,10 @@ same slug across folders is the same logical slide.
 
 ```
 <assetsDir>/
-  portrait/480/carousel1.webp …
+  full/480/carousel1.webp …
+  full/720/carousel1.webp …        (default set: the full image, more widths welcome)
+  portrait/480/carousel1.webp …    (optional art-directed crop)
   portrait/720/carousel1.webp …
-  landscape/480/carousel1.webp …   (optional art-directed crop)
-  landscape/720/carousel1.webp …
 ```
 
 ## Run it
@@ -57,16 +57,18 @@ tsx src/components/Carousel/data-gen/cli.ts carousel-data.config.json
   "urlBase": "/CarouselCC/carousel/",
   "output": "public/carousel-slides.json",
   "variants": [
-    { "subdir": "portrait/480", "width": 480 },
-    { "subdir": "portrait/720", "width": 720 }
+    { "subdir": "full/480", "width": 480 },
+    { "subdir": "full/720", "width": 720 },
+    { "subdir": "full/1080", "width": 1080 },
+    { "subdir": "full/1600", "width": 1600 }
   ],
   "sources": [
     {
-      "media": "(orientation: landscape) and (max-height: 520px)",
+      "media": "(orientation: portrait)",
       "type": "image/webp",
       "variants": [
-        { "subdir": "landscape/480", "width": 480 },
-        { "subdir": "landscape/720", "width": 720 }
+        { "subdir": "portrait/480", "width": 480 },
+        { "subdir": "portrait/720", "width": 720 }
       ]
     }
   ]

@@ -3,11 +3,20 @@
     --color: var(--color-component, var(--color-global));
     --bg: var(--bg-component, var(--bg-global));
     --slides-gap: 55px;
-    --carousel-height: 750px;
-    --carousel-stable-viewport-height: 100vh;
     --pagination-gap: 20px;
     --slide-radius: 12px;
     --viewport-radius: var(--slide-radius);
+
+    // The slide box aspect ratio — the single geometry contract with the
+    // image data. It MUST mirror the aspect of the image set the browser
+    // selects (see the responsive `sources` in the slides document): the
+    // default set is the full 16:9 image; portrait viewports receive the
+    // art-directed 9:16 crop, and the box follows via the media query below.
+    // Because box aspect === asset aspect, `object-fit: cover` never crops
+    // and the image always fills the whole slide. The carousel's height is
+    // DERIVED from slot width × this ratio — there is no fixed component
+    // height, so the deck fits any window without cutting anything off.
+    --slide-aspect: 16 / 9;
 
     position: relative;
     display: flex;
@@ -16,7 +25,6 @@
     justify-content: flex-start;
     width: 100%;
     max-width: 100%;
-    height: var(--carousel-height);
     row-gap: var(--pagination-gap);
     background-color: var(--bg);
     transition:
@@ -27,11 +35,18 @@
     box-sizing: border-box;
   }
 
+  // Portrait viewports pick the 9:16 art-directed source — the box aspect
+  // must switch under the SAME condition, or `cover` would crop again.
+  @media (orientation: portrait) {
+    .outerContainer {
+      --slide-aspect: 9 / 16;
+    }
+  }
+
   .innerContainer {
     position: relative;
     width: 100%;
     min-width: 0;
-    flex: 1;
     border-radius: var(--viewport-radius);
     overflow: hidden;
     user-select: none;
@@ -45,8 +60,8 @@
   .slideContainer {
     position: relative;
     display: flex;
+    align-items: flex-start;
     width: 100%;
-    height: 100%;
     gap: var(--slides-gap);
     will-change: transform;
     min-width: 0;
@@ -55,7 +70,7 @@
   .slide {
     display: block;
     width: 100%;
-    height: 100%;
+    aspect-ratio: var(--slide-aspect);
     padding: 0;
     margin: 0;
     border: 1px solid transparent;
@@ -73,6 +88,16 @@
     &:focus-visible {
       outline: 1px solid #9cc4f0;
       outline-offset: -1px;
+    }
+
+    // <picture> must not introduce its own (inline, auto-height) box: with a
+    // real box in between, the img's percentage height has nothing definite
+    // to resolve against and falls back to the intrinsic ratio — the image
+    // then overflows the slide (bottom-cropped as a <div>, centre-cropped as
+    // an interactive <button>, whose UA layout centres overflowing content).
+    // `display: contents` makes the slide itself the img's containing block.
+    picture {
+      display: contents;
     }
 
     img {
@@ -117,71 +142,42 @@
     font-size: 30px;
   }
 
-  @supports (height: 100svh) {
-    .outerContainer {
-      --carousel-stable-viewport-height: 100svh;
-    }
-  }
-
   @media (width <= 1023px) {
     .outerContainer {
       --slides-gap: 28px;
-      --carousel-height: min(
-        640px,
-        calc(var(--carousel-stable-viewport-height) - 120px)
-      );
       --slide-radius: 10px;
       --pagination-gap: 14px;
-
-      min-height: 420px;
     }
   }
 
   @media (width <= 767px) {
     .outerContainer {
       --slides-gap: 14px;
-      --carousel-height: min(
-        680px,
-        calc(var(--carousel-stable-viewport-height) - 76px)
-      );
       --pagination-gap: 12px;
       --slide-radius: 8px;
-
-      min-height: 360px;
     }
+  }
 
+  // Portrait phones: one tall 9:16 card — cap its width so the card keeps a
+  // phone-like proportion instead of stretching across a wide-but-portrait
+  // viewport.
+  @media (width <= 767px) and (orientation: portrait) {
     .innerContainer {
       width: min(100%, 360px);
     }
   }
 
+  // Compact landscape (low-height handhelds): two 16:9 slides side by side;
+  // cap the strip so the derived height stays within the short viewport.
   @media (orientation: landscape) and (height <= 520px) {
     .outerContainer {
       --slides-gap: 26px;
-      --carousel-height: clamp(
-        250px,
-        calc(var(--carousel-stable-viewport-height) - 54px),
-        300px
-      );
       --pagination-gap: 6px;
       --slide-radius: 8px;
-
-      min-height: 0;
     }
 
     .innerContainer {
       width: min(100%, 760px);
-    }
-  }
-
-  @media (width <= 380px) {
-    .outerContainer {
-      --carousel-height: min(
-        640px,
-        calc(var(--carousel-stable-viewport-height) - 76px)
-      );
-
-      min-height: 330px;
     }
   }
 }
