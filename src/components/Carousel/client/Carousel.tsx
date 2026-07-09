@@ -31,8 +31,7 @@ import { useModuleRenderPolicy } from "./render-policy/useModuleRenderPolicy";
 import {
   SlideItem,
   useCarouselSlideDeck,
-  useImageResourceRetention,
-  useImageResourceStoreInstance,
+  useImageResourceStore,
   useSlideRenderModel,
 } from "./slides";
 import { CAROUSEL_SLOTS } from "./slots";
@@ -118,12 +117,13 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   );
 
   // --- image-resource SSOT --------------------------------------------------
-  // The store exists only when the carousel renders image content; with
-  // `isContentImg` off it is `null` and no image machinery runs. It is passed
-  // explicitly to each `SlideItem` (no context) so the data flow stays visible
-  // in source. Each slide subscribes to its own URL; the store is the single
-  // authority on render status and retry.
-  const imageResourceStore = useImageResourceStoreInstance(isContentImg);
+  // One call owns everything store-related: lifecycle (created only when the
+  // carousel renders image content, `null` otherwise) and retention (entries
+  // + retry timers pruned to the live deck). Passed explicitly to each
+  // `SlideItem` (no context) so the data flow stays visible in source; each
+  // slide subscribes to its own URL — the store is the single authority on
+  // render status and retry.
+  const imageResourceStore = useImageResourceStore({ isContentImg, records });
 
   // --- DOM refs --------------------------------------------------------------
   // Declared here (before `imageSizes`) because the responsive-`sizes` hook
@@ -138,14 +138,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     viewportRef,
     layout.visibleSlidesCount,
   );
-
-  // Keep the store's per-URL entries (and their retry timers) bounded to the
-  // live deck — see useImageResourceRetention.
-  useImageResourceRetention({
-    store: imageResourceStore,
-    records,
-    isContentImg,
-  });
 
   // Read-only, low-frequency status reported to the host. Fires on mount and
   // whenever the idle flag, target page, or page count changes — never on a

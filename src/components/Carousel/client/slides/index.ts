@@ -2,11 +2,7 @@ export { SlideItem } from "./SlideItem";
 export { useSlideRenderModel } from "./useSlideRenderModel";
 export { useCarouselSlideDeck } from "./useCarouselSlideDeck";
 export type { SlideItemProps } from "./SlideItem.types";
-export {
-  useImageResource,
-  useImageResourceRetention,
-  useImageResourceStoreInstance,
-} from "./imageResource";
+export { useImageResource, useImageResourceStore } from "./imageResource";
 export type {
   ImageResourceHandle,
   ImageResourceStore,

@@ -1069,6 +1069,7 @@ src/components/Carousel/client/
 │   ├── imageResource/             image-resource SSOT (store + React bridge)
 │   │   ├── createImageResourceStore.ts  framework-agnostic store
 │   │   ├── useImageResource.ts    per-slide useSyncExternalStore binding (store passed in)
+│   │   ├── useImageResourceStore.ts   facade: lifecycle + retention in one call
 │   │   ├── useImageResourceStoreInstance.ts  lifecycle owner
 │   │   ├── useImageResourceRetention.ts  prunes entries + retry timers to the live deck
 │   │   └── types.ts
