@@ -1,3 +1,8 @@
+/** localStorage key for the persisted theme mode. Lives here (react-free)
+ * so build-time consumers (the theme-boot Vite plugin) can import it without
+ * pulling React into the config bundle. */
+export const THEME_STORAGE_KEY = "theme-mode";
+
 export const THEME_MODES = {
   LIGHT: "light",
   DARK: "dark",

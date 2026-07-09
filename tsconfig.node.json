@@ -2,7 +2,7 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "target": "ES2023",
-    "lib": ["ES2023"],
+    "lib": ["ES2023", "DOM"],
     "module": "ESNext",
     "skipLibCheck": true,
 
@@ -22,6 +22,9 @@
   "include": [
     "vite.config.ts",
     "vitest.config.ts",
-    "src/components/Carousel/data-gen"
+    "src/components/Carousel/data-gen",
+    "src/app/deployBase.ts",
+    "src/shared/themeBoot.ts",
+    "src/theme/types.ts"
   ]
 }

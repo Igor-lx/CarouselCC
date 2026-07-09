@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 
-import { THEME_STORAGE_KEY, ThemeContext } from "./ThemeContext";
+import { ThemeContext } from "./ThemeContext";
 import {
   BROWSER_THEME_COLORS,
+  THEME_STORAGE_KEY,
   ON_SCREEN_MODES,
   THEME_MODES,
   type OnScreenThemeMode,
