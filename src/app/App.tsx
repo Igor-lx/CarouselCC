@@ -15,12 +15,15 @@ import { Diagnostic } from "../components/Carousel/client/modules/Diagnostic";
 import { useTheme } from "../theme/useTheme";
 
 /**
- * Which slides document the demo shows. Two generated sets exist
- * (`npm run gen:carousel` rebuilds both):
- *  1 — full 16:9 images; portrait viewports get the 9:16 art-directed crop;
- *  2 — the vertical 9:16 set everywhere (tall columns on desktop too).
- * Swap the constant by hand, or override per visit with `?slides=1|2` in the
- * URL (handy on a deployed build).
+ * Which slides document the demo shows — two PHOTO COLLECTIONS, each cut for
+ * BOTH orientations from the same originals (`npm run gen:carousel` rebuilds
+ * both):
+ *  1 — nature collection (16:9 wide default, 9:16 tall crop for portrait);
+ *  2 — family collection (same structure).
+ * Within a set the pictures are identical on desktop / mobile / landscape /
+ * portrait — orientation only changes the crop, never the photo. Swap the
+ * constant by hand, or override per visit with `?slides=1|2` in the URL
+ * (handy on a deployed build).
  */
 const DEFAULT_SLIDES_SET: 1 | 2 = 1;
 
@@ -31,15 +34,14 @@ const SLIDES_SET: 1 | 2 = (() => {
   return DEFAULT_SLIDES_SET;
 })();
 
-// Layout per set: a vertical 9:16 card is ~3x taller than a 16:9 one at the
-// same slot width, so wide screens take more columns to stay inside the
-// window height.
-const VISIBLE_BY_BREAKPOINT =
-  SLIDES_SET === 2
-    ? ({ DESKTOP: 4, TABLET: 3, MOBILE: 1, DEFAULT: 4 } as const)
-    : ({ DESKTOP: 2, TABLET: 2, MOBILE: 1, DEFAULT: 3 } as const);
+const VISIBLE_BY_BREAKPOINT = {
+  DESKTOP: 2,
+  TABLET: 2,
+  MOBILE: 1,
+  DEFAULT: 3,
+} as const;
 
-const COMPACT_LANDSCAPE_VISIBLE_SLIDES = SLIDES_SET === 2 ? 4 : 2;
+const COMPACT_LANDSCAPE_VISIBLE_SLIDES = 2;
 
 /** The generated content document, served from `public/` (see `npm run gen:carousel`). */
 const SLIDES_DATA_URL = `${import.meta.env.BASE_URL}carousel-slides${SLIDES_SET}.json`;
@@ -135,14 +137,6 @@ export default function App() {
               ref={carouselRef}
               visibleSlidesNr={visibleSlidesNr}
               slidesData={slidesData}
-              // Set 2 is vertical in EVERY orientation: ride the className
-              // override to pin the slide-box aspect to the asset aspect
-              // (unlayered app CSS wins over the component's @layer default).
-              className={
-                SLIDES_SET === 2
-                  ? { outerContainer: appStyles.verticalSlides }
-                  : undefined
-              }
               isAuto={isAutoplay}
               isPaginationOn
               isInteractive={isInteractive}

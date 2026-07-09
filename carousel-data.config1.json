@@ -4,19 +4,19 @@
   "output": "public/carousel-slides1.json",
   "variants": [
     {
-      "subdir": "full/480",
+      "subdir": "nature/wide/480",
       "width": 480
     },
     {
-      "subdir": "full/720",
+      "subdir": "nature/wide/720",
       "width": 720
     },
     {
-      "subdir": "full/1080",
+      "subdir": "nature/wide/1080",
       "width": 1080
     },
     {
-      "subdir": "full/1600",
+      "subdir": "nature/wide/1600",
       "width": 1600
     }
   ],
@@ -26,11 +26,11 @@
       "type": "image/webp",
       "variants": [
         {
-          "subdir": "portrait/480",
+          "subdir": "nature/tall/480",
           "width": 480
         },
         {
-          "subdir": "portrait/720",
+          "subdir": "nature/tall/720",
           "width": 720
         }
       ]

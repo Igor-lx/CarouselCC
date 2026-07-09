@@ -106,11 +106,3 @@
     min-height: 26px;
   }
 }
-
-// Slides set 2 — the vertical 9:16 document. The slide box must follow the
-// asset aspect in EVERY orientation, so this class (attached through the
-// carousel's `className.outerContainer` API) pins it; being unlayered, it
-// wins over the component's @layer defaults, including its portrait override.
-.verticalSlides {
-  --slide-aspect: 9 / 16;
-}

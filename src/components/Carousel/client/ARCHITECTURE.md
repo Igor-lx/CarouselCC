@@ -206,12 +206,12 @@ For each logical slide you need, starting from a single high-resolution source:
 
 1. **Produce the variant files.** Two axes — resolution and (optionally)
    orientation crop:
-   - the full image (`full/`): a resolution ladder (the demo cuts 480/720/1080/1600w);
-   - an art-directed crop (only if some viewport class would otherwise
-     mis-fit the full aspect — the demo crops `portrait/` 9:16 for portrait
-     viewports).
+   - a wide 16:9 cut (`wide/`): a resolution ladder (the demo cuts up to
+     480/720/1080/1600w);
+   - a tall 9:16 crop of the SAME photos (`tall/`) for portrait viewports —
+     art direction changes the crop, never the picture.
 
-   The demo serves them from `public/carousel/<set>/<width>/carouselN.webp`
+   The demo serves them from `public/carousel/<collection>/<crop>/<width>/carouselN.webp`
    (so they have stable URLs, not bundler-hashed ones). In production they'd
    typically sit on a CDN. Any layout works — the host owns file organisation.
 2. **Generate the content document with the `data-gen` kit.** The carousel ships
@@ -227,14 +227,14 @@ For each logical slide you need, starting from a single high-resolution source:
      "urlBase": "/CarouselCC/carousel/",
      "output": "public/carousel-slides.json",
      "variants": [
-       { "subdir": "full/480", "width": 480 },
-       { "subdir": "full/720", "width": 720 },
-       { "subdir": "full/1080", "width": 1080 },
-       { "subdir": "full/1600", "width": 1600 }
+       { "subdir": "nature/wide/480", "width": 480 },
+       { "subdir": "nature/wide/720", "width": 720 },
+       { "subdir": "nature/wide/1080", "width": 1080 },
+       { "subdir": "nature/wide/1600", "width": 1600 }
      ],
      "sources": [
        { "media": "(orientation: portrait)", "type": "image/webp",
-         "variants": [ { "subdir": "portrait/480", "width": 480 }, { "subdir": "portrait/720", "width": 720 } ] }
+         "variants": [ { "subdir": "nature/tall/480", "width": 480 }, { "subdir": "nature/tall/720", "width": 720 } ] }
      ]
    }
 

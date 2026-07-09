@@ -4,12 +4,28 @@
   "output": "public/carousel-slides2.json",
   "variants": [
     {
-      "subdir": "portrait/480",
+      "subdir": "family/wide/480",
       "width": 480
     },
     {
-      "subdir": "portrait/720",
+      "subdir": "family/wide/720",
       "width": 720
+    }
+  ],
+  "sources": [
+    {
+      "media": "(orientation: portrait)",
+      "type": "image/webp",
+      "variants": [
+        {
+          "subdir": "family/tall/480",
+          "width": 480
+        },
+        {
+          "subdir": "family/tall/720",
+          "width": 720
+        }
+      ]
     }
   ]
 }
