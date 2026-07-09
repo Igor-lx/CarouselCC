@@ -28,7 +28,7 @@ export const MOTION_EPSILON = 0.0001;
  * dropped. `4` paints 3 of 4 running frames; values below `2` disable
  * dropping. Never consulted on WAAPI-capable engines.
  */
-export const FALLBACK_WRITE_FRAME_SKIP = 4;
+export const FALLBACK_WRITE_FRAME_SKIP = 3;
 
 /** Tolerance for "drag already on target" snap detection on release. */
 export const DRAG_RELEASE_EPSILON = 0.001;
