@@ -141,13 +141,14 @@ export default function App() {
           ) : (
             <Carousel
               ref={carouselRef}
-              visibleSlidesNr={visibleSlidesNr}
+               visibleSlidesNr={visibleSlidesNr}
+          
               slidesData={slidesData}
               isAuto={isAutoplay}
               isPaginationOn
               isInteractive={isInteractive}
               durationAutoplay={4000}
-              durationStep={4000}
+              durationStep={2000}
               jumpSpeedMultiplier={12}
               intervalAutoplay={3000}
               isPagePaddingOn
