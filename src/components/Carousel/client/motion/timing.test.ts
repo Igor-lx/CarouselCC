@@ -56,11 +56,11 @@ describe("resolveGoToApproachDistance", () => {
 
 describe("resolveGoToPlan", () => {
   const stepSize = 3;
-  // preflight = 2 pages, approach = 1 page -> a jump within 3 pages is direct.
-  const visibleTeleportSpan = motion.goToPreflightPageSpan + motion.goToFinalApproachPageSpan;
+  // The flight threshold is the explicit constant, not a derived sum.
+  const teleportMinSpan = motion.goToTeleportMinPageSpan;
 
   it("animates the whole distance for a short jump (no teleport)", () => {
-    for (let pageSpan = 1; pageSpan <= visibleTeleportSpan; pageSpan += 1) {
+    for (let pageSpan = 1; pageSpan < teleportMinSpan; pageSpan += 1) {
       const plan = resolveGoToPlan(pageSpan, stepSize, motion);
       expect(plan.isTeleport).toBe(false);
       expect(plan.leadDistance).toBe(pageSpan * stepSize);
@@ -70,7 +70,7 @@ describe("resolveGoToPlan", () => {
   });
 
   it("splits a far jump into preflight + teleport + approach", () => {
-    for (let pageSpan = visibleTeleportSpan + 1; pageSpan <= 20; pageSpan += 1) {
+    for (let pageSpan = teleportMinSpan; pageSpan <= 20; pageSpan += 1) {
       const plan = resolveGoToPlan(pageSpan, stepSize, motion);
       const realDistance = pageSpan * stepSize;
       expect(plan.isTeleport).toBe(true);
@@ -83,10 +83,25 @@ describe("resolveGoToPlan", () => {
     }
   });
 
-  it("treats the exact preflight+approach span as the last direct jump", () => {
-    const atBoundary = resolveGoToPlan(visibleTeleportSpan, stepSize, motion);
-    const justOver = resolveGoToPlan(visibleTeleportSpan + 1, stepSize, motion);
-    expect(atBoundary.isTeleport).toBe(false);
-    expect(justOver.isTeleport).toBe(true);
+  it("flies from exactly goToTeleportMinPageSpan, rides below it", () => {
+    const lastDirect = resolveGoToPlan(teleportMinSpan - 1, stepSize, motion);
+    const firstFlight = resolveGoToPlan(teleportMinSpan, stepSize, motion);
+    expect(lastDirect.isTeleport).toBe(false);
+    expect(firstFlight.isTeleport).toBe(true);
+    expect(firstFlight.teleportDistance).toBeGreaterThan(0);
+  });
+
+  it("obeys the constant over the derived preflight+approach sum", () => {
+    // Raise the threshold: spans that WOULD have flown under the old derived
+    // rule (span > preflight + approach) must now ride fully.
+    const raised: MotionSettings = { ...motion, goToTeleportMinPageSpan: 6 };
+    const rides = resolveGoToPlan(5, stepSize, raised);
+    expect(rides.isTeleport).toBe(false);
+    expect(rides.leadDistance).toBe(5 * stepSize);
+    const flies = resolveGoToPlan(6, stepSize, raised);
+    expect(flies.isTeleport).toBe(true);
+    expect(
+      flies.leadDistance + flies.teleportDistance + flies.approachDistance,
+    ).toBe(6 * stepSize);
   });
 });

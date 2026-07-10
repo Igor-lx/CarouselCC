@@ -326,8 +326,8 @@ These are the user-facing behaviours the implementation guarantees.
 - **GO_TO motion.** Every `GO_TO` follows a speed-authored profile:
   accelerate, cruise, decelerate. Acceleration is measured inside the first
   page screen; deceleration is measured inside the final page screen. A jump
-  that fits the visible preflight + approach budget animates its whole
-  distance. A far jump animates
+  shorter than `GO_TO_TELEPORT_MIN_PAGE_SPAN` page screens animates its whole
+  distance; from that span on it FLIES: animates
   `GO_TO_PREFLIGHT_PAGE_SPAN` page screens, teleports the un-rendered middle,
   then animates the final approach page. See §4.4.
 - **Click during motion (opposite direction).** Re-targets without
@@ -477,7 +477,9 @@ here only invites doc/code drift. The single source of truth is `config/`:
 
 - `config/defaults.ts` — public-prop defaults.
 - `config/motion.ts` — motion-profile distance shares (step / autoplay /
-  snap-back / repeated-click / GO_TO) and the GO_TO teleport spans.
+  snap-back / repeated-click / GO_TO) and the GO_TO teleport geometry: the
+  preflight / approach spans plus `GO_TO_TELEPORT_MIN_PAGE_SPAN`, the flight
+  threshold (must exceed their sum — diagnostics enforce it).
 - `config/interaction.ts` — hover delay, visibility threshold.
 - `config/gesture.ts` — swipe + inertial-release config.
 - `config/constants.ts` — epsilons, render-window buffer.
@@ -688,9 +690,11 @@ inside per-frame subscribers.
 ### 4.4 Far GO_TO teleport
 
 A far `GO_TO` cannot animate edge-to-edge — it would mount every intermediate
-slide. Instead it is split by one pure geometry resolver (`motion/timing.ts`
-`resolveGoToPlan`), consumed by both the reducer and the segment factory so
-the logical landing positions and the animated profile can never drift apart:
+slide. A jump flies from `GO_TO_TELEPORT_MIN_PAGE_SPAN` page screens
+(anything shorter rides fully); the split is laid out by one pure geometry
+resolver (`motion/timing.ts` `resolveGoToPlan`), consumed by both the reducer
+and the segment factory so the logical landing positions and the animated
+profile can never drift apart:
 
 - **Preflight.** The reducer sets `virtualIndex` to a bounded landing
   `GO_TO_PREFLIGHT_PAGE_SPAN` page screens away from the current position and

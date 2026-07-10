@@ -72,11 +72,13 @@ export interface GoToPlan {
 /**
  * Lay out a GO_TO of `pageSpan` page screens.
  *
- * - Short jump: the whole real distance is animated; acceleration and
- *   deceleration stay local to the first and last page screens.
+ * - Short jump (`pageSpan < goToTeleportMinPageSpan`): the whole real
+ *   distance is animated; acceleration and deceleration stay local to the
+ *   first and last page screens.
  * - Long jump: `goToPreflightPageSpan` page screens are animated before the
  *   teleport, the invisible middle is skipped, then the final approach page is
- *   animated.
+ *   animated. `goToTeleportMinPageSpan` must exceed preflight + approach
+ *   (diagnostics enforce it), so the skipped middle is always positive.
  *
  * `pageSpan` is unsigned; the caller applies travel direction.
  */
@@ -90,7 +92,7 @@ export const resolveGoToPlan = (
   const visibleTeleportDistance =
     zones.preflightDistance + zones.approachDistance;
 
-  if (realDistance <= visibleTeleportDistance) {
+  if (pageSpan < motion.goToTeleportMinPageSpan) {
     return {
       isTeleport: false,
       leadDistance: realDistance,

@@ -10,6 +10,7 @@ import {
   GO_TO_DECELERATION_DISTANCE_SHARE,
   GO_TO_FINAL_APPROACH_PAGE_SPAN,
   GO_TO_PREFLIGHT_PAGE_SPAN,
+  GO_TO_TELEPORT_MIN_PAGE_SPAN,
   HOVER_PAUSE_DELAY,
   IMAGE_RETRY_BASE_DELAY_MS,
   IMAGE_RETRY_MAX_ATTEMPTS,
@@ -119,6 +120,18 @@ const numericRules: NumericRule[] = [
     consequence:
       "Far GO_TO needs at least one animated approach page after the teleport cut",
     predicate: isPositiveInteger,
+  },
+  {
+    layer: "Motion",
+    field: "GO_TO_TELEPORT_MIN_PAGE_SPAN",
+    value: GO_TO_TELEPORT_MIN_PAGE_SPAN,
+    severity: "CRITICAL",
+    expected: `Expected a finite integer greater than GO_TO_PREFLIGHT_PAGE_SPAN + GO_TO_FINAL_APPROACH_PAGE_SPAN (${GO_TO_PREFLIGHT_PAGE_SPAN + GO_TO_FINAL_APPROACH_PAGE_SPAN})`,
+    consequence:
+      "A teleport whose span does not exceed preflight + approach skips a zero or negative middle — far GO_TO motion breaks",
+    predicate: (v) =>
+      Number.isInteger(v) &&
+      v > GO_TO_PREFLIGHT_PAGE_SPAN + GO_TO_FINAL_APPROACH_PAGE_SPAN,
   },
   {
     layer: "Motion",

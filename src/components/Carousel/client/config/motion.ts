@@ -29,6 +29,14 @@ export const GO_TO_PREFLIGHT_PAGE_SPAN = 2;
 export const GO_TO_FINAL_APPROACH_PAGE_SPAN = 1;
 
 /**
+ * Minimum GO_TO span, in page screens, that FLIES (teleports the invisible
+ * middle) instead of riding the whole distance. Spans below it animate fully.
+ * Must exceed `GO_TO_PREFLIGHT_PAGE_SPAN + GO_TO_FINAL_APPROACH_PAGE_SPAN`,
+ * otherwise the skipped middle would be zero or negative.
+ */
+export const GO_TO_TELEPORT_MIN_PAGE_SPAN = 4;
+
+/**
  * Acceleration / deceleration distance shares of the GO_TO profile.
  *
  * Both shares are local to one page screen:
