@@ -1,17 +1,12 @@
-import { isFiniteNumber } from "../../../../../../shared";
+import {
+  isNonNegativeFinite,
+  isPositiveFinite,
+  isPositiveInteger,
+} from "../../../../../../shared";
 import type { CarouselDiagnosticContextValue } from "../../../context";
 import type { CarouselDiagnosticWarning } from "../types";
 
 const LAYER = "Props";
-
-const isPositiveInteger = (value: unknown): value is number =>
-  isFiniteNumber(value) && value > 0 && Number.isInteger(value);
-
-const isPositiveFinite = (value: unknown): value is number =>
-  isFiniteNumber(value) && value > 0;
-
-const isNonNegativeFinite = (value: unknown): value is number =>
-  isFiniteNumber(value) && value >= 0;
 
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;

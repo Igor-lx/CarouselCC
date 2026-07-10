@@ -1,17 +1,19 @@
-import { isFiniteNumber } from "../../../../../../shared";
+import {
+  inRangeExclusiveLower,
+  isNonNegativeFinite,
+  isPositiveFinite,
+  isPositiveInteger,
+} from "../../../../../../shared";
 import type { PaginationWidgetProps } from "../../PaginationWidget/types";
 import type { CarouselDiagnosticWarning } from "../types";
 
 const LAYER = "PaginationWidget";
 
-const isPositiveFinite = (value: unknown): value is number =>
-  isFiniteNumber(value) && value > 0;
-
-const isNonNegativeFinite = (value: unknown): value is number =>
-  isFiniteNumber(value) && value >= 0;
-
+// Widget-specific composite: the strip needs a centre dot, hence odd >= 3.
 const isOddIntegerAtLeastThree = (value: unknown): value is number =>
-  isFiniteNumber(value) && Number.isInteger(value) && value >= 3 && value % 2 === 1;
+  isPositiveInteger(value) && value >= 3 && value % 2 === 1;
+
+const isValidScaleFactor = inRangeExclusiveLower(0, 1);
 
 /** The widget's own tunable props, values widened to `unknown`: Diagnostics
  * audits the RAW values the caller wrote. Keying the shape on
@@ -65,7 +67,7 @@ export const collectWidgetWarnings = (
     });
   }
 
-  if (!(isFiniteNumber(input.scaleFactor) && input.scaleFactor > 0 && input.scaleFactor <= 1)) {
+  if (!isValidScaleFactor(input.scaleFactor)) {
     out.push({
       severity: "LOGICAL",
       layer: LAYER,

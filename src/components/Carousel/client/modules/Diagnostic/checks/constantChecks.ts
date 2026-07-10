@@ -1,4 +1,13 @@
-import { isFiniteNumber } from "../../../../../../shared";
+import {
+  atLeast,
+  greaterThan,
+  inRangeExclusiveLower,
+  inRangeExclusiveUpper,
+  inRangeInclusive,
+  isFiniteNumber,
+  isNonNegativeInteger,
+  isPositiveInteger,
+} from "../../../../../../shared";
 import {
   AUTOPLAY_ACCELERATION_DISTANCE_SHARE,
   AUTOPLAY_DECELERATION_DISTANCE_SHARE,
@@ -37,7 +46,10 @@ interface NumericRule {
   expected: string;
   consequence: string;
   severity: CarouselDiagnosticWarning["severity"];
-  predicate: (v: number) => boolean;
+  /** Shared numeric guard (see `shared/math`) — self-sufficient, implies
+   * finiteness; `checkNumber` keeps its own finite gate only as a safety
+   * net for future hand-written lambdas. */
+  predicate: (value: unknown) => boolean;
 }
 
 const checkNumber = (rule: NumericRule): CarouselDiagnosticWarning | null => {
@@ -51,17 +63,6 @@ const checkNumber = (rule: NumericRule): CarouselDiagnosticWarning | null => {
     consequence: rule.consequence,
   };
 };
-
-const inRangeInclusive = (min: number, max: number) => (v: number) =>
-  v >= min && v <= max;
-const inRangeExclusiveLower = (min: number, max: number) => (v: number) =>
-  v > min && v <= max;
-const inRangeExclusiveUpper = (min: number, max: number) => (v: number) =>
-  v >= min && v < max;
-const greaterThan = (min: number) => (v: number) => v > min;
-const atLeast = (min: number) => (v: number) => v >= min;
-const isNonNegativeInteger = (v: number) => v >= 0 && Number.isInteger(v);
-const isPositiveInteger = (v: number) => v > 0 && Number.isInteger(v);
 
 const numericRules: NumericRule[] = [
   // Motion timings / factors
@@ -130,7 +131,7 @@ const numericRules: NumericRule[] = [
     consequence:
       "A teleport whose span does not exceed preflight + approach skips a zero or negative middle — far GO_TO motion breaks",
     predicate: (v) =>
-      Number.isInteger(v) &&
+      isPositiveInteger(v) &&
       v > GO_TO_PREFLIGHT_PAGE_SPAN + GO_TO_FINAL_APPROACH_PAGE_SPAN,
   },
   {
