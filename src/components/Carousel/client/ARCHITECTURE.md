@@ -503,7 +503,7 @@ Every responsibility has exactly one owner. The orchestrator
 | Image prioritization | `SlideItem` | Native `<img loading>` / `fetchpriority` hints derived from the slide's band and the data-saver signal. |
 | Slide image binding | `useImageResource` | Registers a `SlideItem` as a visible owner of its URL and subscribes to the URL's snapshot via `useSyncExternalStore`. |
 | Gesture lifecycle | `useCarouselGesture` | Wraps the shared `usePointerSwipe`. Converts pointer events into dispatches and direct position writes. |
-| Autoplay lifecycle | `useCarouselAutoplay` over `useAutoplay` | Adapter owning viewport visibility, the pause rule, and stable step handlers over the generic interval loop (same shape as gesture). |
+| Autoplay lifecycle | `useCarouselAutoplay` over `useAutoplay` | Adapter owning viewport visibility, the pause rule, and stable step handlers over the interval loop. Same *shape* as the gesture pair, different *tier*: the pointer-swipe primitive is a reusable engine in `shared`, while both autoplay halves are deliberately component-local — an internal redistribution for clarity, not a shared engine. |
 | Focus shift | `useFocusRecovery` | Triggers when the state settles. |
 | Module API | `useModuleContextValue` | Builds the value once, memoised; derives the status view from `state.motionPhase` itself. |
 | Diagnostic context value | `useDiagnosticContextValue` | Mirrors raw props + observable layout/slot state for the Diagnostic slot. |

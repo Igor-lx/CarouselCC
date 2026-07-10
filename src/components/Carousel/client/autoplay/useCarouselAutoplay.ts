@@ -21,9 +21,12 @@ interface UseCarouselAutoplayInput {
 }
 
 /**
- * The carousel-specific autoplay adapter over the generic `useAutoplay` timer
- * loop — the same shape as `useCarouselGesture` over `usePointerSwipe`. Owns
- * everything the loop needs:
+ * The carousel-specific autoplay adapter over the `useAutoplay` timer loop —
+ * the same SHAPE as `useCarouselGesture` over `usePointerSwipe`, but a
+ * different TIER: the pointer-swipe primitive is a reusable engine in
+ * `shared`, while both autoplay halves live inside the component on purpose
+ * (an internal redistribution for clarity; nothing outside the carousel needs
+ * an autoplay loop). Owns everything the loop needs:
  * - viewport visibility (IntersectionObserver + tab visibility) — consumed by
  *   autoplay alone, so the subscription lives here, not in the root;
  * - the pause rule (off-screen, dragging, or already moving);
