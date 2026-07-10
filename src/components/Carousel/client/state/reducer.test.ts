@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildRawCarouselConfig } from "../config";
+import { buildCarouselConfig } from "../config";
 import type { CarouselRuntimeConfig } from "../config";
 import { buildCarouselLayout, buildSlideRecords } from "../domain";
 import type { CarouselLayout } from "../domain";
@@ -11,7 +11,7 @@ import type { CarouselCommand, CarouselState } from "./types";
 
 // --- test kit ---------------------------------------------------------------
 
-const config: CarouselRuntimeConfig = buildRawCarouselConfig({});
+const config: CarouselRuntimeConfig = buildCarouselConfig({});
 
 const makeLayout = (
   slideCount: number,

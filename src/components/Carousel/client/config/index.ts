@@ -31,7 +31,7 @@ export {
   IMAGE_RETRY_MAX_DELAY_MS,
   IMAGE_RETRY_MAX_ATTEMPTS,
 } from "./slides";
-export { buildRawCarouselConfig } from "./buildRawConfig";
+export { buildCarouselConfig } from "./buildConfig";
 export { useCarouselConfig } from "./useCarouselConfig";
 export type {
   CarouselRuntimeConfig,

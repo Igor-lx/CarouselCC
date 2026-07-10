@@ -1,16 +1,7 @@
 import { useMemo } from "react";
 
-import { buildRawCarouselConfig } from "./buildRawConfig";
-import type { CarouselRuntimeConfig } from "./types";
-
-interface UseCarouselConfigInput {
-  visibleSlidesNr?: unknown;
-  durationAutoplay?: unknown;
-  durationStep?: unknown;
-  jumpSpeedMultiplier?: unknown;
-  intervalAutoplay?: unknown;
-  errAltPlaceholder?: unknown;
-}
+import { buildCarouselConfig } from "./buildConfig";
+import type { CarouselRuntimeConfig, RawConfigInput } from "./types";
 
 /**
  * Resolve the runtime config from raw prop input. Defaults are substituted
@@ -25,10 +16,10 @@ export function useCarouselConfig({
   jumpSpeedMultiplier,
   intervalAutoplay,
   errAltPlaceholder,
-}: UseCarouselConfigInput): CarouselRuntimeConfig {
+}: RawConfigInput): CarouselRuntimeConfig {
   return useMemo<CarouselRuntimeConfig>(
     () =>
-      buildRawCarouselConfig({
+      buildCarouselConfig({
         visibleSlidesNr,
         durationAutoplay,
         durationStep,

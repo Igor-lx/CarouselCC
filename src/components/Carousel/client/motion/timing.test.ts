@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildRawCarouselConfig } from "../config/buildRawConfig";
+import { buildCarouselConfig } from "../config/buildConfig";
 import type { MotionSettings } from "../config";
 import {
   resolveGoToApproachDistance,
@@ -10,7 +10,7 @@ import {
   resolveSpeed,
 } from "./timing";
 
-const motion: MotionSettings = buildRawCarouselConfig({}).motion;
+const motion: MotionSettings = buildCarouselConfig({}).motion;
 
 describe("resolveSpeed", () => {
   it("is the unsigned distance over duration", () => {

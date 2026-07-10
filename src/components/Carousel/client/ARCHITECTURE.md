@@ -1034,7 +1034,7 @@ src/components/Carousel/client/
 │   ├── motion.ts                  profile distance shares (step/autoplay/snap-back/repeated/GO_TO)
 │   ├── gesture.ts                 drag config + inertial release config
 │   ├── interaction.ts             hover delay, visibility threshold
-│   ├── buildRawConfig.ts          merges raw input with defaults
+│   ├── buildConfig.ts             merges raw input with defaults
 │   ├── types.ts                   CarouselRuntimeConfig + sub-shapes
 │   └── useCarouselConfig.ts
 ├── context/

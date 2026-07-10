@@ -33,7 +33,7 @@ const useDefault = <T>(value: unknown, fallback: T): T =>
  * carousel intentionally trusts its inputs - see the diagnostic layer for
  * observability.
  */
-export const buildRawCarouselConfig = ({
+export const buildCarouselConfig = ({
   visibleSlidesNr,
   durationAutoplay,
   durationStep,
