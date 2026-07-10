@@ -1,6 +1,6 @@
 import type { MotionPlanSource } from "../motion";
 import type { CarouselNavigation } from "../navigation";
-import type { CarouselState, MotionPhase, MoveReason } from "../state";
+import type { CarouselState, MotionPhase } from "../state";
 import type { VisualPositionSource } from "../position";
 
 export interface CarouselStatusView {
@@ -27,13 +27,10 @@ export interface CarouselLayoutView {
 }
 
 export interface CarouselIntentView {
-  /** Normalised destination page `[0, pageCount)`. The pagination widget tracks
-   * changes to this to advance itself one step per navigation. */
+  /** Normalised destination page `[0, pageCount)`. Pagination marks this dot
+   * active immediately on every command; temporal presentation (the dot
+   * cross-fade, the widget step) rides the motion plan instead. */
   targetPageIndex: number;
-  /** `null` before the carousel has moved for the first time. */
-  moveReason: MoveReason | null;
-  autoplayMotionDuration: number;
-  autoplayPaginationFactor: number;
 }
 
 export type CarouselNavigationView = Pick<

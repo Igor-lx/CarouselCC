@@ -7,6 +7,13 @@
     --pagination-dot-w: 25px;
     --pagination-dot-h: 6px;
     --pagination-dot-radius: 2px;
+    // Dot state values live here as custom properties: the SCSS classes below
+    // consume them, and the engine-driven cross-fade (usePaginationFade)
+    // reads the same three vars to build its WAAPI keyframes — one source of
+    // truth for how an active/inactive dot looks.
+    --pagination-dot-opacity: 0.2;
+    --pagination-dot-opacity-active: 0.8;
+    --pagination-dot-scale-active: 1.5;
 
     display: flex;
     align-items: center;
@@ -26,7 +33,11 @@
     border: none;
     border-radius: var(--pagination-dot-radius);
     background-color: var(--color);
-    opacity: 0.2;
+    opacity: var(--pagination-dot-opacity);
+    // Fallback pacing only: any engine-planned motion overrides this with a
+    // WAAPI cross-fade over the whole step (animations beat transitions);
+    // the transition covers non-planned flips (mount, drag target changes,
+    // the no-WAAPI fallback).
     transition:
       opacity 0.4s,
       transform 0.5s;
@@ -41,8 +52,8 @@
   }
 
   .dotActive {
-    opacity: 0.8;
-    transform: scaleX(1.4);
+    opacity: var(--pagination-dot-opacity-active);
+    transform: scaleX(var(--pagination-dot-scale-active));
     cursor: default;
   }
 

@@ -2,7 +2,6 @@ import { isFiniteNumber } from "../../../../../../shared";
 import {
   AUTOPLAY_ACCELERATION_DISTANCE_SHARE,
   AUTOPLAY_DECELERATION_DISTANCE_SHARE,
-  AUTOPLAY_PAGINATION_FACTOR,
   CAROUSEL_INERTIAL_RELEASE_CONFIG,
   CAROUSEL_SWIPE_CONFIG,
   DRAG_RELEASE_EPSILON,
@@ -248,15 +247,6 @@ const numericRules: NumericRule[] = [
     expected: "Expected a finite number in the range (0, 1]",
     consequence: "IntersectionObserver threshold outside (0,1] makes visibility detection break",
     predicate: inRangeExclusiveLower(0, 1),
-  },
-  {
-    layer: "Interaction",
-    field: "AUTOPLAY_PAGINATION_FACTOR",
-    value: AUTOPLAY_PAGINATION_FACTOR,
-    severity: "LOGICAL",
-    expected: "Expected a finite number in the range [0, 1]",
-    consequence: "Pagination dot delay for autoplay falls out of sync with the visual motion",
-    predicate: inRangeInclusive(0, 1),
   },
 
   // Gesture (swipe config)

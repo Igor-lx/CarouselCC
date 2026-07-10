@@ -4,10 +4,11 @@
  *
  * The motion runner (the only producer) computes each segment ONCE — profile,
  * duration, normalized percent-progress curve — and publishes a plan. Paint
- * consumers (the pagination widget; the track receives the same data directly
- * through `startCompositorMotion`) subscribe and build their own WAAPI
- * animation from it: same `duration`, same `easing`, same `startedAt` clock,
- * their own distance. Time-synchronized by construction, no per-frame work.
+ * consumers (the pagination widget's step, the pagination dots' cross-fade;
+ * the track receives the same data directly through `startCompositorMotion`)
+ * subscribe and build their own WAAPI animation from it: same `duration`,
+ * same curve, same `startedAt` clock, their own animated property — pixels,
+ * dot steps, opacity. Time-synchronized by construction, no per-frame work.
  *
  * The channel is a plain observable value on the stable module context — it
  * never re-renders React; consumers react inside effects/subscriptions.

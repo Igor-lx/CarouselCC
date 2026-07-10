@@ -422,12 +422,14 @@ These are the user-facing behaviours the implementation guarantees.
   transition snaps instantly, the gesture adapter is disabled, and pagination
   dot transitions are killed
   (`[data-reduced-motion="true"] .dot { transition: none }`).
-- **Pagination (`Pagination`).** One dot per page. The active dot reflects
-  the `targetPageIndex` immediately on click and gesture. During
-  *autoplay*, the dot switch is delayed by
-  `autoplayMotionDuration * AUTOPLAY_PAGINATION_FACTOR` (a fraction of the
-  animation) — this matches the historical product behaviour where
-  autoplay rolls the dot later than the visual.
+- **Pagination (`Pagination`).** One dot per page. React marks the
+  `targetPageIndex` dot active immediately on every command; for
+  engine-planned motions (click, autoplay, gesture release) the class flip
+  is masked by a WAAPI **cross-fade** built from the motion plan
+  (`usePaginationFade`, §8.1): the outgoing and incoming dots blend
+  opacity/scale over the plan's own duration and curve, so the dot arrives
+  WITH the picture. Without a plan (drag follow, reduced motion, no-WAAPI
+  fallback) the plain CSS transition owns the switch.
 - **PaginationWidget (touch).** A fixed-width odd-count widget (dot count
   configurable via internal `PAGINATION_WIDGET_DEFAULTS`). Centre
   dot is largest; sides shrink exponentially by `scaleFactor`.
@@ -469,7 +471,7 @@ here only invites doc/code drift. The single source of truth is `config/`:
 - `config/defaults.ts` — public-prop defaults.
 - `config/motion.ts` — motion-profile distance shares (step / autoplay /
   snap-back / repeated-click / GO_TO) and the GO_TO teleport spans.
-- `config/interaction.ts` — hover delay, visibility threshold, autoplay dot factor.
+- `config/interaction.ts` — hover delay, visibility threshold.
 - `config/gesture.ts` — swipe + inertial-release config.
 - `config/constants.ts` — epsilons, render-window buffer.
 - `modules/PaginationWidget/defaults.ts` — widget geometry + write epsilons.
@@ -496,7 +498,7 @@ Every responsibility has exactly one owner. The orchestrator
 | Layout facts | `useCarouselSlideDeck` | `length`, `visibleSlidesCount`, `pageCount`, `virtualLength`, `canSlide`, `isFinite`, `dataKey`. |
 | Logical state | `useCarouselState` | Reducer-backed. Owns `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, optional `teleportVirtualIndex`, `isTeleportApproach`, `motionPhase`, `gesture`, `isRepeatedClickAdvance`, `moveReason`. |
 | Visual sampled position | `useVisualPosition` | Wraps a single `MotionController`. Sole SSOT for the visible track offset. |
-| Motion execution | `useCarouselMotionExecution` + `useMotionRunner` | Owns motion-duration publication and settle feedback, then reads logical state, builds a segment, calls into the controller, and routes compositor-eligible easing segments to the track binding's WAAPI path (§4.5). |
+| Motion execution | `useCarouselMotionExecution` + `useMotionRunner` | Owns settle feedback, then reads logical state, builds a segment, calls into the controller, publishes the motion plan, and routes compositor-eligible easing segments to the track binding's WAAPI path (§4.5). |
 | Track DOM | `useTrackBinding` | Measures slot size and subscribes to visual position; writes `transform`. Also owns the compositor (WAAPI) animation for plain easing steps and suppresses its own per-frame write while that animation runs (§4.5). |
 | Render window | `useSlideRenderModel` | Memoised; expands during motion, snaps on idle. |
 | Image resources | image-resource store (`createImageResourceStore`) | Per-URL render status and retry policy. One instance per carousel; the single authority on image renderability. |
@@ -618,8 +620,8 @@ halves with no cruise zone. Two authoring modes feed the same builder:
 Every segment's temporal shape is then normalized into the percent domain
 (`profileProgressStops`: uniform time samples of distance-progress 0→1) and
 delivered to consumers as-is — each encodes the stops into its own WAAPI
-keyframes, the single consumer-agnostic artefact both the track and the
-pagination widget animate with (§4.5).
+keyframes, the single consumer-agnostic artefact the track, the pagination
+widget, and the pagination dot cross-fade all animate with (§4.5).
 
 ### 4.2 Handoff invariant
 
@@ -730,10 +732,13 @@ to every paint consumer:
   the stable module context as `motionPlan`): `{direction, duration, stops,
   startedAt, targetKey, isContinuation}`. The widget folds the stops into its
   keyframed dot trajectories for one step (§8.2), on the same clock.
+- **Pagination dots** — the same plan channel: `usePaginationFade` blends the
+  outgoing/incoming dots' opacity and scale at each stop (§8.1), on the same
+  clock — the active dot arrives together with the picture.
 
 Because the curve lives in the percent domain, consumers travelling different
-distances (N page screens of track pixels vs one dot step) run the identical
-temporal shape — synchronized by construction.
+distances (N page screens of track pixels vs one dot step vs an opacity delta)
+run the identical temporal shape — synchronized by construction.
 
 The JS controller still runs for **every** segment, composited or not — it
 stays the visual-position SSOT for status snapshots, handoff, settle, and the
@@ -873,8 +878,7 @@ only reads stable data:
 // CarouselMotionContext — high-frequency
 {
   status: { isIdle, isMoving, isJumping, isDragging, motionPhase },
-  intent: { targetPageIndex, moveReason,
-            autoplayMotionDuration, autoplayPaginationFactor },
+  intent: { targetPageIndex },
 }
 ```
 
@@ -893,10 +897,11 @@ others.
 
 Modules that paint motion do **not** depend on context re-renders for it: the
 widget subscribes to `motionPlan` (engine-planned WAAPI steps) and, in follow
-mode only, to `visualPosition` (per-frame drag stream) — both are stable
-observable objects, so publishing never re-renders React. Modules that only
-need the logical view (pagination dots, control availability) read from the
-context and re-render at the React tempo.
+mode only, to `visualPosition` (per-frame drag stream); the pagination dots
+subscribe to the same `motionPlan` for their cross-fade — all stable
+observable objects, so publishing never re-renders React. The logical view
+(which dot is the target, control availability) still flows through context
+at the React tempo.
 
 `Diagnostic`'s presence is surfaced as `layout.isDiagnosticActive` so
 modules with their own checks (`PaginationWidget` via
@@ -909,11 +914,26 @@ modules with their own checks (`PaginationWidget` via
 ### 8.1 `<Pagination />`
 
 Desktop dot pagination. One `PaginationDot` per page. Reads
-`intent.targetPageIndex`, `intent.autoplayMotionDuration`,
-`intent.autoplayPaginationFactor`, and `layout.pageCount` from the
-context. During autoplay, dot switching is delayed by
-`autoplayMotionDuration * autoplayPaginationFactor` via `usePaginationSync`. On
-click, `navigation.handlePageSelect(pageIndex)` is dispatched as `GO_TO`.
+`intent.targetPageIndex` and `layout.pageCount` from the context and
+`motionPlan` from the stable half. On click,
+`navigation.handlePageSelect(pageIndex)` is dispatched as `GO_TO`.
+
+The active dot is the **third consumer of the motion plan** (§4.5): track =
+pixels, widget = dot steps, pagination = opacity. React flips `dotActive` to
+the target immediately; `usePaginationFade` masks the flip with two WAAPI
+animations (outgoing dot → resting look, incoming dot → active look) built by
+`buildFadeKeyframes` from the plan's percent-progress stops, over the plan's
+duration, pinned to the plan's `startedAt` clock — the dot decelerates
+exactly with the deck for every planned motion (click, autoplay, release).
+Dot looks are CSS-owned: the fade reads the same three custom properties
+(`--pagination-dot-opacity`, `--pagination-dot-opacity-active`,
+`--pagination-dot-scale-active`) the classes consume, so fade and resting
+styles cannot disagree. A mid-fade retarget continues from the **painted**
+values (read before `cancel()` drops the fill); far `GO_TO` approach slices
+(`isContinuation`) are ignored — the preflight plan already spans the whole
+command for one-step consumers. Non-planned changes (drag target flips,
+reduced motion where the plan source is `null`, the no-WAAPI fallback) fall
+back to the plain CSS transition under the class flip.
 
 The pagination wrapper carries `aria-hidden="true"`; the dots are pointer
 click-targets but are not exposed to assistive tech. Page indication for
@@ -1013,7 +1033,7 @@ src/components/Carousel/client/
 │   ├── constants.ts               tunable runtime constants (epsilons, buffers)
 │   ├── motion.ts                  profile distance shares (step/autoplay/snap-back/repeated/GO_TO)
 │   ├── gesture.ts                 drag config + inertial release config
-│   ├── interaction.ts             hover delay, visibility threshold, autoplay pagination factor
+│   ├── interaction.ts             hover delay, visibility threshold
 │   ├── buildRawConfig.ts          merges raw input with defaults
 │   ├── types.ts                   CarouselRuntimeConfig + sub-shapes
 │   └── useCarouselConfig.ts
@@ -1048,9 +1068,8 @@ src/components/Carousel/client/
 │   ├── duration.ts                duration-authored step duration resolution
 │   ├── segmentFactory.ts          builds the Segment for the next motion step
 │   ├── sampler.ts                 segment → MotionSampleData at timestamp
-│   ├── autoplayDuration.ts        pure autoplay-step duration derivation
 │   ├── useMotionRunner.ts         state → segment → controller + WAAPI + plan
-│   └── useCarouselMotionExecution.ts  runner + autoplay-duration derivation
+│   └── useCarouselMotionExecution.ts  runner + settle feedback wiring
 ├── position/
 │   ├── types.ts                   VisualPositionFrame, VisualPositionSource
 │   └── useVisualPosition.ts       VisualPositionSource owner

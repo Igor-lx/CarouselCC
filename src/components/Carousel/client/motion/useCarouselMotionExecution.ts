@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 
 import type { MotionController } from "../../../../shared";
 import type { CarouselRuntimeConfig } from "../config";
@@ -6,7 +6,6 @@ import type { TrackBindingApi } from "../geometry";
 import type { CarouselDispatch, CarouselState } from "../state";
 import type { CarouselMotionStrategy } from "./types";
 import type { MotionPlanChannel } from "./planChannel";
-import { resolveAutoplayMotionDuration } from "./autoplayDuration";
 import { useMotionRunner } from "./useMotionRunner";
 
 interface UseCarouselMotionExecutionInput {
@@ -20,15 +19,11 @@ interface UseCarouselMotionExecutionInput {
   publishPlan: MotionPlanChannel["publish"];
 }
 
-interface UseCarouselMotionExecutionResult {
-  autoplayMotionDuration: number;
-}
-
 /**
- * Post-state motion orchestration. The runner stays the sole
- * `state -> segment -> controller` bridge; the autoplay-pagination duration is
- * a pure derivation of the same state, so it is read here with a `useMemo`
- * rather than published back out of the runner.
+ * Post-state motion orchestration: wires the settle feedback into the state
+ * machine and mounts the runner — the sole `state -> segment -> controller`
+ * bridge. Temporal presentation data reaches paint consumers through the
+ * motion-plan channel, not through React values.
  */
 export function useCarouselMotionExecution({
   state,
@@ -39,12 +34,7 @@ export function useCarouselMotionExecution({
   startCompositorMotion,
   cancelCompositorMotion,
   publishPlan,
-}: UseCarouselMotionExecutionInput): UseCarouselMotionExecutionResult {
-  const autoplayMotionDuration = useMemo(
-    () => resolveAutoplayMotionDuration({ state, config, isInstantMode }),
-    [config, isInstantMode, state],
-  );
-
+}: UseCarouselMotionExecutionInput): void {
   const handleMotionSettled = useCallback(
     (settledPosition: number) =>
       dispatch({ type: "MOTION_SETTLED", settledPosition }),
@@ -61,6 +51,4 @@ export function useCarouselMotionExecution({
     publishPlan,
     onSettle: handleMotionSettled,
   });
-
-  return { autoplayMotionDuration };
 }

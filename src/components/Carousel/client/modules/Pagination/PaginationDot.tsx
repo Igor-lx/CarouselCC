@@ -1,20 +1,23 @@
 import clsx from "clsx";
-import { memo, useCallback } from "react";
+import { memo, useCallback, type Ref } from "react";
 
 import type { PaginationClassMap } from "./types";
 
 interface PaginationDotProps {
   pageIndex: number;
-  displayedPageIndex: number;
+  isActive: boolean;
   classNames: PaginationClassMap;
   onPageSelect: (pageIndex: number) => void;
+  /** Element ref for the engine-driven cross-fade binding. */
+  ref?: Ref<HTMLButtonElement>;
 }
 
 export const PaginationDot = memo(function PaginationDot({
   pageIndex,
-  displayedPageIndex,
+  isActive,
   classNames,
   onPageSelect,
+  ref,
 }: PaginationDotProps) {
   const handleClick = useCallback(
     () => onPageSelect(pageIndex),
@@ -26,10 +29,9 @@ export const PaginationDot = memo(function PaginationDot({
     [],
   );
 
-  const isActive = pageIndex === displayedPageIndex;
-
   return (
     <button
+      ref={ref}
       type="button"
       className={clsx(classNames.dot, isActive && classNames.dotActive)}
       onMouseDown={handleMouseDown}

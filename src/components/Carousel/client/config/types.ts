@@ -54,7 +54,6 @@ export interface RepeatedClickSettings {
 export interface InteractionSettings {
   hoverPauseDelay: number;
   visibilityThreshold: number;
-  autoplayPaginationFactor: number;
 }
 
 export interface LayoutSettings {

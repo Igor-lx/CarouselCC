@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 
-import type { CarouselRuntimeConfig } from "../config";
 import type { MotionPlanSource } from "../motion";
 import type { CarouselNavigation } from "../navigation";
 import type { VisualPositionSource } from "../position";
@@ -16,11 +15,9 @@ import type {
 
 interface UseModuleContextValueInput {
   state: CarouselState;
-  config: CarouselRuntimeConfig;
   navigation: CarouselNavigation;
   isTouch: boolean;
   isReducedMotion: boolean;
-  autoplayMotionDuration: number;
   visualPosition: VisualPositionSource | null;
   motionPlan: MotionPlanSource | null;
   isAtStart: boolean;
@@ -30,11 +27,9 @@ interface UseModuleContextValueInput {
 
 export function useModuleContextValue({
   state,
-  config,
   navigation,
   isTouch,
   isReducedMotion,
-  autoplayMotionDuration,
   visualPosition,
   motionPlan,
   isAtStart,
@@ -80,18 +75,8 @@ export function useModuleContextValue({
   );
 
   const intentView = useMemo<CarouselIntentView>(
-    () => ({
-      targetPageIndex: state.targetPageIndex,
-      moveReason: state.moveReason,
-      autoplayMotionDuration,
-      autoplayPaginationFactor: config.interaction.autoplayPaginationFactor,
-    }),
-    [
-      autoplayMotionDuration,
-      config.interaction.autoplayPaginationFactor,
-      state.moveReason,
-      state.targetPageIndex,
-    ],
+    () => ({ targetPageIndex: state.targetPageIndex }),
+    [state.targetPageIndex],
   );
 
   const navigationView = useMemo(

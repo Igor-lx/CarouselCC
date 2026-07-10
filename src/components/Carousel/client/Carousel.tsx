@@ -183,8 +183,8 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   }
   const planChannel = planChannelRef.current;
 
-  // --- motion execution: state -> controller, autoplay duration signal -----
-  const { autoplayMotionDuration } = useCarouselMotionExecution({
+  // --- motion execution: state -> controller --------------------------------
+  useCarouselMotionExecution({
     state,
     config,
     controller,
@@ -260,11 +260,9 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   const { stable: stableContextValue, motion: motionContextValue } =
     useModuleContextValue({
       state,
-      config,
       navigation,
       isTouch,
       isReducedMotion: isInstantMode,
-      autoplayMotionDuration,
       visualPosition: isInstantMode ? null : visualPosition,
       motionPlan: isInstantMode ? null : planChannel.source,
       isAtStart,
