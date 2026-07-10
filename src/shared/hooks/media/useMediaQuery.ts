@@ -9,6 +9,7 @@ import { useSyncExternalStore } from "react";
  * so a later re-subscribe re-reads the live `matchMedia` state cleanly —
  * mirroring the teardown contract of the other module-store hooks.
  */
+
 interface MediaQueryStore {
   subscribe: (callback: () => void) => () => void;
   getSnapshot: () => boolean;
@@ -69,7 +70,12 @@ const getServerSnapshot = () => false;
  * another store. Backed by `useSyncExternalStore` (SSR/hydration handled via
  * the `false` server snapshot).
  */
+
 export function useMediaQuery(query: string): boolean {
   const store = getStore(query);
-  return useSyncExternalStore(store.subscribe, store.getSnapshot, getServerSnapshot);
+  return useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    getServerSnapshot
+  );
 }

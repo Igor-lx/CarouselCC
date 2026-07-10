@@ -28,7 +28,7 @@ import { useTheme } from "../theme/useTheme";
  * constant by hand, or override per visit with `?slides=1|2` in the URL
  * (handy on a deployed build).
  */
-const DEFAULT_SLIDES_SET: 1 | 2 = 1;
+const DEFAULT_SLIDES_SET: 1 | 2 = 2;
 
 const SLIDES_SET: 1 | 2 = (() => {
   const raw = new URLSearchParams(window.location.search).get("slides");
@@ -38,7 +38,7 @@ const SLIDES_SET: 1 | 2 = (() => {
 })();
 
 const VISIBLE_BY_BREAKPOINT = {
-  DESKTOP: 2,
+  DESKTOP: 3,
   TABLET: 2,
   MOBILE: 1,
   DEFAULT: 3,
@@ -47,7 +47,9 @@ const VISIBLE_BY_BREAKPOINT = {
 const COMPACT_LANDSCAPE_VISIBLE_SLIDES = 2;
 
 /** The generated content document, served from `public/` (see `npm run gen:carousel`). */
-const SLIDES_DATA_URL = `${import.meta.env.BASE_URL}carousel-slides${SLIDES_SET}.json`;
+const SLIDES_DATA_URL = `${
+  import.meta.env.BASE_URL
+}carousel-slides${SLIDES_SET}.json`;
 
 const openSlide = (slide: Slide) => {
   window.open(String(slide.content), "_blank");
@@ -55,6 +57,7 @@ const openSlide = (slide: Slide) => {
 
 export default function App() {
   const { toggleTheme, theme } = useTheme();
+
   // One read of the user environment at the app boundary: used here for the
   // responsive layout and forwarded whole into <Carousel> (which never detects
   // the environment itself). The hook returns a memoised, stable object.

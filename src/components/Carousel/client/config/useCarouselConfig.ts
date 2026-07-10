@@ -43,6 +43,6 @@ export function useCarouselConfig({
       intervalAutoplay,
       jumpSpeedMultiplier,
       visibleSlidesNr,
-    ],
+    ]
   );
 }

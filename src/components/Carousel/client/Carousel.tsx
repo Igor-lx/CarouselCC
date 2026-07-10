@@ -1,13 +1,7 @@
-import {
-  memo,
-  useCallback,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-} from "react";
+import { memo, useImperativeHandle, useMemo, useRef } from "react";
 
 import styles from "./Carousel.module.scss";
-import { mergeStyleMaps, resolveSlots, useViewportVisibility } from "../../../shared";
+import { mergeStyleMaps, resolveSlots } from "../../../shared";
 import { CAROUSEL_DEFAULTS, useCarouselConfig } from "./config";
 import {
   CarouselDiagnosticContext,
@@ -17,7 +11,7 @@ import {
   useModuleContextValue,
 } from "./context";
 import { carouselBoundaryState, slideFlexStyle } from "./domain";
-import { useAutoplay } from "./autoplay/useAutoplay";
+import { useCarouselAutoplay } from "./autoplay/useCarouselAutoplay";
 import { useFocusRecovery } from "./focus/useFocusRecovery";
 import { useCarouselGesture } from "./gesture";
 import { useResponsiveImageSizes, useTrackBinding } from "./geometry";
@@ -233,36 +227,17 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     config,
   });
 
-  // --- visibility (for autoplay pause) -------------------------------------
-  const visible = useViewportVisibility({
-    elementRef: viewportRef,
-    threshold: config.interaction.visibilityThreshold,
-  });
-
-  // --- autoplay -------------------------------------------------------------
-  // Step handlers must be referentially stable: they sit in the deps of the
-  // autoplay interval effect, and a fresh identity per render would restart
-  // the setTimeout on every re-render — the interval would then be measured
-  // from the last render instead of the last tick.
-  const handleAutoplayStep = useCallback(
-    () => navigation.move(1, "autoplay"),
-    [navigation],
-  );
-  const handleAutoplayLoopToStart = useCallback(
-    () => navigation.goTo(0, "autoplay"),
-    [navigation],
-  );
-
-  const autoplayPaused = !visible || status.isDragging || status.isMoving;
-  const { handleHoverChange } = useAutoplay({
-    enabled: isAuto && layout.canSlide,
-    isPaused: autoplayPaused,
+  // --- autoplay (visibility-aware) ------------------------------------------
+  // One call owns the whole loop: viewport visibility, the pause rule, and
+  // stable step handlers — see useCarouselAutoplay.
+  const { handleHoverChange } = useCarouselAutoplay({
+    state,
+    config,
+    navigation,
+    isAuto,
+    isTouch,
     isAtEnd,
-    intervalMs: config.autoplayInterval,
-    hoverPauseDelayMs: config.interaction.hoverPauseDelay,
-    ignoreHover: isTouch,
-    onStep: handleAutoplayStep,
-    onGoToStart: handleAutoplayLoopToStart,
+    viewportRef,
   });
 
   // --- focus recovery after settle -----------------------------------------
