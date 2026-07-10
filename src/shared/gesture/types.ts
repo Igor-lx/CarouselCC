@@ -49,17 +49,31 @@ export interface PointerSwipeListeners {
   onLostPointerCapture?: (e: ReactPointerEvent) => void;
 }
 
+/**
+ * Everything the host element needs, as ONE spreadable bundle:
+ * `<div {...hostProps}>`. The `ref` inside is what makes an element the
+ * host, so the listeners, the required styles and the engine's native
+ * suppressors land on the same element by construction. `ref` is always
+ * present; listeners and `style` only while enabled.
+ */
+export interface PointerSwipeHostProps extends PointerSwipeListeners {
+  ref: (node: HTMLElement | null) => void;
+  style?: CSSProperties;
+}
+
+/** A consumer-side ref the engine forwards the host element into. */
+export type PointerSwipeHostRef =
+  | ((node: HTMLElement | null) => void)
+  | { current: HTMLElement | null };
+
 export interface PointerSwipeProps {
   /**
-   * The gesture HOST element — required, no internal fallback. HARD CONTRACT:
-   * this must be the very element the returned `listeners` (and `hostStyle`)
-   * are applied to. The engine ties three things to it: native click/touchmove
-   * suppression during a gesture, pointer-capture release, and the fallback
-   * width measurement for the swipe-distance threshold (the primary width is
-   * read from the event's `currentTarget` — the same element when the
-   * contract holds).
+   * OPTIONAL consumer ref: the engine owns the host element itself through
+   * `hostProps.ref` and forwards the node here, so a consumer that also
+   * needs the element (visibility, focus, measurement) does not wire a
+   * second ref onto the DOM node.
    */
-  hostRef: React.RefObject<HTMLElement | null>;
+  hostRef?: PointerSwipeHostRef;
   enabled?: boolean;
   config?: PointerSwipeConfig;
   onPressStart?: () => void;
@@ -69,12 +83,7 @@ export interface PointerSwipeProps {
 }
 
 export interface PointerSwipeResult {
-  /** Pointer handlers to spread onto the host element. Empty when disabled. */
-  listeners: PointerSwipeListeners;
-  /**
-   * Styles the engine requires on the host (`touch-action`, `user-select`,
-   * overscroll containment). Handed out separately from `listeners` so the
-   * consumer merges it with its own `style` consciously. Empty when disabled.
-   */
-  hostStyle: CSSProperties;
+  /** Spread onto the host element: `<div {...hostProps}>` — ref, listeners
+   * and required styles in one inseparable bundle. */
+  hostProps: PointerSwipeHostProps;
 }

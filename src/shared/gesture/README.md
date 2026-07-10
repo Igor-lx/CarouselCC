@@ -1,8 +1,8 @@
 # Pointer-swipe gesture engine
 
 A self-sufficient, component-agnostic touch-gesture engine. One hook call
-wires complete, production-grade horizontal swipe handling into any component:
-pass a ref, spread the listeners, react to the callbacks — done. Everything a
+wires complete, production-grade horizontal swipe handling into any
+component: spread `hostProps` onto an element, react to the callbacks — done. Everything a
 consumer may need is exported from this folder's facade (`index.ts`);
 `internals/` is private machinery.
 
@@ -20,13 +20,11 @@ consumer may need is exported from this folder's facade (`index.ts`);
 import { usePointerSwipe } from "shared";
 
 function Strip() {
-  const hostRef = useRef<HTMLDivElement>(null);
-  const { listeners, hostStyle } = usePointerSwipe({
-    hostRef,
+  const { hostProps } = usePointerSwipe({
     onDragMove: ({ uiOffset }) => trackEl.style.transform = `translateX(${uiOffset}px)`,
     onRelease: ({ direction, uiOffset, uiReleaseVelocity }) => settle(direction),
   });
-  return <div ref={hostRef} style={hostStyle} {...listeners}>…</div>;
+  return <div {...hostProps}>…</div>;
 }
 ```
 
@@ -35,22 +33,21 @@ No config is required — the engine ships its own tuning
 A component with opinions overrides only what it cares about; a component
 without any passes nothing.
 
-## The host contract (the one hard rule)
+## The host element — enforced by construction
 
-`hostRef` is **required** (no internal fallback ref — one element, no
-guessing) and it MUST point to the same element that receives `listeners` and
-`hostStyle`. The engine ties three things to that element:
+The engine OWNS its host element: the only way an element becomes the host is
+the `ref` inside `hostProps`, and it travels in one inseparable bundle with
+the listeners and the required styles (`touch-action: pan-y`,
+`user-select: none`, overscroll containment). `<div {...hostProps}>` — and
+there is no wiring left to get wrong: the native `click` / `touchmove`
+suppressors, pointer capture, the width measurement and the pointer handlers
+all land on the same element by construction.
 
-1. native `click` / `touchmove` suppression while a gesture is live;
-2. pointer-capture acquisition and release;
-3. the fallback width measurement for the swipe-distance threshold (the
-   primary width is read from the event's `currentTarget` — the same element
-   when the contract holds).
-
-`hostStyle` is handed out **separately** from the listeners on purpose: it
-carries styles the engine needs on the host (`touch-action: pan-y`,
-`user-select: none`, overscroll containment) and the consumer merges it with
-its own `style` consciously — a spread never silently wins or loses.
+A consumer that also needs the element for its own concerns (visibility
+observers, focus management, measurement) passes an optional `hostRef` — the
+engine forwards the host node into it, so the DOM node carries a single ref.
+Note `hostProps` also carries `style`: a consumer styling the host element
+via its own `style` prop should merge, not double-assign.
 
 ## Lifecycle and callbacks
 
@@ -72,8 +69,9 @@ the engine keeps its state in refs and talks only through callbacks:
   finger, px/ms) and `uiReleaseVelocity` (EMA-smoothed UI offset velocity,
   px/ms) let the consumer build inertial follow-through.
 
-`enabled: false` removes the surface entirely: empty `listeners`, empty
-`hostStyle`, no native handlers — as if the engine was never wired.
+`enabled: false` removes the surface entirely: `hostProps` keeps only the
+`ref` (so re-enabling and the forwarded consumer ref keep working) — no
+listeners, no styles, no native handlers, as if the engine was never wired.
 
 ## Interactive children and the escape hatch
 
@@ -101,8 +99,8 @@ what happens after release is entirely the consumer's business.
 
 | Export | What it is |
 | --- | --- |
-| `usePointerSwipe` | The engine hook. |
+| `usePointerSwipe` | The engine hook — returns `{ hostProps }` to spread onto the host. |
 | `POINTER_SWIPE_DEFAULTS` | The built-in resolved tuning (a partial `config` merges over it). |
 | `resolveInertialRelease`, `sameDirectionSpeed` | Release-speed math for consumer-side follow-through. |
 | `DRAG_IGNORE_ATTRIBUTE` | Opt-out attribute name for drag-starting. |
-| `PointerSwipeConfig`, `ResolvedPointerSwipeConfig`, `PointerSwipeProps`, `PointerSwipeResult`, `PointerSwipeListeners`, `PointerSwipeMovePayload`, `PointerSwipeReleasePayload`, `PointerSwipeDirection`, `InertialReleaseConfig`, `InertialReleaseResult` | The full public type surface. |
+| `PointerSwipeConfig`, `ResolvedPointerSwipeConfig`, `PointerSwipeProps`, `PointerSwipeResult`, `PointerSwipeHostProps`, `PointerSwipeHostRef`, `PointerSwipeListeners`, `PointerSwipeMovePayload`, `PointerSwipeReleasePayload`, `PointerSwipeDirection`, `InertialReleaseConfig`, `InertialReleaseResult` | The full public type surface. |

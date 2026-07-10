@@ -3,6 +3,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   type CSSProperties,
 } from "react";
 import {
@@ -16,7 +17,7 @@ import {
 } from "./internals/index";
 import type {
   PointerSwipeConfig,
-  PointerSwipeListeners,
+  PointerSwipeHostProps,
   PointerSwipeMovePayload,
   PointerSwipePhase,
   PointerSwipeProps,
@@ -61,8 +62,6 @@ interface InternalSample {
   timestamp: number;
 }
 
-const EMPTY_STYLE: CSSProperties = {};
-
 const createIdleSample = (width = 0, timestamp = 0): InternalSample => ({
   rawOffset: 0,
   uiOffset: 0,
@@ -78,7 +77,7 @@ const resolveConfig = (config?: PointerSwipeConfig): ResolvedPointerSwipeConfig 
 });
 
 export function usePointerSwipe({
-  hostRef,
+  hostRef: externalHostRef,
   enabled = true,
   config,
   onPressStart,
@@ -114,6 +113,27 @@ export function usePointerSwipe({
   const setPhase = useCallback((phase: PointerSwipePhase) => {
     phaseRef.current = phase;
   }, []);
+
+  // The engine owns the host element itself: `hostProps.ref` below is the
+  // ONLY way an element becomes the host, so the listeners, the host styles
+  // and the native suppressors land on the same element BY CONSTRUCTION —
+  // there is no wiring contract a consumer could get wrong. The ref-state
+  // pair exists because the native-listener effect must re-run when the host
+  // node itself changes, not only when `enabled` flips.
+  const hostElementRef = useRef<HTMLElement | null>(null);
+  const [hostElement, setHostElement] = useState<HTMLElement | null>(null);
+
+  const setHostNode = useCallback(
+    (node: HTMLElement | null) => {
+      hostElementRef.current = node;
+      setHostElement(node);
+      // Forward to the consumer's own ref (optional): the consumer often
+      // needs the same element for its own concerns.
+      if (typeof externalHostRef === "function") externalHostRef(node);
+      else if (externalHostRef) externalHostRef.current = node;
+    },
+    [externalHostRef],
+  );
 
   const ensureCapture = useCallback((target: HTMLElement, pointerId: number) => {
     const gesture = gestureRef.current;
@@ -188,7 +208,7 @@ export function usePointerSwipe({
 
   const finishInteraction = useCallback(
     (isCancel = false, currentX?: number) => {
-      const target = hostRef.current;
+      const target = hostElementRef.current;
       const now = performance.now();
       const phase = phaseRef.current;
       const gesture = gestureRef.current;
@@ -280,7 +300,7 @@ export function usePointerSwipe({
       gesture.isActivated = false;
       gesture.width = 0;
     },
-    [createSample, hostRef, onRelease, setPhase],
+    [createSample, onRelease, setPhase],
   );
 
   const handlePointerDown = useCallback(
@@ -378,7 +398,7 @@ export function usePointerSwipe({
   );
 
   useEffect(() => {
-    const element = hostRef.current;
+    const element = hostElement;
     if (!element || !enabled) return;
 
     const suppressClick = (event: MouseEvent) => {
@@ -427,22 +447,24 @@ export function usePointerSwipe({
         timeoutRef.current = null;
       }
     };
-  }, [enabled, hostRef]);
+  }, [enabled, hostElement]);
 
-  const listeners = useMemo<PointerSwipeListeners>(() => {
-    if (!enabled) return {};
+  // One inseparable bundle: the ref that MAKES an element the host travels
+  // together with the listeners and the required styles, so they cannot be
+  // applied to different elements. `ref` is present even while disabled —
+  // re-enabling and the forwarded consumer ref keep working.
+  const hostProps = useMemo<PointerSwipeHostProps>(() => {
+    if (!enabled) return { ref: setHostNode };
     return {
+      ref: setHostNode,
+      style: HOST_STYLES,
       onPointerDown: handlePointerDown,
       onPointerMove: handlePointerMove,
       onPointerUp: (event) => finishInteraction(false, event.clientX),
       onPointerCancel: (event) => finishInteraction(true, event.clientX),
       onLostPointerCapture: (event) => finishInteraction(true, event.clientX),
     };
-  }, [enabled, finishInteraction, handlePointerDown, handlePointerMove]);
+  }, [enabled, finishInteraction, handlePointerDown, handlePointerMove, setHostNode]);
 
-  // Handed out separately from the listeners so the consumer merges it with
-  // its own `style` consciously instead of a spread silently winning/losing.
-  const hostStyle = enabled ? HOST_STYLES : EMPTY_STYLE;
-
-  return { listeners, hostStyle };
+  return { hostProps };
 }

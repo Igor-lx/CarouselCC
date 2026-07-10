@@ -217,7 +217,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   );
 
   // --- gesture --------------------------------------------------------------
-  const { listeners: dragListeners, hostStyle: dragHostStyle } = useCarouselGesture({
+  const { hostProps: dragHostProps } = useCarouselGesture({
     viewportRef,
     layout,
     isSwipeOn,
@@ -328,14 +328,14 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
             data-reduced-motion={isInstantMode}
           >
             <div
-              ref={viewportRef}
               tabIndex={-1}
               className={classNames.innerContainer}
               data-carousel-viewport=""
               onMouseEnter={() => handleHoverChange(true)}
               onMouseLeave={() => handleHoverChange(false)}
-              style={dragHostStyle}
-              {...dragListeners}
+              // ref + listeners + engine styles, one bundle: the engine owns
+              // the host and forwards the node into viewportRef.
+              {...dragHostProps}
             >
               <div
                 ref={trackRef}

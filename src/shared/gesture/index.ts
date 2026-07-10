@@ -16,6 +16,8 @@ export type {
 export type {
   PointerSwipeConfig,
   ResolvedPointerSwipeConfig,
+  PointerSwipeHostProps,
+  PointerSwipeHostRef,
   PointerSwipeListeners,
   PointerSwipeMovePayload,
   PointerSwipeProps,

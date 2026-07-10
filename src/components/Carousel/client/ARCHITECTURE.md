@@ -804,10 +804,11 @@ full standalone contract) provides `usePointerSwipe` — a generic horizontal
 pointer-swipe primitive (touch-only, built-in defaults with per-field config
 merge, EMA-smoothed velocity with progressive distance resistance, intent
 threshold, quick-flick detection, capture / cooldown). The engine hands back
-`{ listeners, hostStyle }`; both go onto the SAME element `hostRef` points to
-(the engine's one hard contract). It is not carousel-specific and is
-reusable; the carousel overrides every tuning field with its own
-`CAROUSEL_SWIPE_CONFIG`.
+one spreadable `hostProps` bundle (ref + listeners + required styles), so the
+host element is correct BY CONSTRUCTION; the carousel's `viewportRef` is
+filled through the engine's optional `hostRef` forwarding. It is not
+carousel-specific and is reusable; the carousel overrides every tuning field
+with its own `CAROUSEL_SWIPE_CONFIG`.
 
 `useCarouselGesture` is the carousel-specific adapter. It:
 
