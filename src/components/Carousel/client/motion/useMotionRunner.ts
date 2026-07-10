@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 
 import {
+  motionNow,
   useIsomorphicLayoutEffect,
   type MotionController,
   type MotionSample,
@@ -37,8 +38,7 @@ export interface UseMotionRunnerInput {
   onSettle: (settledPosition: number) => void;
 }
 
-const now = (): number =>
-  typeof performance !== "undefined" ? performance.now() : Date.now();
+
 
 const directionOf = (delta: number): MotionPlanDirection =>
   delta > 0 ? 1 : delta < 0 ? -1 : 0;
@@ -272,7 +272,7 @@ export function useMotionRunner({
       // of the curve that is painting now. The rebuild happens synchronously
       // in this commit — the old compositor animation carries the pixels
       // until the new one replaces it.
-      const handoff = controller.captureHandoff(now());
+      const handoff = controller.captureHandoff(motionNow());
       startResolvedMotion(
         {
           position: handoff.position,
@@ -284,7 +284,7 @@ export function useMotionRunner({
       return;
     }
 
-    const startedAt = now();
+    const startedAt = motionNow();
 
     if (state.moveReason === "gesture") {
       startResolvedMotion(buildStartFromGesture(state), startedAt);

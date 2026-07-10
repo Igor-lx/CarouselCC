@@ -10,9 +10,7 @@ import type {
   MotionStartOptions,
   MotionSubscriber,
 } from "./types";
-
-const now = () =>
-  typeof performance !== "undefined" ? performance.now() : Date.now();
+import { motionNow as now } from "./clock";
 
 const requestFrame = (callback: FrameRequestCallback): number | null =>
   typeof window === "undefined" ? null : window.requestAnimationFrame(callback);

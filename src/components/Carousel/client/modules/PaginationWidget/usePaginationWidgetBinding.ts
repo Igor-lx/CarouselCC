@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 
-import { useIsomorphicLayoutEffect } from "../../../../../shared";
+import { motionNow, useIsomorphicLayoutEffect } from "../../../../../shared";
 import {
   sampleProgressStops,
   type CarouselMotionPlan,
@@ -72,8 +72,7 @@ const emptyDotState = (): PaginationWidgetDotState => ({
 const toTransform = (x: number, scale: number) =>
   `translate3d(${x}px, 0, 0) scale(${scale})`;
 
-const now = (): number =>
-  typeof performance !== "undefined" ? performance.now() : Date.now();
+
 
 /**
  * Cache the *inputs* to the per-frame transform, not the formatted string.
@@ -310,7 +309,7 @@ export function usePaginationWidgetBinding({
     const step = stepRef.current;
     if (!step) return offsetRef.current;
     const fraction =
-      step.duration > 0 ? (now() - step.startedAt) / step.duration : 1;
+      step.duration > 0 ? (motionNow() - step.startedAt) / step.duration : 1;
     const progress = sampleProgressStops(step.stops, fraction);
     return step.from + (step.target - step.from) * progress;
   }, []);
