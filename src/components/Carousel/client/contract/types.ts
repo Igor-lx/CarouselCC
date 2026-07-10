@@ -14,21 +14,18 @@ import type {
  * below derive from the same definition. These two arrays are the only runtime
  * values this otherwise type-only module emits.
  */
-export const CLASS_NAME_KEYS = [
-  "outerContainer",
-  "innerContainer",
-  "slideContainer",
+export const SLIDE_CLASS_KEYS = [
   "slide",
   "slideInteractive",
   "slideError",
   "slideText",
 ] as const;
 
-export const SLIDE_CLASS_KEYS = [
-  "slide",
-  "slideInteractive",
-  "slideError",
-  "slideText",
+export const CLASS_NAME_KEYS = [
+  "outerContainer",
+  "innerContainer",
+  "slideContainer",
+  ...SLIDE_CLASS_KEYS,
 ] as const;
 
 export type ClassNameKey = (typeof CLASS_NAME_KEYS)[number];

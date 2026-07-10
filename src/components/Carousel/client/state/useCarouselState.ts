@@ -1,21 +1,14 @@
 import { useCallback, useMemo, useReducer, useRef } from "react";
 
-import type { CarouselLayout } from "../domain";
-import type { CarouselRuntimeConfig } from "../config";
 import { buildInitialState, motionStatus } from "./initial";
 import { reconcileStateToLayout } from "./reconcile";
 import { carouselReducer } from "./reducer";
 import type {
   CarouselCommand,
   CarouselState,
+  ReducerContext,
   ReducerEnvelope,
 } from "./types";
-
-interface UseCarouselStateInput {
-  layout: CarouselLayout;
-  config: CarouselRuntimeConfig;
-  isInstantMode: boolean;
-}
 
 export type CarouselDispatch = (command: CarouselCommand) => void;
 
@@ -29,7 +22,7 @@ export function useCarouselState({
   layout,
   config,
   isInstantMode,
-}: UseCarouselStateInput): UseCarouselStateResult {
+}: ReducerContext): UseCarouselStateResult {
   const [committedState, dispatchRaw] = useReducer(
     carouselReducer,
     layout,

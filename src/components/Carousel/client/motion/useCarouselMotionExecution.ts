@@ -1,22 +1,13 @@
 import { useCallback } from "react";
 
-import type { MotionController } from "../../../../shared";
-import type { CarouselRuntimeConfig } from "../config";
-import type { TrackBindingApi } from "../geometry";
-import type { CarouselDispatch, CarouselState } from "../state";
-import type { CarouselMotionStrategy } from "./types";
-import type { MotionPlanChannel } from "./planChannel";
-import { useMotionRunner } from "./useMotionRunner";
+import type { CarouselDispatch } from "../state";
+import { useMotionRunner, type UseMotionRunnerInput } from "./useMotionRunner";
 
-interface UseCarouselMotionExecutionInput {
-  state: CarouselState;
-  config: CarouselRuntimeConfig;
-  controller: MotionController<CarouselMotionStrategy>;
+/** The runner's own input, with the settle callback replaced by the dispatch
+ * it is derived from — adding a runner field extends this hook automatically. */
+interface UseCarouselMotionExecutionInput
+  extends Omit<UseMotionRunnerInput, "onSettle"> {
   dispatch: CarouselDispatch;
-  isInstantMode: boolean;
-  startCompositorMotion: TrackBindingApi["startCompositorMotion"];
-  cancelCompositorMotion: TrackBindingApi["cancelCompositorMotion"];
-  publishPlan: MotionPlanChannel["publish"];
 }
 
 /**
@@ -26,14 +17,8 @@ interface UseCarouselMotionExecutionInput {
  * motion-plan channel, not through React values.
  */
 export function useCarouselMotionExecution({
-  state,
-  config,
-  controller,
   dispatch,
-  isInstantMode,
-  startCompositorMotion,
-  cancelCompositorMotion,
-  publishPlan,
+  ...runnerInput
 }: UseCarouselMotionExecutionInput): void {
   const handleMotionSettled = useCallback(
     (settledPosition: number) =>
@@ -41,14 +26,5 @@ export function useCarouselMotionExecution({
     [dispatch],
   );
 
-  useMotionRunner({
-    state,
-    config,
-    controller,
-    isInstantMode,
-    startCompositorMotion,
-    cancelCompositorMotion,
-    publishPlan,
-    onSettle: handleMotionSettled,
-  });
+  useMotionRunner({ ...runnerInput, onSettle: handleMotionSettled });
 }

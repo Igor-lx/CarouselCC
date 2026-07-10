@@ -19,7 +19,7 @@ import { sampleCarouselSegment } from "./sampler";
 import { resolveGoToApproachDuration, resolveJumpPeakSpeed } from "./timing";
 import type { CarouselMotionStrategy, MotionStart } from "./types";
 
-interface UseMotionRunnerInput {
+export interface UseMotionRunnerInput {
   state: CarouselState;
   config: CarouselRuntimeConfig;
   controller: MotionController<CarouselMotionStrategy>;

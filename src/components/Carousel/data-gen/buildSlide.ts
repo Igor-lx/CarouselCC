@@ -17,12 +17,11 @@ export interface ImageCandidate {
   width: number;
 }
 
-/** An art-directed variant the browser uses only when `media` matches. */
-export interface ArtDirectedSource {
-  media: string;
+/** An art-directed variant the browser uses only when `media` matches — the
+ * emitted `GeneratedImageSource`, with raw `candidates` in place of the
+ * assembled `srcSet` string. */
+export interface ArtDirectedSource extends Omit<GeneratedImageSource, "srcSet"> {
   candidates: ImageCandidate[];
-  sizes?: string;
-  type?: string;
 }
 
 export interface BuildSlideInput {

@@ -1,4 +1,5 @@
 import { isFiniteNumber } from "../../../../../../shared";
+import type { PaginationWidgetProps } from "../../PaginationWidget/types";
 import type { CarouselDiagnosticWarning } from "../types";
 
 const LAYER = "PaginationWidget";
@@ -12,12 +13,13 @@ const isNonNegativeFinite = (value: unknown): value is number =>
 const isOddIntegerAtLeastThree = (value: unknown): value is number =>
   isFiniteNumber(value) && Number.isInteger(value) && value >= 3 && value % 2 === 1;
 
-export interface WidgetDiagnosticInput {
-  visibleDots: unknown;
-  dotSize: unknown;
-  dotGap: unknown;
-  scaleFactor: unknown;
-}
+/** The widget's own tunable props, values widened to `unknown`: Diagnostics
+ * audits the RAW values the caller wrote. Keying the shape on
+ * `PaginationWidgetProps` (type-only import; erased) means a new widget prop
+ * grows a required field here, forcing an explicit audit decision. */
+export type WidgetDiagnosticInput = {
+  [K in keyof Omit<PaginationWidgetProps, "className">]-?: unknown;
+};
 
 /**
  * Audit PaginationWidget props. Each entry fires when the *resolved* value
