@@ -5,6 +5,11 @@ import { useIsomorphicLayoutEffect } from "../../../../shared";
 
 const SIZE_EPSILON_PX = 1;
 
+interface UseResponsiveImageSizesInput {
+  viewportRef: RefObject<HTMLElement | null>;
+  visibleSlidesCount: number;
+}
+
 /**
  * The `sizes` attribute for the responsive slide images, derived from the
  * carousel's *measured* slot width rather than a `vw` formula.
@@ -29,10 +34,10 @@ const SIZE_EPSILON_PX = 1;
  * the same viewport element the track binding measures, so there is one
  * measurement definition, not two.
  */
-export function useResponsiveImageSizes(
-  viewportRef: RefObject<HTMLElement | null>,
-  visibleSlidesCount: number,
-): string {
+export function useResponsiveImageSizes({
+  viewportRef,
+  visibleSlidesCount,
+}: UseResponsiveImageSizesInput): string {
   const [slotPx, setSlotPx] = useState<number | null>(null);
 
   useIsomorphicLayoutEffect(() => {

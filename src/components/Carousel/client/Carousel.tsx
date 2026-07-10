@@ -125,10 +125,10 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // Carousel-owned default `sizes` for responsive slide images, measured from
   // the real (capped + padded) slot so the browser never up-picks a candidate
   // larger than the slot actually needs (see `useResponsiveImageSizes`).
-  const imageSizes = useResponsiveImageSizes(
+  const imageSizes = useResponsiveImageSizes({
     viewportRef,
-    layout.visibleSlidesCount,
-  );
+    visibleSlidesCount: layout.visibleSlidesCount,
+  });
 
   // Read-only, low-frequency status reported to the host (deduplicated;
   // reflects intent immediately — see useCarouselStatusReporter).
