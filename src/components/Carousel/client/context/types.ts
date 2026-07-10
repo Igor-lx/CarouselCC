@@ -1,7 +1,7 @@
 import type { MotionPlanSource } from "../motion";
 import type { CarouselNavigation } from "../navigation";
 import type { CarouselState, MotionPhase } from "../state";
-import type { VisualPositionSource } from "../position";
+import type { VisualPositionSource } from "../visual-position";
 
 export interface CarouselStatusView {
   motionPhase: MotionPhase;

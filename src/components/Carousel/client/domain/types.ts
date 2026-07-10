@@ -1,4 +1,4 @@
-import type { Slide } from "../contract/types";
+import type { Slide } from "../public-api/types";
 
 export interface CarouselLayout {
   length: number;

@@ -20,7 +20,7 @@ import { z } from "zod";
  * pulls in Zod. So this module is deliberately NOT re-exported from the contract
  * barrel or the component entry — that keeps Zod out of the app bundle. Hosts
  * opt in with an explicit deep import:
- *   import { CarouselSlidesDataSchema } from "@/components/Carousel/client/contract/schemas";
+ *   import { CarouselSlidesDataSchema } from "@/components/Carousel/client/public-api/schemas";
  */
 
 const ReactElementSchema = z.custom<ReactElement>((value) => {

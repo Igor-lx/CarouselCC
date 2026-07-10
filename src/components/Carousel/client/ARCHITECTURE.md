@@ -500,7 +500,7 @@ Every responsibility has exactly one owner. The orchestrator
 
 | Concern | Owner | Notes |
 | --- | --- | --- |
-| Public props | `Carousel.tsx` | Frozen contract, declared in `types.ts`. |
+| Public props | `Carousel.tsx` | Frozen contract, declared in `public-api/types.ts`. |
 | User environment | host application | Injected via the `userEnvironment` prop. The carousel never detects `prefers-reduced-motion` / touch / data-saver itself; the host reads them (recommended: `useUserEnvironment` in `shared`) and passes a stable object in. |
 | Resolved runtime config | `useCarouselConfig` | One memo. Substitutes defaults only for `undefined` props; never normalises explicit values. Motion-profile share normalization happens later inside the profile builder, not in config. |
 | Slide records | `useCarouselSlideDeck` | Builds slide records, optionally extends to fill perfect pages. |
@@ -765,7 +765,7 @@ Boundaries and guarantees:
   without it the runner publishes a fallback `follow` plan and every consumer
   runs the pre-engine per-frame path — where the track and the widget also
   drop the same Nth running frames (`FALLBACK_WRITE_FRAME_SKIP`, one shared
-  constant; the rule is `position/fallbackPacing.ts` evaluated on
+  constant; the rule is `visual-position/fallbackPacing.ts` evaluated on
   source-numbered frames, so the two can never desynchronize).
 - **Graceful fallback.** `startCompositorMotion` returns `false` (and the
   caller falls back to per-frame writes) when there is no measured slot size,
@@ -1049,6 +1049,9 @@ src/components/Carousel/client/
 ├── Carousel.tsx                   composition root, no business logic
 ├── Carousel.module.scss
 ├── index.ts                       public re-exports (component + types + schema)
+├── public-api/                    the product contract (§1)
+│   ├── types.ts                   CarouselProps, Slide, handle, status snapshot, class maps
+│   └── schemas.ts                 zod slide schemas (deep-import only, §11)
 ├── config/                        config resolution
 │   ├── defaults.ts                public-prop defaults
 │   ├── constants.ts               tunable runtime constants (epsilons, buffers)
@@ -1091,8 +1094,9 @@ src/components/Carousel/client/
 │   ├── sampler.ts                 segment → MotionSampleData at timestamp
 │   ├── useMotionRunner.ts         state → segment → controller + WAAPI + plan
 │   └── useCarouselMotionExecution.ts  runner + settle feedback wiring
-├── position/
+├── visual-position/
 │   ├── types.ts                   VisualPositionFrame, VisualPositionSource
+│   ├── fallbackPacing.ts          shared no-WAAPI frame-skip rule
 │   └── useVisualPosition.ts       VisualPositionSource owner
 ├── geometry/
 │   └── useTrackBinding.ts         ResizeObserver + slot measure + transform writer + WAAPI compositor motion
@@ -1105,7 +1109,7 @@ src/components/Carousel/client/
 │   └── useFocusRecovery.ts
 ├── navigation/
 │   └── useCarouselNavigation.ts   public click handlers
-├── status/
+├── host-report/
 │   ├── statusSnapshot.ts          onCarouselStatusChange snapshot equality
 │   └── useCarouselStatusReporter.ts  deduplicated host status emission
 ├── slides/
@@ -1133,13 +1137,13 @@ src/components/Carousel/client/
 
 Reading order for someone new:
 
-1. `types.ts` — public surface.
+1. `public-api/types.ts` — public surface.
 2. `Carousel.tsx` — top-down composition.
 3. `state/types.ts` and `state/reducer.ts` — what the carousel knows
    about itself.
 4. `motion/types.ts` and `motion/segmentFactory.ts` — how a logical step
    becomes a visual segment.
-5. `position/useVisualPosition.ts` — how the visible position is sampled
+5. `visual-position/useVisualPosition.ts` — how the visible position is sampled
    and exposed.
 6. `motion/useMotionRunner.ts` — how a state change becomes a controller
    start; the handoff invariant (§4.2).
@@ -1254,11 +1258,11 @@ dependencies, the architecture has held.
   source of truth** the public `Slide` / `SlideImageVariants` / `SlideImageSource`
   types are inferred from (`z.infer`), so the validated shape and the type cannot
   drift. There are **no** prop/callback schemas — props are not validated. The
-  schemas are exported only from `contract/schemas` and deliberately **not**
-  re-exported from the contract barrel or the component entry: a value re-export
+  schemas are exported only from `public-api/schemas` and deliberately **not**
+  re-exported from the public-api barrel or the component entry: a value re-export
   on the runtime import path would pull Zod into the app bundle, so hosts opt in
   with an explicit deep import
-  (`import { CarouselSlidesDataSchema } from ".../client/contract/schemas"`).
+  (`import { CarouselSlidesDataSchema } from ".../client/public-api/schemas"`).
   The component itself does **not** runtime-validate: invalid input propagates
   and is surfaced by the `Diagnostic` slot as DEV-only warnings, keeping the
   failure mode visible at the source.

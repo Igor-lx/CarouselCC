@@ -8,7 +8,7 @@ import {
   type CarouselLayout,
   type CarouselSlideRecord,
 } from "../domain";
-import type { Slide } from "../contract/types";
+import type { Slide } from "../public-api/types";
 
 interface UseCarouselSlideDeckInput {
   slidesData: Slide[];

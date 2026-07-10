@@ -21,7 +21,7 @@ import {
   type MotionPlanChannel,
 } from "./motion";
 import { useCarouselNavigation } from "./navigation";
-import { useVisualPosition } from "./position";
+import { useVisualPosition } from "./visual-position";
 import { useModuleRenderPolicy } from "./render-policy/useModuleRenderPolicy";
 import {
   SlideItem,
@@ -31,9 +31,9 @@ import {
 } from "./slides";
 import { CAROUSEL_SLOTS } from "./slots";
 import { useCarouselState } from "./state";
-import { useCarouselStatusReporter } from "./status/useCarouselStatusReporter";
-import { SLIDE_CLASS_KEYS } from "./contract/types";
-import type { CarouselProps, SlideClassMap } from "./contract/types";
+import { useCarouselStatusReporter } from "./host-report/useCarouselStatusReporter";
+import { SLIDE_CLASS_KEYS } from "./public-api/types";
+import type { CarouselProps, SlideClassMap } from "./public-api/types";
 
 const Carousel = memo(function Carousel(props: CarouselProps) {
   const {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildCarouselLayout, buildSlideRecords } from "../domain";
 import type { CarouselLayout } from "../domain";
-import type { Slide } from "../contract/types";
+import type { Slide } from "../public-api/types";
 import { buildInitialState } from "./initial";
 import { reconcileStateToLayout } from "./reconcile";
 import type { CarouselState } from "./types";

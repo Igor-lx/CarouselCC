@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import type { CarouselStatusSnapshot } from "../contract/types";
+import type { CarouselStatusSnapshot } from "../public-api/types";
 import { areStatusSnapshotsEqual } from "./statusSnapshot";
 
 interface UseCarouselStatusReporterInput {

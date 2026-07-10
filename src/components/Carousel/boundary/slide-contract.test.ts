@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Slide } from "../client/contract/types";
+import type { Slide } from "../client/public-api/types";
 import type { GeneratedSlide } from "../data-gen/types";
 
 /**

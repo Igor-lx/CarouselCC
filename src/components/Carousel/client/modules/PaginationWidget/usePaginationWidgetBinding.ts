@@ -10,7 +10,7 @@ import {
 import {
   isDroppedFallbackFrame,
   type VisualPositionSource,
-} from "../../position";
+} from "../../visual-position";
 import {
   DOT_OPACITY_EPSILON,
   DOT_POSITION_EPSILON_PX,

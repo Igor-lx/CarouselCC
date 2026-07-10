@@ -1,4 +1,4 @@
-import type { CarouselStatusSnapshot } from "../contract/types";
+import type { CarouselStatusSnapshot } from "../public-api/types";
 
 /**
  * Shallow equality of two status snapshots. The `onCarouselStatusChange`

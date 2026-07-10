@@ -4,7 +4,7 @@ import { buildCarouselConfig } from "../config";
 import type { CarouselRuntimeConfig } from "../config";
 import { buildCarouselLayout, buildSlideRecords } from "../domain";
 import type { CarouselLayout } from "../domain";
-import type { Slide } from "../contract/types";
+import type { Slide } from "../public-api/types";
 import { buildInitialState } from "./initial";
 import { carouselReducer } from "./reducer";
 import type { CarouselCommand, CarouselState } from "./types";

@@ -7,7 +7,7 @@ import {
 } from "../domain";
 import { useIsomorphicLayoutEffect } from "../../../../shared";
 import { isWaapiSupported } from "../motion/progressCurve";
-import { isDroppedFallbackFrame, type VisualPositionSource } from "../position";
+import { isDroppedFallbackFrame, type VisualPositionSource } from "../visual-position";
 
 const RESIZE_EPSILON_PX = 0.5;
 

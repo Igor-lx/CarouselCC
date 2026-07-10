@@ -2,7 +2,7 @@ import { useMemo } from "react";
 
 import type { MotionPlanSource } from "../motion";
 import type { CarouselNavigation } from "../navigation";
-import type { VisualPositionSource } from "../position";
+import type { VisualPositionSource } from "../visual-position";
 import { motionStatus } from "../state";
 import type { CarouselState } from "../state";
 import type {

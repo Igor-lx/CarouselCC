@@ -17,4 +17,4 @@ export { CLASS_NAME_KEYS, SLIDE_CLASS_KEYS } from "./types";
 // the component's runtime import path, so a value re-export of the schemas would
 // defeat tree-shaking and pull Zod into the app bundle. Hosts that want to
 // validate external data opt in with an explicit deep import:
-//   import { CarouselSlidesDataSchema } from "@/components/Carousel/client/contract/schemas";
+//   import { CarouselSlidesDataSchema } from "@/components/Carousel/client/public-api/schemas";

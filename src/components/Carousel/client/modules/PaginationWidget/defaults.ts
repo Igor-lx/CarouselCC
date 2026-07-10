@@ -24,4 +24,4 @@ export const DOT_SCALE_EPSILON = 0.002;
 export const DOT_OPACITY_EPSILON = 0.01;
 // The legacy-fallback frame-skip is NOT widget-local: one shared constant
 // (`config/constants.ts` FALLBACK_WRITE_FRAME_SKIP) and one shared rule
-// (`position/fallbackPacing.ts`) pace the widget and the track together.
+// (`visual-position/fallbackPacing.ts`) pace the widget and the track together.

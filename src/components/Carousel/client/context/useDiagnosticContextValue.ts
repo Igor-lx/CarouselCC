@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
 import type { CarouselState } from "../state";
-import type { UserEnvironment } from "../contract/types";
+import type { UserEnvironment } from "../public-api/types";
 import type { CarouselDiagnosticContextValue } from "./types";
 
 interface UseDiagnosticContextValueInput {
