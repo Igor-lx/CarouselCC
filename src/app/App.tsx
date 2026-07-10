@@ -37,8 +37,13 @@ const SLIDES_SET: 1 | 2 = (() => {
   return DEFAULT_SLIDES_SET;
 })();
 
+/** Gesture switch for device testing: `?swipe=0` renders the carousel with
+ * `isSwipeOn={false}` — no pointer-swipe surface at all. */
+const IS_SWIPE_ON: boolean =
+  new URLSearchParams(window.location.search).get("swipe") !== "0";
+
 const VISIBLE_BY_BREAKPOINT = {
-  DESKTOP: 3,
+  DESKTOP: 2,
   TABLET: 2,
   MOBILE: 1,
   DEFAULT: 3,
@@ -141,9 +146,9 @@ export default function App() {
           ) : (
             <Carousel
               ref={carouselRef}
-               visibleSlidesNr={visibleSlidesNr}
-          
+              visibleSlidesNr={visibleSlidesNr}
               slidesData={slidesData}
+              isSwipeOn={IS_SWIPE_ON}
               isAuto={isAutoplay}
               isPaginationOn
               isInteractive={isInteractive}

@@ -51,6 +51,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     isInteractive = CAROUSEL_DEFAULTS.isInteractive,
     isFinite: isFiniteProp = CAROUSEL_DEFAULTS.isFinite,
     isControlsOn = CAROUSEL_DEFAULTS.isControlsOn,
+    isSwipeOn = CAROUSEL_DEFAULTS.isSwipeOn,
     className,
     userEnvironment,
     onSlideClick,
@@ -219,6 +220,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   const { listeners: dragListeners } = useCarouselGesture({
     viewportRef,
     layout,
+    isSwipeOn,
     dispatch,
     readCurrentPosition,
     applyTrackPosition: applyImmediatePosition,

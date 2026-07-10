@@ -139,6 +139,7 @@ export interface CarouselProps {
   isInteractive?: boolean;
   isFinite?: boolean;
   isControlsOn?: boolean;
+  isSwipeOn?: boolean;
   className?: ClassNameMap;
   userEnvironment?: UserEnvironment;
   onSlideClick?: (slide: Slide) => void;

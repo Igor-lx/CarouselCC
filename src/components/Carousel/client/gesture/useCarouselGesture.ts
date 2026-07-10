@@ -18,6 +18,12 @@ import {
 interface UseCarouselGestureInput {
   viewportRef: RefObject<HTMLDivElement | null>;
   layout: CarouselLayout;
+  /**
+   * Public gesture switch (`isSwipeOn` prop). When `false` the pointer-swipe
+   * primitive attaches NO listeners at all — the viewport carries zero
+   * pointer handlers, as if the gesture surface did not exist.
+   */
+  isSwipeOn: boolean;
   dispatch: CarouselDispatch;
   readCurrentPosition: () => number;
   applyTrackPosition: (position: number) => void;
@@ -38,6 +44,7 @@ export interface CarouselGestureResult {
 export function useCarouselGesture({
   viewportRef,
   layout,
+  isSwipeOn,
   dispatch,
   readCurrentPosition,
   applyTrackPosition,
@@ -153,22 +160,45 @@ export function useCarouselGesture({
     [applyTrackPosition, dispatch, layout, offsetToPosition],
   );
 
-  // When the carousel becomes non-sliding (a resize or slidesData replace
-  // collapsed the deck to a single page), the
-  // pointer-swipe listeners are torn down without ever delivering `onRelease`.
-  // The reducer recovers from the stale `dragging` phase on its own via layout
-  // reconciliation, but the adapter's drag-origin refs would otherwise stay
-  // pinned — and `startDragFromCurrentPosition` early-returns while
-  // `originPositionRef` is non-null, so the *next* drag would start from a
-  // stale origin. Clearing the refs here keeps a later drag correct.
+  // When the gesture surface goes away — the deck collapsed to a single page
+  // (`canSlide` false) or the host flipped `isSwipeOn` off — the pointer-swipe
+  // listeners are torn down without ever delivering `onRelease`. For a layout
+  // collapse the reducer recovers from the stale `dragging` phase on its own
+  // via layout reconciliation, but the adapter's drag-origin refs would
+  // otherwise stay pinned — and `startDragFromCurrentPosition` early-returns
+  // while `originPositionRef` is non-null, so the *next* drag would start from
+  // a stale origin. Clearing the refs here keeps a later drag correct.
+  //
+  // An `isSwipeOn` flip has no such reducer-side recovery (the layout did not
+  // change), so a drag orphaned by it is ended here explicitly: a passive
+  // snap from the live position, zero release velocity — the same command a
+  // real motionless release would have produced.
   useEffect(() => {
-    if (layout.canSlide) return;
+    if (layout.canSlide && isSwipeOn) return;
+    if (!isSwipeOn && layout.canSlide && originPositionRef.current !== null) {
+      const releasePosition = readCurrentPosition();
+      const releaseTarget = resolveDragRelease({
+        direction: "none",
+        releasePosition,
+        dragOriginPageIndex: originPageIndexRef.current,
+        layout,
+      });
+      dispatch({
+        type: "END_DRAG",
+        fromVirtualIndex: releasePosition,
+        targetPageIndex: releaseTarget.targetPageIndex,
+        targetVirtualIndex: releaseTarget.targetVirtualIndex,
+        isSnap: releaseTarget.isSnap,
+        pointerReleaseVelocity: 0,
+        uiReleaseVelocity: 0,
+      });
+    }
     originPositionRef.current = null;
     slotSizeRef.current = 0;
-  }, [layout.canSlide]);
+  }, [dispatch, isSwipeOn, layout, readCurrentPosition]);
 
   const { listeners } = usePointerSwipe({
-    enabled: layout.canSlide,
+    enabled: layout.canSlide && isSwipeOn,
     measureRef: viewportRef,
     config: config.swipeConfig,
     onPressStart: startDragFromCurrentPosition,

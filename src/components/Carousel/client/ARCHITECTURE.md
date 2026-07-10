@@ -131,6 +131,7 @@ This document does not restate them, so it cannot drift from the code.
 | `isAuto`         | — | Master autoplay switch. When `false`, the `setTimeout` loop never runs. Autoplay also auto-pauses when (a) the viewport is less than `VISIBILITY_THRESHOLD` on screen, (b) the user is dragging or motion is in progress, (c) on desktop only, the pointer hovers the viewport (`HOVER_PAUSE_DELAY` debounce). On the final page in finite mode it loops back to page 0 via `GO_TO`. |
 | `isPaginationOn` | — | Gates the rendering of the attached `Pagination`/`PaginationWidget` slot. If the prop is `true` but no pagination slot is attached, nothing renders; the slot must opt in by being placed in `children`. |
 | `isControlsOn`   | — | Same contract as `isPaginationOn`, for the `Controls` slot. |
+| `isSwipeOn`      | — | Master gesture switch. When `false` the pointer-swipe primitive attaches **no listeners at all** — the viewport carries zero pointer handlers and touch input behaves natively, as if the gesture surface did not exist. Flipped off under a live finger, the orphaned drag is ended by the adapter as a passive snap from the live position (§5). Unlike the slot gates this is not a render gate — gesture has no slot. |
 | `isInteractive`  | — | When on, a slide whose image has loaded successfully and that has an `onSlideClick` handler renders as a `<button>`. When off, slides are never interactive even with a handler. |
 
 #### Callbacks
@@ -812,6 +813,16 @@ It is not carousel-specific and is reusable.
 The dispatch carries the velocities into the state machine. They are
 stored on the snapshot and read by `useMotionRunner` when it builds the
 release segment.
+
+The whole surface is gated by `enabled: layout.canSlide && isSwipeOn` on the
+primitive: when either is `false`, `usePointerSwipe` returns an **empty
+listeners object**, so the viewport carries no pointer handlers at all — the
+gesture surface simply does not exist in the DOM. The two disable paths part
+ways on recovery: a layout collapse (`canSlide` → `false`) is already healed
+by the reducer's layout reconciliation, but an `isSwipeOn` flip changes no
+layout, so the adapter itself ends a drag orphaned by it — dispatching the
+same passive-snap `END_DRAG` (live position, zero velocity) a motionless
+release would have produced, then clearing its origin refs.
 
 ---
 
