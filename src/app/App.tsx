@@ -37,11 +37,6 @@ const SLIDES_SET: 1 | 2 = (() => {
   return DEFAULT_SLIDES_SET;
 })();
 
-/** Gesture switch for device testing: `?swipe=0` renders the carousel with
- * `isSwipeOn={false}` — no pointer-swipe surface at all. */
-const IS_SWIPE_ON: boolean =
-  new URLSearchParams(window.location.search).get("swipe") !== "0";
-
 const VISIBLE_BY_BREAKPOINT = {
   DESKTOP: 2,
   TABLET: 2,
@@ -148,7 +143,7 @@ export default function App() {
               ref={carouselRef}
               visibleSlidesNr={visibleSlidesNr}
               slidesData={slidesData}
-              isSwipeOn={IS_SWIPE_ON}
+              isSwipeOn={true}
               isAuto={isAutoplay}
               isPaginationOn
               isInteractive={isInteractive}
@@ -156,7 +151,7 @@ export default function App() {
               durationStep={2000}
               jumpSpeedMultiplier={12}
               intervalAutoplay={3000}
-              isPagePaddingOn
+              isFullPagesOn
               userEnvironment={userEnvironment}
               onSlideClick={openSlide}
               onCarouselStatusChange={(snapshot) => setStatus(snapshot)}

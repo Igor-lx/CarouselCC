@@ -14,7 +14,7 @@ interface UseCarouselSlideDeckInput {
   slidesData: Slide[];
   visibleSlidesCount: number;
   isFinite: boolean;
-  isPagePaddingOn: boolean;
+  isFullPagesOn: boolean;
 }
 
 interface PerfectPageLayoutInfo {
@@ -34,12 +34,12 @@ export function useCarouselSlideDeck({
   slidesData,
   visibleSlidesCount,
   isFinite,
-  isPagePaddingOn,
+  isFullPagesOn,
 }: UseCarouselSlideDeckInput): UseCarouselSlideDeckResult {
   const rawRecords = useMemo(() => buildSlideRecords(slidesData), [slidesData]);
 
   const hasPartial = hasPartialPageLayout(rawRecords.length, visibleSlidesCount);
-  const didExtend = isPagePaddingOn && hasPartial;
+  const didExtend = isFullPagesOn && hasPartial;
 
   const records = useMemo(
     () => (didExtend ? padDeckToFullPage(rawRecords, visibleSlidesCount) : rawRecords),

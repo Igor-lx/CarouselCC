@@ -54,7 +54,7 @@ export const collectLayoutWarnings = (
       out.push({
         severity: "LOGICAL",
         layer: LAYOUT_LAYER,
-        field: "isPagePaddingOn",
+        field: "isFullPagesOn",
         actual: true,
         expected: `Expected slides count (${layout.rawLength}) divisible by visibleSlidesNr (${layout.visibleSlidesCount})`,
         consequence: `Deck was extended to ${layout.extendedLength} via cloned tail slides; align slide count to remove the clones`,
@@ -65,7 +65,7 @@ export const collectLayoutWarnings = (
         layer: LAYOUT_LAYER,
         field: "slidesData.length",
         actual: layout.rawLength,
-        expected: `Expected slides count divisible by visibleSlidesNr (${layout.visibleSlidesCount}), or isPagePaddingOn={true}`,
+        expected: `Expected slides count divisible by visibleSlidesNr (${layout.visibleSlidesCount}), or isFullPagesOn={true}`,
         consequence: "The last page renders fewer slides than the visible band",
       });
     }

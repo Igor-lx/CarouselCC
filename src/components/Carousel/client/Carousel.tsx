@@ -44,7 +44,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     jumpSpeedMultiplier,
     intervalAutoplay,
     errAltPlaceholder,
-    isPagePaddingOn = CAROUSEL_DEFAULTS.isPagePaddingOn,
+    isFullPagesOn = CAROUSEL_DEFAULTS.isFullPagesOn,
     isContentImg = CAROUSEL_DEFAULTS.isContentImg,
     isAuto = CAROUSEL_DEFAULTS.isAuto,
     isPaginationOn = CAROUSEL_DEFAULTS.isPaginationOn,
@@ -88,7 +88,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     slidesData,
     visibleSlidesCount: config.visibleSlidesCount,
     isFinite: isFiniteProp,
-    isPagePaddingOn,
+    isFullPagesOn,
   });
 
   // --- logical state machine ------------------------------------------------

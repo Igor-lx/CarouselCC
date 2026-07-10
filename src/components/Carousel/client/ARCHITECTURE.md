@@ -58,7 +58,7 @@ const userEnvironment = useUserEnvironment(); // from "@/shared"
   slidesData={slides}
   visibleSlidesNr={3}
   isAuto
-  isPagePaddingOn
+  isFullPagesOn
   durationStep={2000}
   jumpSpeedMultiplier={8}
   intervalAutoplay={3000}
@@ -90,7 +90,7 @@ equal halves with no cruise zone, and Diagnostic reports that normalized shape.
 | ------------- | --------------- | ------- | ------ |
 | `slidesData`  | `Slide[]`       | —       | Required. `Slide = { id; content; alt?; image? }` — see §1.4.1. `content` must be a trimmed-non-empty string, a number, or a React element, and is the slide's **identity** (it alone, with `id`, feeds `dataKey`). `image` is optional render-only responsive variants. |
 | `visibleSlidesNr` | `number`     | — | How many slides share the viewport. Drives layout flex-basis, slot-size measurement, page math (`pageCount = ceil(slidesData.length / visibleSlidesNr)`), and the PaginationWidget projection slot count. |
-| `isPagePaddingOn` | `boolean`    | — | When on, pads the deck with cloned tail slides so `length` becomes a multiple of `visibleSlidesNr`. Eliminates partial pages at the tail. |
+| `isFullPagesOn` | `boolean`    | — | Guarantees every page is full: when the slide count is not a multiple of `visibleSlidesNr`, the deck is extended with cloned slides so the last page is never partial. |
 | `isContentImg` | `boolean`      | — | When on, treats string `content` as an `<img src>`. When off, renders raw `content`. Image errors fall back to `slide.alt` or `errAltPlaceholder`. |
 | `errAltPlaceholder` | `string`  | — | Used when an image fails to load and the slide has no `alt`. |
 

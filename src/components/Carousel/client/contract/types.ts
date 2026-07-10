@@ -127,7 +127,7 @@ export interface CarouselHandle {
 export interface CarouselProps {
   slidesData: Slide[];
   visibleSlidesNr?: number;
-  isPagePaddingOn?: boolean;
+  isFullPagesOn?: boolean;
   durationAutoplay?: number;
   intervalAutoplay?: number;
   durationStep?: number;

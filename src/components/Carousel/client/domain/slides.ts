@@ -24,7 +24,7 @@ export const hasPartialPageLayout = (length: number, visibleSlidesCount: number)
 
 /**
  * Pad the deck with clones drawn from the head so the total length is a
- * multiple of `visibleSlidesCount`. Used when `isPagePaddingOn` is true so
+ * multiple of `visibleSlidesCount`. Used when `isFullPagesOn` is true so
  * the last page is not visually short.
  */
 export const padDeckToFullPage = (

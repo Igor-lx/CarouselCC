@@ -10,7 +10,7 @@ export const CAROUSEL_DEFAULTS = {
   durationStep: 2000,
   jumpSpeedMultiplier: 8,
   errAltPlaceholder: "Downloading Error",
-  isPagePaddingOn: false,
+  isFullPagesOn: false,
   isContentImg: true,
   isAuto: true,
   isPaginationOn: true,
