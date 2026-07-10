@@ -1,23 +1,14 @@
 export interface InertialReleaseConfig {
   /** Multiplier applied to the raw release velocity before clamping. */
   inertiaBoost: number;
-  /**
-   * Fraction of the remaining distance dedicated to smooth deceleration into
-   * the target after the inertial fast segment.
-   */
-  decelerationDistanceShare: number;
 }
+
+import { sameDirectionSpeed } from "./internals/index";
 
 export interface InertialReleaseResult {
   effectiveReleaseSpeed: number;
   isInertialRelease: boolean;
 }
-
-const sameDirectionSpeed = (velocity: number, distance: number) => {
-  const direction = Math.sign(distance);
-  if (direction === 0 || Math.sign(velocity) !== direction) return 0;
-  return Math.abs(velocity);
-};
 
 interface ResolveReleaseInput {
   gestureReleaseVelocity: number;

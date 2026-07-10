@@ -1,8 +1,6 @@
-import {
-  resolveInertialRelease,
-  type InertialReleaseConfig,
-} from "../../../../shared";
+import { resolveInertialRelease } from "../../../../shared";
 import type {
+  CarouselInertialReleaseConfig,
   CarouselRuntimeConfig,
   MotionProfileSharesSettings,
   MotionSettings,
@@ -158,7 +156,7 @@ const buildGestureProfile = (
   state: CarouselState,
   start: MotionStart,
   startedAt: number,
-  release: InertialReleaseConfig,
+  release: CarouselInertialReleaseConfig,
   releaseSpeed: number,
 ): CarouselSegment => {
   const distance = state.virtualIndex - start.position;

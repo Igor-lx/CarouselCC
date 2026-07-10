@@ -217,7 +217,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   );
 
   // --- gesture --------------------------------------------------------------
-  const { listeners: dragListeners } = useCarouselGesture({
+  const { listeners: dragListeners, hostStyle: dragHostStyle } = useCarouselGesture({
     viewportRef,
     layout,
     isSwipeOn,
@@ -334,6 +334,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
               data-carousel-viewport=""
               onMouseEnter={() => handleHoverChange(true)}
               onMouseLeave={() => handleHoverChange(false)}
+              style={dragHostStyle}
               {...dragListeners}
             >
               <div

@@ -14,6 +14,7 @@ import {
   type PointerSwipeMovePayload,
   type PointerSwipeReleasePayload,
 } from "../../../../shared";
+import type { CSSProperties } from "react";
 
 interface UseCarouselGestureInput {
   viewportRef: RefObject<HTMLDivElement | null>;
@@ -39,6 +40,8 @@ interface UseCarouselGestureInput {
 
 export interface CarouselGestureResult {
   listeners: PointerSwipeListeners;
+  /** Engine-required host styles; applied on the same viewport element. */
+  hostStyle: CSSProperties;
 }
 
 export function useCarouselGesture({
@@ -197,9 +200,9 @@ export function useCarouselGesture({
     slotSizeRef.current = 0;
   }, [dispatch, isSwipeOn, layout, readCurrentPosition]);
 
-  const { listeners } = usePointerSwipe({
+  const { listeners, hostStyle } = usePointerSwipe({
     enabled: layout.canSlide && isSwipeOn,
-    measureRef: viewportRef,
+    hostRef: viewportRef,
     config: config.swipeConfig,
     onPressStart: startDragFromCurrentPosition,
     onDragStart: handleDragStart,
@@ -207,5 +210,5 @@ export function useCarouselGesture({
     onRelease: handleRelease,
   });
 
-  return { listeners };
+  return { listeners, hostStyle };
 }

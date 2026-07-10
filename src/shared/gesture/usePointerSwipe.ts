@@ -13,7 +13,7 @@ import {
   frameAdjustedAlpha,
   getInteractiveTarget,
   resolveSwipeDirection,
-} from "./internals";
+} from "./internals/index";
 import type {
   PointerSwipeConfig,
   PointerSwipeListeners,
@@ -25,7 +25,12 @@ import type {
   ResolvedPointerSwipeConfig,
 } from "./types";
 
-const DEFAULT_CONFIG: ResolvedPointerSwipeConfig = {
+/**
+ * The engine's own out-of-the-box tuning. A consumer config is merged OVER
+ * these per field, so passing nothing (or a partial object) always yields a
+ * fully working engine.
+ */
+export const POINTER_SWIPE_DEFAULTS: ResolvedPointerSwipeConfig = {
   cooldownMs: 150,
   intentThreshold: 8,
   resistance: 0.7,
@@ -38,7 +43,8 @@ const DEFAULT_CONFIG: ResolvedPointerSwipeConfig = {
   swipeThresholdRatio: 0.2,
 };
 
-const STYLES: CSSProperties = {
+/** Styles the engine needs on its host element to own horizontal touch input. */
+const HOST_STYLES: CSSProperties = {
   touchAction: "pan-y",
   userSelect: "none",
   WebkitUserSelect: "none",
@@ -55,6 +61,8 @@ interface InternalSample {
   timestamp: number;
 }
 
+const EMPTY_STYLE: CSSProperties = {};
+
 const createIdleSample = (width = 0, timestamp = 0): InternalSample => ({
   rawOffset: 0,
   uiOffset: 0,
@@ -65,12 +73,12 @@ const createIdleSample = (width = 0, timestamp = 0): InternalSample => ({
 });
 
 const resolveConfig = (config?: PointerSwipeConfig): ResolvedPointerSwipeConfig => ({
-  ...DEFAULT_CONFIG,
+  ...POINTER_SWIPE_DEFAULTS,
   ...config,
 });
 
 export function usePointerSwipe({
-  measureRef,
+  hostRef,
   enabled = true,
   config,
   onPressStart,
@@ -82,9 +90,9 @@ export function usePointerSwipe({
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
-  // The full pointer phase is internal and synchronous. The carousel reducer
-  // owns public dragging state, so pointer bookkeeping never re-renders React
-  // by itself.
+  // The full pointer phase is internal and synchronous. Consumers own their
+  // public dragging state through the callbacks, so pointer bookkeeping never
+  // re-renders React by itself.
   const phaseRef = useRef<PointerSwipePhase>("idle");
 
   const lockUntilRef = useRef(0);
@@ -180,7 +188,7 @@ export function usePointerSwipe({
 
   const finishInteraction = useCallback(
     (isCancel = false, currentX?: number) => {
-      const target = measureRef.current;
+      const target = hostRef.current;
       const now = performance.now();
       const phase = phaseRef.current;
       const gesture = gestureRef.current;
@@ -272,7 +280,7 @@ export function usePointerSwipe({
       gesture.isActivated = false;
       gesture.width = 0;
     },
-    [createSample, measureRef, onRelease, setPhase],
+    [createSample, hostRef, onRelease, setPhase],
   );
 
   const handlePointerDown = useCallback(
@@ -370,7 +378,7 @@ export function usePointerSwipe({
   );
 
   useEffect(() => {
-    const element = measureRef.current;
+    const element = hostRef.current;
     if (!element || !enabled) return;
 
     const suppressClick = (event: MouseEvent) => {
@@ -419,7 +427,7 @@ export function usePointerSwipe({
         timeoutRef.current = null;
       }
     };
-  }, [enabled, measureRef]);
+  }, [enabled, hostRef]);
 
   const listeners = useMemo<PointerSwipeListeners>(() => {
     if (!enabled) return {};
@@ -429,9 +437,12 @@ export function usePointerSwipe({
       onPointerUp: (event) => finishInteraction(false, event.clientX),
       onPointerCancel: (event) => finishInteraction(true, event.clientX),
       onLostPointerCapture: (event) => finishInteraction(true, event.clientX),
-      style: STYLES,
     };
   }, [enabled, finishInteraction, handlePointerDown, handlePointerMove]);
 
-  return { listeners };
+  // Handed out separately from the listeners so the consumer merges it with
+  // its own `style` consciously instead of a spread silently winning/losing.
+  const hostStyle = enabled ? HOST_STYLES : EMPTY_STYLE;
+
+  return { listeners, hostStyle };
 }

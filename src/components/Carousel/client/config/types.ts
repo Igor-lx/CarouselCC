@@ -1,7 +1,5 @@
-import type {
-  InertialReleaseConfig,
-  PointerSwipeConfig,
-} from "../../../../shared";
+import type { PointerSwipeConfig } from "../../../../shared";
+import type { CarouselInertialReleaseConfig } from "./gesture";
 
 export interface PropDerivedSettings {
   visibleSlidesCount: number;
@@ -68,7 +66,7 @@ export interface CarouselRuntimeConfig extends PropDerivedSettings {
   interaction: InteractionSettings;
   layout: LayoutSettings;
   swipeConfig: Required<PointerSwipeConfig>;
-  releaseConfig: InertialReleaseConfig;
+  releaseConfig: CarouselInertialReleaseConfig;
   dragReleaseEpsilon: number;
 }
 

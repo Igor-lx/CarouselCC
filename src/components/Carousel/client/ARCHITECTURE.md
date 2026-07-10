@@ -799,10 +799,15 @@ not a second source of truth.
 
 ## 5. Gesture model
 
-The shared `usePointerSwipe` hook is a generic horizontal pointer-swipe
-primitive (touch-only, configurable, EMA-smoothed velocity with edge
-resistance, intent threshold, quick-flick detection, capture / cooldown).
-It is not carousel-specific and is reusable.
+The shared gesture ENGINE (`shared/gesture/`, its own README documents the
+full standalone contract) provides `usePointerSwipe` — a generic horizontal
+pointer-swipe primitive (touch-only, built-in defaults with per-field config
+merge, EMA-smoothed velocity with progressive distance resistance, intent
+threshold, quick-flick detection, capture / cooldown). The engine hands back
+`{ listeners, hostStyle }`; both go onto the SAME element `hostRef` points to
+(the engine's one hard contract). It is not carousel-specific and is
+reusable; the carousel overrides every tuning field with its own
+`CAROUSEL_SWIPE_CONFIG`.
 
 `useCarouselGesture` is the carousel-specific adapter. It:
 
@@ -825,8 +830,8 @@ stored on the snapshot and read by `useMotionRunner` when it builds the
 release segment.
 
 The whole surface is gated by `enabled: layout.canSlide && isSwipeOn` on the
-primitive: when either is `false`, `usePointerSwipe` returns an **empty
-listeners object**, so the viewport carries no pointer handlers at all — the
+primitive: when either is `false`, `usePointerSwipe` returns **empty
+listeners and host styles**, so the viewport carries no pointer handlers at all — the
 gesture surface simply does not exist in the DOM. The two disable paths part
 ways on recovery: a layout collapse (`canSlide` → `false`) is already healed
 by the reducer's layout reconciliation, but an `isSwipeOn` flip changes no

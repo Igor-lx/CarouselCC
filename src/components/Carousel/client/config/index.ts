@@ -44,3 +44,4 @@ export type {
   InteractionSettings,
   LayoutSettings,
 } from "./types";
+export type { CarouselInertialReleaseConfig } from "./gesture";
