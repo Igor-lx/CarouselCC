@@ -144,6 +144,53 @@ describe("GO_TO", () => {
     expect(next.teleportVirtualIndex).toBe(15); // final = 5 pages * stepSize 3
     expect(next.motionPhase).toBe("step-jump");
   });
+
+  // Direction contract: a GO_TO rides in the direction the user moved on the
+  // pagination strip (plain dot-scale delta), NEVER a cyclic shortcut. The
+  // wrap remains the business of ±1 MOVE steps.
+  it("rides backward to an earlier dot even when both directions are equidistant", () => {
+    const layout = makeLayout(12, 3, false); // pageCount 4: 2 -> 0 is 2 either way
+    const there = reduce(buildInitialState(layout), {
+      type: "GO_TO",
+      targetPageIndex: 2,
+      moveReason: "click",
+      fromVirtualIndex: 0,
+    });
+    const settled = reduce(there, {
+      type: "MOTION_SETTLED",
+      settledPosition: there.virtualIndex,
+    });
+    const back = reduce(settled, {
+      type: "GO_TO",
+      targetPageIndex: 0,
+      moveReason: "click",
+      fromVirtualIndex: settled.virtualIndex,
+    });
+    expect(back.targetPageIndex).toBe(0);
+    expect(back.virtualIndex).toBe(0); // 6 - 2 pages * stepSize 3: travels LEFT
+  });
+
+  it("rides backward to an earlier dot even when the cyclic wrap would be shorter", () => {
+    const layout = makeLayout(9, 3, false); // pageCount 3: 2 -> 0 wrap is 1 forward
+    const there = reduce(buildInitialState(layout), {
+      type: "GO_TO",
+      targetPageIndex: 2,
+      moveReason: "click",
+      fromVirtualIndex: 0,
+    });
+    const settled = reduce(there, {
+      type: "MOTION_SETTLED",
+      settledPosition: there.virtualIndex,
+    });
+    const back = reduce(settled, {
+      type: "GO_TO",
+      targetPageIndex: 0,
+      moveReason: "click",
+      fromVirtualIndex: settled.virtualIndex,
+    });
+    expect(back.targetPageIndex).toBe(0);
+    expect(back.virtualIndex).toBe(0); // 6 - 2 pages * stepSize 3: LEFT, not +1 wrap
+  });
 });
 
 describe("MOTION_SETTLED", () => {

@@ -98,7 +98,7 @@ equal halves with no cruise zone, and Diagnostic reports that normalized shape.
 
 | Prop            | Type      | Default | Effect |
 | --------------- | --------- | ------- | ------ |
-| `isFinite`      | `boolean` | — | When on, the track stops at the boundaries (no wrap, `isAtStart`/`isAtEnd` flag the edges). When off, the track loops cyclically and `GO_TO` always travels the shortest cyclic distance. |
+| `isFinite`      | `boolean` | — | When on, the track stops at the boundaries (no wrap, `isAtStart`/`isAtEnd` flag the edges). When off, the track loops cyclically; the wrap belongs to ±1 steps (controls / gesture / autoplay), while `GO_TO` travels in dot-scale direction (§1.6). |
 
 #### User environment
 
@@ -315,8 +315,14 @@ These are the user-facing behaviours the implementation guarantees.
   statically (no gesture, no click navigation, no autoplay). When
   `!isFinite && canSlide`, the track behaves cyclically.
 - **Step semantics.** `MOVE(+1)` advances one page, `MOVE(-1)` retreats one
-  page, `GO_TO(pageIndex)` jumps over a possibly larger distance. In cyclic
-  mode, `GO_TO` always travels the shortest cyclic distance.
+  page (wrapping through the edge in cyclic mode), `GO_TO(pageIndex)` jumps
+  over a possibly larger distance. A `GO_TO` travels in **dot-scale
+  direction**: a dot to the left of the current one always rides left, a dot
+  to the right rides right, over exactly `|target − current|` pages — never a
+  cyclic shortcut. A shortcut would sometimes ride against the strip (and, on
+  the equidistant opposite dot, always forward), which reads as broken; it
+  would also save nothing, because a far span is already bounded by the
+  teleport plan.
 - **GO_TO motion.** Every `GO_TO` follows a speed-authored profile:
   accelerate, cruise, decelerate. Acceleration is measured inside the first
   page screen; deceleration is measured inside the final page screen. A jump
@@ -1055,7 +1061,7 @@ src/components/Carousel/client/
 │   ├── useModuleContextValue.ts
 │   └── types.ts
 ├── domain/                        pure functions, no React
-│   ├── math.ts                    clamp, mod, normalizePageIndex, shortestCyclicDistance
+│   ├── math.ts                    clamp, mod, normalizePageIndex
 │   ├── slides.ts                  record building, partial-page detection, extension
 │   ├── layout.ts                  CarouselLayout factory, page/virtual conversions
 │   ├── renderWindow.ts            windowing math

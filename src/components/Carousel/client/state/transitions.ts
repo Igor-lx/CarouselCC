@@ -3,7 +3,6 @@ import {
   clamp,
   normalizePageIndex,
   pageStart,
-  shortestCyclicDistance,
 } from "../domain";
 import type { MotionSettings } from "../config";
 import { resolveGoToPlan } from "../motion/timing";
@@ -136,12 +135,16 @@ export const resolveStepTransition = (
     const resolved = layout.isFinite
       ? clamp(command.targetPageIndex, 0, layout.pageCount - 1)
       : normalizePageIndex(command.targetPageIndex, layout.pageCount);
-    pageDelta = layout.isFinite
-      ? resolved - currentPageIndex
-      : shortestCyclicDistance(currentPageIndex, resolved, layout.pageCount);
-    nextTargetPageIndex = layout.isFinite
-      ? resolved
-      : normalizePageIndex(currentPageIndex + pageDelta, layout.pageCount);
+    // Dot-scale direction, NOT the shortest cyclic path: both the cursor and
+    // the target live in `[0, pageCount)`, so the plain difference rides the
+    // deck in the direction the user moved on the pagination strip — a dot to
+    // the left always travels left. A cyclic shortcut would sometimes ride
+    // AGAINST the strip (and always ride forward on the equidistant opposite
+    // dot), which reads as broken; it also saves nothing visually, because a
+    // far span is already bounded by the teleport plan below. Cyclic wrap
+    // remains the business of ±1 steps (controls / gesture / autoplay).
+    pageDelta = resolved - currentPageIndex;
+    nextTargetPageIndex = resolved;
   }
 
   // The full visual destination, before any teleport bounding is applied.

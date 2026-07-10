@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { clamp, mod, normalizePageIndex, shortestCyclicDistance } from "./math";
+import { clamp, mod, normalizePageIndex } from "./math";
 
 describe("mod", () => {
   it("wraps positive and negative values into [0, total)", () => {
@@ -36,17 +36,3 @@ describe("normalizePageIndex", () => {
   });
 });
 
-describe("shortestCyclicDistance", () => {
-  it("picks the forward direction when it is shorter", () => {
-    expect(shortestCyclicDistance(0, 2, 10)).toBe(2);
-  });
-  it("picks the backward direction when it is shorter", () => {
-    expect(shortestCyclicDistance(0, 8, 10)).toBe(-2);
-  });
-  it("prefers the forward direction on an exact tie", () => {
-    expect(shortestCyclicDistance(0, 5, 10)).toBe(5);
-  });
-  it("returns 0 for a non-positive total", () => {
-    expect(shortestCyclicDistance(0, 3, 0)).toBe(0);
-  });
-});
