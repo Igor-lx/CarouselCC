@@ -25,7 +25,7 @@ export const SLIDE_PORTRAIT_MEDIA_CONDITION = "(orientation: portrait)";
  * the veil lifts and the swap finishes in the open. The cap must leave room
  * for a full fade out AND back in.
  */
-export const SLIDE_REORIENT_FADE_MS = 180;
+export const SLIDE_REORIENT_FADE_MS = 350;
 export const SLIDE_REORIENT_VEIL_MAX_MS = 2_000;
 
 export const IMAGE_RETRY_BASE_DELAY_MS = 400;

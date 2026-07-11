@@ -25,6 +25,10 @@ import {
   IMAGE_RETRY_MAX_ATTEMPTS,
   IMAGE_RETRY_MAX_DELAY_MS,
   SLIDE_REORIENT_FADE_MS,
+  SWIPE_COMMIT_MAX_PX,
+  SWIPE_COMMIT_MIN_PX,
+  SWIPE_COMMIT_SLOT_SHARE,
+  SWIPE_REFERENCE_SLOT_PX,
   SLIDE_REORIENT_VEIL_MAX_MS,
   MOTION_EPSILON,
   REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
@@ -379,6 +383,42 @@ const numericRules: NumericRule[] = [
   // Release config
   {
     layer: "Gesture",
+    field: "SWIPE_COMMIT_SLOT_SHARE",
+    value: SWIPE_COMMIT_SLOT_SHARE,
+    severity: "LOGICAL",
+    expected: "Expected a finite number in the range (0, 1]",
+    consequence: "Slot-relative commit share outside (0,1] makes the swipe threshold degenerate",
+    predicate: inRangeExclusiveLower(0, 1),
+  },
+  {
+    layer: "Gesture",
+    field: "SWIPE_COMMIT_MIN_PX",
+    value: SWIPE_COMMIT_MIN_PX,
+    severity: "LOGICAL",
+    expected: "Expected a positive finite number of px",
+    consequence: "Ergonomic floor for the commit distance becomes incoherent",
+    predicate: greaterThan(0),
+  },
+  {
+    layer: "Gesture",
+    field: "SWIPE_COMMIT_MAX_PX",
+    value: SWIPE_COMMIT_MAX_PX,
+    severity: "LOGICAL",
+    expected: "Expected a positive finite number of px",
+    consequence: "Ergonomic ceiling for the commit distance becomes incoherent",
+    predicate: greaterThan(0),
+  },
+  {
+    layer: "Gesture",
+    field: "SWIPE_REFERENCE_SLOT_PX",
+    value: SWIPE_REFERENCE_SLOT_PX,
+    severity: "LOGICAL",
+    expected: "Expected a positive finite number of px",
+    consequence: "Resistance-curvature rescaling loses its calibration anchor",
+    predicate: greaterThan(0),
+  },
+  {
+    layer: "Gesture",
     field: "CAROUSEL_INERTIAL_RELEASE_CONFIG.inertiaBoost",
     value: CAROUSEL_INERTIAL_RELEASE_CONFIG.inertiaBoost,
     severity: "LOGICAL",
@@ -452,6 +492,38 @@ const collectReorientVeilRelation = (): CarouselDiagnosticWarning | null => {
   };
 };
 
+const collectSwipeCommitRelations = (): CarouselDiagnosticWarning[] => {
+  const out: CarouselDiagnosticWarning[] = [];
+  if (SWIPE_COMMIT_MIN_PX > SWIPE_COMMIT_MAX_PX) {
+    out.push({
+      severity: "LOGICAL",
+      layer: "Gesture",
+      field: "SWIPE_COMMIT_MIN_PX <= SWIPE_COMMIT_MAX_PX",
+      actual: { minPx: SWIPE_COMMIT_MIN_PX, maxPx: SWIPE_COMMIT_MAX_PX },
+      expected: "Expected the ergonomic floor not to exceed the ceiling",
+      consequence: "The commit-distance clamp collapses to the ceiling for every slot",
+    });
+  }
+  const atReference = SWIPE_COMMIT_SLOT_SHARE * SWIPE_REFERENCE_SLOT_PX;
+  if (atReference < SWIPE_COMMIT_MIN_PX || atReference > SWIPE_COMMIT_MAX_PX) {
+    out.push({
+      severity: "LOGICAL",
+      layer: "Gesture",
+      field: "SWIPE_COMMIT_SLOT_SHARE * SWIPE_REFERENCE_SLOT_PX within [SWIPE_COMMIT_MIN_PX, SWIPE_COMMIT_MAX_PX]",
+      actual: {
+        commitAtReferencePx: atReference,
+        minPx: SWIPE_COMMIT_MIN_PX,
+        maxPx: SWIPE_COMMIT_MAX_PX,
+      },
+      expected:
+        "Expected the commit distance at the calibration slot to land inside the ergonomic clamps",
+      consequence:
+        "The clamps override the intended share exactly where the feel was calibrated — the share constant becomes dead tuning",
+    });
+  }
+  return out;
+};
+
 const collectRetryDelayRelation = (): CarouselDiagnosticWarning | null => {
   if (IMAGE_RETRY_MAX_DELAY_MS >= IMAGE_RETRY_BASE_DELAY_MS) return null;
   return {
@@ -517,5 +589,6 @@ export const collectConstantWarnings = (): CarouselDiagnosticWarning[] => {
   if (retryDelayRelation) out.push(retryDelayRelation);
   const reorientVeilRelation = collectReorientVeilRelation();
   if (reorientVeilRelation) out.push(reorientVeilRelation);
+  out.push(...collectSwipeCommitRelations());
   return out;
 };

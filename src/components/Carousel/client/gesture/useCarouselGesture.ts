@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";
 
 import {
   nearestPageIndex,
@@ -6,7 +6,9 @@ import {
   resolveDragRelease,
   type CarouselLayout,
 } from "../domain";
+import { resolveSlotAdaptiveSwipeConfig } from "../config";
 import type { CarouselRuntimeConfig } from "../config";
+import { useMeasuredSlotSize } from "../geometry";
 import type { CarouselDispatch } from "../state";
 import {
   usePointerSwipe,
@@ -199,10 +201,24 @@ export function useCarouselGesture({
     slotSizeRef.current = 0;
   }, [dispatch, isSwipeOn, layout, readCurrentPosition]);
 
+  // Content-normalized engine tuning: the commit threshold is a share of
+  // the MEASURED slot (clamped to ergonomic px bounds) and the rubber
+  // curvature is rescaled to the slot, so the swipe feels identical at any
+  // visibleSlidesNr / device size. Pre-measure frames fall back to the base
+  // config (see resolveSlotAdaptiveSwipeConfig).
+  const slotPx = useMeasuredSlotSize({
+    viewportRef,
+    visibleSlidesCount: layout.visibleSlidesCount,
+  });
+  const swipeConfig = useMemo(
+    () => resolveSlotAdaptiveSwipeConfig(config.swipeConfig, slotPx),
+    [config.swipeConfig, slotPx],
+  );
+
   const { hostProps } = usePointerSwipe({
     enabled: layout.canSlide && isSwipeOn,
     hostRef: viewportRef,
-    config: config.swipeConfig,
+    config: swipeConfig,
     onPressStart: startDragFromCurrentPosition,
     onDragStart: handleDragStart,
     onDragMove: handleDragMove,

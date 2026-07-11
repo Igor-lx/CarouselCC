@@ -4,3 +4,4 @@ export type {
   TrackCompositorMotionOptions,
 } from "./useTrackBinding";
 export { useResponsiveImageSizes } from "./useResponsiveImageSizes";
+export { useMeasuredSlotSize } from "./useMeasuredSlotSize";

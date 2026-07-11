@@ -497,7 +497,8 @@ here only invites doc/code drift. The single source of truth is `config/`:
   preflight / approach spans plus `GO_TO_TELEPORT_MIN_PAGE_SPAN`, the flight
   threshold (must exceed their sum — diagnostics enforce it).
 - `config/interaction.ts` — hover delay, visibility threshold.
-- `config/gesture.ts` — swipe + inertial-release config.
+- `config/gesture.ts` — swipe + inertial-release config, the slot-adaptive
+  normalization constants and their pure resolver (§5).
 - `config/constants.ts` — epsilons, render-window buffer.
 - `modules/PaginationWidget/defaults.ts` — widget geometry + write epsilons.
 
@@ -826,6 +827,23 @@ filled through the engine's optional `hostRef` forwarding. It is not
 carousel-specific and is reusable; the carousel overrides every tuning field
 with its own `CAROUSEL_SWIPE_CONFIG`.
 
+The engine's tuning is **slot-normalized** before it reaches the engine: the
+engine thinks in absolute px of its host, but the user's eye thinks in slots
+("how far did the content move relative to one slide"), and a host-relative
+threshold drifts with `visibleSlidesNr` (11% of a slide at 1 visible vs 32%
+at 3). `resolveSlotAdaptiveSwipeConfig` (config/gesture.ts, pure, unit
+tested) translates content semantics into engine units against the MEASURED
+slot (`useMeasuredSlotSize`): the commit distance becomes
+`clamp(SWIPE_COMMIT_MIN_PX, slot × SWIPE_COMMIT_SLOT_SHARE,
+SWIPE_COMMIT_MAX_PX)` delivered via `minSwipeDistance` (with
+`swipeThresholdRatio: 0` — the engine's own host-relative path is retired
+for the carousel), and the rubber curvature is rescaled by
+`SWIPE_REFERENCE_SLOT_PX / slot` so resistance reaches the same relative
+stiffness at the same relative pull on any slot. The engine itself is
+untouched — slot semantics stay carousel-owned. Diagnostics audit the
+constants and their relations (clamp ordering; the share at the reference
+slot must land inside the clamps).
+
 `useCarouselGesture` is the carousel-specific adapter. It:
 
 1. on press-start for the non-interactive surface, or on horizontal intent for
@@ -1121,9 +1139,11 @@ src/components/Carousel/client/
 │   ├── fallbackPacing.ts          shared no-WAAPI frame-skip rule
 │   └── useVisualPosition.ts       VisualPositionSource owner
 ├── geometry/
+│   ├── useMeasuredSlotSize.ts     reactive measured slot width (sizes hint + swipe normalization)
+│   ├── useResponsiveImageSizes.ts measured-slot `sizes` attribute for slide images
 │   └── useTrackBinding.ts         ResizeObserver + slot measure + transform writer + WAAPI compositor motion
 ├── gesture/
-│   └── useCarouselGesture.ts      pointer-swipe → dispatch + visual position writes
+│   └── useCarouselGesture.ts      pointer-swipe → dispatch + visual position writes (slot-normalized engine tuning)
 ├── autoplay/
 │   ├── useAutoplay.ts             generic interval loop (enabled/pause/hover)
 │   └── useCarouselAutoplay.ts     carousel adapter: visibility + pause rule + handlers
