@@ -24,7 +24,8 @@ import {
   IMAGE_RETRY_BASE_DELAY_MS,
   IMAGE_RETRY_MAX_ATTEMPTS,
   IMAGE_RETRY_MAX_DELAY_MS,
-  SLIDE_REORIENT_FADE_MS,
+  SLIDE_REORIENT_FADE_IN_MS,
+  SLIDE_REORIENT_FADE_OUT_MS,
   SWIPE_COMMIT_MAX_PX,
   SWIPE_COMMIT_MIN_PX,
   SWIPE_COMMIT_SLOT_SHARE,
@@ -250,11 +251,20 @@ const numericRules: NumericRule[] = [
   },
   {
     layer: "Slides",
-    field: "SLIDE_REORIENT_FADE_MS",
-    value: SLIDE_REORIENT_FADE_MS,
+    field: "SLIDE_REORIENT_FADE_OUT_MS",
+    value: SLIDE_REORIENT_FADE_OUT_MS,
     severity: "LOGICAL",
     expected: "Expected a positive finite number of milliseconds",
-    consequence: "Orientation-swap veil fade collapses to an instant blink or a negative transition",
+    consequence: "Orientation-swap fade-out collapses to an instant blink or a negative transition",
+    predicate: greaterThan(0),
+  },
+  {
+    layer: "Slides",
+    field: "SLIDE_REORIENT_FADE_IN_MS",
+    value: SLIDE_REORIENT_FADE_IN_MS,
+    severity: "LOGICAL",
+    expected: "Expected a positive finite number of milliseconds",
+    consequence: "Orientation-swap fade-in collapses to an instant blink or a negative transition",
     predicate: greaterThan(0),
   },
   {
@@ -503,17 +513,19 @@ const collectProfileShareRelation = (
 const collectReorientVeilRelation = (): CarouselDiagnosticWarning | null => {
   // The cap must leave room for a full fade OUT and back IN, otherwise the
   // fail-open lift truncates the mask mid-transition.
-  if (SLIDE_REORIENT_VEIL_MAX_MS >= SLIDE_REORIENT_FADE_MS * 2) return null;
+  const fullRoundTrip = SLIDE_REORIENT_FADE_OUT_MS + SLIDE_REORIENT_FADE_IN_MS;
+  if (SLIDE_REORIENT_VEIL_MAX_MS >= fullRoundTrip) return null;
   return {
     severity: "LOGICAL",
     layer: "Slides",
-    field: "SLIDE_REORIENT_VEIL_MAX_MS >= SLIDE_REORIENT_FADE_MS * 2",
+    field: "SLIDE_REORIENT_VEIL_MAX_MS >= SLIDE_REORIENT_FADE_OUT_MS + SLIDE_REORIENT_FADE_IN_MS",
     actual: {
-      fadeMs: SLIDE_REORIENT_FADE_MS,
+      fadeOutMs: SLIDE_REORIENT_FADE_OUT_MS,
+      fadeInMs: SLIDE_REORIENT_FADE_IN_MS,
       veilMaxMs: SLIDE_REORIENT_VEIL_MAX_MS,
     },
     expected:
-      "Expected the fail-open cap to cover a full fade out plus fade in (>= 2x the fade)",
+      "Expected the fail-open cap to cover a full fade out plus fade in",
     consequence:
       "The veil is force-lifted mid-transition: the stale-crop mask flashes instead of fading",
   };

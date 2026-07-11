@@ -4,7 +4,8 @@ import styles from "./Carousel.module.scss";
 import { mergeStyleMaps, resolveSlots } from "../../../shared";
 import {
   CAROUSEL_DEFAULTS,
-  SLIDE_REORIENT_FADE_MS,
+  SLIDE_REORIENT_FADE_IN_MS,
+  SLIDE_REORIENT_FADE_OUT_MS,
   useCarouselConfig,
 } from "./config";
 import {
@@ -44,7 +45,8 @@ import type { CarouselProps, SlideClassMap } from "./public-api/types";
 // config/slides.ts — the stylesheet only consumes the variable. Module-level
 // constant: one object identity for the component's whole life.
 const REORIENT_FADE_STYLE = {
-  "--slide-reorient-fade": `${SLIDE_REORIENT_FADE_MS}ms`,
+  "--slide-reorient-fade-out": `${SLIDE_REORIENT_FADE_OUT_MS}ms`,
+  "--slide-reorient-fade-in": `${SLIDE_REORIENT_FADE_IN_MS}ms`,
 } as React.CSSProperties;
 
 const Carousel = memo(function Carousel(props: CarouselProps) {

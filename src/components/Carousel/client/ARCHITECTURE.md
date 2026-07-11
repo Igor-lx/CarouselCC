@@ -252,9 +252,16 @@ For each logical slide you need, starting from a single high-resolution source:
    watches the same media condition (`SLIDE_PORTRAIT_MEDIA_CONDITION`, the
    third leg of the contract — `orientationMediaSync.test.ts` keeps SCSS,
    generated sources and the constant in lockstep), fades the bitmap out via
-   `data-reorienting` (duration `SLIDE_REORIENT_FADE_MS`, injected by the
-   root as `--slide-reorient-fade` — a value bound to a JS invariant lives
-   in config, not the stylesheet), and unveils when `img.decode()` settles — instantly
+   `data-reorienting` and unveils when `img.decode()` settles. Fade-out and
+   fade-in have SEPARATE durations (`SLIDE_REORIENT_FADE_OUT_MS` /
+   `SLIDE_REORIENT_FADE_IN_MS`, injected by the root as CSS vars — values
+   bound to a JS invariant live in config, not the stylesheet) — not extra
+   tuning for its own sake: the fade-out starts mid-rotation (the OS flips
+   the condition at ~45–60° of tilt, so part of the dimming hides inside
+   the system rotation animation) and its frames are dropped by the
+   rotation relayout, while the eye reads disappearance as an event and
+   appearance as a process — with equal values the fade-out FEELS much
+   shorter, so it gets the longer setting — instantly
    on a warm cache, as long as needed on a slow device, and never longer
    than the `SLIDE_REORIENT_VEIL_MAX_MS` fail-open cap (past it, the honest
    old crop beats a hidden image). Reduced motion keeps the mask but drops

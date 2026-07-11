@@ -6,9 +6,9 @@
     --pagination-gap: 20px;
     --slide-radius: 12px;
     --slide-outline-width: 2px;
-    // --slide-reorient-fade is injected inline by the root from
-    // SLIDE_REORIENT_FADE_MS (config/slides.ts): a value bound to a JS
-    // invariant (the veil fail-open cap) lives in config under diagnostics,
+    // --slide-reorient-fade-out / --slide-reorient-fade-in are injected
+    // inline by the root from config/slides.ts: values bound to a JS
+    // invariant (the veil fail-open cap) live in config under diagnostics,
     // not in the stylesheet.
     --viewport-radius: var(--slide-radius);
 
@@ -127,10 +127,16 @@
       // Orientation-swap veil (data-reorienting, set by useOrientationSwapVeil):
       // masks the window where the box already flipped its aspect but the old
       // crop is still painted. Cached swaps clear before the fade is visible.
-      transition: opacity var(--slide-reorient-fade) ease;
+      //
+      // Two durations by design (config/slides.ts explains the perceptual
+      // asymmetry). CSS transitions take the timing of the DESTINATION
+      // state: the base rule governs the fade-IN (attribute removed), the
+      // [data-reorienting] rule the fade-OUT (attribute added).
+      transition: opacity var(--slide-reorient-fade-in) ease;
 
       &[data-reorienting="true"] {
         opacity: 0;
+        transition-duration: var(--slide-reorient-fade-out);
       }
     }
   }
