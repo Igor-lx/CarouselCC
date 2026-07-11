@@ -11,6 +11,7 @@ import type { CarouselRuntimeConfig } from "../config";
 import { useMeasuredSlotSize } from "../geometry";
 import type { CarouselDispatch } from "../state";
 import {
+  motionNow,
   usePointerSwipe,
   type PointerSwipeHostProps,
   type PointerSwipeMovePayload,
@@ -197,6 +198,7 @@ export function useCarouselGesture({
         targetPageIndex: releaseTarget.targetPageIndex,
         targetVirtualIndex: releaseTarget.targetVirtualIndex,
         isSnap: releaseTarget.isSnap,
+        releasedAt: motionNow(),
         pointerReleaseVelocity: pointerVelocityToVirtual(
           payload.pointerReleaseVelocity,
           slotSizeRef.current,

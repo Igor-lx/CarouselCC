@@ -921,6 +921,14 @@ slot must land inside the clamps).
    flushes the pending `START_DRAG` synchronously first, so the reducer
    always sees START before END — a gesture faster than the deferral simply
    lands both in one commit;
+   The mirror of this on the RELEASE side is the backdated release clock:
+   `END_DRAG` carries the lift-off `releasedAt` stamp, and the runner dates
+   the ride segment to it (clamped by `GESTURE_RELEASE_MAX_BACKDATE_MS`,
+   which diagnostics keep below the ride-duration floor). The commit-gap
+   dead frames — pointerup → WAAPI attach, where a click retarget is masked
+   by the previous animation (§4.2) but a release has nothing to mask it —
+   become a small in-phase skip shared by every plan consumer instead of a
+   freeze;
 2. on every move payload: translates `uiOffset` into a virtual-index
    delta using the recorded slot size and writes that into the visual
    position via `applyTrackPosition`. No React state per move;

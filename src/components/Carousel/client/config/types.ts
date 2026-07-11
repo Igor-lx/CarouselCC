@@ -68,6 +68,8 @@ export interface CarouselRuntimeConfig extends PropDerivedSettings {
   swipeConfig: Required<PointerSwipeConfig>;
   releaseConfig: CarouselInertialReleaseConfig;
   dragReleaseEpsilon: number;
+  /** @see GESTURE_RELEASE_MAX_BACKDATE_MS */
+  gestureReleaseMaxBackdateMs: number;
 }
 
 export interface RawConfigInput {
