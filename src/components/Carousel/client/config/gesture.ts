@@ -32,7 +32,7 @@ export const CAROUSEL_SWIPE_CONFIG: Required<PointerSwipeConfig> = {
   // Flick memory: the flick decision and the release speed judge the whole
   // gesture (weighted-average velocity), not its last segment, and survive a
   // finger settling before lift-off (grace, then half-life decay).
-  flickVelocityAlpha: 0.35,
+  flickVelocityAlpha: 0.45,
   flickPauseGraceMs: 120,
   flickVelocityHalfLifeMs: 250,
   minSwipeDistance: 20,
@@ -104,6 +104,6 @@ export const resolveSlotAdaptiveSwipeConfig = (
  * smooth tail.
  */
 export const CAROUSEL_INERTIAL_RELEASE_CONFIG: CarouselInertialReleaseConfig = {
-  inertiaBoost: 2.15,
+  inertiaBoost: 1.7,
   decelerationDistanceShare: 0.25,
 };
