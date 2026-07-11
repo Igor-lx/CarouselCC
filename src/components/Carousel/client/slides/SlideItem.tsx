@@ -1,7 +1,8 @@
 import clsx from "clsx";
-import { memo, useEffect } from "react";
+import { memo, useEffect, useRef } from "react";
 
 import { useImageResource } from "./imageResource";
+import { useOrientationSwapVeil } from "./useOrientationSwapVeil";
 import type { SlideItemProps } from "./SlideItem.types";
 
 /**
@@ -45,6 +46,14 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
   const isImageSlide = imageSource !== null;
   const hasImageError = isImageSlide && status === "error";
 
+  // Orientation-swap veil: masks the stale-crop repaint window on rotation
+  // (see useOrientationSwapVeil). Applies only while a bitmap is on screen.
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const isReorienting = useOrientationSwapVeil({
+    imgRef,
+    isBitmapShown: isImageSlide && status === "loaded",
+  });
+
   // An errored image that is currently in the active band is retried on a
   // backed-off schedule owned by the store. A successful retry flips the
   // resource back to `loading` with a new `generation`, which remounts the
@@ -75,6 +84,8 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
         // Outside `<picture>` the `<img>` carries the retry key (a retry then
         // remounts it); inside `<picture>` the key lives on the wrapper.
         key={sources.length === 0 ? generation : undefined}
+        ref={imgRef}
+        data-reorienting={isReorienting || undefined}
         src={imageSource}
         srcSet={image?.srcSet}
         sizes={isResponsive ? resolvedSizes : undefined}

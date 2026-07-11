@@ -243,6 +243,20 @@ For each logical slide you need, starting from a single high-resolution source:
    what makes `object-fit: cover` a no-op (the image fills the slide with
    nothing cropped), and the carousel derives its height from slot width ×
    aspect instead of a fixed height, so it fits any window.
+
+   On a device ROTATION the two halves of the contract swap at different
+   speeds: CSS flips the box aspect instantly, but the browser keeps
+   painting the old crop until the new `<source>` resource decodes — under
+   `cover` that window shows a zoomed centre of the previous orientation's
+   photo. `useOrientationSwapVeil` (slides/) masks exactly that window: it
+   watches the same media condition (`SLIDE_PORTRAIT_MEDIA_CONDITION`, the
+   third leg of the contract — `orientationMediaSync.test.ts` keeps SCSS,
+   generated sources and the constant in lockstep), fades the bitmap out via
+   `data-reorienting`, and unveils when `img.decode()` settles — instantly
+   on a warm cache, as long as needed on a slow device, and never longer
+   than the `SLIDE_REORIENT_VEIL_MAX_MS` fail-open cap (past it, the honest
+   old crop beats a hidden image). Reduced motion keeps the mask but drops
+   the fade.
    ```
    ```bash
    npm run gen:carousel   # tsx Carousel/data-gen/cli.ts carousel-data.config.json
@@ -1129,6 +1143,7 @@ src/components/Carousel/client/
 │   │   ├── useImageResourceRetention.ts  prunes entries + retry timers to the live deck
 │   │   └── types.ts
 │   ├── useCarouselSlideDeck.ts    layout, records, perfect-page info
+│   ├── useOrientationSwapVeil.ts  rotation stale-crop mask (decode-gated)
 │   └── useSlideRenderModel.ts     virtual slides + render window
 ├── slots/
 │   └── slotNames.ts               CAROUSEL_SLOTS + CarouselSlotComponent

@@ -24,6 +24,7 @@ import {
   IMAGE_RETRY_BASE_DELAY_MS,
   IMAGE_RETRY_MAX_ATTEMPTS,
   IMAGE_RETRY_MAX_DELAY_MS,
+  SLIDE_REORIENT_VEIL_MAX_MS,
   MOTION_EPSILON,
   REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
   REPEATED_CLICK_DECELERATION_DISTANCE_SHARE,
@@ -241,6 +242,16 @@ const numericRules: NumericRule[] = [
     expected: "Expected a positive finite integer",
     consequence: "Image retry cap becomes incoherent",
     predicate: isPositiveInteger,
+  },
+  {
+    layer: "Slides",
+    field: "SLIDE_REORIENT_VEIL_MAX_MS",
+    value: SLIDE_REORIENT_VEIL_MAX_MS,
+    severity: "LOGICAL",
+    expected: "Expected a positive finite number of milliseconds",
+    consequence:
+      "Orientation-swap veil either never fails open (images can stay hidden on a stalled network) or lifts before it can mask anything",
+    predicate: greaterThan(0),
   },
 
   // Interaction

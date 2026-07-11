@@ -31,6 +31,8 @@ export {
   IMAGE_RETRY_BASE_DELAY_MS,
   IMAGE_RETRY_MAX_DELAY_MS,
   IMAGE_RETRY_MAX_ATTEMPTS,
+  SLIDE_PORTRAIT_MEDIA_CONDITION,
+  SLIDE_REORIENT_VEIL_MAX_MS,
 } from "./slides";
 export { buildCarouselConfig } from "./buildConfig";
 export { useCarouselConfig } from "./useCarouselConfig";
