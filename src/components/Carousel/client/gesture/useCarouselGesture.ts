@@ -26,6 +26,17 @@ interface UseCarouselGestureInput {
    * pointer handlers, as if the gesture surface did not exist.
    */
   isSwipeOn: boolean;
+  /**
+   * The pending destination of an in-flight ride, `null` while idle. A drag
+   * that GRABS a moving deck anchors its origin page here instead of the
+   * nearest-by-geometry page: otherwise a repeat swipe early in a ride
+   * (visual < 50% of a page) would round back to the ride's start page and
+   * merely re-target the ALREADY incoming page — while the same swipe past
+   * 50% (and every repeated click, uniformly) advances one page beyond it.
+   * Anchoring on the pending target makes the repeat gesture progress-
+   * independent, exactly like the repeated click.
+   */
+  inFlightTargetPageIndex: number | null;
   dispatch: CarouselDispatch;
   readCurrentPosition: () => number;
   applyTrackPosition: (position: number) => void;
@@ -49,6 +60,7 @@ export function useCarouselGesture({
   viewportRef,
   layout,
   isSwipeOn,
+  inFlightTargetPageIndex,
   dispatch,
   readCurrentPosition,
   applyTrackPosition,
@@ -85,7 +97,9 @@ export function useCarouselGesture({
     // motion runner's post-commit effect).
     cancelTrackMotion(origin);
     applyTrackPosition(origin);
-    const pageIndex = nearestPageIndex(origin, layout);
+    // In-flight grab: anchor on the interrupted ride's destination (see the
+    // input doc); idle grab: the geometric nearest page.
+    const pageIndex = inFlightTargetPageIndex ?? nearestPageIndex(origin, layout);
 
     originPositionRef.current = origin;
     originPageIndexRef.current = pageIndex;
@@ -100,6 +114,7 @@ export function useCarouselGesture({
     cancelTrackMotion,
     dispatch,
     getSlotSize,
+    inFlightTargetPageIndex,
     layout,
     readCurrentPosition,
   ]);

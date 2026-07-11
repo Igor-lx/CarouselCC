@@ -235,6 +235,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     viewportRef,
     layout,
     isSwipeOn,
+    inFlightTargetPageIndex: status.isIdle ? null : state.targetPageIndex,
     dispatch,
     readCurrentPosition,
     applyTrackPosition: applyImmediatePosition,

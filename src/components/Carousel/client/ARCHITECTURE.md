@@ -903,7 +903,12 @@ slot must land inside the clamps).
 
 1. on press-start for the non-interactive surface, or on horizontal intent for
    an interactive child: records the visually sampled origin position and the
-   slot size (`getSlotSize()`), then takes the track **synchronously** —
+   slot size (`getSlotSize()`). The drag-origin PAGE is the geometric nearest
+   page when the deck is idle, but the interrupted ride's pending target when
+   the grab lands mid-flight — otherwise an early repeat swipe (visual < 50%)
+   would round back to the ride's start page and merely re-target the already
+   incoming page, while the repeated click uniformly advances beyond it. Then
+   it takes the track **synchronously** —
    `cancelTrackMotion(origin)` tears down any compositor animation and pins the
    track at the live origin, so the finger owns it in the same turn rather than
    after the motion runner's post-commit effect — and publishes the origin into
