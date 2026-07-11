@@ -1,6 +1,12 @@
 @layer components {
   .paginationWrapper {
     --pagination-padding-block-start: 20px;
+    // Clearance below the dots: they must NOT sit flush on the outer
+    // container's overflow-hidden edge. During the WAAPI cross-fade a dot is
+    // rasterized on a compositor layer whose sub-pixel rounding differs from
+    // the in-flow render — flush content gets its bottom sliver clipped
+    // (sharp corners) for the duration of the animation.
+    --pagination-padding-block-end: 4px;
     --pagination-padding-inline: 15px;
     --pagination-row-gap: 10px;
     --pagination-column-gap: 35px;
@@ -22,7 +28,7 @@
     width: 100%;
     height: auto;
     padding: var(--pagination-padding-block-start)
-      var(--pagination-padding-inline) 0;
+      var(--pagination-padding-inline) var(--pagination-padding-block-end);
     gap: var(--pagination-row-gap) var(--pagination-column-gap);
     pointer-events: none;
   }
