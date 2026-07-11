@@ -6,6 +6,9 @@
     --pagination-gap: 20px;
     --slide-radius: 12px;
     --slide-outline-width: 2px;
+    // Orientation-swap veil fade (see useOrientationSwapVeil). Keep it well
+    // under the SLIDE_REORIENT_VEIL_MAX_MS fail-open cap in config/slides.ts.
+    --slide-reorient-fade: 0.18s;
     --viewport-radius: var(--slide-radius);
 
     // The slide box aspect ratio — the single geometry contract with the
@@ -123,7 +126,7 @@
       // Orientation-swap veil (data-reorienting, set by useOrientationSwapVeil):
       // masks the window where the box already flipped its aspect but the old
       // crop is still painted. Cached swaps clear before the fade is visible.
-      transition: opacity 0.18s ease;
+      transition: opacity var(--slide-reorient-fade) ease;
 
       &[data-reorienting="true"] {
         opacity: 0;
