@@ -17,6 +17,15 @@ import type {
 export interface CarouselInertialReleaseConfig extends InertialReleaseConfig {
   accelerationDistanceShare: number;
   decelerationDistanceShare: number;
+  /**
+   * Floor on the ride duration: a vigorous flick on a narrow slot (portrait,
+   * one visible slide) can otherwise collapse the ride to a few dozen ms —
+   * 1–3 painted frames on a weak device, which the eye reads as a teleport,
+   * not a motion. The speed intent is re-solved down so the ride never runs
+   * shorter than this; continuity still wins — a launch speed that alone
+   * beats the floor is never slowed (the segment simply arrives earlier).
+   */
+  minRideDurationMs: number;
 }
 
 /**
@@ -114,4 +123,5 @@ export const CAROUSEL_INERTIAL_RELEASE_CONFIG: CarouselInertialReleaseConfig = {
   inertiaBoost: 1.7,
   accelerationDistanceShare: 0.2,
   decelerationDistanceShare: 0.25,
+  minRideDurationMs: 160,
 };

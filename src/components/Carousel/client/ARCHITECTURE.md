@@ -924,7 +924,11 @@ and `pointerReleaseVelocity` — the flick-memory intent, boosted — is the
 CRUISE target the profile accelerates to over
 `CAROUSEL_INERTIAL_RELEASE_CONFIG.accelerationDistanceShare`. Content
 never jumps above its visible speed; a fast lift-off makes start ≈ cruise
-and the ramp collapses by itself.
+and the ramp collapses by itself. The ride also has a DURATION FLOOR
+(`minRideDurationMs`): a vigorous flick on a narrow slot would otherwise
+collapse to a few dozen ms — 1–3 painted frames on a weak device, read as a
+teleport — so the intent speed is re-solved down to the floor; a launch
+speed that alone beats the floor is never slowed (continuity wins).
 
 The whole surface is gated by `enabled: layout.canSlide && isSwipeOn` on the
 primitive: when either is `false`, `usePointerSwipe` returns **empty

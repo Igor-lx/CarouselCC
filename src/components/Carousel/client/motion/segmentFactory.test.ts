@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCarouselConfig } from "../config";
+import { buildCarouselConfig, CAROUSEL_INERTIAL_RELEASE_CONFIG } from "../config";
 import { buildCarouselLayout, buildSlideRecords } from "../domain";
 import type { Slide } from "../public-api/types";
 import { buildInitialState } from "../state/initial";
@@ -32,7 +32,11 @@ const reduce = (state: CarouselState, command: CarouselCommand): CarouselState =
   });
 
 /** Release a drag with a calm visual finish but a fast gesture memory. */
-const releasedState = (uiVelocity: number, pointerVelocity: number) => {
+const releasedState = (
+  uiVelocity: number,
+  pointerVelocity: number,
+  fromVirtualIndex = -0.4,
+) => {
   const layout = makeLayout(12, 3);
   const dragging = reduce(buildInitialState(layout), {
     type: "START_DRAG",
@@ -41,7 +45,7 @@ const releasedState = (uiVelocity: number, pointerVelocity: number) => {
   });
   return reduce(dragging, {
     type: "END_DRAG",
-    fromVirtualIndex: -0.4,
+    fromVirtualIndex,
     targetPageIndex: 1,
     targetVirtualIndex: 3,
     isSnap: false,
@@ -49,6 +53,58 @@ const releasedState = (uiVelocity: number, pointerVelocity: number) => {
     uiReleaseVelocity: uiVelocity,
   });
 };
+
+describe("ride-duration floor", () => {
+  it("a vigorous flick over a short remaining distance never collapses below the floor", () => {
+    // calm visible finish (0.001 u/ms) + huge flick memory: 0.4 remaining
+    // units at the boosted intent would be a ~10ms teleport without the floor
+    const state = releasedState(0.001, 0.05, 2.6);
+    const { segment } = buildCarouselSegment({
+      state,
+      config,
+      isInstantMode: false,
+      start: { position: state.fromVirtualIndex, velocity: 0, strategy: "idle" },
+      startedAt: 0,
+    });
+    // float-tolerant: the solver lands exactly on the floor
+    expect(segment.duration).toBeGreaterThanOrEqual(
+      CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs - 1e-6,
+    );
+  });
+
+  it("a launch speed that alone beats the floor is never slowed (continuity wins)", () => {
+    // the EYE saw 0.05 u/ms at lift-off: a ~10ms ride is continuous with the
+    // finger, not a teleport — the floor must not brake the visible speed
+    const state = releasedState(0.05, 0.05, 2.6);
+    const { segment } = buildCarouselSegment({
+      state,
+      config,
+      isInstantMode: false,
+      start: { position: state.fromVirtualIndex, velocity: 0, strategy: "idle" },
+      startedAt: 0,
+    });
+    expect(segment.duration).toBeLessThan(
+      CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs,
+    );
+    const launch = sampleCarouselSegment(segment, 1);
+    expect(Math.abs(launch.velocity)).toBeGreaterThan(0.03);
+  });
+
+  it("long rides above the floor are untouched by it", () => {
+    // ~3.4 units at a moderate speed: raw duration is well above the floor
+    const state = releasedState(0.003, 0.003);
+    const { segment } = buildCarouselSegment({
+      state,
+      config,
+      isInstantMode: false,
+      start: { position: state.fromVirtualIndex, velocity: 0, strategy: "idle" },
+      startedAt: 0,
+    });
+    expect(segment.duration).toBeGreaterThan(
+      CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs * 2,
+    );
+  });
+});
 
 describe("gesture-release continuity launch", () => {
   it("starts at the visual (ui) velocity, not the faster gesture memory", () => {

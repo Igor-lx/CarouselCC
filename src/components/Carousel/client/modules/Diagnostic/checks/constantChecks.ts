@@ -10,6 +10,7 @@ import {
 } from "../../../../../../shared";
 import {
   AUTOPLAY_ACCELERATION_DISTANCE_SHARE,
+  CAROUSEL_DEFAULTS,
   AUTOPLAY_DECELERATION_DISTANCE_SHARE,
   CAROUSEL_INERTIAL_RELEASE_CONFIG,
   CAROUSEL_SWIPE_CONFIG,
@@ -474,6 +475,15 @@ const numericRules: NumericRule[] = [
   },
   {
     layer: "Gesture",
+    field: "CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs",
+    value: CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs,
+    severity: "LOGICAL",
+    expected: "Expected a positive finite number of milliseconds",
+    consequence: "Ride-duration floor becomes incoherent — flicks may collapse into teleports again",
+    predicate: greaterThan(0),
+  },
+  {
+    layer: "Gesture",
     field: "CAROUSEL_INERTIAL_RELEASE_CONFIG.decelerationDistanceShare",
     value: CAROUSEL_INERTIAL_RELEASE_CONFIG.decelerationDistanceShare,
     severity: "CRITICAL",
@@ -537,6 +547,25 @@ const collectReorientVeilRelation = (): CarouselDiagnosticWarning | null => {
       "Expected the fail-open cap to cover a full fade out plus fade in",
     consequence:
       "The veil is force-lifted mid-transition: the stale-crop mask flashes instead of fading",
+  };
+};
+
+const collectRideFloorRelation = (): CarouselDiagnosticWarning | null => {
+  // The floor must stay well under the default step duration, otherwise a
+  // flick stops being faster than an ordinary click step.
+  if (CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs < CAROUSEL_DEFAULTS.durationStep) {
+    return null;
+  }
+  return {
+    severity: "LOGICAL",
+    layer: "Gesture",
+    field: "CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs < CAROUSEL_DEFAULTS.durationStep",
+    actual: {
+      minRideDurationMs: CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs,
+      defaultStepDurationMs: CAROUSEL_DEFAULTS.durationStep,
+    },
+    expected: "Expected the ride floor to stay below the default step duration",
+    consequence: "A flick rides no faster than a plain click step — the gesture loses its snap",
   };
 };
 
@@ -644,5 +673,7 @@ collectProfileShareRelation(
   const reorientVeilRelation = collectReorientVeilRelation();
   if (reorientVeilRelation) out.push(reorientVeilRelation);
   out.push(...collectSwipeCommitRelations());
+  const rideFloorRelation = collectRideFloorRelation();
+  if (rideFloorRelation) out.push(rideFloorRelation);
   return out;
 };

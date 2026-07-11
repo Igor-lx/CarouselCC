@@ -173,15 +173,35 @@ const buildGestureProfile = (
     handoffVelocity: start.velocity,
     intentSpeed: releaseSpeed,
   });
-  const profile = buildProfile({
-    from: start.position,
-    to: state.virtualIndex,
-    startSpeed: launch.startSpeed,
-    peakSpeed: launch.cruiseSpeed,
-    endSpeed: 0,
-    accelerationDistanceShare: release.accelerationDistanceShare,
-    decelerationDistanceShare: release.decelerationDistanceShare,
-  });
+  const buildRide = (peakSpeed: number) =>
+    buildProfile({
+      from: start.position,
+      to: state.virtualIndex,
+      startSpeed: launch.startSpeed,
+      peakSpeed,
+      endSpeed: 0,
+      accelerationDistanceShare: release.accelerationDistanceShare,
+      decelerationDistanceShare: release.decelerationDistanceShare,
+    });
+
+  let profile = buildRide(launch.cruiseSpeed);
+  // Ride-duration floor: a flick must stay a VISIBLE motion (see
+  // minRideDurationMs). Re-solve the cruise down to the floor duration; the
+  // launch speed is never reduced (continuity wins — if it alone beats the
+  // floor, the ride just arrives earlier, same as the solver's contract).
+  if (profile.duration < release.minRideDurationMs) {
+    const flooredPeak = Math.max(
+      resolvePeakSpeedForDuration({
+        distance,
+        duration: release.minRideDurationMs,
+        startSpeed: launch.startSpeed,
+        accelerationDistanceShare: release.accelerationDistanceShare,
+        decelerationDistanceShare: release.decelerationDistanceShare,
+      }),
+      launch.startSpeed,
+    );
+    profile = buildRide(flooredPeak);
+  }
 
   return {
     strategy: "gesture",
