@@ -9,8 +9,8 @@ import {
   frameAdjustedAlpha,
   pauseDecayedVelocity,
   safeResistance,
-  sameDirectionSpeed,
-} from "../internals/math";
+} from "../swipe/internals/math";
+import { sameDirectionSpeed } from "../inertia/speed";
 
 describe("safeResistance", () => {
   it("clamps into [0, 1]", () => {

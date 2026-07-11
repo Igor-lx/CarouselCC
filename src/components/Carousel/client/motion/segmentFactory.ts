@@ -1,4 +1,9 @@
-import { resolveInertialRelease } from "../../../../shared";
+import {
+  buildProfile,
+  resolveInertialRelease,
+  resolvePeakSpeedForDuration,
+  resolveReleaseLaunch,
+} from "../../../../shared";
 import type {
   CarouselInertialReleaseConfig,
   CarouselRuntimeConfig,
@@ -8,8 +13,6 @@ import type {
 } from "../config";
 import type { CarouselState } from "../state";
 import { durationByVirtualSpan, resolveStepDuration } from "./duration";
-import { buildProfile } from "./profile";
-import { resolvePeakSpeedForDuration } from "./progressCurve";
 import { sameDirectionSpeed, signedVelocity } from "./speed";
 import {
   resolveGoToProfileZones,
@@ -160,22 +163,21 @@ const buildGestureProfile = (
   releaseSpeed: number,
 ): CarouselSegment => {
   const distance = state.virtualIndex - start.position;
-  // CONTINUITY LAUNCH (etalon scroll physics): the segment starts at the
-  // VISUAL velocity the eye saw at lift-off — the follow stream's ui
-  // velocity (the handoff velocity is zero during a drag: the finger wrote
-  // positions, not a curve). The intent speed (flick memory × boost) is the
-  // CRUISE target the profile accelerates to over the configured share —
-  // never an instant jump above what was visible. A fast lift-off makes
-  // start ≈ peak and the ramp collapses by itself.
-  const startSpeed = Math.max(
-    sameDirectionSpeed(start.velocity, distance),
-    sameDirectionSpeed(state.gesture.uiVelocity, distance),
-  );
+  // CONTINUITY LAUNCH (see gesture/inertia/releaseLaunch): start at the
+  // visual velocity the eye saw at lift-off (the follow stream's ui
+  // velocity; the handoff velocity is zero during a drag), accelerate to
+  // the intent cruise. A fast lift-off collapses the ramp by itself.
+  const launch = resolveReleaseLaunch({
+    distance,
+    visualVelocity: state.gesture.uiVelocity,
+    handoffVelocity: start.velocity,
+    intentSpeed: releaseSpeed,
+  });
   const profile = buildProfile({
     from: start.position,
     to: state.virtualIndex,
-    startSpeed,
-    peakSpeed: Math.max(Math.abs(signedVelocity(releaseSpeed, distance)), startSpeed),
+    startSpeed: launch.startSpeed,
+    peakSpeed: launch.cruiseSpeed,
     endSpeed: 0,
     accelerationDistanceShare: release.accelerationDistanceShare,
     decelerationDistanceShare: release.decelerationDistanceShare,

@@ -5,7 +5,7 @@ import {
   createMotionProfile,
   normalizeMotionProfileShares,
   sampleMotionProfile,
-} from "./profile";
+} from "../profile/profile";
 
 describe("normalizeMotionProfileShares", () => {
   it("keeps in-budget shares and derives the cruise remainder", () => {

@@ -1,18 +1,13 @@
 /**
- * The pointer-swipe gesture engine — one self-sufficient facade. Everything a
- * component needs to wire touch gestures comes from here: the hook, the
- * release-speed helpers, the engine defaults, the drag-ignore escape hatch,
- * and every public type. See README.md in this folder for the full contract.
- * The `internals/` folder is the engine's private machinery — import only
- * from this facade.
+ * The GESTURE library — everything for touch (finger) control, one facade.
+ * Sub-modules by concern: `swipe/` — gesture registration (the hook, host
+ * props, recognition); `inertia/` — the kinetic meaning of a release
+ * (intent speed, continuity launch). See README.md for the quick start and
+ * the standard rig with the `motion` library (referenced by name — this
+ * folder imports nothing outside itself, so it can be copied alone).
  */
-export { usePointerSwipe, POINTER_SWIPE_DEFAULTS } from "./usePointerSwipe";
-export { resolveInertialRelease } from "./inertialRelease";
-export { DRAG_IGNORE_ATTRIBUTE, sameDirectionSpeed } from "./internals/index";
-export type {
-  InertialReleaseConfig,
-  InertialReleaseResult,
-} from "./inertialRelease";
+export { usePointerSwipe, POINTER_SWIPE_DEFAULTS } from "./swipe/usePointerSwipe";
+export { DRAG_IGNORE_ATTRIBUTE } from "./swipe/internals/index";
 export type {
   PointerSwipeConfig,
   ResolvedPointerSwipeConfig,
@@ -24,4 +19,15 @@ export type {
   PointerSwipeReleasePayload,
   PointerSwipeResult,
   PointerSwipeDirection,
-} from "./types";
+} from "./swipe/types";
+export { resolveInertialRelease } from "./inertia/inertialRelease";
+export { resolveReleaseLaunch } from "./inertia/releaseLaunch";
+export { sameDirectionSpeed } from "./inertia/speed";
+export type {
+  InertialReleaseConfig,
+  InertialReleaseResult,
+} from "./inertia/inertialRelease";
+export type {
+  ReleaseLaunch,
+  ReleaseLaunchInput,
+} from "./inertia/releaseLaunch";

@@ -1184,10 +1184,10 @@ src/components/Carousel/client/
 │   ├── transitions.ts             pure step / repeated-click / drag transitions
 │   ├── reducer.ts                 single switch over Commands
 │   └── useCarouselState.ts        binds the reducer to React
-├── motion/
+├── motion/                        carousel SEMANTICS on top of the shared motion library
+│   │                              (curves + runtime live in shared/motion — see its README;
+│   │                              release physics in shared/gesture/inertia)
 │   ├── types.ts                   CarouselSegment (one profile shape), MotionIntent, MotionStart
-│   ├── profile.ts                 smoothstep profile (accel/cruise/decel)
-│   ├── progressCurve.ts           profile → percent stops (WAAPI keyframe transport); peak solver; WAAPI gate
 │   ├── planChannel.ts             engine → paint-consumer motion-plan observable
 │   ├── speed.ts                   sameDirectionSpeed, signedVelocity
 │   ├── timing.ts                  GO_TO speed + teleport geometry (resolveGoToPlan)

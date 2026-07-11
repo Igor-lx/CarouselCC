@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildProfile, sampleMotionProfile } from "./profile";
+import { buildProfile, sampleMotionProfile } from "../profile/profile";
 import {
   profileProgressStops,
   resolvePeakSpeedForDuration,
   sampleProgressStops,
-} from "./progressCurve";
+} from "../profile/progressCurve";
 
 const stepProfile = (shares = { a: 0.35, d: 0.4 }, startSpeed = 0, duration = 2000) => {
   const peak = resolvePeakSpeedForDuration({

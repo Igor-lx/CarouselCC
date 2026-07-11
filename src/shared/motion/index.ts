@@ -1,12 +1,14 @@
 /**
- * The motion-controller engine — one self-sufficient facade. Everything a
- * consumer needs to animate a numeric value comes from here: the factory,
- * the React ownership hook, the motion clock, and the full type surface.
- * See README.md in this folder for the standalone contract.
+ * The MOTION library — everything to make a numeric value travel beautifully,
+ * one facade, gesture-agnostic. Sub-modules by concern: `profile/` — the
+ * curve mathematics (accel/cruise/decel profiles, percent-progress stops for
+ * WAAPI keyframe transport, peak-speed solver, WAAPI gate); `runtime/` — the
+ * execution engine (RAF controller, the motion clock). See README.md; this
+ * folder imports nothing outside itself, so it can be copied alone.
  */
-export { createMotionController } from "./createMotionController";
-export { useMotionController } from "./useMotionController";
-export { motionNow } from "./clock";
+export { createMotionController } from "./runtime/createMotionController";
+export { useMotionController } from "./runtime/useMotionController";
+export { motionNow } from "./runtime/clock";
 export type {
   MotionController,
   MotionSample,
@@ -20,4 +22,17 @@ export type {
   MotionSnapOptions,
   MotionSubscriber,
   MotionCompletionMode,
-} from "./types";
+} from "./runtime/types";
+export {
+  buildProfile,
+  createMotionProfile,
+  normalizeMotionProfileShares,
+  sampleMotionProfile,
+} from "./profile/profile";
+export type { MotionProfile, MotionProfileZone } from "./profile/profile";
+export {
+  isWaapiSupported,
+  profileProgressStops,
+  resolvePeakSpeedForDuration,
+  sampleProgressStops,
+} from "./profile/progressCurve";

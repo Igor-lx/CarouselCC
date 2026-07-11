@@ -1,22 +1,36 @@
 # Motion controller engine
 
-A self-sufficient, component-agnostic motion runtime. It animates **one
-numeric value over time** — a track position, an opacity, an angle, any
-number — by executing a consumer-supplied curve at RAF cadence and handing
-coherent samples to subscribers. Everything a consumer needs is exported from
-this folder's facade (`index.ts`).
+A self-sufficient, gesture-agnostic motion library: everything to make **one
+numeric value travel beautifully** — a track position, an opacity, an angle,
+any number. Everything a consumer needs is exported from this folder's
+facade (`index.ts`).
+
+## Library layout & copy-portability
+
+- `profile/` — the CURVE mathematics (the record): accel/cruise/decel
+  profiles from speeds and distance shares, percent-progress stops (the
+  WAAPI keyframe transport), the peak-speed-for-duration solver, the WAAPI
+  gate;
+- `runtime/` — the EXECUTION engine (the player): the RAF controller, the
+  motion clock;
+- `tests/` — the library's own suite.
+
+This folder imports **only React and itself** (enforced by
+`shared/enginePortability.test.ts`), so it can be COPIED into another
+project as-is — even its `clamp` is a sanctioned local copy.
 
 ## Scope (deliberate)
 
-- **Runtime, not math.** The engine contains NO easing, NO profiles, NO
-  opinions about how things move. The consumer brings a *sampler* — a pure
-  function `(segment, timestamp) → sample` — and the engine is the clock,
-  the loop, the state machine and the subscription hub around it. The
-  player, not the record.
+- **The runtime has no opinions about curves.** The controller executes any
+  sampler — `(segment, timestamp) → sample`; the profile module is one
+  (excellent) way to build such curves, not a requirement.
 - **One value per controller.** Multi-value choreography is the consumer's
   composition (or several controllers).
 - **Zero React re-renders.** State lives inside the closure; consumers read
   it through subscriptions and snapshot getters, never through render.
+- **Gesture-agnostic.** Autoplay, clicks, programmatic animation — no finger
+  required. Finger input is the sibling `gesture` library's business; the
+  two connect by recipe (see its README), never by import.
 
 ## Quick start
 
@@ -108,7 +122,9 @@ a velocity from the other is the classic handoff bug this split prevents.
 
 | Export | What it is |
 | --- | --- |
-| `createMotionController` | The engine as a plain factory (no React). |
+| `buildProfile`, `createMotionProfile`, `sampleMotionProfile`, `normalizeMotionProfileShares` | Profile curves: accel/cruise/decel from speeds + distance shares. |
+| `profileProgressStops`, `sampleProgressStops`, `resolvePeakSpeedForDuration`, `isWaapiSupported` | The WAAPI keyframe transport: percent stops, duration solver, engine gate. |
+| `createMotionController` | The runtime as a plain factory (no React). |
 | `useMotionController` | React ownership wrapper — one instance per component lifetime. |
 | `motionNow` | THE motion clock (`performance.now()` domain, SSR-safe). |
 | `MotionController`, `MotionSample`, `MotionSampleData`, `MotionHandoff`, `MotionPhase`, `MotionSegmentBase`, `MotionSegmentSampler`, `MotionStartOptions`, `MotionSetOptions`, `MotionSnapOptions`, `MotionSubscriber`, `MotionCompletionMode` | The full public type surface. |

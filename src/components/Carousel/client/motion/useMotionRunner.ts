@@ -10,11 +10,11 @@ import type { CarouselRuntimeConfig } from "../config";
 import type { TrackBindingApi } from "../geometry";
 import type { CarouselState } from "../state";
 import type { MotionPlanChannel, MotionPlanDirection } from "./planChannel";
-import { buildProfile } from "./profile";
 import {
+  buildProfile,
   profileProgressStops,
   resolvePeakSpeedForDuration,
-} from "./progressCurve";
+} from "../../../../shared";
 import { buildCarouselSegment } from "./segmentFactory";
 import { sampleCarouselSegment } from "./sampler";
 import { resolveGoToApproachDuration, resolveJumpPeakSpeed } from "./timing";

@@ -6,7 +6,7 @@ import {
   trackPixelTransform,
 } from "../domain";
 import { useIsomorphicLayoutEffect } from "../../../../shared";
-import { isWaapiSupported } from "../motion/progressCurve";
+import { isWaapiSupported } from "../../../../shared";
 import { isDroppedFallbackFrame, type VisualPositionSource } from "../visual-position";
 
 const RESIZE_EPSILON_PX = 0.5;

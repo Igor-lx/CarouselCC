@@ -1,5 +1,5 @@
 import type { MotionSampleData } from "../../../../shared";
-import { sampleMotionProfile } from "./profile";
+import { sampleMotionProfile } from "../../../../shared";
 import type { CarouselMotionStrategy, CarouselSegment } from "./types";
 
 export function sampleCarouselSegment(

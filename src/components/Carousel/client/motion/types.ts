@@ -1,4 +1,4 @@
-import type { MotionProfile } from "./profile";
+import type { MotionProfile } from "../../../../shared";
 
 /**
  * Every carousel motion is one accel/cruise/decel profile — there is no

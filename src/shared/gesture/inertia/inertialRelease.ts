@@ -3,7 +3,7 @@ export interface InertialReleaseConfig {
   inertiaBoost: number;
 }
 
-import { sameDirectionSpeed } from "./internals/index";
+import { sameDirectionSpeed } from "./speed";
 
 export interface InertialReleaseResult {
   effectiveReleaseSpeed: number;

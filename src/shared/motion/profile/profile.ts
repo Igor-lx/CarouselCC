@@ -1,4 +1,4 @@
-import { clamp } from "../domain";
+import { clamp } from "./clamp";
 
 export interface MotionProfileZone {
   startDistanceProgress: number;

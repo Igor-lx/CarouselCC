@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { POINTER_SWIPE_DEFAULTS } from "../usePointerSwipe";
-import { resolveSwipeDirection } from "../internals/resolveSwipeDirection";
+import { POINTER_SWIPE_DEFAULTS } from "../swipe/usePointerSwipe";
+import { resolveSwipeDirection } from "../swipe/internals/resolveSwipeDirection";
 
 const config = POINTER_SWIPE_DEFAULTS;
 const base = { width: 400, config, canCommit: true, flickVelocity: 0 };

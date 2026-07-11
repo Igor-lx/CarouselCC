@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { createMotionController } from "../createMotionController";
-import { motionNow } from "../clock";
-import type { MotionSegmentBase, MotionSegmentSampler } from "../types";
+import { createMotionController } from "../runtime/createMotionController";
+import { motionNow } from "../runtime/clock";
+import type { MotionSegmentBase, MotionSegmentSampler } from "../runtime/types";
 
 /** Trivial linear curve, enough to exercise the controller's sampling. */
 const linearSampler: MotionSegmentSampler<MotionSegmentBase> = (

@@ -7,7 +7,9 @@ export type {
   MotionPlanSource,
   WaapiMotionPlan,
 } from "./planChannel";
-export { isWaapiSupported, sampleProgressStops } from "./progressCurve";
+// Re-exported from the shared motion library so carousel modules keep one
+// import root for motion concerns.
+export { isWaapiSupported, sampleProgressStops } from "../../../../shared";
 export type {
   CarouselMotionStrategy,
   CarouselMotionIntent,

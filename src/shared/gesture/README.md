@@ -1,10 +1,23 @@
 # Pointer-swipe gesture engine
 
-A self-sufficient, component-agnostic touch-gesture engine. One hook call
+A self-sufficient, component-agnostic touch-gesture library. One hook call
 wires complete, production-grade horizontal swipe handling into any
-component: spread `hostProps` onto an element, react to the callbacks — done. Everything a
-consumer may need is exported from this folder's facade (`index.ts`);
-`internals/` is private machinery.
+component: spread `hostProps` onto an element, react to the callbacks —
+done. Everything a consumer may need is exported from this folder's facade
+(`index.ts`).
+
+## Library layout & copy-portability
+
+- `swipe/` — gesture REGISTRATION: the hook, host props, recognition
+  (`internals/` inside is private machinery);
+- `inertia/` — the KINETIC MEANING of a release: intent speed
+  (`resolveInertialRelease`), continuity launch (`resolveReleaseLaunch`);
+- `tests/` — the library's own suite.
+
+This folder imports **only React and itself** (enforced by
+`shared/enginePortability.test.ts`), so it can be COPIED into another
+project as-is. The standard rig below references the `motion` library by
+name, never by import — want the full ride physics, copy both folders.
 
 ## Scope (deliberate)
 
@@ -90,14 +103,34 @@ ancestor) with the exported `DRAG_IGNORE_ATTRIBUTE`:
 <div {...{ [DRAG_IGNORE_ATTRIBUTE]: "true" }}>never starts a drag</div>
 ```
 
-## Inertial release helper
+## The standard rig (with the `motion` library)
+
+Gestures alone give you offsets, velocities and commit decisions — enough
+for CSS transitions or your own animation. For the full native-feeling ride
+add the sibling `motion` library and connect three lines:
+
+```ts
+// 1. what the release MEANS (this library):
+const intent = resolveInertialRelease({ gestureReleaseVelocity, distanceToTarget, baseDuration, config });
+const launch = resolveReleaseLaunch({ distance, visualVelocity: uiReleaseVelocity, intentSpeed: intent.effectiveReleaseSpeed });
+// 2. what the ride LOOKS like (motion/profile):
+const profile = buildProfile({ from, to, startSpeed: launch.startSpeed, peakSpeed: launch.cruiseSpeed, endSpeed: 0, accelerationDistanceShare, decelerationDistanceShare });
+// 3. who EXECUTES it (motion/runtime, or WAAPI via profileProgressStops):
+controller.start({ segment, sampler });
+```
+
+## Inertial release helpers
 
 `resolveInertialRelease({ gestureReleaseVelocity, distanceToTarget,
 baseDuration, config: { inertiaBoost } })` converts a release velocity into a
 speed intent for the consumer's own animation: releases slower than the base
 `distance / duration` speed settle at base speed (`isInertialRelease: false`);
 faster ones get boosted, never below base. Direction-opposing velocity counts
-as zero (`sameDirectionSpeed`, also exported). The engine does not animate —
+as zero (`sameDirectionSpeed`, also exported). `resolveReleaseLaunch` then
+codifies the CONTINUITY LAUNCH: the ride starts at the velocity the eye saw
+at lift-off (`startSpeed`) and accelerates to the intent
+(`cruiseSpeed >= startSpeed`) — content never jumps above its visible speed;
+a fast lift-off collapses the ramp by itself. The library does not animate —
 what happens after release is entirely the consumer's business.
 
 ## Exports
@@ -106,6 +139,6 @@ what happens after release is entirely the consumer's business.
 | --- | --- |
 | `usePointerSwipe` | The engine hook — returns `{ hostProps }` to spread onto the host. |
 | `POINTER_SWIPE_DEFAULTS` | The built-in resolved tuning (a partial `config` merges over it). |
-| `resolveInertialRelease`, `sameDirectionSpeed` | Release-speed math for consumer-side follow-through. |
+| `resolveInertialRelease`, `resolveReleaseLaunch`, `sameDirectionSpeed` | Release physics: intent speed + continuity launch. |
 | `DRAG_IGNORE_ATTRIBUTE` | Opt-out attribute name for drag-starting. |
 | `PointerSwipeConfig`, `ResolvedPointerSwipeConfig`, `PointerSwipeProps`, `PointerSwipeResult`, `PointerSwipeHostProps`, `PointerSwipeHostRef`, `PointerSwipeListeners`, `PointerSwipeMovePayload`, `PointerSwipeReleasePayload`, `PointerSwipeDirection`, `InertialReleaseConfig`, `InertialReleaseResult` | The full public type surface. |

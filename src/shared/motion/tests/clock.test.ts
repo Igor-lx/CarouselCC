@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { motionNow } from "../clock";
+import { motionNow } from "../runtime/clock";
 
 describe("motionNow", () => {
   it("returns a finite, non-decreasing timestamp", () => {

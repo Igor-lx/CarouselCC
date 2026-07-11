@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveInertialRelease } from "../inertialRelease";
+import { resolveInertialRelease } from "../inertia/inertialRelease";
 
 const config = { inertiaBoost: 2 };
 

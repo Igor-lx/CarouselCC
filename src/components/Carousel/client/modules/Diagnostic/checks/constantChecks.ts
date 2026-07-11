@@ -43,7 +43,7 @@ import {
   STEP_DECELERATION_DISTANCE_SHARE,
   VISIBILITY_THRESHOLD,
 } from "../../../config";
-import { normalizeMotionProfileShares } from "../../../motion/profile";
+import { normalizeMotionProfileShares } from "../../../../../../shared";
 import type { CarouselDiagnosticWarning } from "../types";
 
 interface NumericRule {
