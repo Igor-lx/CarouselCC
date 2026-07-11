@@ -47,6 +47,13 @@
     transition:
       opacity 0.4s,
       transform 0.5s;
+    // Keep the dot on a compositor layer PERMANENTLY. The cross-fade
+    // animates it there anyway; toggling between in-flow antialiased
+    // rendering (fractional Y, soft edge rows) and layer rasterization
+    // (pixel-snapped, solid edge rows) makes the dot visibly "fatten" for
+    // the duration of every animation and snap back on finish. One constant
+    // rendering mode, no jump; a dozen ~25x6 layers cost nothing.
+    will-change: transform, opacity;
     flex-shrink: 0;
     -webkit-tap-highlight-color: transparent;
     cursor: pointer;
