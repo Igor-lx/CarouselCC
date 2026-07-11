@@ -820,7 +820,7 @@ picked the single path:
 
 1. **The profile is not a bezier.** The engine's accel/cruise/decel profile
    (distance shares) cannot be expressed by any
-   , so the "plain browser animation"
+   `transition-timing-function`, so the "plain browser animation"
    alternative would in fact be a SECOND curve that only approximates the
    engine's — two sources of truth for how one step feels, drifting apart
    with every tuning change.
