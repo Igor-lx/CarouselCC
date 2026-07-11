@@ -20,7 +20,11 @@ export const CAROUSEL_SWIPE_CONFIG: Required<PointerSwipeConfig> = {
   cooldownMs: 150,
   intentThreshold: 8,
   resistance: 0.53,
-  resistanceCurvature: 0.0045,
+  // Rubber length: the resistance curve saturates at
+  // 1 / (curvature * r/(1-r)) px of UI travel — the "wall" the finger hits.
+  // 0.0028 puts the wall at ~315px on the reference slot (~0.8 slot) instead
+  // of ~197px, so a sweeping tablet pull keeps giving before the stop.
+  resistanceCurvature: 0.0028,
   maxVelocity: 5,
   emaAlpha: 0.85,
   quickFlickVelocity: 0.1,
