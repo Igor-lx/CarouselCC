@@ -2,7 +2,11 @@ import { memo, useImperativeHandle, useMemo, useRef } from "react";
 
 import styles from "./Carousel.module.scss";
 import { mergeStyleMaps, resolveSlots } from "../../../shared";
-import { CAROUSEL_DEFAULTS, useCarouselConfig } from "./config";
+import {
+  CAROUSEL_DEFAULTS,
+  SLIDE_REORIENT_FADE_MS,
+  useCarouselConfig,
+} from "./config";
 import {
   CarouselDiagnosticContext,
   CarouselMotionContext,
@@ -34,6 +38,14 @@ import { useCarouselState } from "./state";
 import { useCarouselStatusReporter } from "./host-report/useCarouselStatusReporter";
 import { SLIDE_CLASS_KEYS } from "./public-api/types";
 import type { CarouselProps, SlideClassMap } from "./public-api/types";
+
+// Config-owned visual timing injected as a CSS custom property: the veil
+// fade is bound to a JS invariant (the fail-open cap), so its SSOT is
+// config/slides.ts — the stylesheet only consumes the variable. Module-level
+// constant: one object identity for the component's whole life.
+const REORIENT_FADE_STYLE = {
+  "--slide-reorient-fade": `${SLIDE_REORIENT_FADE_MS}ms`,
+} as React.CSSProperties;
 
 const Carousel = memo(function Carousel(props: CarouselProps) {
   const {
@@ -321,6 +333,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
         <CarouselDiagnosticContext.Provider value={diagnosticContextValue}>
           <div
             className={classNames.outerContainer}
+            style={REORIENT_FADE_STYLE}
             role="region"
             aria-roledescription="carousel"
             data-carousel-root=""

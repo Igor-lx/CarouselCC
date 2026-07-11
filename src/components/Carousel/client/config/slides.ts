@@ -18,12 +18,14 @@
 export const SLIDE_PORTRAIT_MEDIA_CONDITION = "(orientation: portrait)";
 
 /**
- * Fail-open ceiling for the orientation-swap veil. The veil normally clears
- * the moment the new crop decodes (typically well under a second); on a
- * network slow enough that the crop takes longer, showing the OLD crop
- * (zoomed centre) beats hiding the image — so the veil lifts at this cap and
- * lets the browser finish the swap in the open.
+ * Orientation-swap veil timing (one layer, two knobs — diagnostics audit the
+ * pair): the fade is how fast the bitmap dims/reappears (injected into CSS as
+ * `--slide-reorient-fade` by the root), the cap is the fail-open ceiling —
+ * past it, showing the OLD crop (zoomed centre) beats hiding the image, so
+ * the veil lifts and the swap finishes in the open. The cap must leave room
+ * for a full fade out AND back in.
  */
+export const SLIDE_REORIENT_FADE_MS = 180;
 export const SLIDE_REORIENT_VEIL_MAX_MS = 2_000;
 
 export const IMAGE_RETRY_BASE_DELAY_MS = 400;

@@ -6,9 +6,10 @@
     --pagination-gap: 20px;
     --slide-radius: 12px;
     --slide-outline-width: 2px;
-    // Orientation-swap veil fade (see useOrientationSwapVeil). Keep it well
-    // under the SLIDE_REORIENT_VEIL_MAX_MS fail-open cap in config/slides.ts.
-    --slide-reorient-fade: 0.18s;
+    // --slide-reorient-fade is injected inline by the root from
+    // SLIDE_REORIENT_FADE_MS (config/slides.ts): a value bound to a JS
+    // invariant (the veil fail-open cap) lives in config under diagnostics,
+    // not in the stylesheet.
     --viewport-radius: var(--slide-radius);
 
     // The slide box aspect ratio — the single geometry contract with the

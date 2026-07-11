@@ -24,6 +24,7 @@ import {
   IMAGE_RETRY_BASE_DELAY_MS,
   IMAGE_RETRY_MAX_ATTEMPTS,
   IMAGE_RETRY_MAX_DELAY_MS,
+  SLIDE_REORIENT_FADE_MS,
   SLIDE_REORIENT_VEIL_MAX_MS,
   MOTION_EPSILON,
   REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
@@ -245,6 +246,15 @@ const numericRules: NumericRule[] = [
   },
   {
     layer: "Slides",
+    field: "SLIDE_REORIENT_FADE_MS",
+    value: SLIDE_REORIENT_FADE_MS,
+    severity: "LOGICAL",
+    expected: "Expected a positive finite number of milliseconds",
+    consequence: "Orientation-swap veil fade collapses to an instant blink or a negative transition",
+    predicate: greaterThan(0),
+  },
+  {
+    layer: "Slides",
     field: "SLIDE_REORIENT_VEIL_MAX_MS",
     value: SLIDE_REORIENT_VEIL_MAX_MS,
     severity: "LOGICAL",
@@ -397,6 +407,7 @@ const collectProfileShareRelation = (
   accelerationDistanceShare: number,
   decelerationDistanceShare: number,
   consequence: string,
+  expected = "Expected accelerationShare + decelerationShare <= 1 for an explicit cruise zone",
 ): CarouselDiagnosticWarning | null => {
   const normalized = normalizeMotionProfileShares(
     accelerationDistanceShare,
@@ -417,70 +428,27 @@ const collectProfileShareRelation = (
       decelerationDistanceShare: normalized.decelerationShare,
       cruiseDistanceShare: normalized.cruiseShare,
     },
-    expected: "Expected accelerationShare + decelerationShare <= 1 for an explicit cruise zone",
+    expected,
     consequence,
   };
 };
 
-const collectRepeatedShareRelation = (): CarouselDiagnosticWarning | null => {
-  const accelerationDistanceShare = REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE;
-  const decelerationDistanceShare = REPEATED_CLICK_DECELERATION_DISTANCE_SHARE;
-  const normalized = normalizeMotionProfileShares(
-    accelerationDistanceShare,
-    decelerationDistanceShare,
-  );
-  const sum =
-    REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE +
-    REPEATED_CLICK_DECELERATION_DISTANCE_SHARE;
-  if (!normalized.wasNormalized) return null;
+const collectReorientVeilRelation = (): CarouselDiagnosticWarning | null => {
+  // The cap must leave room for a full fade OUT and back IN, otherwise the
+  // fail-open lift truncates the mask mid-transition.
+  if (SLIDE_REORIENT_VEIL_MAX_MS >= SLIDE_REORIENT_FADE_MS * 2) return null;
   return {
     severity: "LOGICAL",
-    layer: "Motion",
-    field: "REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE + REPEATED_CLICK_DECELERATION_DISTANCE_SHARE",
+    layer: "Slides",
+    field: "SLIDE_REORIENT_VEIL_MAX_MS >= SLIDE_REORIENT_FADE_MS * 2",
     actual: {
-      accelerationDistanceShare,
-      decelerationDistanceShare,
-      sum,
-    },
-    normalizedTo: {
-      accelerationDistanceShare: normalized.accelerationShare,
-      decelerationDistanceShare: normalized.decelerationShare,
-      cruiseDistanceShare: normalized.cruiseShare,
-    },
-    expected: "Expected accelerationShare + decelerationShare <= 1 for an explicit cruise zone",
-    consequence:
-      "Motion profile runtime normalizes overallocated shares to 50% acceleration and 50% deceleration",
-  };
-};
-
-const collectGoToShareRelation = (): CarouselDiagnosticWarning | null => {
-  const accelerationDistanceShare = GO_TO_ACCELERATION_DISTANCE_SHARE;
-  const decelerationDistanceShare = GO_TO_DECELERATION_DISTANCE_SHARE;
-  const normalized = normalizeMotionProfileShares(
-    accelerationDistanceShare,
-    decelerationDistanceShare,
-  );
-  const sum = accelerationDistanceShare + decelerationDistanceShare;
-  if (!normalized.wasNormalized) return null;
-
-  return {
-    severity: "LOGICAL",
-    layer: "Motion",
-    field: "GO_TO_ACCELERATION_DISTANCE_SHARE + GO_TO_DECELERATION_DISTANCE_SHARE",
-    actual: {
-      accelerationDistanceShare,
-      decelerationDistanceShare,
-      sum,
-    },
-    normalizedTo: {
-      accelerationDistanceShare: normalized.accelerationShare,
-      decelerationDistanceShare: normalized.decelerationShare,
-      cruiseDistanceShare: normalized.cruiseShare,
+      fadeMs: SLIDE_REORIENT_FADE_MS,
+      veilMaxMs: SLIDE_REORIENT_VEIL_MAX_MS,
     },
     expected:
-      "Expected accelerationShare + decelerationShare <= 1 for a one-page direct GO_TO",
+      "Expected the fail-open cap to cover a full fade out plus fade in (>= 2x the fade)",
     consequence:
-      "A one-page direct GO_TO runtime profile normalizes overallocated local zones to 50% acceleration and 50% deceleration",
+      "The veil is force-lifted mid-transition: the stale-crop mask flashes instead of fading",
   };
 };
 
@@ -509,11 +477,20 @@ export const collectConstantWarnings = (): CarouselDiagnosticWarning[] => {
     const warning = checkNumber(rule);
     if (warning) out.push(warning);
   }
-  const sumRelation = collectRepeatedShareRelation();
-  if (sumRelation) out.push(sumRelation);
-  const goToShareRelation = collectGoToShareRelation();
-  if (goToShareRelation) out.push(goToShareRelation);
   const profileRelations = [
+    collectProfileShareRelation(
+      "REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE + REPEATED_CLICK_DECELERATION_DISTANCE_SHARE",
+      REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
+      REPEATED_CLICK_DECELERATION_DISTANCE_SHARE,
+      "Motion profile runtime normalizes overallocated shares to 50% acceleration and 50% deceleration",
+    ),
+    collectProfileShareRelation(
+      "GO_TO_ACCELERATION_DISTANCE_SHARE + GO_TO_DECELERATION_DISTANCE_SHARE",
+      GO_TO_ACCELERATION_DISTANCE_SHARE,
+      GO_TO_DECELERATION_DISTANCE_SHARE,
+      "A one-page direct GO_TO runtime profile normalizes overallocated local zones to 50% acceleration and 50% deceleration",
+      "Expected accelerationShare + decelerationShare <= 1 for a one-page direct GO_TO",
+    ),
     collectProfileShareRelation(
       "STEP_ACCELERATION_DISTANCE_SHARE + STEP_DECELERATION_DISTANCE_SHARE",
       STEP_ACCELERATION_DISTANCE_SHARE,
@@ -538,5 +515,7 @@ export const collectConstantWarnings = (): CarouselDiagnosticWarning[] => {
   }
   const retryDelayRelation = collectRetryDelayRelation();
   if (retryDelayRelation) out.push(retryDelayRelation);
+  const reorientVeilRelation = collectReorientVeilRelation();
+  if (reorientVeilRelation) out.push(reorientVeilRelation);
   return out;
 };
