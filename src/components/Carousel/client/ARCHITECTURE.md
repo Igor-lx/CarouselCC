@@ -812,6 +812,34 @@ widget WAAPI entirely in its binding; the runner computes the math once but
 owns no DOM. The compositor is a paint optimization layered under the SSOT,
 not a second source of truth.
 
+**ADR-003 — one compositor path for every planned motion.** Every
+non-drag, non-instant segment — including a trivial one-page step that a CSS
+transition could visually approximate — is painted through the same WAAPI
+keyframe transport. This is not uniformity for its own sake; three forces
+picked the single path:
+
+1. **The profile is not a bezier.** The engine's accel/cruise/decel profile
+   (distance shares) cannot be expressed by any
+   , so the "plain browser animation"
+   alternative would in fact be a SECOND curve that only approximates the
+   engine's — two sources of truth for how one step feels, drifting apart
+   with every tuning change.
+2. **Jank hits the short step hardest.** The original start-of-motion
+   freeze was main-thread contention, and a step begins exactly when the
+   main thread is busiest (React commits the expanded render window, images
+   decode). Off-main-thread painting has to cover the COMMON motion — the
+   single click step — not only far jumps, or the fix misses the case users
+   see most often.
+3. **A second path would rot.** A "simple" CSS path would need its own
+   retarget continuity, its own settle and fallback story, its own clock
+   discipline — and would silently decay every time the primary path
+   evolves. With one path the track, the widget and the dot cross-fade stay
+   synchronized by construction (one plan, one clock, §4.5), and the
+   no-WAAPI fallback exists exactly once.
+
+The accepted cost is documented in §10: the JS controller still samples
+every segment as the visual-position SSOT while the compositor paints.
+
 ---
 
 ## 5. Gesture model
