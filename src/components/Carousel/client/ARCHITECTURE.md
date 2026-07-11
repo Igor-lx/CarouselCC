@@ -912,7 +912,15 @@ slot must land inside the clamps).
    `cancelTrackMotion(origin)` tears down any compositor animation and pins the
    track at the live origin, so the finger owns it in the same turn rather than
    after the motion runner's post-commit effect — and publishes the origin into
-   the visual stream via `applyTrackPosition` before dispatching `START_DRAG`;
+   the visual stream via `applyTrackPosition`. The `START_DRAG` dispatch
+   itself is DEFERRED to its own task (press-commit deferral): the follow
+   stream needs no React — positions go straight to style — but the dragging
+   render used to run inside the press task and, on a weak device, blocked
+   frame presentation for the first ~30–80ms of a fast swipe. Order stays
+   guaranteed: every dependent dispatch site (release, orphan teardown)
+   flushes the pending `START_DRAG` synchronously first, so the reducer
+   always sees START before END — a gesture faster than the deferral simply
+   lands both in one commit;
 2. on every move payload: translates `uiOffset` into a virtual-index
    delta using the recorded slot size and writes that into the visual
    position via `applyTrackPosition`. No React state per move;

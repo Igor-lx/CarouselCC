@@ -72,6 +72,34 @@ export function useCarouselGesture({
   const originPageIndexRef = useRef(0);
   const slotSizeRef = useRef(0);
 
+  // PRESS-COMMIT DEFERRAL. The follow stream needs no React at all (positions
+  // are written straight to style), but the START_DRAG render used to run
+  // INSIDE the press task — on a weak device that single long task blocked
+  // frame presentation for the first ~30-80ms of a fast swipe, reading as
+  // "content does not follow, then rides after lift-off". The track grab
+  // stays fully synchronous; only the dispatch moves to its own task, opening
+  // a presentation slot between them. ORDER IS GUARANTEED: every dependent
+  // dispatch site flushes the pending START_DRAG synchronously first, so the
+  // reducer always sees START before END — on a gesture faster than the
+  // deferral both land in one task (and one commit), which is semantically
+  // the same release the reducer would have processed anyway.
+  const pendingStartRef = useRef<{
+    fromVirtualIndex: number;
+    targetPageIndex: number;
+  } | null>(null);
+  const startTimerRef = useRef<number | null>(null);
+
+  const flushPendingStart = useCallback(() => {
+    if (startTimerRef.current !== null) {
+      window.clearTimeout(startTimerRef.current);
+      startTimerRef.current = null;
+    }
+    const pending = pendingStartRef.current;
+    if (!pending) return;
+    pendingStartRef.current = null;
+    dispatch({ type: "START_DRAG", ...pending });
+  }, [dispatch]);
+
   const offsetToPosition = useCallback(
     (uiOffset: number) => {
       const origin = originPositionRef.current ?? 0;
@@ -104,12 +132,16 @@ export function useCarouselGesture({
     originPositionRef.current = origin;
     originPageIndexRef.current = pageIndex;
 
-    dispatch({
-      type: "START_DRAG",
+    pendingStartRef.current = {
       fromVirtualIndex: origin,
       targetPageIndex: pageIndex,
-    });
+    };
+    startTimerRef.current = window.setTimeout(() => {
+      startTimerRef.current = null;
+      flushPendingStart();
+    }, 0);
   }, [
+    flushPendingStart,
     applyTrackPosition,
     cancelTrackMotion,
     dispatch,
@@ -141,6 +173,8 @@ export function useCarouselGesture({
 
   const handleRelease = useCallback(
     (payload: PointerSwipeReleasePayload) => {
+      // Reducer-order guarantee: START_DRAG always lands before END_DRAG.
+      flushPendingStart();
       if (!layout.canSlide || originPositionRef.current === null) {
         originPositionRef.current = null;
         slotSizeRef.current = 0;
@@ -176,7 +210,7 @@ export function useCarouselGesture({
       originPositionRef.current = null;
       slotSizeRef.current = 0;
     },
-    [applyTrackPosition, dispatch, layout, offsetToPosition],
+    [applyTrackPosition, dispatch, flushPendingStart, layout, offsetToPosition],
   );
 
   // When the gesture surface goes away — the deck collapsed to a single page
@@ -195,6 +229,7 @@ export function useCarouselGesture({
   useEffect(() => {
     if (layout.canSlide && isSwipeOn) return;
     if (!isSwipeOn && layout.canSlide && originPositionRef.current !== null) {
+      flushPendingStart();
       const releasePosition = readCurrentPosition();
       const releaseTarget = resolveDragRelease({
         direction: "none",
@@ -212,9 +247,16 @@ export function useCarouselGesture({
         uiReleaseVelocity: 0,
       });
     }
+    // A layout collapse drops an undispatched grab entirely: the reducer
+    // never learned of it, and reconciliation owns the recovery.
+    pendingStartRef.current = null;
+    if (startTimerRef.current !== null) {
+      window.clearTimeout(startTimerRef.current);
+      startTimerRef.current = null;
+    }
     originPositionRef.current = null;
     slotSizeRef.current = 0;
-  }, [dispatch, isSwipeOn, layout, readCurrentPosition]);
+  }, [dispatch, flushPendingStart, isSwipeOn, layout, readCurrentPosition]);
 
   // Content-normalized engine tuning: the commit threshold is a share of
   // the MEASURED slot (clamped to ergonomic px bounds) and the rubber
@@ -228,6 +270,18 @@ export function useCarouselGesture({
   const swipeConfig = useMemo(
     () => resolveSlotAdaptiveSwipeConfig(config.swipeConfig, slotPx),
     [config.swipeConfig, slotPx],
+  );
+
+  // Unmount: a pending deferred dispatch must not outlive the component.
+  useEffect(
+    () => () => {
+      if (startTimerRef.current !== null) {
+        window.clearTimeout(startTimerRef.current);
+        startTimerRef.current = null;
+      }
+      pendingStartRef.current = null;
+    },
+    [],
   );
 
   const { hostProps } = usePointerSwipe({
