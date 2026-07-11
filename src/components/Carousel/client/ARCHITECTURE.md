@@ -869,6 +869,12 @@ filled through the engine's optional `hostRef` forwarding. It is not
 carousel-specific and is reusable; the carousel overrides every tuning field
 with its own `CAROUSEL_SWIPE_CONFIG`.
 
+Flick recognition and the release speed judge the WHOLE gesture, not its
+last segment: the engine keeps a weighted-average velocity memory that
+survives a finger settling before lift-off (grace + half-life, see the
+engine README) — a fast tablet sweep that ends in a brief stick still
+reads, and rides, as a flick.
+
 The engine's tuning is **slot-normalized** before it reaches the engine: the
 engine thinks in absolute px of its host, but the user's eye thinks in slots
 ("how far did the content move relative to one slide"), and a host-relative

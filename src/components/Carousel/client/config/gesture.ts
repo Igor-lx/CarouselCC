@@ -25,6 +25,12 @@ export const CAROUSEL_SWIPE_CONFIG: Required<PointerSwipeConfig> = {
   emaAlpha: 0.85,
   quickFlickVelocity: 0.1,
   quickFlickMinOffset: 6,
+  // Flick memory: the flick decision and the release speed judge the whole
+  // gesture (weighted-average velocity), not its last segment, and survive a
+  // finger settling before lift-off (grace, then half-life decay).
+  flickVelocityAlpha: 0.35,
+  flickPauseGraceMs: 120,
+  flickVelocityHalfLifeMs: 250,
   minSwipeDistance: 20,
   swipeThresholdRatio: 0.23,
 };

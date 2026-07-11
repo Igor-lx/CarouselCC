@@ -4,7 +4,7 @@ import { POINTER_SWIPE_DEFAULTS } from "../usePointerSwipe";
 import { resolveSwipeDirection } from "../internals/resolveSwipeDirection";
 
 const config = POINTER_SWIPE_DEFAULTS;
-const base = { width: 400, config, canCommit: true };
+const base = { width: 400, config, canCommit: true, flickVelocity: 0 };
 
 describe("resolveSwipeDirection", () => {
   it("never commits when the gesture cannot commit (cancel / never dragged)", () => {
@@ -63,9 +63,33 @@ describe("resolveSwipeDirection", () => {
     const r = resolveSwipeDirection({
       rawOffset: stiff.minSwipeDistance - 1,
       rawVelocity: 0,
+      flickVelocity: 0,
       width: 4000,
       config: stiff,
       canCommit: true,
+    });
+    expect(r.direction).toBe("none");
+  });
+
+  it("flicks on the WEIGHTED-AVERAGE speed when the final segment stalled", () => {
+    // fast gesture, finger stuck before lift-off: instantaneous ~0, memory high
+    const r = resolveSwipeDirection({
+      ...base,
+      rawOffset: -(config.quickFlickMinOffset + 5),
+      rawVelocity: -0.01,
+      flickVelocity: -config.quickFlickVelocity * 2,
+    });
+    expect(r.direction).toBe("left");
+    // and the ride speed is the gesture's speed, not the stalled instant
+    expect(r.pointerReleaseVelocity).toBeCloseTo(-config.quickFlickVelocity * 2, 10);
+  });
+
+  it("memory alone cannot flick without the token distance", () => {
+    const r = resolveSwipeDirection({
+      ...base,
+      rawOffset: -(config.quickFlickMinOffset - 2),
+      rawVelocity: 0,
+      flickVelocity: -config.quickFlickVelocity * 3,
     });
     expect(r.direction).toBe("none");
   });

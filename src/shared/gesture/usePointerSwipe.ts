@@ -11,8 +11,10 @@ import {
   calculateEma,
   clampMagnitude,
   decayedVelocity,
+  dominantMagnitude,
   frameAdjustedAlpha,
   getInteractiveTarget,
+  pauseDecayedVelocity,
   resolveSwipeDirection,
 } from "./internals/index";
 import type {
@@ -40,6 +42,9 @@ export const POINTER_SWIPE_DEFAULTS: ResolvedPointerSwipeConfig = {
   emaAlpha: 0.7,
   quickFlickVelocity: 0.5,
   quickFlickMinOffset: 10,
+  flickVelocityAlpha: 0.35,
+  flickPauseGraceMs: 120,
+  flickVelocityHalfLifeMs: 250,
   minSwipeDistance: 20,
   swipeThresholdRatio: 0.2,
 };
@@ -58,6 +63,10 @@ interface InternalSample {
   uiOffset: number;
   rawVelocity: number;
   uiVelocity: number;
+  /** Weighted-average gesture speed (EMA of the raw instantaneous velocity):
+   * the flick decision and the release speed judge the GESTURE, not its
+   * last — often decelerating — segment. */
+  flickVelocity: number;
   width: number;
   timestamp: number;
 }
@@ -67,6 +76,7 @@ const createIdleSample = (width = 0, timestamp = 0): InternalSample => ({
   uiOffset: 0,
   rawVelocity: 0,
   uiVelocity: 0,
+  flickVelocity: 0,
   width,
   timestamp,
 });
@@ -181,6 +191,14 @@ export function usePointerSwipe({
         ),
         cfg.maxVelocity,
       );
+      const flickVelocity = clampMagnitude(
+        calculateEma(
+          sampleRef.current.flickVelocity,
+          rawVelocity,
+          frameAdjustedAlpha(cfg.flickVelocityAlpha, dt),
+        ),
+        cfg.maxVelocity,
+      );
       const width = gesture.width || sampleRef.current.width;
 
       gesture.lastX = currentX;
@@ -192,6 +210,7 @@ export function usePointerSwipe({
         uiOffset,
         rawVelocity,
         uiVelocity,
+        flickVelocity,
         width,
         timestamp,
       };
@@ -237,6 +256,16 @@ export function usePointerSwipe({
 
       const hasMovementOnRelease =
         typeof currentX === "number" && currentX !== gesture.lastX;
+      // The flick memory survives a lift-off hold on the human pause law
+      // (grace + half-life) — NOT the per-frame EMA decay below, which zeroes
+      // a fast gesture after a ~2-frame stick. Captured before createSample
+      // so a last-instant micro-twitch cannot wipe the gesture's speed.
+      const pausedFlickVelocity = pauseDecayedVelocity(
+        sampleRef.current.flickVelocity,
+        now - sampleRef.current.timestamp,
+        settingsRef.current.flickPauseGraceMs,
+        settingsRef.current.flickVelocityHalfLifeMs,
+      );
       const sample: InternalSample = hasMovementOnRelease
         ? createSample(currentX, now)
         : {
@@ -254,6 +283,10 @@ export function usePointerSwipe({
             width: gesture.width || target?.offsetWidth || sampleRef.current.width,
             timestamp: now,
           };
+      sample.flickVelocity = dominantMagnitude(
+        sample.flickVelocity ?? 0,
+        pausedFlickVelocity,
+      );
       sampleRef.current = sample;
 
       const wasDragging = phase === "dragging";
@@ -261,6 +294,7 @@ export function usePointerSwipe({
       const resolution = resolveSwipeDirection({
         rawOffset: sample.rawOffset,
         rawVelocity: sample.rawVelocity,
+        flickVelocity: sample.flickVelocity,
         width: sample.width,
         config: settingsRef.current,
         canCommit,

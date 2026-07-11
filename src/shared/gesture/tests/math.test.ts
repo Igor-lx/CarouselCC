@@ -5,7 +5,9 @@ import {
   calculateEma,
   clampMagnitude,
   decayedVelocity,
+  dominantMagnitude,
   frameAdjustedAlpha,
+  pauseDecayedVelocity,
   safeResistance,
   sameDirectionSpeed,
 } from "../internals/math";
@@ -89,5 +91,38 @@ describe("sameDirectionSpeed", () => {
     expect(sameDirectionSpeed(2, 0)).toBe(0);
     expect(sameDirectionSpeed(Number.NaN, 10)).toBe(0);
     expect(sameDirectionSpeed(Infinity, 10)).toBe(0);
+  });
+});
+
+describe("pauseDecayedVelocity", () => {
+  it("costs nothing within the grace window", () => {
+    expect(pauseDecayedVelocity(2, 0, 120, 250)).toBe(2);
+    expect(pauseDecayedVelocity(2, 119, 120, 250)).toBe(2);
+    expect(pauseDecayedVelocity(2, 120, 120, 250)).toBe(2);
+  });
+
+  it("halves per half-life beyond the grace", () => {
+    expect(pauseDecayedVelocity(2, 120 + 250, 120, 250)).toBeCloseTo(1, 10);
+    expect(pauseDecayedVelocity(2, 120 + 500, 120, 250)).toBeCloseTo(0.5, 10);
+  });
+
+  it("a realistic lift-off stick keeps most of the speed (vs frame-EMA zeroing)", () => {
+    // 200ms stick: 80ms past grace -> ~80% kept. The old per-frame decay at
+    // alpha 0.85 would have kept ~0.000002%.
+    const kept = pauseDecayedVelocity(1, 200, 120, 250);
+    expect(kept).toBeGreaterThan(0.75);
+    expect(decayedVelocity(1, 0.85, 200)).toBeLessThan(0.0001);
+  });
+
+  it("degenerate half-life disables decay instead of exploding", () => {
+    expect(pauseDecayedVelocity(2, 1000, 120, 0)).toBe(2);
+  });
+});
+
+describe("dominantMagnitude", () => {
+  it("picks the larger magnitude and preserves its sign", () => {
+    expect(dominantMagnitude(0.02, -0.4)).toBe(-0.4);
+    expect(dominantMagnitude(-0.5, 0.1)).toBe(-0.5);
+    expect(dominantMagnitude(0.3, 0.3)).toBe(0.3);
   });
 });

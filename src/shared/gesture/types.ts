@@ -19,6 +19,16 @@ export interface PointerSwipeConfig {
   maxVelocity?: number;
   /** Velocity EMA smoothing weight in (0, 1]. */
   emaAlpha?: number;
+  /**
+   * Per-frame EMA weight of the FLICK-VELOCITY MEMORY — the weighted-average
+   * gesture speed the flick decision and the release speed are based on, so
+   * a fast gesture is not judged by its last (often decelerating) segment.
+   */
+  flickVelocityAlpha?: number;
+  /** Hold before lift-off that costs the flick memory nothing (ms). */
+  flickPauseGraceMs?: number;
+  /** Beyond the grace, the flick memory halves every this many ms. */
+  flickVelocityHalfLifeMs?: number;
   /** Minimum raw pointer velocity (px/ms) for a quick-flick. */
   quickFlickVelocity?: number;
   /** Minimum raw pointer offset (px) for a quick-flick. */

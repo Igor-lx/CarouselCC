@@ -64,10 +64,15 @@ the engine keeps its state in refs and talks only through callbacks:
   boundaries; resistance is a global distance curve.
 - `onRelease(payload)` — always fires exactly once per owned gesture, also on
   cancel. `direction` is the commit decision (`"left" | "right" | "none"`):
-  a quick flick (velocity + token distance) or a slow pull past the
-  resistance-adapted distance threshold. `pointerReleaseVelocity` (raw
-  finger, px/ms) and `uiReleaseVelocity` (EMA-smoothed UI offset velocity,
-  px/ms) let the consumer build inertial follow-through.
+  a quick flick (gesture speed + token distance) or a slow pull past the
+  resistance-adapted distance threshold. The flick — and the
+  `pointerReleaseVelocity` (px/ms) handed out for inertial follow-through —
+  judge the GESTURE, not its last segment: the engine keeps a
+  weighted-average velocity memory (`flickVelocityAlpha`) that survives a
+  finger settling before lift-off (`flickPauseGraceMs` grace, then
+  `flickVelocityHalfLifeMs` half-life decay), so a fast swipe that ends in
+  a brief stick still reads — and rides — as a flick. `uiReleaseVelocity`
+  is the EMA-smoothed UI-offset velocity (px/ms).
 
 `enabled: false` removes the surface entirely: `hostProps` keeps only the
 `ref` (so re-enabling and the forwarded consumer ref keep working) — no

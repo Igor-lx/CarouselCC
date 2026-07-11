@@ -3,7 +3,9 @@ export {
   calculateEma,
   clampMagnitude,
   decayedVelocity,
+  dominantMagnitude,
   frameAdjustedAlpha,
+  pauseDecayedVelocity,
   safeResistance,
   sameDirectionSpeed,
 } from "./math";

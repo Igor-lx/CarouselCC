@@ -52,6 +52,29 @@ export const frameAdjustedAlpha = (alpha: number, dt: number) => {
   return 1 - Math.pow(1 - safe, frames);
 };
 
+/**
+ * Human-scale pause decay: a hold shorter than `graceMs` costs nothing (a
+ * finger settling before lift-off is part of a normal gesture), beyond it
+ * the velocity halves every `halfLifeMs`. Used for the flick-velocity
+ * memory, where the per-frame EMA decay below would zero a fast gesture
+ * after a ~2-frame stick.
+ */
+export const pauseDecayedVelocity = (
+  velocity: number,
+  pauseMs: number,
+  graceMs: number,
+  halfLifeMs: number,
+) => {
+  if (!(halfLifeMs > 0)) return velocity;
+  const effective = Math.max(0, pauseMs - Math.max(0, graceMs));
+  if (effective === 0) return velocity;
+  return velocity * Math.pow(0.5, effective / halfLifeMs);
+};
+
+/** The argument with the larger magnitude (sign preserved). */
+export const dominantMagnitude = (a: number, b: number) =>
+  Math.abs(a) >= Math.abs(b) ? a : b;
+
 /** EMA-decay a velocity toward zero over an idle gap of `dt` ms. */
 export const decayedVelocity = (velocity: number, alpha: number, dt: number) => {
   const safe = Math.max(0, Math.min(1, alpha));
