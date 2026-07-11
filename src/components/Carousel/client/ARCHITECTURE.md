@@ -917,7 +917,14 @@ slot must land inside the clamps).
 
 The dispatch carries the velocities into the state machine. They are
 stored on the snapshot and read by `useMotionRunner` when it builds the
-release segment.
+release segment. The two velocities play DIFFERENT roles there (the
+continuity launch, matching native scroll physics): `uiReleaseVelocity` —
+the visual speed the eye saw at lift-off — is the segment's START speed,
+and `pointerReleaseVelocity` — the flick-memory intent, boosted — is the
+CRUISE target the profile accelerates to over
+`CAROUSEL_INERTIAL_RELEASE_CONFIG.accelerationDistanceShare`. Content
+never jumps above its visible speed; a fast lift-off makes start ≈ cruise
+and the ramp collapses by itself.
 
 The whole surface is gated by `enabled: layout.canSlide && isSwipeOn` on the
 primitive: when either is `false`, `usePointerSwipe` returns **empty

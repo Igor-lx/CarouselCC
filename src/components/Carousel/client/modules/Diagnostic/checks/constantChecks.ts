@@ -465,6 +465,15 @@ const numericRules: NumericRule[] = [
   },
   {
     layer: "Gesture",
+    field: "CAROUSEL_INERTIAL_RELEASE_CONFIG.accelerationDistanceShare",
+    value: CAROUSEL_INERTIAL_RELEASE_CONFIG.accelerationDistanceShare,
+    severity: "CRITICAL",
+    expected: "Expected a finite number in the range [0, 1]",
+    consequence: "Continuity-launch ramp share outside [0,1] yields malformed release profiles",
+    predicate: inRangeInclusive(0, 1),
+  },
+  {
+    layer: "Gesture",
     field: "CAROUSEL_INERTIAL_RELEASE_CONFIG.decelerationDistanceShare",
     value: CAROUSEL_INERTIAL_RELEASE_CONFIG.decelerationDistanceShare,
     severity: "CRITICAL",
@@ -613,6 +622,12 @@ export const collectConstantWarnings = (): CarouselDiagnosticWarning[] => {
       AUTOPLAY_ACCELERATION_DISTANCE_SHARE,
       AUTOPLAY_DECELERATION_DISTANCE_SHARE,
       "Autoplay-step runtime profile normalizes overallocated shares to 50% acceleration and 50% deceleration",
+    ),
+collectProfileShareRelation(
+      "CAROUSEL_INERTIAL_RELEASE_CONFIG.accelerationDistanceShare + decelerationDistanceShare",
+      CAROUSEL_INERTIAL_RELEASE_CONFIG.accelerationDistanceShare,
+      CAROUSEL_INERTIAL_RELEASE_CONFIG.decelerationDistanceShare,
+      "Gesture-release runtime profile normalizes overallocated shares to 50% acceleration and 50% deceleration",
     ),
     collectProfileShareRelation(
       "SNAP_BACK_ACCELERATION_DISTANCE_SHARE + SNAP_BACK_DECELERATION_DISTANCE_SHARE",

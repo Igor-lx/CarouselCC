@@ -160,13 +160,24 @@ const buildGestureProfile = (
   releaseSpeed: number,
 ): CarouselSegment => {
   const distance = state.virtualIndex - start.position;
+  // CONTINUITY LAUNCH (etalon scroll physics): the segment starts at the
+  // VISUAL velocity the eye saw at lift-off — the follow stream's ui
+  // velocity (the handoff velocity is zero during a drag: the finger wrote
+  // positions, not a curve). The intent speed (flick memory × boost) is the
+  // CRUISE target the profile accelerates to over the configured share —
+  // never an instant jump above what was visible. A fast lift-off makes
+  // start ≈ peak and the ramp collapses by itself.
+  const startSpeed = Math.max(
+    sameDirectionSpeed(start.velocity, distance),
+    sameDirectionSpeed(state.gesture.uiVelocity, distance),
+  );
   const profile = buildProfile({
     from: start.position,
     to: state.virtualIndex,
-    startSpeed: sameDirectionSpeed(start.velocity, distance),
-    peakSpeed: Math.abs(signedVelocity(releaseSpeed, distance)),
+    startSpeed,
+    peakSpeed: Math.max(Math.abs(signedVelocity(releaseSpeed, distance)), startSpeed),
     endSpeed: 0,
-    accelerationDistanceShare: 0,
+    accelerationDistanceShare: release.accelerationDistanceShare,
     decelerationDistanceShare: release.decelerationDistanceShare,
   });
 

@@ -4,11 +4,18 @@ import type {
 } from "../../../../shared";
 
 /**
- * The engine's release config plus the carousel's own profile knob: how much
- * of the remaining distance the release segment devotes to deceleration. The
- * share is consumed by the carousel's segment factory, not by the engine.
+ * The engine's release config plus the carousel's own profile knobs — both
+ * consumed by the carousel's segment factory, not by the engine.
+ *
+ * `accelerationDistanceShare` implements the CONTINUITY LAUNCH (the etalon
+ * behaviour of native scroll physics): the release segment starts at the
+ * VISUAL velocity the eye saw at lift-off and ramps up to the intent speed
+ * (flick memory × boost) over this share of the distance — content never
+ * jumps to a higher speed than it visibly had, it accelerates there. With a
+ * fast lift-off (start ≈ intent) the ramp collapses to nothing by itself.
  */
 export interface CarouselInertialReleaseConfig extends InertialReleaseConfig {
+  accelerationDistanceShare: number;
   decelerationDistanceShare: number;
 }
 
@@ -105,5 +112,6 @@ export const resolveSlotAdaptiveSwipeConfig = (
  */
 export const CAROUSEL_INERTIAL_RELEASE_CONFIG: CarouselInertialReleaseConfig = {
   inertiaBoost: 1.7,
+  accelerationDistanceShare: 0.2,
   decelerationDistanceShare: 0.25,
 };
