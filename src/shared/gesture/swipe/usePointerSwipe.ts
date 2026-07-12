@@ -111,6 +111,13 @@ export function usePointerSwipe({
   const gestureRef = useRef({
     startX: 0,
     startY: 0,
+    /** Anchor for the VISUAL offset. Starts at `startX`, re-anchored to the
+     * finger the moment the drag activates: the OS suppresses the first
+     * touch moves (touch slop) and queues input, so by activation the finger
+     * is already 20–40px away from `startX` — measuring the visual offset
+     * from there would teleport the deck on the first drag frame. Commit and
+     * flick judgment keep the full `startX`-based travel (`rawOffset`). */
+    visualStartX: 0,
     lastX: 0,
     lastTime: 0,
     lastOffset: 0,
@@ -173,7 +180,11 @@ export function usePointerSwipe({
       const gesture = gestureRef.current;
       const cfg = settingsRef.current;
       const rawOffset = currentX - gesture.startX;
-      const uiOffset = applyResistance(rawOffset, cfg.resistance, cfg.resistanceCurvature);
+      const uiOffset = applyResistance(
+        currentX - gesture.visualStartX,
+        cfg.resistance,
+        cfg.resistanceCurvature,
+      );
       const dt = Math.max(1, timestamp - gesture.lastTime);
       const rawVelocity = clampMagnitude(
         (currentX - gesture.lastX) / dt,
@@ -359,6 +370,7 @@ export function usePointerSwipe({
       gestureRef.current = {
         startX: event.clientX,
         startY: event.clientY,
+        visualStartX: event.clientX,
         lastX: event.clientX,
         lastTime: now,
         lastOffset: 0,
@@ -403,6 +415,11 @@ export function usePointerSwipe({
 
           if (event.cancelable) event.preventDefault();
           activateOwnership(event.currentTarget as HTMLElement, event.pointerId);
+
+          // Re-anchor the visual origin to the finger: the deck starts its
+          // follow from rest (offset 0) instead of snapping to the distance
+          // accumulated during OS touch slop and input latency.
+          gesture.visualStartX = event.clientX;
 
           const sample = createSample(event.clientX, now);
           sampleRef.current = sample;

@@ -74,7 +74,13 @@ the engine keeps its state in refs and talks only through callbacks:
   resistance-shaped offset in px: near zero it tracks the finger ~1:1 and lags
   progressively as the pull grows (`resistance` / `resistanceCurvature`).
   There is no edge detection — the engine knows nothing about the consumer's
-  boundaries; resistance is a global distance curve.
+  boundaries; resistance is a global distance curve. The visual offset is
+  anchored where the drag ACTIVATES, not where the finger first landed: the
+  OS suppresses the first touch moves (touch slop) and queues input, so by
+  activation the finger is already tens of px away — anchoring there starts
+  the follow from rest instead of teleporting the surface on the first drag
+  frame. Commit and flick judgment still count the full travel from the
+  original touch point.
 - `onRelease(payload)` — always fires exactly once per owned gesture, also on
   cancel. `direction` is the commit decision (`"left" | "right" | "none"`):
   a quick flick (gesture speed + token distance) or a slow pull past the
