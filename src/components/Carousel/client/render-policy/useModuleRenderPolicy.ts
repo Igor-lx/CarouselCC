@@ -4,6 +4,7 @@ interface UseModuleRenderPolicyInput {
   controlsSlot: ReactNode;
   paginationSlot: ReactNode;
   diagnosticSlot: ReactNode;
+  responsiveImagesSlot: ReactNode;
   isControlsOn: boolean;
   isPaginationOn: boolean;
   canSlide: boolean;
@@ -13,15 +14,18 @@ export interface ModuleRenderPolicy {
   hasControlsSlot: boolean;
   hasPaginationSlot: boolean;
   hasDiagnosticSlot: boolean;
+  hasResponsiveImagesSlot: boolean;
   shouldRenderControls: boolean;
   shouldRenderPagination: boolean;
   shouldRenderDiagnostic: boolean;
+  shouldRenderResponsiveImages: boolean;
 }
 
 export function useModuleRenderPolicy({
   controlsSlot,
   paginationSlot,
   diagnosticSlot,
+  responsiveImagesSlot,
   isControlsOn,
   isPaginationOn,
   canSlide,
@@ -29,6 +33,7 @@ export function useModuleRenderPolicy({
   const hasControlsSlot = Boolean(controlsSlot);
   const hasPaginationSlot = Boolean(paginationSlot);
   const hasDiagnosticSlot = Boolean(diagnosticSlot);
+  const hasResponsiveImagesSlot = Boolean(responsiveImagesSlot);
 
   // Controls and pagination follow one symmetric rule: a module renders only
   // when its flag is on, its slot is attached, AND the deck can actually slide
@@ -43,15 +48,20 @@ export function useModuleRenderPolicy({
       hasControlsSlot,
       hasPaginationSlot,
       hasDiagnosticSlot,
+      hasResponsiveImagesSlot,
       shouldRenderControls: isControlsOn && canSlide && hasControlsSlot,
       shouldRenderPagination: isPaginationOn && canSlide && hasPaginationSlot,
       shouldRenderDiagnostic: hasDiagnosticSlot,
+      // Headless like Diagnostic: renders whenever attached — its PRESENCE is
+      // the switch that turns the responsive-image stack on.
+      shouldRenderResponsiveImages: hasResponsiveImagesSlot,
     }),
     [
       canSlide,
       hasControlsSlot,
       hasDiagnosticSlot,
       hasPaginationSlot,
+      hasResponsiveImagesSlot,
       isControlsOn,
       isPaginationOn,
     ],

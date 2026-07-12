@@ -1,4 +1,9 @@
-export const CAROUSEL_SLOTS = ["pagination", "controls", "diagnostic"] as const;
+export const CAROUSEL_SLOTS = [
+  "pagination",
+  "controls",
+  "diagnostic",
+  "responsive-images",
+] as const;
 
 export type CarouselSlotName = (typeof CAROUSEL_SLOTS)[number];
 

@@ -17,5 +17,6 @@ export type {
   CarouselDiagnosticContextValue,
   CarouselStatusView,
   CarouselLayoutView,
+  CarouselSlideMediaView,
   CarouselIntentView,
 } from "./types";

@@ -9,6 +9,7 @@ import type {
   CarouselIntentView,
   CarouselLayoutView,
   CarouselMotionContextValue,
+  CarouselSlideMediaView,
   CarouselStableContextValue,
   CarouselStatusView,
 } from "./types";
@@ -18,6 +19,9 @@ interface UseModuleContextValueInput {
   navigation: CarouselNavigation;
   isTouch: boolean;
   isReducedMotion: boolean;
+  isDataSaverEnabled: boolean;
+  slides: readonly CarouselSlideMediaView[];
+  imageSizes: string;
   visualPosition: VisualPositionSource | null;
   motionPlan: MotionPlanSource | null;
   isAtStart: boolean;
@@ -30,6 +34,9 @@ export function useModuleContextValue({
   navigation,
   isTouch,
   isReducedMotion,
+  isDataSaverEnabled,
+  slides,
+  imageSizes,
   visualPosition,
   motionPlan,
   isAtStart,
@@ -56,21 +63,27 @@ export function useModuleContextValue({
   const layoutView = useMemo<CarouselLayoutView>(
     () => ({
       pageCount: state.layout.pageCount,
+      visibleSlidesCount: state.layout.visibleSlidesCount,
+      isFinite: state.layout.isFinite,
       canSlide: state.layout.canSlide,
       isAtStart,
       isAtEnd,
       isTouch,
       isReducedMotion,
+      isDataSaverEnabled,
       isDiagnosticActive,
     }),
     [
       isAtEnd,
       isAtStart,
+      isDataSaverEnabled,
       isDiagnosticActive,
       isReducedMotion,
       isTouch,
       state.layout.canSlide,
+      state.layout.isFinite,
       state.layout.pageCount,
+      state.layout.visibleSlidesCount,
     ],
   );
 
@@ -99,8 +112,10 @@ export function useModuleContextValue({
       navigation: navigationView,
       visualPosition,
       motionPlan,
+      slides,
+      imageSizes,
     }),
-    [layoutView, motionPlan, navigationView, visualPosition],
+    [imageSizes, layoutView, motionPlan, navigationView, slides, visualPosition],
   );
 
   const motion = useMemo<CarouselMotionContextValue>(

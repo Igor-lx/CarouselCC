@@ -41,8 +41,11 @@
 
   // Portrait viewports pick the 9:16 art-directed source — the box aspect
   // must switch under the SAME condition, or `cover` would crop again.
+  // Scoped to the <ResponsiveImages /> module's presence: without the module
+  // there is only ONE native set, so the box keeps the default aspect in any
+  // orientation (a flipped box would permanently zoom-crop the single asset).
   @media (orientation: portrait) {
-    .outerContainer {
+    .outerContainer[data-responsive-images="true"] {
       --slide-aspect: 9 / 16;
     }
   }

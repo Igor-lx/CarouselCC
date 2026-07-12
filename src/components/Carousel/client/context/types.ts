@@ -1,4 +1,5 @@
 import type { MotionPlanSource } from "../motion";
+import type { SlideImageSource } from "../public-api/types";
 import type { CarouselNavigation } from "../navigation";
 import type { CarouselState, MotionPhase } from "../state";
 import type { VisualPositionSource } from "../visual-position";
@@ -13,11 +14,16 @@ export interface CarouselStatusView {
 
 export interface CarouselLayoutView {
   pageCount: number;
+  /** Slides per page — modules mapping pages to slides (e.g. preload). */
+  visibleSlidesCount: number;
+  isFinite: boolean;
   canSlide: boolean;
   isAtStart: boolean;
   isAtEnd: boolean;
   isTouch: boolean;
   isReducedMotion: boolean;
+  /** Host reduced-data signal — preloading modules must respect it. */
+  isDataSaverEnabled: boolean;
   /**
    * True when a Diagnostic slot is attached. Modules with their own checks
    * (e.g. PaginationWidget) gate diagnostic work on this flag so the carousel
@@ -50,6 +56,18 @@ export type CarouselNavigationView = Pick<
  * step. A consumer that reads only this half (e.g. `<Controls>`, the widget
  * diagnostic) does not re-render on every click.
  */
+/**
+ * Per-slide media descriptor (deck order, page-padding clones included) for
+ * media-oriented modules (<ResponsiveImages />): everything needed to warm a
+ * slide's image without touching the DOM. `src` is the canonical content URL.
+ */
+export interface CarouselSlideMediaView {
+  src: string;
+  srcSet?: string;
+  sizes?: string;
+  sources?: readonly SlideImageSource[];
+}
+
 export interface CarouselStableContextValue {
   layout: CarouselLayoutView;
   navigation: CarouselNavigationView;
@@ -62,6 +80,10 @@ export interface CarouselStableContextValue {
    * to their static rendering.
    */
   motionPlan: MotionPlanSource | null;
+  /** Deck-order media descriptors (empty when image content is off). */
+  slides: readonly CarouselSlideMediaView[];
+  /** The carousel-derived default `sizes` hint (see useResponsiveImageSizes). */
+  imageSizes: string;
 }
 
 /**
@@ -109,5 +131,8 @@ export interface CarouselDiagnosticContextValue {
     hasControlsSlot: boolean;
     isPaginationOn: boolean;
     hasPaginationSlot: boolean;
+    hasResponsiveImagesSlot: boolean;
+    /** Any slide in the deck carries image variants (srcSet / sources). */
+    deckCarriesImageSets: boolean;
   };
 }

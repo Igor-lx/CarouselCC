@@ -47,3 +47,58 @@ export const padDeckToFullPage = (
 };
 
 export { clampedVisibleSlidesCount };
+
+/**
+ * Parse a `w`-descriptor `srcSet` and return the LARGEST candidate URL.
+ * Entries without a width descriptor count as width 0; a malformed or empty
+ * srcSet yields `null`.
+ */
+export const resolveLargestSrcSetCandidate = (
+  srcSet: string | undefined,
+): string | null => {
+  if (!srcSet) return null;
+  let bestUrl: string | null = null;
+  let bestWidth = -1;
+  for (const entry of srcSet.split(",")) {
+    const parts = entry.trim().split(/\s+/);
+    const url = parts[0];
+    if (!url) continue;
+    const match = parts[1]?.match(/^(\d+(?:\.\d+)?)w$/);
+    const width = match ? Number(match[1]) : 0;
+    if (width > bestWidth) {
+      bestWidth = width;
+      bestUrl = url;
+    }
+  }
+  return bestUrl;
+};
+
+/**
+ * The image URL the deck actually RENDERS for a slide, and therefore the URL
+ * the image-resource store tracks (load / error / retry). One resolution rule
+ * shared by the slide renderer and the store retention, so they can never
+ * key on different URLs:
+ *
+ * - responsive mode (`<ResponsiveImages />` mounted): the canonical
+ *   `content` URL — the browser upgrades it via `srcSet` / `<source>`;
+ * - single-set mode (module absent): the LARGEST default-set candidate —
+ *   the deliberate "quality first, no economy" mode. Slide identity is
+ *   untouched either way (`dataKey` stays on `id + content`).
+ */
+export const resolveRenderedImageSrc = (
+  slideData: Slide,
+  isResponsiveImagesOn: boolean,
+): string | null => {
+  const { content, image } = slideData;
+  if (typeof content !== "string") return null;
+  if (isResponsiveImagesOn) return content;
+  return resolveLargestSrcSetCandidate(image?.srcSet) ?? content;
+};
+
+/** Whether any slide in the deck carries responsive image variants. */
+export const deckCarriesImageSets = (records: CarouselSlideRecord[]): boolean =>
+  records.some(
+    (record) =>
+      record.slideData.image?.srcSet !== undefined ||
+      (record.slideData.image?.sources?.length ?? 0) > 0,
+  );

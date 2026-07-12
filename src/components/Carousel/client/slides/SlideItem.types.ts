@@ -8,6 +8,10 @@ export interface SlideItemProps extends SlideAriaProps {
   className: SlideClassMap;
   style: CSSProperties;
   isContentImg: boolean;
+  /** Presence switch of the <ResponsiveImages /> module: gates the whole
+   * responsive surface (sources/srcSet/sizes, rotation veil) and flips the
+   * rendered URL rule (see resolveRenderedImageSrc). */
+  isResponsiveImagesOn: boolean;
   errAltPlaceholder: string;
   isInteractive: boolean;
   isActive: boolean;

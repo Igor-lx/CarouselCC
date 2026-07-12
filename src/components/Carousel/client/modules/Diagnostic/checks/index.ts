@@ -9,3 +9,7 @@ export {
   collectWidgetWarnings,
   type WidgetDiagnosticInput,
 } from "./widgetChecks";
+export {
+  collectResponsiveImagesWarnings,
+  type ResponsiveImagesDiagnosticInput,
+} from "./responsiveImagesChecks";

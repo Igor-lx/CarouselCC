@@ -15,6 +15,7 @@ import { Controls } from "../components/Carousel/client/modules/Controls";
 import { Pagination } from "../components/Carousel/client/modules/Pagination";
 import { PaginationWidget } from "../components/Carousel/client/modules/PaginationWidget";
 import { Diagnostic } from "../components/Carousel/client/modules/Diagnostic";
+import { ResponsiveImages } from "../components/Carousel/client/modules/ResponsiveImages";
 import { useTheme } from "../theme/useTheme";
 
 /**
@@ -36,6 +37,12 @@ const SLIDES_SET: 1 | 2 = (() => {
   if (raw === "2") return 2;
   return DEFAULT_SLIDES_SET;
 })();
+
+/** Responsive-images module switch for device testing: `?ri=0` renders the
+ * carousel WITHOUT <ResponsiveImages /> — one native set, largest candidate,
+ * no preload, no aspect flip. */
+const HAS_RESPONSIVE_IMAGES: boolean =
+  new URLSearchParams(window.location.search).get("ri") !== "0";
 
 const VISIBLE_BY_BREAKPOINT = {
   DESKTOP: 2,
@@ -156,8 +163,11 @@ export default function App() {
               onSlideClick={openSlide}
               onCarouselStatusChange={(snapshot) => setStatus(snapshot)}
             >
-              {isTouch ? <PaginationWidget /> : <Pagination />}
+              { isTouch ? <PaginationWidget /> : <Pagination />}
               <Controls />
+              {HAS_RESPONSIVE_IMAGES ? (
+                <ResponsiveImages isParallelSetPreloadOn />
+              ) : null}
               <Diagnostic />
             </Carousel>
           )}

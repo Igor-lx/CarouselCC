@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { memo, useEffect, useRef } from "react";
 
+import { resolveRenderedImageSrc } from "../domain";
 import { useImageResource } from "./imageResource";
 import { useOrientationSwapVeil } from "./useOrientationSwapVeil";
 import type { SlideItemProps } from "./SlideItem.types";
@@ -24,6 +25,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
     className,
     style,
     isContentImg,
+    isResponsiveImagesOn,
     errAltPlaceholder,
     isInteractive,
     isActive,
@@ -35,9 +37,12 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
     ...ariaProps
   } = props;
 
+  // The rendered (and store-keyed) URL: canonical content in responsive
+  // mode, the LARGEST default candidate in single-set mode — one rule shared
+  // with the store retention (see resolveRenderedImageSrc).
   const imageSource =
-    isContentImg && typeof slideData?.content === "string"
-      ? slideData.content
+    isContentImg && slideData
+      ? resolveRenderedImageSrc(slideData, isResponsiveImagesOn)
       : null;
 
   const { status, generation, reportLoaded, reportError, requestRetry } =
@@ -51,7 +56,9 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
   const imgRef = useRef<HTMLImageElement | null>(null);
   const isReorienting = useOrientationSwapVeil({
     imgRef,
-    isBitmapShown: isImageSlide && status === "loaded",
+    // Without the ResponsiveImages module there is no art-directed source to
+    // swap on rotation — the veil stays inert.
+    isBitmapShown: isResponsiveImagesOn && isImageSlide && status === "loaded",
   });
 
   // An errored image that is currently in the active band is retried on a
@@ -74,8 +81,12 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
   // concrete asset; identity stays `content`. `sizes` is only meaningful with a
   // `srcSet`, so a plain `<img src>` slide carries none.
   const image = slideData.image;
-  const sources = image?.sources ?? [];
-  const isResponsive = image?.srcSet !== undefined || sources.length > 0;
+  // The whole responsive surface is gated by the module's presence: without
+  // it a slide is a plain <img src> of the largest candidate — no sources,
+  // no srcSet, no sizes.
+  const sources = isResponsiveImagesOn ? image?.sources ?? [] : [];
+  const isResponsive =
+    isResponsiveImagesOn && (image?.srcSet !== undefined || sources.length > 0);
   const resolvedSizes = image?.sizes ?? imageSizes;
 
   const imageNode =
@@ -87,7 +98,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
         ref={imgRef}
         data-reorienting={isReorienting || undefined}
         src={imageSource}
-        srcSet={image?.srcSet}
+        srcSet={isResponsiveImagesOn ? image?.srcSet : undefined}
         sizes={isResponsive ? resolvedSizes : undefined}
         alt={slideData.alt || ""}
         draggable={false}

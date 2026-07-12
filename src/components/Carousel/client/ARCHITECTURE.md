@@ -244,6 +244,12 @@ For each logical slide you need, starting from a single high-resolution source:
    nothing cropped), and the carousel derives its height from slot width ×
    aspect instead of a fixed height, so it fits any window.
 
+   The whole pairing is scoped to the `<ResponsiveImages />` module's
+   presence (`data-responsive-images` on the root): without the module the
+   deck deliberately runs ONE native set — the largest default candidate
+   everywhere (`resolveRenderedImageSrc`), the box keeps the default aspect
+   in any orientation, and none of the machinery below runs.
+
    On a device ROTATION the two halves of the contract swap at different
    speeds: CSS flips the box aspect instantly, but the browser keeps
    painting the old crop until the new `<source>` resource decodes — under
@@ -297,6 +303,7 @@ For each logical slide you need, starting from a single high-resolution source:
 | ------------- | ------------------------------- | ----- |
 | `pagination`  | `<Pagination />` or `<PaginationWidget />` | Exactly one may be attached. Renders only when `isPaginationOn` is `true`. |
 | `controls`    | `<Controls />`                  | Renders only when `isControlsOn` is `true`. |
+| `responsive-images` | `<ResponsiveImages />` | Headless. Its PRESENCE switches the responsive-image stack on (art-directed sources, srcSet/sizes, rotation veil, portrait aspect flip); its body preloads neighbour pages (§8.5). Absent: one native set everywhere — the LARGEST default candidate, zero responsive machinery. |
 | `diagnostic`  | `<Diagnostic />`                | Always renders if attached. Dev-only; in prod console output is suppressed by the env guard. |
 
 Slot resolution is done by the shared `resolveSlots` against `CAROUSEL_SLOTS`.
@@ -1129,7 +1136,27 @@ viewport-hover or `:focus-visible`. Always visible on touch. The
 left/right zones are not rendered when `layout.isAtStart`/`isAtEnd` is
 true (finite mode), so there is no destination to navigate to.
 
-### 8.4 `<Diagnostic />`
+### 8.4 `<ResponsiveImages />`
+
+Headless (renders `null`). Two effects in one slot:
+
+1. **Presence switch.** Mounting it turns the responsive stack on: SlideItem
+   emits `<source>`/`srcSet`/`sizes`, the rotation veil arms, the portrait
+   aspect flip applies, and the image store keys on the canonical `content`
+   URL. Unmounted, a slide is a plain `<img>` of the LARGEST default
+   candidate ("quality first, no economy") and the module's code is
+   tree-shaken out. The same slides JSON works in both modes.
+2. **Preload manager.** While the deck is idle it warms `preloadPagesNr`
+   neighbour pages per side through React 19 `preload()` with
+   `imageSrcSet`/`imageSizes` — the browser picks the exact candidate.
+   `isParallelSetPreloadOn` (default off) additionally warms the parallel
+   orientation's crop with a heuristic candidate (a `media`-gated source
+   cannot preload natively; a miss is masked by the rotation veil).
+   `isDataSaverRespected` (default on) zeroes all warm traffic under the
+   host's reduced-data signal. Props are audited by Diagnostics
+   (`useResponsiveImagesDiagnostic`).
+
+### 8.5 `<Diagnostic />`
 
 DEV-only console emitter. Reads
 `CarouselDiagnosticContext` (raw props + observable layout/slot state)
@@ -1264,6 +1291,7 @@ src/components/Carousel/client/
     ├── Controls/
     ├── Pagination/
     ├── PaginationWidget/
+    ├── ResponsiveImages/          headless: presence switch + idle preload manager
     └── Diagnostic/
 ```
 

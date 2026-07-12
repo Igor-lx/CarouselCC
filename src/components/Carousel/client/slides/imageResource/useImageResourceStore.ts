@@ -6,6 +6,8 @@ import { useImageResourceStoreInstance } from "./useImageResourceStoreInstance";
 interface UseImageResourceStoreInput {
   isContentImg: boolean;
   records: CarouselSlideRecord[];
+  /** Mirrors the slide renderer: the store keys on the RENDERED src. */
+  isResponsiveImagesOn: boolean;
 }
 
 /**
@@ -19,8 +21,9 @@ interface UseImageResourceStoreInput {
 export function useImageResourceStore({
   isContentImg,
   records,
+  isResponsiveImagesOn,
 }: UseImageResourceStoreInput): ImageResourceStore | null {
   const store = useImageResourceStoreInstance(isContentImg);
-  useImageResourceRetention({ store, records, isContentImg });
+  useImageResourceRetention({ store, records, isContentImg, isResponsiveImagesOn });
   return store;
 }

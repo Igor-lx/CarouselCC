@@ -5,6 +5,9 @@ export {
   hasPartialPageLayout,
   padDeckToFullPage,
   clampedVisibleSlidesCount,
+  deckCarriesImageSets,
+  resolveLargestSrcSetCandidate,
+  resolveRenderedImageSrc,
 } from "./slides";
 export {
   pageStart,

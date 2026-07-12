@@ -25,6 +25,32 @@ export const collectSlotWarnings = (
     });
   }
 
+  if (slots.deckCarriesImageSets && !slots.hasResponsiveImagesSlot) {
+    out.push({
+      severity: "LOGICAL",
+      layer: SLOT_LAYER,
+      field: "ResponsiveImages",
+      actual: false,
+      expected:
+        "Slides carry responsive image variants; mount <ResponsiveImages /> to use them",
+      consequence:
+        "Deliberate quality-first mode: every viewport loads the LARGEST candidate, no art direction, no preload",
+    });
+  }
+
+  if (slots.hasResponsiveImagesSlot && !slots.deckCarriesImageSets) {
+    out.push({
+      severity: "LOGICAL",
+      layer: SLOT_LAYER,
+      field: "ResponsiveImages",
+      actual: true,
+      expected:
+        "Expected slides with image variants (srcSet / sources) when <ResponsiveImages /> is mounted",
+      consequence:
+        "Only neighbour-page preloading of the single set is active — no responsive selection to perform",
+    });
+  }
+
   if (slots.isPaginationOn && !slots.hasPaginationSlot) {
     out.push({
       severity: "LOGICAL",

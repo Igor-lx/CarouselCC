@@ -15,7 +15,11 @@ import {
   useDiagnosticContextValue,
   useModuleContextValue,
 } from "./context";
-import { carouselBoundaryState, slideFlexStyle } from "./domain";
+import {
+  carouselBoundaryState,
+  deckCarriesImageSets,
+  slideFlexStyle,
+} from "./domain";
 import { useCarouselAutoplay } from "./autoplay/useCarouselAutoplay";
 import { useFocusRecovery } from "./focus/useFocusRecovery";
 import { useCarouselGesture } from "./gesture";
@@ -87,6 +91,12 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // --- slots ----------------------------------------------------------------
   const slots = useMemo(() => resolveSlots(children, CAROUSEL_SLOTS), [children]);
 
+  // The responsive-image stack (art-directed sources, srcSet/sizes, rotation
+  // veil, aspect flip) is switched by the PRESENCE of the <ResponsiveImages>
+  // slot: no module — one native set everywhere, largest candidate, zero
+  // responsive machinery (see resolveRenderedImageSrc).
+  const isResponsiveImagesOn = Boolean(slots["responsive-images"]);
+
   // --- resolved runtime config (no diagnostic dependency) ------------------
   const config = useCarouselConfig({
     visibleSlidesNr,
@@ -128,7 +138,37 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // `SlideItem` (no context) so the data flow stays visible in source; each
   // slide subscribes to its own URL — the store is the single authority on
   // render status and retry.
-  const imageResourceStore = useImageResourceStore({ isContentImg, records });
+  // Deck-order media descriptors for media modules (ResponsiveImages):
+  // low-frequency (changes with the data only), image slides only.
+  const slideMediaViews = useMemo(
+    () =>
+      isContentImg
+        ? records.flatMap((record) => {
+            const { content, image } = record.slideData;
+            if (typeof content !== "string") return [];
+            return [
+              {
+                src: content,
+                srcSet: image?.srcSet,
+                sizes: image?.sizes,
+                sources: image?.sources,
+              },
+            ];
+          })
+        : [],
+    [isContentImg, records],
+  );
+
+  const useMemoDeckCarriesImageSets = useMemo(
+    () => deckCarriesImageSets(records),
+    [records],
+  );
+
+  const imageResourceStore = useImageResourceStore({
+    isContentImg,
+    records,
+    isResponsiveImagesOn,
+  });
 
   // --- DOM refs --------------------------------------------------------------
   // Declared here (before `imageSizes`) because the responsive-`sizes` hook
@@ -272,6 +312,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     controlsSlot: slots.controls,
     paginationSlot: slots.pagination,
     diagnosticSlot: slots.diagnostic,
+    responsiveImagesSlot: slots["responsive-images"],
     isControlsOn,
     isPaginationOn,
     canSlide: layout.canSlide,
@@ -283,6 +324,9 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
       navigation,
       isTouch,
       isReducedMotion: isInstantMode,
+      isDataSaverEnabled,
+      slides: slideMediaViews,
+      imageSizes,
       visualPosition: isInstantMode ? null : visualPosition,
       motionPlan: isInstantMode ? null : planChannel.source,
       isAtStart,
@@ -312,6 +356,8 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     hasControlsSlot: renderPolicy.hasControlsSlot,
     isPaginationOn,
     hasPaginationSlot: renderPolicy.hasPaginationSlot,
+    hasResponsiveImagesSlot: renderPolicy.hasResponsiveImagesSlot,
+    deckCarriesImageSets: useMemoDeckCarriesImageSets,
   });
 
   // --- style mapping --------------------------------------------------------
@@ -340,6 +386,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
           <div
             className={classNames.outerContainer}
             style={REORIENT_FADE_STYLE}
+            data-responsive-images={isResponsiveImagesOn}
             role="region"
             aria-roledescription="carousel"
             data-carousel-root=""
@@ -368,6 +415,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
                     className={slideClassMap}
                     style={slideStyle}
                     isContentImg={isContentImg}
+                    isResponsiveImagesOn={isResponsiveImagesOn}
                     errAltPlaceholder={config.errorAltPlaceholder}
                     isInteractive={isInteractive}
                     isActive={slide.isActive}
@@ -383,6 +431,9 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
               {renderPolicy.shouldRenderControls ? slots.controls : null}
             </div>
             {renderPolicy.shouldRenderPagination ? slots.pagination : null}
+            {renderPolicy.shouldRenderResponsiveImages
+              ? slots["responsive-images"]
+              : null}
             {renderPolicy.shouldRenderDiagnostic ? slots.diagnostic : null}
           </div>
         </CarouselDiagnosticContext.Provider>

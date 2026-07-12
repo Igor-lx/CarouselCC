@@ -30,6 +30,8 @@ interface UseDiagnosticContextValueInput {
   hasControlsSlot: boolean;
   isPaginationOn: boolean;
   hasPaginationSlot: boolean;
+  hasResponsiveImagesSlot: boolean;
+  deckCarriesImageSets: boolean;
 }
 
 /**
@@ -58,6 +60,8 @@ export function useDiagnosticContextValue({
   hasControlsSlot,
   isPaginationOn,
   hasPaginationSlot,
+  hasResponsiveImagesSlot,
+  deckCarriesImageSets,
 }: UseDiagnosticContextValueInput): CarouselDiagnosticContextValue {
   const propsView = useMemo(
     () => ({
@@ -105,8 +109,17 @@ export function useDiagnosticContextValue({
       hasControlsSlot,
       isPaginationOn,
       hasPaginationSlot,
+      hasResponsiveImagesSlot,
+      deckCarriesImageSets,
     }),
-    [hasControlsSlot, hasPaginationSlot, isControlsOn, isPaginationOn],
+    [
+      deckCarriesImageSets,
+      hasControlsSlot,
+      hasPaginationSlot,
+      hasResponsiveImagesSlot,
+      isControlsOn,
+      isPaginationOn,
+    ],
   );
 
   return useMemo(
