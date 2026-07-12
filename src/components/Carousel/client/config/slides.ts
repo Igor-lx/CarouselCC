@@ -36,7 +36,7 @@ export const SLIDE_PORTRAIT_MEDIA_CONDITION = "(orientation: portrait)";
  */
 export const SLIDE_REORIENT_FADE_OUT_MS = 650;
 export const SLIDE_REORIENT_FADE_IN_MS = 550;
-export const SLIDE_REORIENT_VEIL_MAX_MS = 1500;
+export const SLIDE_REORIENT_VEIL_MAX_MS = 2250;
 
 export const IMAGE_RETRY_BASE_DELAY_MS = 400;
 export const IMAGE_RETRY_MAX_DELAY_MS = 8000;

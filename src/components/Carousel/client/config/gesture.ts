@@ -35,12 +35,13 @@ export interface CarouselInertialReleaseConfig extends InertialReleaseConfig {
 export const CAROUSEL_SWIPE_CONFIG: Required<PointerSwipeConfig> = {
   cooldownMs: 150,
   intentThreshold: 8,
-  resistance: 0.48,
+  resistance: 0.38,
   // Rubber length: the resistance curve saturates at
   // 1 / (curvature * r/(1-r)) px of UI travel — the "wall" the finger hits.
-  // 0.0028 puts the wall at ~315px on the reference slot (~0.8 slot) instead
-  // of ~197px, so a sweeping tablet pull keeps giving before the stop.
-  resistanceCurvature: 0.0035,
+  // r=0.38, c=0.0046 -> stiffness 0.613, wall ~355px (~0.9 of the reference
+  // slot): ~20% softer early ramp and ~15% longer travel than the previous
+  // r=0.48 / c=0.0035 calibration (wall ~310px).
+  resistanceCurvature: 0.0046,
   maxVelocity: 5,
   emaAlpha: 0.85,
   quickFlickVelocity: 0.1,
