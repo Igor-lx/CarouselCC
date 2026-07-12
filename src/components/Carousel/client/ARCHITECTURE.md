@@ -1108,6 +1108,13 @@ The widget is a **decoupled one-step indicator**: it owns an unbounded step
 counter and never mirrors the deck's absolute position — a navigation command
 is one step forward or back, whether the deck travels one page or teleports
 ten. Its motion follows the engine's plans (§4.5):
+the landing of each step is resolved by one pure rule (`stepTarget.ts`)
+over TWO memories — the live running step (a repeated click retargets while
+it animates) and the step a finger grab tore down (follow mode cancels the
+animation, so by release time only this memory survives). Same `targetKey`
+→ keep the target (retiming, snap to the same page); same direction → one
+step beyond, matching the deck's repeat semantics for clicks and swipes
+alike; otherwise plain geometry from the live offset.
 
 - **WAAPI step** (any planned motion): each dot gets a keyframed animation of
   its spatial path across the step (`math/trajectory.ts` samples the

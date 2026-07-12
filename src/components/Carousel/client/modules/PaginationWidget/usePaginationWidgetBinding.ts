@@ -21,6 +21,7 @@ import {
   widgetProjectionSlotCount,
 } from "./math/spatialField";
 import { writeDotProjection } from "./math/projection";
+import { resolveWidgetStepTarget, type WidgetStepMemory } from "./stepTarget";
 import {
   activeTrajectoryIds,
   sampleActiveDotTrajectory,
@@ -151,6 +152,11 @@ export function usePaginationWidgetBinding({
   /** The widget's own step counter — where the strip logically sits. */
   const offsetRef = useRef(0);
   const stepRef = useRef<ActiveStep | null>(null);
+  /** The step a finger grab tore down (follow mode cancels the running
+   * animation): survives the follow interlude so a repeat swipe advances the
+   * widget one step BEYOND, exactly like a repeat click whose `stepRef`
+   * never dies. Consumed by the next plan, cleared on settle. */
+  const interruptedStepRef = useRef<WidgetStepMemory | null>(null);
   const followUnsubRef = useRef<(() => void) | null>(null);
   const followBaseRef = useRef<{ pageOffset: number; offset: number } | null>(
     null,
@@ -329,6 +335,7 @@ export function usePaginationWidgetBinding({
 
   const finalizeStep = useCallback(
     (finalOffset: number) => {
+      interruptedStepRef.current = null;
       cancelStepAnimations();
       offsetRef.current = finalOffset;
       // WAAPI owned the styles; the caches no longer describe the DOM.
@@ -347,27 +354,24 @@ export function usePaginationWidgetBinding({
       const previous = stepRef.current;
       const from = currentOffset();
 
-      let target: number;
-      if (previous && plan.targetKey === previous.targetKey) {
-        // Retiming of the same logical destination (repeated-click refresh,
-        // settle re-anchor): keep the widget's target, rebuild the timing.
-        target = previous.target;
-      } else if (
-        previous &&
-        plan.direction !== 0 &&
-        plan.direction === previous.direction
-      ) {
-        // Same-direction retarget while mid-step (repeated click advanced the
-        // deck's destination): one more step from the current target.
-        target = previous.target + plan.direction;
-      } else if (plan.direction > 0) {
-        target = Math.floor(from) + 1;
-      } else if (plan.direction < 0) {
-        target = Math.ceil(from) - 1;
-      } else {
-        // Snap-back: return to the nearest integer step.
-        target = Math.round(from);
-      }
+      // One resolution rule for both memories (see stepTarget.ts): the live
+      // step for click retargets, the grab-interrupted step for swipe
+      // retargets. The memory is consumed — a new step supersedes it.
+      const interrupted = interruptedStepRef.current;
+      interruptedStepRef.current = null;
+      const target = resolveWidgetStepTarget({
+        direction: plan.direction,
+        targetKey: plan.targetKey,
+        from,
+        previous: previous
+          ? {
+              target: previous.target,
+              direction: previous.direction,
+              targetKey: previous.targetKey,
+            }
+          : null,
+        interrupted,
+      });
 
       cancelStepAnimations();
       invalidateWriteCaches();
@@ -488,8 +492,16 @@ export function usePaginationWidgetBinding({
   const startFollowing = useCallback(
     (isFallback: boolean) => {
       if (followUnsubRef.current || !visualPosition) return;
-      // Take over from wherever the strip visually is right now.
+      // Take over from wherever the strip visually is right now — and
+      // remember the step this grab tears down (see interruptedStepRef).
       const start = currentOffset();
+      interruptedStepRef.current = stepRef.current
+        ? {
+            target: stepRef.current.target,
+            direction: stepRef.current.direction,
+            targetKey: stepRef.current.targetKey,
+          }
+        : null;
       cancelStepAnimations();
       invalidateWriteCaches();
       offsetRef.current = start;
