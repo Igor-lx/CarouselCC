@@ -27,8 +27,9 @@ import type { ResponsiveImagesProps } from "./types";
  *   warmed too, so the first device rotation swaps instantly; here a
  *   candidate must be picked heuristically (a `media`-gated source can never
  *   preload natively) — a miss is masked by the rotation veil;
- * - the host's data-saver signal is respected by default
- *   (`isDataSaverRespected`): a reduced-data user gets zero warm traffic.
+ * - the host's data-saver signal is ALWAYS respected — a reduced-data user
+ *   gets zero warm traffic, and there is deliberately no override: the
+ *   user's preference outranks any product opinion.
  *
  * Unmounted, none of this exists: one native set everywhere (largest
  * candidate), no responsive markup, no preload — and this module's code is
@@ -38,7 +39,6 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
   isPreloadOn = true,
   preloadPagesNr = 1,
   isParallelSetPreloadOn = false,
-  isDataSaverRespected = true,
 }: ResponsiveImagesProps) {
   const { layout, slides, imageSizes } = useCarouselStable();
   const { status, intent } = useCarouselMotion();
@@ -52,7 +52,7 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
 
   useEffect(() => {
     if (!isPreloadOn) return;
-    if (isDataSaverRespected && layout.isDataSaverEnabled) return;
+    if (layout.isDataSaverEnabled) return;
     if (!status.isIdle) return; // warm only while the deck rests
     if (slides.length === 0) return;
 
@@ -96,7 +96,6 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
   }, [
     imageSizes,
     intent.targetPageIndex,
-    isDataSaverRespected,
     isParallelSetPreloadOn,
     isPortrait,
     isPreloadOn,

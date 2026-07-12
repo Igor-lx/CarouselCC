@@ -163,7 +163,6 @@ export default function App() {
                 isPreloadOn
                 preloadPagesNr={1}
                 isParallelSetPreloadOn
-                isDataSaverRespected
               />
               <Diagnostic />
             </Carousel>

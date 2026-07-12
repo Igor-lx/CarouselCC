@@ -1152,8 +1152,9 @@ Headless (renders `null`). Two effects in one slot:
    `isParallelSetPreloadOn` (default off) additionally warms the parallel
    orientation's crop with a heuristic candidate (a `media`-gated source
    cannot preload natively; a miss is masked by the rotation veil).
-   `isDataSaverRespected` (default on) zeroes all warm traffic under the
-   host's reduced-data signal. Props are audited by Diagnostics
+   The host's reduced-data signal ALWAYS zeroes warm traffic — there is
+   deliberately no override knob: the user's preference outranks any
+   product opinion. Props are audited by Diagnostics
    (`useResponsiveImagesDiagnostic`).
 
 ### 8.5 `<Diagnostic />`

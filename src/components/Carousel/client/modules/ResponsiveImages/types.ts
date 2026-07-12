@@ -9,6 +9,4 @@ export interface ResponsiveImagesProps {
    * Default `false`: it is extra traffic for an event that may never happen.
    */
   isParallelSetPreloadOn?: boolean;
-  /** Honour the host's data-saver signal (zero warm traffic). Default `true`. */
-  isDataSaverRespected?: boolean;
 }
