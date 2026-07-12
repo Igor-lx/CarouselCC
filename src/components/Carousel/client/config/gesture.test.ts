@@ -22,7 +22,15 @@ describe("resolveSlotAdaptiveSwipeConfig", () => {
   it("disables the engine's host-relative threshold and delivers the commit distance resolved", () => {
     const resolved = resolveSlotAdaptiveSwipeConfig(CAROUSEL_SWIPE_CONFIG, 500);
     expect(resolved.swipeThresholdRatio).toBe(0);
-    expect(resolved.minSwipeDistance).toBeCloseTo(500 * SWIPE_COMMIT_SLOT_SHARE, 10);
+    // Mirror the formula (share of the slot inside the ergonomic clamps), so
+    // hand-tuning the knobs never fails a mechanism assertion.
+    expect(resolved.minSwipeDistance).toBeCloseTo(
+      Math.min(
+        Math.max(500 * SWIPE_COMMIT_SLOT_SHARE, SWIPE_COMMIT_MIN_PX),
+        SWIPE_COMMIT_MAX_PX,
+      ),
+      10,
+    );
   });
 
   it("keeps the calibration point intact: at the reference slot the curvature is the base one", () => {
@@ -37,8 +45,14 @@ describe("resolveSlotAdaptiveSwipeConfig", () => {
   });
 
   it("rescales the rubber inversely to the slot (bigger slot, softer per-px curvature)", () => {
-    const big = resolveSlotAdaptiveSwipeConfig(CAROUSEL_SWIPE_CONFIG, 800);
-    const small = resolveSlotAdaptiveSwipeConfig(CAROUSEL_SWIPE_CONFIG, 200);
+    const big = resolveSlotAdaptiveSwipeConfig(
+      CAROUSEL_SWIPE_CONFIG,
+      SWIPE_REFERENCE_SLOT_PX * 2,
+    );
+    const small = resolveSlotAdaptiveSwipeConfig(
+      CAROUSEL_SWIPE_CONFIG,
+      SWIPE_REFERENCE_SLOT_PX / 2,
+    );
     expect(big.resistanceCurvature).toBeCloseTo(
       CAROUSEL_SWIPE_CONFIG.resistanceCurvature / 2,
       12,
@@ -50,8 +64,11 @@ describe("resolveSlotAdaptiveSwipeConfig", () => {
   });
 
   it("clamps the commit distance to the ergonomic bounds on extreme slots", () => {
-    const tiny = resolveSlotAdaptiveSwipeConfig(CAROUSEL_SWIPE_CONFIG, 50);
-    const huge = resolveSlotAdaptiveSwipeConfig(CAROUSEL_SWIPE_CONFIG, 5000);
+    // Slots chosen FROM the knobs so the clamps engage for any sane tuning.
+    const tinySlot = (SWIPE_COMMIT_MIN_PX / SWIPE_COMMIT_SLOT_SHARE) * 0.5;
+    const hugeSlot = (SWIPE_COMMIT_MAX_PX / SWIPE_COMMIT_SLOT_SHARE) * 2;
+    const tiny = resolveSlotAdaptiveSwipeConfig(CAROUSEL_SWIPE_CONFIG, tinySlot);
+    const huge = resolveSlotAdaptiveSwipeConfig(CAROUSEL_SWIPE_CONFIG, hugeSlot);
     expect(tiny.minSwipeDistance).toBe(SWIPE_COMMIT_MIN_PX);
     expect(huge.minSwipeDistance).toBe(SWIPE_COMMIT_MAX_PX);
   });

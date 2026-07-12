@@ -17,6 +17,7 @@ import type { CarouselCommand, CarouselState } from "./types";
 const builtConfig = buildCarouselConfig({});
 const config: CarouselRuntimeConfig = {
   ...builtConfig,
+  dragReleaseEpsilon: 1e-3,
   motion: {
     ...builtConfig.motion,
     goToPreflightPageSpan: 2,

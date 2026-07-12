@@ -27,7 +27,13 @@ const RELEASE_KNOBS = {
   minRideDurationMs: 200,
 };
 
-const config = { ...buildCarouselConfig({}), releaseConfig: RELEASE_KNOBS };
+// `durationStep` is pinned too: the release's base duration (and with it the
+// intent-speed floor) derives from it, and the duration assertions below
+// compare against it.
+const config = {
+  ...buildCarouselConfig({ durationStep: 800 }),
+  releaseConfig: RELEASE_KNOBS,
+};
 
 const makeLayout = (slideCount: number, visible: number) => {
   const slides: Slide[] = Array.from({ length: slideCount }, (_, i) => ({

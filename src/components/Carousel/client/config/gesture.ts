@@ -35,7 +35,7 @@ export interface CarouselInertialReleaseConfig extends InertialReleaseConfig {
 export const CAROUSEL_SWIPE_CONFIG: Required<PointerSwipeConfig> = {
   cooldownMs: 150,
   intentThreshold: 8,
-  resistance: 0.38,
+  resistance: 0.33,
   // Rubber length: the resistance curve saturates at
   // 1 / (curvature * r/(1-r)) px of UI travel — the "wall" the finger hits.
   // r=0.38, c=0.0046 -> stiffness 0.613, wall ~355px (~0.9 of the reference
@@ -71,10 +71,6 @@ export const CAROUSEL_SWIPE_CONFIG: Required<PointerSwipeConfig> = {
  * - `SWIPE_COMMIT_MIN_PX` / `SWIPE_COMMIT_MAX_PX` — ergonomic clamps: a
  *   finger's comfortable travel does not scale with the screen, so extreme
  *   slots must not produce a hair-trigger or a half-metre swipe.
- * - `SWIPE_REFERENCE_SLOT_PX` — the slot width at which the px-domain feel
- *   of `CAROUSEL_SWIPE_CONFIG` (its `resistanceCurvature`) was calibrated;
- *   the curvature is rescaled by `reference / slot` so the rubber reaches
- *   the same relative stiffness at the same relative pull on any slot.
  *
  * Diagnostics audit the values and their pairing (clamps ordered; the share
  * at the reference slot must land inside the clamps).
@@ -82,6 +78,21 @@ export const CAROUSEL_SWIPE_CONFIG: Required<PointerSwipeConfig> = {
 export const SWIPE_COMMIT_SLOT_SHARE = 0.11;
 export const SWIPE_COMMIT_MIN_PX = 20;
 export const SWIPE_COMMIT_MAX_PX = 120;
+
+/**
+ * NOT a tuning knob — a calibration RECORD for `resolveSlotAdaptiveSwipeConfig`
+ * below. It answers one question: "at what measured slot width do the raw
+ * numbers of `CAROUSEL_SWIPE_CONFIG` (specifically `resistanceCurvature`,
+ * a per-px quantity) mean exactly themselves, with no rescaling?" The rubber
+ * was hand-tuned on the stand whose slot measured ≈400px; the resolver keeps
+ * that feel identical everywhere by rescaling the curvature by
+ * `reference / measured slot` (half the slot → double the curvature).
+ *
+ * Never adjust it for new image sets, slide sizes or breakpoints — the
+ * measured slot adapts by itself. The ONLY reason to touch it: the rubber
+ * numbers were re-tuned by hand while looking at a slot of a different size,
+ * and that size becomes the new record of where the numbers were born.
+ */
 export const SWIPE_REFERENCE_SLOT_PX = 400;
 
 const clamp = (value: number, min: number, max: number) =>
@@ -121,8 +132,8 @@ export const resolveSlotAdaptiveSwipeConfig = (
  * smooth tail.
  */
 export const CAROUSEL_INERTIAL_RELEASE_CONFIG: CarouselInertialReleaseConfig = {
-  inertiaBoost: 1.5,
-  accelerationDistanceShare: 0.3,
-  decelerationDistanceShare: 0.25,
-  minRideDurationMs: 200,
+  inertiaBoost: 1.4,
+  accelerationDistanceShare: 0,
+  decelerationDistanceShare: 0.7,
+  minRideDurationMs: 240,
 };
