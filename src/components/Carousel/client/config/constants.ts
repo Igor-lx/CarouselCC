@@ -28,18 +28,7 @@ export const MOTION_EPSILON = 0.0001;
  * dropped. `4` paints 3 of 4 running frames; values below `2` disable
  * dropping. Never consulted on WAAPI-capable engines.
  */
-export const FALLBACK_WRITE_FRAME_SKIP = 4;
-
-/**
- * Cap on backdating the release segment's clock to the physical lift-off.
- * The commit gap between pointerup and the WAAPI attach (React render of the
- * release phase + render-window expansion) is dead frames; backdating turns
- * them into a small in-phase skip. The cap bounds the skip when the commit
- * is pathologically long — it MUST stay below the gesture ride-duration
- * floor (diagnostics enforce it), so even a fully clamped skip leaves a
- * visible remainder of the ride.
- */
-export const GESTURE_RELEASE_MAX_BACKDATE_MS = 120;
+export const FALLBACK_WRITE_FRAME_SKIP = 1;
 
 /** Tolerance for "drag already on target" snap detection on release. */
 export const DRAG_RELEASE_EPSILON = 0.001;

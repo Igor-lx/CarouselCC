@@ -16,7 +16,6 @@ import {
   CAROUSEL_SWIPE_CONFIG,
   DRAG_RELEASE_EPSILON,
   FALLBACK_WRITE_FRAME_SKIP,
-  GESTURE_RELEASE_MAX_BACKDATE_MS,
   GO_TO_ACCELERATION_DISTANCE_SHARE,
   GO_TO_DECELERATION_DISTANCE_SHARE,
   GO_TO_FINAL_APPROACH_PAGE_SPAN,
@@ -476,15 +475,6 @@ const numericRules: NumericRule[] = [
   },
   {
     layer: "Gesture",
-    field: "GESTURE_RELEASE_MAX_BACKDATE_MS",
-    value: GESTURE_RELEASE_MAX_BACKDATE_MS,
-    severity: "LOGICAL",
-    expected: "Expected a non-negative finite number of milliseconds",
-    consequence: "Release-clock backdating becomes incoherent",
-    predicate: atLeast(0),
-  },
-  {
-    layer: "Gesture",
     field: "CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs",
     value: CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs,
     severity: "LOGICAL",
@@ -557,27 +547,6 @@ const collectReorientVeilRelation = (): CarouselDiagnosticWarning | null => {
       "Expected the fail-open cap to cover a full fade out plus fade in",
     consequence:
       "The veil is force-lifted mid-transition: the stale-crop mask flashes instead of fading",
-  };
-};
-
-const collectBackdateRelation = (): CarouselDiagnosticWarning | null => {
-  // A fully clamped backdate must leave a visible remainder of the ride:
-  // the cap has to stay below the ride-duration floor.
-  if (GESTURE_RELEASE_MAX_BACKDATE_MS < CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs) {
-    return null;
-  }
-  return {
-    severity: "LOGICAL",
-    layer: "Gesture",
-    field: "GESTURE_RELEASE_MAX_BACKDATE_MS < CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs",
-    actual: {
-      maxBackdateMs: GESTURE_RELEASE_MAX_BACKDATE_MS,
-      minRideDurationMs: CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs,
-    },
-    expected:
-      "Expected the backdate cap to stay below the ride-duration floor",
-    consequence:
-      "A long commit gap could skip the WHOLE ride — the release lands as a teleport",
   };
 };
 
@@ -706,7 +675,5 @@ collectProfileShareRelation(
   out.push(...collectSwipeCommitRelations());
   const rideFloorRelation = collectRideFloorRelation();
   if (rideFloorRelation) out.push(rideFloorRelation);
-  const backdateRelation = collectBackdateRelation();
-  if (backdateRelation) out.push(backdateRelation);
   return out;
 };

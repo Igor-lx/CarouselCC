@@ -19,17 +19,11 @@ export type MotionPhase =
 export interface GestureRelease {
   pointerVelocity: number;
   uiVelocity: number;
-  /** `motionNow()` stamp of the physical lift-off, `null` when unknown.
-   * The runner backdates the release segment's clock to it (clamped), so
-   * the commit-gap dead frames become a small in-phase skip instead of a
-   * freeze (§4.2 twin for gestures). */
-  releasedAt: number | null;
 }
 
 export const ZERO_GESTURE_RELEASE: GestureRelease = {
   pointerVelocity: 0,
   uiVelocity: 0,
-  releasedAt: null,
 };
 
 export interface CarouselState {
@@ -91,8 +85,6 @@ export interface StartDragCommand extends VirtualIndexSource {
 export interface EndDragCommand extends VirtualIndexSource {
   type: "END_DRAG";
   isInstant?: boolean;
-  /** `motionNow()` at the physical lift-off (optional; `null` semantics). */
-  releasedAt?: number;
   targetPageIndex: number;
   targetVirtualIndex: number;
   isSnap: boolean;

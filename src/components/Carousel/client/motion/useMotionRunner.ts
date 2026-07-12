@@ -15,7 +15,6 @@ import {
   profileProgressStops,
   resolvePeakSpeedForDuration,
 } from "../../../../shared";
-import { resolveReleaseStartedAt } from "./releaseClock";
 import { buildCarouselSegment } from "./segmentFactory";
 import { sampleCarouselSegment } from "./sampler";
 import { resolveGoToApproachDuration, resolveJumpPeakSpeed } from "./timing";
@@ -288,16 +287,7 @@ export function useMotionRunner({
     const startedAt = motionNow();
 
     if (state.moveReason === "gesture") {
-      // Backdate the release clock to the lift-off (clamped): the commit-gap
-      // dead frames become an in-phase skip for every plan consumer at once.
-      startResolvedMotion(
-        buildStartFromGesture(state),
-        resolveReleaseStartedAt(
-          state.gesture.releasedAt,
-          startedAt,
-          config.gestureReleaseMaxBackdateMs,
-        ),
-      );
+      startResolvedMotion(buildStartFromGesture(state), startedAt);
       return;
     }
 

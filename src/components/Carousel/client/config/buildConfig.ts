@@ -1,7 +1,6 @@
 import { CAROUSEL_DEFAULTS } from "./defaults";
 import {
   DRAG_RELEASE_EPSILON,
-  GESTURE_RELEASE_MAX_BACKDATE_MS,
   MOTION_EPSILON,
   RENDER_WINDOW_BUFFER_MULTIPLIER,
 } from "./constants";
@@ -88,5 +87,4 @@ export const buildCarouselConfig = ({
   swipeConfig: { ...CAROUSEL_SWIPE_CONFIG },
   releaseConfig: { ...CAROUSEL_INERTIAL_RELEASE_CONFIG },
   dragReleaseEpsilon: DRAG_RELEASE_EPSILON,
-  gestureReleaseMaxBackdateMs: GESTURE_RELEASE_MAX_BACKDATE_MS,
 });
