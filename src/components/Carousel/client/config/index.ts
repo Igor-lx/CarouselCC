@@ -30,8 +30,6 @@ export {
   SWIPE_COMMIT_SLOT_SHARE,
   SWIPE_COMMIT_MIN_PX,
   SWIPE_COMMIT_MAX_PX,
-  SWIPE_REFERENCE_SLOT_PX,
-  resolveSlotAdaptiveSwipeConfig,
 } from "./gesture";
 export {
   IMAGE_RETRY_BASE_DELAY_MS,

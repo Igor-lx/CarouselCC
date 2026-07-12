@@ -31,7 +31,6 @@ import {
   SWIPE_COMMIT_MAX_PX,
   SWIPE_COMMIT_MIN_PX,
   SWIPE_COMMIT_SLOT_SHARE,
-  SWIPE_REFERENCE_SLOT_PX,
   SLIDE_REORIENT_VEIL_MAX_MS,
   MOTION_EPSILON,
   REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
@@ -46,6 +45,9 @@ import {
   VISIBILITY_THRESHOLD,
 } from "../../../config";
 import { normalizeMotionProfileShares } from "../../../../../../shared";
+// The calibration record lives with the computation it anchors, not among
+// the tuning knobs — see gesture/slotAdaptiveSwipe.ts.
+import { SWIPE_REFERENCE_SLOT_PX } from "../../../gesture/slotAdaptiveSwipe";
 import type { CarouselDiagnosticWarning } from "../types";
 
 interface NumericRule {

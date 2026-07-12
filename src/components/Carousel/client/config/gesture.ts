@@ -57,13 +57,15 @@ export const CAROUSEL_SWIPE_CONFIG: Required<PointerSwipeConfig> = {
 };
 
 /**
- * Slot-adaptive swipe normalization. The engine works in absolute px of the
- * HOST element, but the user's eye works in slots — "how far did the content
- * move relative to one slide". A fixed host-relative threshold therefore
- * drifts with `visibleSlidesNr`: at 1 visible slide it commits at ~11% of a
- * slide, at 3 it demands ~32%. These constants let the carousel adapter
- * translate content semantics into the engine's absolute units, reactively
- * to the measured slot (see `resolveSlotAdaptiveSwipeConfig`):
+ * Slot-adaptive swipe normalization KNOBS. The engine works in absolute px
+ * of the HOST element, but the user's eye works in slots — "how far did the
+ * content move relative to one slide". A fixed host-relative threshold
+ * therefore drifts with `visibleSlidesNr`: at 1 visible slide it commits at
+ * ~11% of a slide, at 3 it demands ~32%. These constants let the carousel
+ * adapter translate content semantics into the engine's absolute units,
+ * reactively to the measured slot. The computation itself (and its
+ * calibration record) lives with the gesture logic:
+ * `gesture/slotAdaptiveSwipe.ts`.
  *
  * - `SWIPE_COMMIT_SLOT_SHARE` — raw finger travel, as a fraction of the slot
  *   width, that commits a slow (non-flick) swipe. Calibrated to match the
@@ -80,60 +82,13 @@ export const SWIPE_COMMIT_MIN_PX = 20;
 export const SWIPE_COMMIT_MAX_PX = 120;
 
 /**
- * NOT a tuning knob — a calibration RECORD for `resolveSlotAdaptiveSwipeConfig`
- * below. It answers one question: "at what measured slot width do the raw
- * numbers of `CAROUSEL_SWIPE_CONFIG` (specifically `resistanceCurvature`,
- * a per-px quantity) mean exactly themselves, with no rescaling?" The rubber
- * was hand-tuned on the stand whose slot measured ≈400px; the resolver keeps
- * that feel identical everywhere by rescaling the curvature by
- * `reference / measured slot` (half the slot → double the curvature).
- *
- * Never adjust it for new image sets, slide sizes or breakpoints — the
- * measured slot adapts by itself. The ONLY reason to touch it: the rubber
- * numbers were re-tuned by hand while looking at a slot of a different size,
- * and that size becomes the new record of where the numbers were born.
- */
-export const SWIPE_REFERENCE_SLOT_PX = 400;
-
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(Math.max(value, min), max);
-
-/**
- * Translate the carousel's content-relative swipe semantics into the
- * engine's absolute px config for the given measured slot. Pure; `null`
- * slot (pre-measure / SSR) returns the base config untouched.
- *
- * `swipeThresholdRatio: 0` deliberately disables the engine's host-relative
- * threshold: the commit distance is delivered fully resolved via
- * `minSwipeDistance` (the engine's floor passes it through unmodified), so
- * the engine stays generic and the slot semantics stay carousel-owned.
- */
-export const resolveSlotAdaptiveSwipeConfig = (
-  base: Required<PointerSwipeConfig>,
-  slotPx: number | null
-): Required<PointerSwipeConfig> => {
-  if (slotPx === null || !(slotPx > 0)) return base;
-  return {
-    ...base,
-    swipeThresholdRatio: 0,
-    minSwipeDistance: clamp(
-      slotPx * SWIPE_COMMIT_SLOT_SHARE,
-      SWIPE_COMMIT_MIN_PX,
-      SWIPE_COMMIT_MAX_PX
-    ),
-    resistanceCurvature:
-      base.resistanceCurvature * (SWIPE_REFERENCE_SLOT_PX / slotPx),
-  };
-};
-
-/**
  * Inertial release tuning. `inertiaBoost` makes a fast swipe land faster than
  * a passive base duration would imply; the deceleration share shapes the
  * smooth tail.
  */
 export const CAROUSEL_INERTIAL_RELEASE_CONFIG: CarouselInertialReleaseConfig = {
   inertiaBoost: 1.4,
-  accelerationDistanceShare: 0,
+  accelerationDistanceShare: 0.3,
   decelerationDistanceShare: 0.7,
   minRideDurationMs: 240,
 };

@@ -5,9 +5,11 @@ import {
   SWIPE_COMMIT_MAX_PX,
   SWIPE_COMMIT_MIN_PX,
   SWIPE_COMMIT_SLOT_SHARE,
+} from "../config";
+import {
   SWIPE_REFERENCE_SLOT_PX,
   resolveSlotAdaptiveSwipeConfig,
-} from "./gesture";
+} from "./slotAdaptiveSwipe";
 
 describe("resolveSlotAdaptiveSwipeConfig", () => {
   it("returns the base config untouched before the first measurement", () => {

@@ -6,8 +6,8 @@ import {
   resolveDragRelease,
   type CarouselLayout,
 } from "../domain";
-import { resolveSlotAdaptiveSwipeConfig } from "../config";
 import type { CarouselRuntimeConfig } from "../config";
+import { resolveSlotAdaptiveSwipeConfig } from "./slotAdaptiveSwipe";
 import { useMeasuredSlotSize } from "../geometry";
 import type { CarouselDispatch } from "../state";
 import {

@@ -893,15 +893,19 @@ The engine's tuning is **slot-normalized** before it reaches the engine: the
 engine thinks in absolute px of its host, but the user's eye thinks in slots
 ("how far did the content move relative to one slide"), and a host-relative
 threshold drifts with `visibleSlidesNr` (11% of a slide at 1 visible vs 32%
-at 3). `resolveSlotAdaptiveSwipeConfig` (config/gesture.ts, pure, unit
-tested) translates content semantics into engine units against the MEASURED
+at 3). `resolveSlotAdaptiveSwipeConfig` (gesture/slotAdaptiveSwipe.ts, pure,
+unit tested; the tuning KNOBS it translates stay in config/gesture.ts)
+translates content semantics into engine units against the MEASURED
 slot (`useMeasuredSlotSize`): the commit distance becomes
 `clamp(SWIPE_COMMIT_MIN_PX, slot × SWIPE_COMMIT_SLOT_SHARE,
 SWIPE_COMMIT_MAX_PX)` delivered via `minSwipeDistance` (with
 `swipeThresholdRatio: 0` — the engine's own host-relative path is retired
 for the carousel), and the rubber curvature is rescaled by
 `SWIPE_REFERENCE_SLOT_PX / slot` so resistance reaches the same relative
-stiffness at the same relative pull on any slot. The engine itself is
+stiffness at the same relative pull on any slot.
+`SWIPE_REFERENCE_SLOT_PX` is not a knob but a calibration record — the slot
+width at which the rubber numbers were hand-tuned — and lives next to the
+computation it anchors, not among the tuning constants. The engine itself is
 untouched — slot semantics stay carousel-owned. Diagnostics audit the
 constants and their relations (clamp ordering; the share at the reference
 slot must land inside the clamps).
