@@ -38,12 +38,6 @@ const SLIDES_SET: 1 | 2 = (() => {
   return DEFAULT_SLIDES_SET;
 })();
 
-/** Responsive-images module switch for device testing: `?ri=0` renders the
- * carousel WITHOUT <ResponsiveImages /> — one native set, largest candidate,
- * no preload, no aspect flip. */
-const HAS_RESPONSIVE_IMAGES: boolean =
-  new URLSearchParams(window.location.search).get("ri") !== "0";
-
 const VISIBLE_BY_BREAKPOINT = {
   DESKTOP: 2,
   TABLET: 2,
@@ -165,9 +159,12 @@ export default function App() {
             >
               { isTouch ? <PaginationWidget /> : <Pagination />}
               <Controls />
-              {HAS_RESPONSIVE_IMAGES ? (
-                <ResponsiveImages isParallelSetPreloadOn />
-              ) : null}
+              <ResponsiveImages
+                isPreloadOn
+                preloadPagesNr={1}
+                isParallelSetPreloadOn
+                isDataSaverRespected
+              />
               <Diagnostic />
             </Carousel>
           )}
