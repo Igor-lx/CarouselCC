@@ -28,7 +28,7 @@ export const MOTION_EPSILON = 0.0001;
  * dropped. `4` paints 3 of 4 running frames; values below `2` disable
  * dropping. Never consulted on WAAPI-capable engines.
  */
-export const FALLBACK_WRITE_FRAME_SKIP = 1;
+export const FALLBACK_WRITE_FRAME_SKIP = 4;
 
 /**
  * Fail-safe ceiling for the gesture coast bridge (lift-off → runner
