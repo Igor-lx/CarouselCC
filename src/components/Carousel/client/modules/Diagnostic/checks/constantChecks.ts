@@ -461,9 +461,10 @@ const numericRules: NumericRule[] = [
     field: "CAROUSEL_INERTIAL_RELEASE_CONFIG.inertiaBoost",
     value: CAROUSEL_INERTIAL_RELEASE_CONFIG.inertiaBoost,
     severity: "LOGICAL",
-    expected: "Expected a positive finite number",
-    consequence: "Release boost becomes zero or negative and high-velocity releases lose inertia",
-    predicate: greaterThan(0),
+    expected: "Expected a finite number >= 1 (1 = no boost; below 1 the multiplier DAMPS the flick)",
+    consequence:
+      "A flick's cruise intent falls below its own release speed — the boost is neutered (the continuity launch clamps cruise to the start speed) and fast swipes read as damped",
+    predicate: atLeast(1),
   },
   {
     layer: "Gesture",
