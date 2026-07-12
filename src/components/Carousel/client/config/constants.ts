@@ -31,10 +31,11 @@ export const MOTION_EPSILON = 0.0001;
 export const FALLBACK_WRITE_FRAME_SKIP = 4;
 
 /**
- * Fail-safe ceiling for the gesture coast bridge (lift-off → runner
- * takeover). The bridge normally ends the moment the ride segment starts or
- * the coast reaches the ride target; the cap only guards against a takeover
- * that never comes (a pathologically stalled commit).
+ * Sanity clamp for the coasted ride launch (lift-off → runner takeover).
+ * The takeover extrapolates the launch position over the measured commit
+ * gap at the release velocity (`gesture/coast.ts`); this cap bounds the
+ * extrapolated interval so a pathologically stalled commit cannot teleport
+ * the deck (the target clamp already bounds the distance).
  */
 export const GESTURE_COAST_MAX_MS = 250;
 

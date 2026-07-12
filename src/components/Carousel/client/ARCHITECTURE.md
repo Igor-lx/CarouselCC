@@ -928,26 +928,34 @@ slot must land inside the clamps).
    flushes the pending `START_DRAG` synchronously first, so the reducer
    always sees START before END — a gesture faster than the deferral simply
    lands both in one commit;
-   The release side is bridged by the COAST: between lift-off and the
-   runner's post-commit takeover a click retarget is carried by the
-   previous WAAPI animation (§4.2), but a release has nothing — so the
-   adapter keeps writing per-frame positions at the release's visual
-   velocity (the exact speed the continuity launch starts with) through the
-   finger's own channel. Every tick checks the controller BEFORE writing
-   (the started ride is never fought), the coast clamps at the ride target,
-   and a fail-safe cap (`GESTURE_COAST_MAX_MS`) bounds a stalled takeover.
-   The runner in turn continues the gesture ride from the LIVE controller
-   position, so a coasted track hands off seamlessly;
+   The release side is closed by the COASTED LAUNCH: between lift-off and
+   the runner's post-commit takeover a click retarget is carried by the
+   previous WAAPI animation (§4.2), but a release has nothing painting —
+   and nothing CAN paint through the commit gap: the commit task owns the
+   main thread (a per-frame RAF bridge was tried and measured on device;
+   its ticks queue behind the very task they were meant to mask). So the
+   gap is closed spatially instead of temporally: `END_DRAG` records
+   `releasedAt` (`motionNow()` at dispatch), and at takeover the runner
+   extrapolates the ride's launch position over the measured gap at the
+   release's visual velocity (`resolveCoastedLaunchPosition`, pure, in
+   `gesture/coast.ts`) — one catch-up step at the eye's own speed instead
+   of a freeze and a restart from the stale release point. The
+   extrapolation clamps AT the ride target (never overshoots), launches
+   from the release point itself on snap-backs and calm releases
+   (opposing / zero aligned velocity), and bounds the interval by
+   `GESTURE_COAST_MAX_MS` so a pathologically stalled commit cannot
+   teleport the deck. On a fast commit the gap is a frame or two and the
+   launch is practically the release point itself;
 2. on every move payload: translates `uiOffset` into a virtual-index
    delta using the recorded slot size and writes that into the visual
    position via `applyTrackPosition`. No React state per move;
 3. on release: computes the swipe target via `resolveDragRelease` (pure
    helper in `domain/dragRelease.ts`) and dispatches `END_DRAG` with the
-   resolved target plus the pointer/UI release velocities.
+   resolved target, the pointer/UI release velocities and `releasedAt`.
 
-The dispatch carries the velocities into the state machine. They are
-stored on the snapshot and read by `useMotionRunner` when it builds the
-release segment. The two velocities play DIFFERENT roles there (the
+The dispatch carries the velocities (and the release clock reading) into
+the state machine. They are stored on the snapshot and read by
+`useMotionRunner` when it builds the release segment. The two velocities play DIFFERENT roles there (the
 continuity launch, matching native scroll physics): `uiReleaseVelocity` —
 the visual speed the eye saw at lift-off — is the segment's START speed,
 and `pointerReleaseVelocity` — the flick-memory intent, boosted — is the

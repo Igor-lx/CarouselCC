@@ -15,6 +15,7 @@ import {
   profileProgressStops,
   resolvePeakSpeedForDuration,
 } from "../../../../shared";
+import { resolveCoastedLaunchPosition } from "../gesture/coast";
 import { buildCarouselSegment } from "./segmentFactory";
 import { sampleCarouselSegment } from "./sampler";
 import { resolveGoToApproachDuration, resolveJumpPeakSpeed } from "./timing";
@@ -51,13 +52,15 @@ const directionOf = (delta: number): MotionPlanDirection =>
  */
 const buildStartFromGesture = (
   state: CarouselState,
-  livePosition: number,
+  launchPosition: number,
 ): MotionStart => ({
-  // The LIVE visual value, not the recorded release point: the coast bridge
-  // may have carried the track further during the commit gap, and the ride
-  // must continue from where the eye sees it. Without a coast the two are
-  // identical (the finger's last write IS the release point).
-  position: livePosition,
+  // The COASTED launch point, not the recorded release point: the ride
+  // starts from where the deck would be had it kept travelling at the
+  // release velocity through the commit gap (see `gesture/coast.ts`) — the
+  // gap becomes a single catch-up step at the eye's own speed instead of a
+  // freeze and a restart from a stale position. On a fast commit the two
+  // are practically identical.
+  position: launchPosition,
   velocity: state.gesture.uiVelocity,
   strategy: "gesture",
 });
@@ -126,6 +129,7 @@ export function useMotionRunner({
       state.isRepeatedClickAdvance,
       state.gesture.pointerVelocity,
       state.gesture.uiVelocity,
+      state.gesture.releasedAt,
       isInstantMode,
     ].join(":");
 
@@ -295,7 +299,15 @@ export function useMotionRunner({
 
     if (state.moveReason === "gesture") {
       const handoff = controller.captureHandoff(startedAt);
-      startResolvedMotion(buildStartFromGesture(state, handoff.position), startedAt);
+      const launchPosition = resolveCoastedLaunchPosition({
+        livePosition: handoff.position,
+        releaseVelocity: state.gesture.uiVelocity,
+        releasedAt: state.gesture.releasedAt,
+        now: startedAt,
+        maxCoastMs: config.gestureCoastMaxMs,
+        targetVirtualIndex: state.virtualIndex,
+      });
+      startResolvedMotion(buildStartFromGesture(state, launchPosition), startedAt);
       return;
     }
 
@@ -316,6 +328,7 @@ export function useMotionRunner({
     state.fromVirtualIndex,
     state.gesture.pointerVelocity,
     state.gesture.uiVelocity,
+    state.gesture.releasedAt,
     state.isTeleportApproach,
     state.isRepeatedClickAdvance,
     state.layout.canSlide,

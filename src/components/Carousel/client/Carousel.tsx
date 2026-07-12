@@ -1,4 +1,4 @@
-import { memo, useCallback, useImperativeHandle, useMemo, useRef } from "react";
+import { memo, useImperativeHandle, useMemo, useRef } from "react";
 
 import styles from "./Carousel.module.scss";
 import { mergeStyleMaps, resolveSlots } from "../../../shared";
@@ -271,13 +271,10 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   );
 
   // --- gesture --------------------------------------------------------------
-  // Stable probe for the coast bridge: "has the runner started a segment".
-  const isMotionActive = useCallback(() => controller.isActive(), [controller]);
   const { hostProps: dragHostProps } = useCarouselGesture({
     viewportRef,
     layout,
     isSwipeOn,
-    isMotionActive,
     inFlightTargetPageIndex: status.isIdle ? null : state.targetPageIndex,
     dispatch,
     readCurrentPosition,

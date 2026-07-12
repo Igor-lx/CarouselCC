@@ -93,6 +93,7 @@ export function carouselReducer(
           : {
               pointerVelocity: envelope.pointerReleaseVelocity,
               uiVelocity: envelope.uiReleaseVelocity,
+              releasedAt: envelope.releasedAt,
             };
 
       return {

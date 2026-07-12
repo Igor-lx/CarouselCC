@@ -19,11 +19,16 @@ export type MotionPhase =
 export interface GestureRelease {
   pointerVelocity: number;
   uiVelocity: number;
+  /** `motionNow()` reading recorded by the END_DRAG dispatch. The motion
+   * runner coasts the ride's launch position over the commit gap it measures
+   * against this clock (see `gesture/coast.ts`). */
+  releasedAt: number;
 }
 
 export const ZERO_GESTURE_RELEASE: GestureRelease = {
   pointerVelocity: 0,
   uiVelocity: 0,
+  releasedAt: 0,
 };
 
 export interface CarouselState {
@@ -90,6 +95,8 @@ export interface EndDragCommand extends VirtualIndexSource {
   isSnap: boolean;
   pointerReleaseVelocity: number;
   uiReleaseVelocity: number;
+  /** `motionNow()` at dispatch — the start of the commit gap. */
+  releasedAt: number;
 }
 
 export interface MotionSettledCommand {

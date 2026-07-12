@@ -300,11 +300,13 @@ describe("START_DRAG / END_DRAG", () => {
       isSnap: false,
       pointerReleaseVelocity: 0.1,
       uiReleaseVelocity: 0.12,
+      releasedAt: 1000,
     });
     expect(released.motionPhase).toBe("step-normal");
     expect(released.targetPageIndex).toBe(1);
     expect(released.virtualIndex).toBe(3);
     expect(released.gesture.uiVelocity).toBe(0.12);
+    expect(released.gesture.releasedAt).toBe(1000);
   });
 
   it("resolves a no-intent release into a snap-back", () => {
@@ -321,6 +323,7 @@ describe("START_DRAG / END_DRAG", () => {
       isSnap: true,
       pointerReleaseVelocity: 0,
       uiReleaseVelocity: 0,
+      releasedAt: 1000,
     });
     expect(released.motionPhase).toBe("step-snap");
   });
@@ -339,6 +342,7 @@ describe("START_DRAG / END_DRAG", () => {
       isSnap: true,
       pointerReleaseVelocity: 0,
       uiReleaseVelocity: 0,
+      releasedAt: 1000,
     });
     expect(released.motionPhase).toBe("idle");
   });

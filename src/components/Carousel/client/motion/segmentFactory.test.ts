@@ -51,6 +51,7 @@ const releasedState = (
     isSnap: false,
     pointerReleaseVelocity: pointerVelocity,
     uiReleaseVelocity: uiVelocity,
+    releasedAt: 0,
   });
 };
 
