@@ -477,6 +477,17 @@ const numericRules: NumericRule[] = [
   },
   {
     layer: "Gesture",
+    field: "CAROUSEL_INERTIAL_RELEASE_CONFIG.accelerationDistanceShare",
+    value: CAROUSEL_INERTIAL_RELEASE_CONFIG.accelerationDistanceShare,
+    severity: "LOGICAL",
+    expected:
+      "Expected > 0 — the share IS the continuity-launch ramp (the path over which the ride accelerates from the visible lift-off speed to the cruise intent)",
+    consequence:
+      "Zero share switches the continuity launch OFF: the ride starts instantly at the cruise speed, restoring the velocity jump at lift-off the ramp exists to remove",
+    predicate: greaterThan(0),
+  },
+  {
+    layer: "Gesture",
     field: "GESTURE_COAST_MAX_MS",
     value: GESTURE_COAST_MAX_MS,
     severity: "LOGICAL",

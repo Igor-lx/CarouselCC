@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCarouselConfig, CAROUSEL_INERTIAL_RELEASE_CONFIG } from "../config";
+import { buildCarouselConfig } from "../config";
 import { buildCarouselLayout, buildSlideRecords } from "../domain";
 import type { Slide } from "../public-api/types";
 import { buildInitialState } from "../state/initial";
@@ -15,7 +15,19 @@ import { sampleCarouselSegment } from "./sampler";
  * intent speed — it never jumps above the visible speed instantly.
  */
 
-const config = buildCarouselConfig({});
+// MECHANISM tests, not tuning tests: the release knobs are PINNED here.
+// The project's live values are feel tunables — e.g. accelerationDistanceShare
+// of 0 legally switches the continuity ramp off — and hand-tuning must never
+// fail these assertions. The pinned values are the documented reference shape
+// (ramp present, cruise zone present, floor active).
+const RELEASE_KNOBS = {
+  inertiaBoost: 1.5,
+  accelerationDistanceShare: 0.3,
+  decelerationDistanceShare: 0.25,
+  minRideDurationMs: 200,
+};
+
+const config = { ...buildCarouselConfig({}), releaseConfig: RELEASE_KNOBS };
 
 const makeLayout = (slideCount: number, visible: number) => {
   const slides: Slide[] = Array.from({ length: slideCount }, (_, i) => ({
@@ -69,7 +81,7 @@ describe("ride-duration floor", () => {
     });
     // float-tolerant: the solver lands exactly on the floor
     expect(segment.duration).toBeGreaterThanOrEqual(
-      CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs - 1e-6,
+      RELEASE_KNOBS.minRideDurationMs - 1e-6,
     );
   });
 
@@ -85,7 +97,7 @@ describe("ride-duration floor", () => {
       startedAt: 0,
     });
     expect(segment.duration).toBeLessThan(
-      CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs,
+      RELEASE_KNOBS.minRideDurationMs,
     );
     const launch = sampleCarouselSegment(segment, 1);
     expect(Math.abs(launch.velocity)).toBeGreaterThan(0.03);
@@ -102,7 +114,7 @@ describe("ride-duration floor", () => {
       startedAt: 0,
     });
     expect(segment.duration).toBeGreaterThan(
-      CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs * 2,
+      RELEASE_KNOBS.minRideDurationMs * 2,
     );
   });
 });

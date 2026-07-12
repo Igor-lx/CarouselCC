@@ -11,7 +11,19 @@ import type { CarouselCommand, CarouselState } from "./types";
 
 // --- test kit ---------------------------------------------------------------
 
-const config: CarouselRuntimeConfig = buildCarouselConfig({});
+// MECHANISM tests, not tuning tests: the GO_TO teleport geometry knobs are
+// PINNED here — the project's live spans are feel tunables and hand-tuning
+// them must never fail these assertions.
+const builtConfig = buildCarouselConfig({});
+const config: CarouselRuntimeConfig = {
+  ...builtConfig,
+  motion: {
+    ...builtConfig.motion,
+    goToPreflightPageSpan: 2,
+    goToFinalApproachPageSpan: 1,
+    goToTeleportMinPageSpan: 3,
+  },
+};
 
 const makeLayout = (
   slideCount: number,
