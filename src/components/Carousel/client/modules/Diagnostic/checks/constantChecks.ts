@@ -16,6 +16,7 @@ import {
   CAROUSEL_SWIPE_CONFIG,
   DRAG_RELEASE_EPSILON,
   FALLBACK_WRITE_FRAME_SKIP,
+  GESTURE_COAST_MAX_MS,
   GO_TO_ACCELERATION_DISTANCE_SHARE,
   GO_TO_DECELERATION_DISTANCE_SHARE,
   GO_TO_FINAL_APPROACH_PAGE_SPAN,
@@ -472,6 +473,15 @@ const numericRules: NumericRule[] = [
     expected: "Expected a finite number in the range [0, 1]",
     consequence: "Continuity-launch ramp share outside [0,1] yields malformed release profiles",
     predicate: inRangeInclusive(0, 1),
+  },
+  {
+    layer: "Gesture",
+    field: "GESTURE_COAST_MAX_MS",
+    value: GESTURE_COAST_MAX_MS,
+    severity: "LOGICAL",
+    expected: "Expected a positive finite number of milliseconds",
+    consequence: "Coast-bridge fail-safe becomes incoherent (a stalled takeover could coast forever or never)",
+    predicate: greaterThan(0),
   },
   {
     layer: "Gesture",

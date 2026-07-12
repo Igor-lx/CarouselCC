@@ -49,8 +49,15 @@ const directionOf = (delta: number): MotionPlanDirection =>
  * release velocity in state. The reducer payload stays canonical here because
  * it binds the sampled position and the release velocity to the same event.
  */
-const buildStartFromGesture = (state: CarouselState): MotionStart => ({
-  position: state.fromVirtualIndex,
+const buildStartFromGesture = (
+  state: CarouselState,
+  livePosition: number,
+): MotionStart => ({
+  // The LIVE visual value, not the recorded release point: the coast bridge
+  // may have carried the track further during the commit gap, and the ride
+  // must continue from where the eye sees it. Without a coast the two are
+  // identical (the finger's last write IS the release point).
+  position: livePosition,
   velocity: state.gesture.uiVelocity,
   strategy: "gesture",
 });
@@ -287,7 +294,8 @@ export function useMotionRunner({
     const startedAt = motionNow();
 
     if (state.moveReason === "gesture") {
-      startResolvedMotion(buildStartFromGesture(state), startedAt);
+      const handoff = controller.captureHandoff(startedAt);
+      startResolvedMotion(buildStartFromGesture(state, handoff.position), startedAt);
       return;
     }
 

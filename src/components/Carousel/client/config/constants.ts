@@ -30,5 +30,13 @@ export const MOTION_EPSILON = 0.0001;
  */
 export const FALLBACK_WRITE_FRAME_SKIP = 1;
 
+/**
+ * Fail-safe ceiling for the gesture coast bridge (lift-off → runner
+ * takeover). The bridge normally ends the moment the ride segment starts or
+ * the coast reaches the ride target; the cap only guards against a takeover
+ * that never comes (a pathologically stalled commit).
+ */
+export const GESTURE_COAST_MAX_MS = 250;
+
 /** Tolerance for "drag already on target" snap detection on release. */
 export const DRAG_RELEASE_EPSILON = 0.001;

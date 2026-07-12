@@ -9,8 +9,11 @@ import {
 import { resolveSlotAdaptiveSwipeConfig } from "../config";
 import type { CarouselRuntimeConfig } from "../config";
 import { useMeasuredSlotSize } from "../geometry";
+import { resolveCoastFrame } from "./coast";
 import type { CarouselDispatch } from "../state";
 import {
+  motionNow,
+  sameDirectionSpeed,
   usePointerSwipe,
   type PointerSwipeHostProps,
   type PointerSwipeMovePayload,
@@ -26,6 +29,9 @@ interface UseCarouselGestureInput {
    * pointer handlers, as if the gesture surface did not exist.
    */
   isSwipeOn: boolean;
+  /** Live "is the motion controller running a segment" probe — the coast
+   * bridge's primary stop signal (the runner took the track over). */
+  isMotionActive: () => boolean;
   /**
    * The pending destination of an in-flight ride, `null` while idle. A drag
    * that GRABS a moving deck anchors its origin page here instead of the
@@ -60,6 +66,7 @@ export function useCarouselGesture({
   viewportRef,
   layout,
   isSwipeOn,
+  isMotionActive,
   inFlightTargetPageIndex,
   dispatch,
   readCurrentPosition,
@@ -89,6 +96,54 @@ export function useCarouselGesture({
   } | null>(null);
   const startTimerRef = useRef<number | null>(null);
 
+  // COAST BRIDGE (release side of the press-commit deferral): between
+  // lift-off and the runner's post-commit takeover nothing painted the
+  // track — a click retarget is carried by the previous WAAPI animation
+  // (§4.2), a release has nothing, which reads as a freeze on weak devices.
+  // The bridge keeps writing per-frame positions at the release's visual
+  // velocity (the same speed the continuity launch starts with, so the
+  // takeover is seamless) until the runner's segment goes live, the coast
+  // reaches the ride target, or the fail-safe cap expires. Writes go through
+  // `applyTrackPosition` — the finger's own channel — and every tick checks
+  // `isMotionActive()` BEFORE writing, so the bridge can never fight the
+  // started ride.
+  const coastFrameRef = useRef<number | null>(null);
+
+  const stopCoast = useCallback(() => {
+    if (coastFrameRef.current !== null) {
+      cancelAnimationFrame(coastFrameRef.current);
+      coastFrameRef.current = null;
+    }
+  }, []);
+
+  const startCoast = useCallback(
+    (fromPosition: number, velocity: number, targetVirtualIndex: number) => {
+      stopCoast();
+      const startedAt = motionNow();
+      let position = fromPosition;
+      let lastAt = startedAt;
+      const tick = () => {
+        coastFrameRef.current = null;
+        if (isMotionActive()) return;
+        const now = motionNow();
+        if (now - startedAt > config.gestureCoastMaxMs) return;
+        const frame = resolveCoastFrame({
+          position,
+          velocity,
+          dtMs: now - lastAt,
+          targetVirtualIndex,
+        });
+        lastAt = now;
+        position = frame.position;
+        applyTrackPosition(position);
+        if (frame.done) return;
+        coastFrameRef.current = requestAnimationFrame(tick);
+      };
+      coastFrameRef.current = requestAnimationFrame(tick);
+    },
+    [applyTrackPosition, config.gestureCoastMaxMs, isMotionActive, stopCoast],
+  );
+
   const flushPendingStart = useCallback(() => {
     if (startTimerRef.current !== null) {
       window.clearTimeout(startTimerRef.current);
@@ -116,6 +171,7 @@ export function useCarouselGesture({
     // has already initialised this drag.
     if (originPositionRef.current !== null) return;
 
+    stopCoast();
     slotSizeRef.current = getSlotSize();
     const origin = readCurrentPosition();
     // Take the track synchronously: drop any compositor animation and pin it at
@@ -149,6 +205,7 @@ export function useCarouselGesture({
     inFlightTargetPageIndex,
     layout,
     readCurrentPosition,
+    stopCoast,
   ]);
 
   const handleDragStart = useCallback(
@@ -191,6 +248,11 @@ export function useCarouselGesture({
 
       applyTrackPosition(releasePosition);
 
+      const uiVirtualVelocity = pointerVelocityToVirtual(
+        payload.uiReleaseVelocity,
+        slotSizeRef.current,
+      );
+
       dispatch({
         type: "END_DRAG",
         fromVirtualIndex: releasePosition,
@@ -201,16 +263,38 @@ export function useCarouselGesture({
           payload.pointerReleaseVelocity,
           slotSizeRef.current,
         ),
-        uiReleaseVelocity: pointerVelocityToVirtual(
-          payload.uiReleaseVelocity,
-          slotSizeRef.current,
-        ),
+        uiReleaseVelocity: uiVirtualVelocity,
       });
+
+      // Bridge the commit gap: coast at the visual release velocity toward
+      // the ride target. Snap-backs are excluded (their target opposes the
+      // velocity), and a calm release (aligned speed 0) has nothing to
+      // bridge — the deck was visually at rest anyway.
+      if (!releaseTarget.isSnap) {
+        const coastSpeed = sameDirectionSpeed(
+          uiVirtualVelocity,
+          releaseTarget.targetVirtualIndex - releasePosition,
+        );
+        if (coastSpeed > 0) {
+          startCoast(
+            releasePosition,
+            Math.sign(releaseTarget.targetVirtualIndex - releasePosition) * coastSpeed,
+            releaseTarget.targetVirtualIndex,
+          );
+        }
+      }
 
       originPositionRef.current = null;
       slotSizeRef.current = 0;
     },
-    [applyTrackPosition, dispatch, flushPendingStart, layout, offsetToPosition],
+    [
+      applyTrackPosition,
+      dispatch,
+      flushPendingStart,
+      layout,
+      offsetToPosition,
+      startCoast,
+    ],
   );
 
   // When the gesture surface goes away — the deck collapsed to a single page
@@ -247,6 +331,7 @@ export function useCarouselGesture({
         uiReleaseVelocity: 0,
       });
     }
+    stopCoast();
     // A layout collapse drops an undispatched grab entirely: the reducer
     // never learned of it, and reconciliation owns the recovery.
     pendingStartRef.current = null;
@@ -256,7 +341,7 @@ export function useCarouselGesture({
     }
     originPositionRef.current = null;
     slotSizeRef.current = 0;
-  }, [dispatch, flushPendingStart, isSwipeOn, layout, readCurrentPosition]);
+  }, [dispatch, flushPendingStart, isSwipeOn, layout, readCurrentPosition, stopCoast]);
 
   // Content-normalized engine tuning: the commit threshold is a share of
   // the MEASURED slot (clamped to ergonomic px bounds) and the rubber
@@ -272,7 +357,7 @@ export function useCarouselGesture({
     [config.swipeConfig, slotPx],
   );
 
-  // Unmount: a pending deferred dispatch must not outlive the component.
+  // Unmount: neither the deferred dispatch nor the coast may outlive us.
   useEffect(
     () => () => {
       if (startTimerRef.current !== null) {
@@ -280,6 +365,10 @@ export function useCarouselGesture({
         startTimerRef.current = null;
       }
       pendingStartRef.current = null;
+      if (coastFrameRef.current !== null) {
+        cancelAnimationFrame(coastFrameRef.current);
+        coastFrameRef.current = null;
+      }
     },
     [],
   );

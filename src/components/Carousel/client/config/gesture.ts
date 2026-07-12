@@ -35,12 +35,12 @@ export interface CarouselInertialReleaseConfig extends InertialReleaseConfig {
 export const CAROUSEL_SWIPE_CONFIG: Required<PointerSwipeConfig> = {
   cooldownMs: 150,
   intentThreshold: 8,
-  resistance: 0.53,
+  resistance: 0.48,
   // Rubber length: the resistance curve saturates at
   // 1 / (curvature * r/(1-r)) px of UI travel — the "wall" the finger hits.
   // 0.0028 puts the wall at ~315px on the reference slot (~0.8 slot) instead
   // of ~197px, so a sweeping tablet pull keeps giving before the stop.
-  resistanceCurvature: 0.0028,
+  resistanceCurvature: 0.0035,
   maxVelocity: 5,
   emaAlpha: 0.85,
   quickFlickVelocity: 0.1,
@@ -98,7 +98,7 @@ const clamp = (value: number, min: number, max: number) =>
  */
 export const resolveSlotAdaptiveSwipeConfig = (
   base: Required<PointerSwipeConfig>,
-  slotPx: number | null,
+  slotPx: number | null
 ): Required<PointerSwipeConfig> => {
   if (slotPx === null || !(slotPx > 0)) return base;
   return {
@@ -107,7 +107,7 @@ export const resolveSlotAdaptiveSwipeConfig = (
     minSwipeDistance: clamp(
       slotPx * SWIPE_COMMIT_SLOT_SHARE,
       SWIPE_COMMIT_MIN_PX,
-      SWIPE_COMMIT_MAX_PX,
+      SWIPE_COMMIT_MAX_PX
     ),
     resistanceCurvature:
       base.resistanceCurvature * (SWIPE_REFERENCE_SLOT_PX / slotPx),
@@ -120,8 +120,8 @@ export const resolveSlotAdaptiveSwipeConfig = (
  * smooth tail.
  */
 export const CAROUSEL_INERTIAL_RELEASE_CONFIG: CarouselInertialReleaseConfig = {
-  inertiaBoost: 1.7,
-  accelerationDistanceShare: 0.2,
+  inertiaBoost: 1.5,
+  accelerationDistanceShare: 0.3,
   decelerationDistanceShare: 0.25,
-  minRideDurationMs: 160,
+  minRideDurationMs: 200,
 };

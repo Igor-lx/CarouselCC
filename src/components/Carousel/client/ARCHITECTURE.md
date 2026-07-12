@@ -921,6 +921,16 @@ slot must land inside the clamps).
    flushes the pending `START_DRAG` synchronously first, so the reducer
    always sees START before END — a gesture faster than the deferral simply
    lands both in one commit;
+   The release side is bridged by the COAST: between lift-off and the
+   runner's post-commit takeover a click retarget is carried by the
+   previous WAAPI animation (§4.2), but a release has nothing — so the
+   adapter keeps writing per-frame positions at the release's visual
+   velocity (the exact speed the continuity launch starts with) through the
+   finger's own channel. Every tick checks the controller BEFORE writing
+   (the started ride is never fought), the coast clamps at the ride target,
+   and a fail-safe cap (`GESTURE_COAST_MAX_MS`) bounds a stalled takeover.
+   The runner in turn continues the gesture ride from the LIVE controller
+   position, so a coasted track hands off seamlessly;
 2. on every move payload: translates `uiOffset` into a virtual-index
    delta using the recorded slot size and writes that into the visual
    position via `applyTrackPosition`. No React state per move;

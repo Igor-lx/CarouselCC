@@ -4,6 +4,7 @@ export {
   MOTION_EPSILON,
   DRAG_RELEASE_EPSILON,
   FALLBACK_WRITE_FRAME_SKIP,
+  GESTURE_COAST_MAX_MS,
 } from "./constants";
 export {
   SNAP_BACK_DURATION,
