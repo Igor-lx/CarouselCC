@@ -241,7 +241,13 @@ For each logical slide you need, starting from a single high-resolution source:
    `object-fit: cover`s into it. WITH the module the browser also swaps to
    the crop matching that orientation, so box aspect === asset aspect and
    nothing is cropped. The carousel derives its height from slot width ×
-   aspect instead of a fixed height, so it fits any window.
+   aspect instead of a fixed height, so it fits any window. To PIN the
+   height instead, set `--slide-height` to a length (default `auto` keeps
+   the fluid ratio): an explicit height makes the browser ignore
+   `aspect-ratio`, giving a `slot-width × <length>` box. The in-flow slides
+   size the track, so pinning the slide height pins the whole strip; width
+   stays fluid and the motion math is width-based, so a fixed height never
+   affects scrolling.
 
    Without the `<ResponsiveImages />` module (`data-responsive-images`
    false) the deck runs ONE native set (`resolveRenderedImageSrc`) and none

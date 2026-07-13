@@ -25,6 +25,15 @@
     // component height, so the deck fits any window.
     --slide-aspect: 16 / 9;
 
+    // Optional FIXED slide height. `auto` (default) => the height derives from
+    // slot width × --slide-aspect (the fluid default above). Set a length
+    // (e.g. `150px`) to pin the height instead: an explicit height makes the
+    // browser ignore `aspect-ratio`, so the box becomes `slot-width ×
+    // <length>`. The in-flow slides give the track its height, so pinning the
+    // slide height pins the whole strip. Width stays fluid and the motion math
+    // is width-based, so a fixed height never affects scrolling.
+    --slide-height: auto;
+
     position: relative;
     display: flex;
     flex-direction: column;
@@ -85,6 +94,7 @@
     display: block;
     width: 100%;
     aspect-ratio: var(--slide-aspect);
+    height: var(--slide-height);
     padding: 0;
     margin: 0;
     border: none;
