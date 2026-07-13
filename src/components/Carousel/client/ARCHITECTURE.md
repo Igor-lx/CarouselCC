@@ -235,20 +235,20 @@ For each logical slide you need, starting from a single high-resolution source:
      ]
    }
 
-   One geometry contract binds the data to the styles: the slide box's
-   `--slide-aspect` (SCSS) must equal the aspect of the set the browser
-   selects, under the SAME media condition — the demo pairs the default
-   16:9 set with `--slide-aspect: 16 / 9` and the portrait 9:16 source with
-   an `(orientation: portrait)` override. Box aspect === asset aspect is
-   what makes `object-fit: cover` a no-op (the image fills the slide with
-   nothing cropped), and the carousel derives its height from slot width ×
+   The slide box's `--slide-aspect` (SCSS) FOLLOWS THE VIEWPORT orientation
+   — landscape `16 / 9`, portrait `9 / 16` via an `(orientation: portrait)`
+   override — always, module or not. The box tracks the screen; the image
+   `object-fit: cover`s into it. WITH the module the browser also swaps to
+   the crop matching that orientation, so box aspect === asset aspect and
+   nothing is cropped. The carousel derives its height from slot width ×
    aspect instead of a fixed height, so it fits any window.
 
-   The whole pairing is scoped to the `<ResponsiveImages />` module's
-   presence (`data-responsive-images` on the root): without the module the
-   deck deliberately runs ONE native set (`resolveRenderedImageSrc`), the
-   box keeps the default aspect in any orientation, and none of the
-   machinery below runs. Which single asset: the publisher's designated
+   Without the `<ResponsiveImages />` module (`data-responsive-images`
+   false) the deck runs ONE native set (`resolveRenderedImageSrc`) and none
+   of the machinery below runs — but the box still flips with the viewport,
+   so the single asset fills the screen in its OWN orientation and is
+   centre-cropped by `cover` in the other (the deliberate single-set
+   trade-off). Which single asset: the publisher's designated
    `image.defaultSrc` when the data declares one (a multi-set deck has a
    human who chose the canonical stand-alone asset — the generator's
    `default` field records it); otherwise the widest candidate across all

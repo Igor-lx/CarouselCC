@@ -12,15 +12,17 @@
     // not in the stylesheet.
     --viewport-radius: var(--slide-radius);
 
-    // The slide box aspect ratio — the single geometry contract with the
-    // image data. It MUST mirror the aspect of the image set the browser
-    // selects (see the responsive `sources` in the slides document): the
-    // default set is the full 16:9 image; portrait viewports receive the
-    // art-directed 9:16 crop, and the box follows via the media query below.
-    // Because box aspect === asset aspect, `object-fit: cover` never crops
-    // and the image always fills the whole slide. The carousel's height is
-    // DERIVED from slot width × this ratio — there is no fixed component
-    // height, so the deck fits any window without cutting anything off.
+    // The slide box aspect ratio. The box FOLLOWS THE VIEWPORT orientation
+    // (landscape 16:9, portrait 9:16 via the media query below) — always,
+    // module or not. The image `object-fit: cover`s into it:
+    //  - WITH <ResponsiveImages />: the browser also swaps to the art-directed
+    //    crop matching the orientation, so box aspect === asset aspect and
+    //    nothing is cropped;
+    //  - WITHOUT it: the ONE designated asset covers the box, filling the
+    //    screen in its own orientation and cropping to the centre in the
+    //    other (plain `cover` semantics — the deliberate single-set trade-off).
+    // The carousel's height is DERIVED from slot width × this ratio — no fixed
+    // component height, so the deck fits any window.
     --slide-aspect: 16 / 9;
 
     position: relative;
@@ -39,13 +41,12 @@
     box-sizing: border-box;
   }
 
-  // Portrait viewports pick the 9:16 art-directed source — the box aspect
-  // must switch under the SAME condition, or `cover` would crop again.
-  // Scoped to the <ResponsiveImages /> module's presence: without the module
-  // there is only ONE native set, so the box keeps the default aspect in any
-  // orientation (a flipped box would permanently zoom-crop the single asset).
+  // Portrait viewports flip the box to 9:16 — regardless of the module. With
+  // the module the browser also picks the 9:16 crop (perfect fit); without it
+  // the single asset covers the flipped box (full in its own orientation,
+  // centre-cropped in the other). The box tracks the SCREEN, not the module.
   @media (orientation: portrait) {
-    .outerContainer[data-responsive-images="true"] {
+    .outerContainer {
       --slide-aspect: 9 / 16;
     }
   }
