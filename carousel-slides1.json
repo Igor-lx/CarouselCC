@@ -5,11 +5,13 @@
     "alt": "",
     "image": {
       "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel1.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel1.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel1.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel1.webp 1600w",
+      "aspect": 1.7777777777777777,
       "sources": [
         {
           "media": "(orientation: portrait)",
           "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel1.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel1.webp 720w",
-          "type": "image/webp"
+          "type": "image/webp",
+          "aspect": 0.5625
         }
       ]
     }
@@ -20,11 +22,13 @@
     "alt": "",
     "image": {
       "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel2.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel2.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel2.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel2.webp 1600w",
+      "aspect": 1.7777777777777777,
       "sources": [
         {
           "media": "(orientation: portrait)",
           "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel2.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel2.webp 720w",
-          "type": "image/webp"
+          "type": "image/webp",
+          "aspect": 0.5625
         }
       ]
     }
@@ -35,11 +39,13 @@
     "alt": "",
     "image": {
       "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel3.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel3.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel3.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel3.webp 1600w",
+      "aspect": 1.7777777777777777,
       "sources": [
         {
           "media": "(orientation: portrait)",
           "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel3.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel3.webp 720w",
-          "type": "image/webp"
+          "type": "image/webp",
+          "aspect": 0.5625
         }
       ]
     }
@@ -50,11 +56,13 @@
     "alt": "",
     "image": {
       "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel4.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel4.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel4.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel4.webp 1600w",
+      "aspect": 1.7777777777777777,
       "sources": [
         {
           "media": "(orientation: portrait)",
           "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel4.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel4.webp 720w",
-          "type": "image/webp"
+          "type": "image/webp",
+          "aspect": 0.5625
         }
       ]
     }
@@ -65,11 +73,13 @@
     "alt": "",
     "image": {
       "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel5.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel5.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel5.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel5.webp 1600w",
+      "aspect": 1.7777777777777777,
       "sources": [
         {
           "media": "(orientation: portrait)",
           "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel5.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel5.webp 720w",
-          "type": "image/webp"
+          "type": "image/webp",
+          "aspect": 0.5625
         }
       ]
     }
@@ -80,11 +90,13 @@
     "alt": "",
     "image": {
       "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel6.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel6.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel6.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel6.webp 1600w",
+      "aspect": 1.7777777777777777,
       "sources": [
         {
           "media": "(orientation: portrait)",
           "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel6.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel6.webp 720w",
-          "type": "image/webp"
+          "type": "image/webp",
+          "aspect": 0.5625
         }
       ]
     }
@@ -95,11 +107,13 @@
     "alt": "",
     "image": {
       "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel7.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel7.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel7.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel7.webp 1600w",
+      "aspect": 1.7777777777777777,
       "sources": [
         {
           "media": "(orientation: portrait)",
           "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel7.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel7.webp 720w",
-          "type": "image/webp"
+          "type": "image/webp",
+          "aspect": 0.5625
         }
       ]
     }
@@ -110,11 +124,13 @@
     "alt": "",
     "image": {
       "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel8.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel8.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel8.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel8.webp 1600w",
+      "aspect": 1.7777777777777777,
       "sources": [
         {
           "media": "(orientation: portrait)",
           "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel8.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel8.webp 720w",
-          "type": "image/webp"
+          "type": "image/webp",
+          "aspect": 0.5625
         }
       ]
     }
@@ -125,11 +141,13 @@
     "alt": "",
     "image": {
       "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel9.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel9.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel9.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel9.webp 1600w",
+      "aspect": 1.7777777777777777,
       "sources": [
         {
           "media": "(orientation: portrait)",
           "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel9.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel9.webp 720w",
-          "type": "image/webp"
+          "type": "image/webp",
+          "aspect": 0.5625
         }
       ]
     }
@@ -140,11 +158,13 @@
     "alt": "",
     "image": {
       "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel10.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel10.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel10.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel10.webp 1600w",
+      "aspect": 1.7777777777777777,
       "sources": [
         {
           "media": "(orientation: portrait)",
           "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel10.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel10.webp 720w",
-          "type": "image/webp"
+          "type": "image/webp",
+          "aspect": 0.5625
         }
       ]
     }
@@ -155,11 +175,13 @@
     "alt": "",
     "image": {
       "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel11.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel11.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel11.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel11.webp 1600w",
+      "aspect": 1.7777777777777777,
       "sources": [
         {
           "media": "(orientation: portrait)",
           "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel11.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel11.webp 720w",
-          "type": "image/webp"
+          "type": "image/webp",
+          "aspect": 0.5625
         }
       ]
     }
@@ -170,11 +192,13 @@
     "alt": "",
     "image": {
       "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel12.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel12.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel12.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel12.webp 1600w",
+      "aspect": 1.7777777777777777,
       "sources": [
         {
           "media": "(orientation: portrait)",
           "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel12.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel12.webp 720w",
-          "type": "image/webp"
+          "type": "image/webp",
+          "aspect": 0.5625
         }
       ]
     }
