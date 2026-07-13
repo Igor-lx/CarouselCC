@@ -25,7 +25,12 @@ interface WarmTarget {
 }
 
 interface WarmEntry {
-  image: HTMLImageElement;
+  /** Held only until the fetch/decode completes, then released: pinning
+   * decoded bitmaps for the whole warm window measurably squeezed the GPU
+   * raster budget on weak devices (more checkerboard frames at the
+   * post-settle window shift). The browser's own decode cache keeps the
+   * warm useful; the entry itself stays as the dedupe record. */
+  image: HTMLImageElement | null;
   isDecoded: boolean;
 }
 
@@ -161,7 +166,18 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
         image.srcset = target.srcSet;
       }
       image.src = target.src;
-      warm.set(target.key, { image, isDecoded: false });
+      const entry: WarmEntry = { image, isDecoded: false };
+      warm.set(target.key, entry);
+      if (!target.isDecodeEligible || !isPredecodeOn) {
+        // Network-only warm: release the ref once the bytes are in —
+        // holding it would pin nothing useful (no decode was requested).
+        image.addEventListener("load", () => {
+          entry.image = null;
+        });
+        image.addEventListener("error", () => {
+          warm.delete(target.key);
+        });
+      }
     }
 
     // …while decodes go strictly one per idle slot — never in parallel,
@@ -180,16 +196,22 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
       const target = queue.shift();
       if (!target || isStopped) return;
       const entry = warm.get(target.key);
-      if (!entry) {
+      if (!entry || entry.image === null) {
         pump();
         return;
       }
       entry.isDecoded = true;
       entry.image
         .decode()
+        .then(() => {
+          // Decoded into the browser's cache — release the ref instead of
+          // pinning the bitmap: a window of pinned decodes squeezed the GPU
+          // raster budget on weak devices.
+          entry.image = null;
+        })
         .catch(() => {
           // Decode failures (broken image, eviction race) are non-events:
-          // the slide's own error path owns retries; drop the ref so a
+          // the slide's own error path owns retries; drop the record so a
           // later idle pass may try again.
           warm.delete(target.key);
         })
