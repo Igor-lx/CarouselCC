@@ -54,6 +54,11 @@
     pointer-events: none;
 
     svg {
+      // Explicit size is REQUIRED: the icon carries only a viewBox, and
+      // Safari collapses an unsized inline SVG to 0x0 (Chrome happens to
+      // shrink-fit it to the same glyph these 100% produce).
+      width: 100%;
+      height: 100%;
       opacity: 0.8;
     }
   }
