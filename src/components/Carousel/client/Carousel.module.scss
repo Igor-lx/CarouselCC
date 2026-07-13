@@ -25,6 +25,16 @@
     // component height, so the deck fits any window.
     --slide-aspect: 16 / 9;
 
+    // Optional FIXED slide height. `auto` (default) => the height derives from
+    // slot width × --slide-aspect (the fluid default above). Set a length
+    // (e.g. `150px`) to pin the height instead: an explicit height makes the
+    // browser ignore `aspect-ratio`, so the box becomes `slot-width ×
+    // <length>`. The slide AND the invisible height sizer both consume this
+    // one variable, so the slide, the track and the clip stay in sync — a
+    // host overriding only one would desync them. Width stays fluid and the
+    // motion math is width-based, so a fixed height never affects scrolling.
+    --slide-height: auto;
+
     position: relative;
     display: flex;
     flex-direction: column;
@@ -86,11 +96,14 @@
   }
 
   // Height sizer: the only in-flow child, one slot wide (inline width), its
-  // aspect-ratio gives the otherwise-collapsed track its height. Invisible
-  // and inert; the real slides are absolutely positioned OVER it.
+  // aspect-ratio (or the --slide-height override) gives the otherwise-
+  // collapsed track its height. It MUST honour the same height source as the
+  // slide, or the track and the slides would desync. Invisible and inert;
+  // the real slides are absolutely positioned OVER it.
   .slideSizer {
     visibility: hidden;
     aspect-ratio: var(--slide-aspect);
+    height: var(--slide-height);
     pointer-events: none;
   }
 
@@ -100,6 +113,7 @@
     left: 0;
     display: block;
     aspect-ratio: var(--slide-aspect);
+    height: var(--slide-height);
     padding: 0;
     margin: 0;
     border: none;
