@@ -38,9 +38,9 @@ export const CAROUSEL_SWIPE_CONFIG: Required<PointerSwipeConfig> = {
   resistance: 0.33,
   // Rubber length: the resistance curve saturates at
   // 1 / (curvature * r/(1-r)) px of UI travel — the "wall" the finger hits.
-  // r=0.38, c=0.0046 -> stiffness 0.613, wall ~355px (~0.9 of the reference
-  // slot): ~20% softer early ramp and ~15% longer travel than the previous
-  // r=0.48 / c=0.0035 calibration (wall ~310px).
+  // r=0.33, c=0.0046 -> stiffness 0.4925, wall ~441px (~1.1 of the reference
+  // slot): softer early ramp and longer travel than the previous
+  // r=0.38 calibration (wall ~355px).
   resistanceCurvature: 0.0046,
   maxVelocity: 5,
   emaAlpha: 0.85,
@@ -87,8 +87,8 @@ export const SWIPE_COMMIT_MAX_PX = 120;
  * smooth tail.
  */
 export const CAROUSEL_INERTIAL_RELEASE_CONFIG: CarouselInertialReleaseConfig = {
-  inertiaBoost: 1.4,
+  inertiaBoost: 1.35,
   accelerationDistanceShare: 0.3,
   decelerationDistanceShare: 0.7,
-  minRideDurationMs: 240,
+  minRideDurationMs: 220,
 };
