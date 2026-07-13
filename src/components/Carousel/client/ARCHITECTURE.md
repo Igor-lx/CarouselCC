@@ -303,7 +303,7 @@ For each logical slide you need, starting from a single high-resolution source:
 | ------------- | ------------------------------- | ----- |
 | `pagination`  | `<Pagination />` or `<PaginationWidget />` | Exactly one may be attached. Renders only when `isPaginationOn` is `true`. |
 | `controls`    | `<Controls />`                  | Renders only when `isControlsOn` is `true`. |
-| `responsive-images` | `<ResponsiveImages />` | Headless. Its PRESENCE switches the responsive-image stack on (art-directed sources, srcSet/sizes, rotation veil, portrait aspect flip); its body preloads neighbour pages (§8.5). Absent: one native set everywhere — the LARGEST default candidate, zero responsive machinery. |
+| `responsive-images` | `<ResponsiveImages />` | Headless. Its PRESENCE switches the responsive-image stack on (art-directed sources, srcSet/sizes, rotation veil, portrait aspect flip); its body warms neighbour pages and the rotation crop (§8.4). Absent: one native set everywhere — the LARGEST default candidate, zero responsive machinery. |
 | `diagnostic`  | `<Diagnostic />`                | Always renders if attached. Dev-only; in prod console output is suppressed by the env guard. |
 
 Slot resolution is done by the shared `resolveSlots` against `CAROUSEL_SLOTS`.
@@ -1170,19 +1170,26 @@ Headless (renders `null`). Two effects in one slot:
    URL. Unmounted, a slide is a plain `<img>` of the LARGEST default
    candidate ("quality first, no economy") and the module's code is
    tree-shaken out. The same slides JSON works in both modes.
-2. **Warm manager.** While the deck is idle it warms `preloadPagesNr`
-   neighbour pages per side. Network-only warm goes through React 19
-   `preload()` with `imageSrcSet`/`imageSizes` — the browser picks the
-   exact candidate. `isPredecodeOn` (default off) upgrades the warm to
-   network + DECODE: candidates load through detached `Image`s (same
-   browser-side candidate resolution) and are `decode()`d one per idle
-   callback, so the incoming page's bitmap is ready BEFORE a ride starts —
-   the mid-ride decode/raster spike that can hold one frame on a weak GPU
-   never happens. Decoded refs are pruned to the current warm window
-   (bounded memory) and the queue stops whenever the deck moves.
-   `isParallelSetPreloadOn` (default off) additionally warms the parallel
-   orientation's crop with a heuristic candidate (a `media`-gated source
-   cannot preload natively; a miss is masked by the rotation veil).
+2. **Warm manager.** ONE transport for every warm: a detached `Image`
+   (`fetchPriority: "low"`, `srcset`/`sizes` set — the browser resolves the
+   candidate exactly like the rendered markup would; no `<link rel=preload>`
+   — the link path cannot decode and by its nature spams "preloaded but not
+   used" warnings for ahead-of-time warming). While the deck is idle it
+   warms `preloadPagesNr` neighbour pages per side in the CURRENT
+   orientation. `isPredecodeOn` (default off) upgrades that warm to
+   network + DECODE: neighbours are `decode()`d one per idle callback, so
+   the incoming page's bitmap is ready BEFORE a ride starts — the mid-ride
+   decode/raster spike that can hold one frame on a weak GPU never happens.
+   Warm refs are pruned to the current window (bounded memory) and the
+   decode queue stops whenever the deck moves. `isPredecodeOn` is an
+   upgrade of the warm, not a sibling: the type union forbids it with
+   `isPreloadOn: false`, and Diagnostics reports the dead combination for
+   untyped call sites. `isParallelSetPreloadOn` (default off) warms the
+   CURRENT page's parallel-orientation crops, network-only — a rotation
+   swaps the visible slides instantly, after which the new orientation is
+   current and neighbour warming continues from there (warming neighbours
+   of an orientation the user may never enter would double the traffic for
+   nothing; the heuristic candidate may miss — the rotation veil masks it).
    The host's reduced-data signal ALWAYS zeroes warm traffic — there is
    deliberately no override knob: the user's preference outranks any
    product opinion. Props are audited by Diagnostics
@@ -1323,7 +1330,7 @@ src/components/Carousel/client/
     ├── Controls/
     ├── Pagination/
     ├── PaginationWidget/
-    ├── ResponsiveImages/          headless: presence switch + idle preload manager
+    ├── ResponsiveImages/          headless: presence switch + idle warm manager
     └── Diagnostic/
 ```
 

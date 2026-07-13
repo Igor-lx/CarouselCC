@@ -1,24 +1,47 @@
-export interface ResponsiveImagesProps {
-  /** Master preload switch. Default `true`. */
-  isPreloadOn?: boolean;
-  /** Neighbour pages to warm on EACH side of the target. Default `1`. */
+interface ResponsiveImagesBaseProps {
+  /** Neighbour pages to warm on EACH side of the target (current
+   * orientation only). Default `1`. */
   preloadPagesNr?: number;
   /**
-   * Also warm the parallel orientation's crop (heuristic candidate — see
-   * `resolveParallelCandidate`), so the first rotation swaps instantly.
-   * Default `false`: it is extra traffic for an event that may never happen.
+   * Also warm the CURRENT page's parallel-orientation crops (heuristic
+   * candidate — see `resolveParallelCandidate`), so a device rotation swaps
+   * the visible slides instantly. Network-only and current page only by
+   * design: after the rotation the new orientation becomes current and the
+   * regular neighbour warming continues from there — warming neighbour
+   * pages of an orientation the user may never enter would double the
+   * traffic for nothing. Default `false`.
    */
   isParallelSetPreloadOn?: boolean;
-  /**
-   * Upgrade the warm from network-only to network + DECODE: candidates are
-   * fetched through a detached `Image` and `decode()`d in idle time, so the
-   * incoming page's bitmap is ready before the ride ever starts. Motivation:
-   * preload warms only the HTTP cache — the decode + first rasterisation
-   * then lands MID-RIDE, and on a weak GPU that occasionally costs exactly
-   * one vsync (a visible single held frame). Decoded bitmaps are retained
-   * only for the current warm window (refs are pruned as the target moves),
-   * so memory stays bounded. Default `false`: decoded frames are memory a
-   * weak device may not have to spare — measure before enabling.
-   */
-  isPredecodeOn?: boolean;
 }
+
+/**
+ * `isPreloadOn` is the warm manager's MASTER switch; `isPredecodeOn` merely
+ * upgrades the warm from network-only to network + decode (decoding without
+ * fetching is not a thing). The union makes the dead combination
+ * `isPreloadOn: false` + `isPredecodeOn: true` a TYPE error; Diagnostics
+ * reports the same at runtime for untyped call sites.
+ */
+export type ResponsiveImagesProps = ResponsiveImagesBaseProps &
+  (
+    | {
+        /** Master warm switch. Default `true`. */
+        isPreloadOn?: true;
+        /**
+         * Upgrade the warm from network-only to network + DECODE: neighbour
+         * candidates load through detached `Image`s and are `decode()`d one
+         * at a time in idle callbacks, so the incoming page's bitmap is
+         * ready before the ride ever starts. Motivation: a network-only
+         * warm leaves the decode + first rasterisation to land MID-RIDE,
+         * and on a weak GPU that occasionally costs exactly one vsync (a
+         * visible single held frame). Decoded bitmaps are retained only for
+         * the current warm window (refs are pruned as the target moves), so
+         * memory stays bounded. Default `false`: decoded frames are memory
+         * a weak device may not have to spare — measure before enabling.
+         */
+        isPredecodeOn?: boolean;
+      }
+    | {
+        isPreloadOn: false;
+        isPredecodeOn?: false;
+      }
+  );

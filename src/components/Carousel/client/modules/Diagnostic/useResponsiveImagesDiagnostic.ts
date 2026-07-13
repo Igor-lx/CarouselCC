@@ -22,7 +22,7 @@ export function useResponsiveImagesDiagnostic(
 
   const warnings = useMemo(
     () => (isActive ? collectResponsiveImagesWarnings(input) : EMPTY_WARNINGS),
-    [input.preloadPagesNr, isActive],
+    [input.preloadPagesNr, input.isPreloadOn, input.isPredecodeOn, isActive],
   );
 
   useGroupedWarnings(warnings);

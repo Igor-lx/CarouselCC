@@ -1,5 +1,4 @@
 import { memo, useEffect, useRef } from "react";
-import { preload } from "react-dom";
 
 import { useMediaQuery } from "../../../../../shared";
 import { SLIDE_PORTRAIT_MEDIA_CONDITION } from "../../config";
@@ -20,6 +19,14 @@ interface WarmTarget {
   src: string;
   srcSet?: string;
   sizes?: string;
+  /** Only current-orientation neighbours are decode-eligible; the parallel
+   * crop is a network-only hint for a rotation that may never happen. */
+  isDecodeEligible: boolean;
+}
+
+interface WarmEntry {
+  image: HTMLImageElement;
+  isDecoded: boolean;
 }
 
 const scheduleIdle = (work: () => void): (() => void) => {
@@ -36,26 +43,32 @@ const scheduleIdle = (work: () => void): (() => void) => {
  * PRESENCE switches the carousel's responsive stack on (art-directed
  * `<source>`s, `srcSet`/`sizes`, the rotation veil, the portrait aspect
  * flip — see `resolveRenderedImageSrc` and the root's
- * `data-responsive-images`); its BODY is the warm manager:
+ * `data-responsive-images`); its BODY is the warm manager.
  *
- * - neighbour pages of the current target are warmed while the deck is idle.
- *   Network-only warm (`isPredecodeOn` off) goes through React 19's
- *   `preload()` with `imageSrcSet`/`imageSizes` — the BROWSER picks the
- *   exact candidate, no guessing;
- * - `isPredecodeOn` upgrades the warm to network + DECODE: candidates load
- *   through detached `Image`s (same browser-side candidate resolution via
- *   `srcset`/`sizes`) and are `decode()`d one at a time in idle callbacks,
- *   so the incoming page's bitmap is ready BEFORE a ride starts — the
- *   mid-ride decode/raster spike that can hold a frame on a weak GPU never
- *   happens. Decoded refs are pruned to the current warm window, and the
- *   queue stops while the deck moves (warming never competes with a ride);
- * - optionally (`isParallelSetPreloadOn`) the parallel orientation's crop is
- *   warmed too, so the first device rotation swaps instantly; here a
- *   candidate must be picked heuristically (a `media`-gated source can never
- *   preload natively) — a miss is masked by the rotation veil;
- * - the host's data-saver signal is ALWAYS respected — a reduced-data user
- *   gets zero warm traffic, and there is deliberately no override: the
- *   user's preference outranks any product opinion.
+ * ONE transport for every warm: a detached `Image` (`fetchPriority: "low"`;
+ * `srcset`/`sizes` set, so the BROWSER resolves the candidate exactly like
+ * the rendered markup would — no guessing). No `<link rel=preload>`: the
+ * link path cannot decode and spams "preloaded but not used" warnings for
+ * ahead-of-time warming by its very nature.
+ *
+ * What is warmed, while the deck is idle:
+ * - `preloadPagesNr` neighbour pages per side, CURRENT orientation. With
+ *   `isPredecodeOn` these are also `decode()`d one per idle callback, so the
+ *   incoming page's bitmap is ready BEFORE a ride starts — the mid-ride
+ *   decode/raster spike that can hold one frame on a weak GPU never happens.
+ *   Warm refs are pruned to the current window (bounded memory) and the
+ *   decode queue stops whenever the deck moves;
+ * - with `isParallelSetPreloadOn`: the CURRENT page's parallel-orientation
+ *   crops, network-only — so a rotation swaps the visible slides instantly;
+ *   after it the new orientation is current and neighbour warming continues
+ *   from there (warming neighbours of an orientation the user may never
+ *   enter would double the traffic for nothing). The candidate is picked
+ *   heuristically (a `media`-gated source can never be resolved by the
+ *   browser ahead of time) — a miss is masked by the rotation veil.
+ *
+ * The host's data-saver signal is ALWAYS respected — a reduced-data user
+ * gets zero warm traffic, and there is deliberately no override: the user's
+ * preference outranks any product opinion.
  *
  * Unmounted, none of this exists: one native set everywhere (largest
  * candidate), no responsive markup, no warming — and this module's code is
@@ -71,15 +84,12 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
   const { status, intent } = useCarouselMotion();
   const isPortrait = useMediaQuery(SLIDE_PORTRAIT_MEDIA_CONDITION);
 
-  useResponsiveImagesDiagnostic({ preloadPagesNr });
+  useResponsiveImagesDiagnostic({ preloadPagesNr, isPreloadOn, isPredecodeOn });
 
-  // preload() deduplicates by href internally; this set just keeps the
-  // effect from re-issuing calls on every idle re-entry.
-  const warmedRef = useRef(new Set<string>());
-  // Predecode mode: key -> decoded Image. The live ref IS both the dedupe
-  // and the thing that keeps the decoded bitmap cache-resident; pruning an
-  // entry both frees the bitmap and re-arms decoding for that key.
-  const decodedRef = useRef(new Map<string, HTMLImageElement>());
+  // key -> live warm entry. The ref IS the dedupe, the retention anchor for
+  // a decoded bitmap, and the guarantee an in-flight fetch is not GC-aborted;
+  // pruning an entry frees the bitmap and re-arms the key for a revisit.
+  const warmRef = useRef(new Map<string, WarmEntry>());
 
   useEffect(() => {
     if (!isPreloadOn) return;
@@ -99,55 +109,69 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
       (typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1);
 
     const targets: WarmTarget[] = [];
+
+    // Neighbour pages, current orientation — the swipe-ahead warm.
     for (const page of pages) {
       const start = page * layout.visibleSlidesCount;
       for (const slide of slides.slice(start, start + layout.visibleSlidesCount)) {
-        // Current orientation: the browser resolves the candidate itself.
         targets.push({
           key: slide.src,
           src: slide.src,
           srcSet: slide.srcSet,
           sizes: slide.srcSet ? slide.sizes ?? imageSizes : undefined,
+          isDecodeEligible: true,
         });
+      }
+    }
 
-        if (!isParallelSetPreloadOn) continue;
+    // CURRENT page, parallel orientation — the rotation warm (network-only).
+    if (isParallelSetPreloadOn) {
+      const start = intent.targetPageIndex * layout.visibleSlidesCount;
+      for (const slide of slides.slice(start, start + layout.visibleSlidesCount)) {
         const parallel = resolveParallelCandidate(
           resolveParallelSrcSet(slide, isPortrait, SLIDE_PORTRAIT_MEDIA_CONDITION),
           targetPx,
         );
         if (parallel !== null) {
-          targets.push({ key: parallel, src: parallel });
+          targets.push({
+            key: parallel,
+            src: parallel,
+            isDecodeEligible: false,
+          });
         }
       }
     }
 
-    if (!isPredecodeOn) {
-      const warmed = warmedRef.current;
-      for (const target of targets) {
-        if (warmed.has(target.key)) continue;
-        warmed.add(target.key);
-        preload(target.src, {
-          as: "image",
-          fetchPriority: "low",
-          imageSrcSet: target.srcSet,
-          imageSizes: target.sizes,
-        });
-      }
-      return;
-    }
-
-    // Predecode: prune refs that left the warm window (frees their bitmaps
-    // and re-arms them for a future revisit), then decode the missing ones
-    // strictly one per idle slot — never in parallel, never during a ride
-    // (the effect body only runs while idle, and the cleanup below stops the
-    // chain the moment the deck starts moving).
-    const decoded = decodedRef.current;
+    // Prune refs that left the warm window: frees their bitmaps and re-arms
+    // the keys for a future revisit.
+    const warm = warmRef.current;
     const windowKeys = new Set(targets.map((target) => target.key));
-    for (const key of decoded.keys()) {
-      if (!windowKeys.has(key)) decoded.delete(key);
+    for (const key of warm.keys()) {
+      if (!windowKeys.has(key)) warm.delete(key);
     }
 
-    const queue = targets.filter((target) => !decoded.has(target.key));
+    // Fetches start immediately (the browser schedules low-priority loads
+    // itself, exactly as it did for preload links)…
+    for (const target of targets) {
+      if (warm.has(target.key)) continue;
+      const image = new Image();
+      image.fetchPriority = "low";
+      if (target.srcSet) {
+        image.sizes = target.sizes ?? "";
+        image.srcset = target.srcSet;
+      }
+      image.src = target.src;
+      warm.set(target.key, { image, isDecoded: false });
+    }
+
+    // …while decodes go strictly one per idle slot — never in parallel,
+    // never during a ride (the effect only runs while idle, and the cleanup
+    // stops the chain the moment the deck starts moving).
+    if (!isPredecodeOn) return;
+
+    const queue = targets.filter(
+      (target) => target.isDecodeEligible && warm.get(target.key)?.isDecoded === false,
+    );
     let cancelIdle: (() => void) | null = null;
     let isStopped = false;
 
@@ -155,20 +179,19 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
       cancelIdle = null;
       const target = queue.shift();
       if (!target || isStopped) return;
-      const image = new Image();
-      if (target.srcSet) {
-        image.sizes = target.sizes ?? "";
-        image.srcset = target.srcSet;
+      const entry = warm.get(target.key);
+      if (!entry) {
+        pump();
+        return;
       }
-      image.src = target.src;
-      decoded.set(target.key, image);
-      image
+      entry.isDecoded = true;
+      entry.image
         .decode()
         .catch(() => {
           // Decode failures (broken image, eviction race) are non-events:
           // the slide's own error path owns retries; drop the ref so a
           // later idle pass may try again.
-          decoded.delete(target.key);
+          warm.delete(target.key);
         })
         .finally(() => {
           if (!isStopped && queue.length > 0) cancelIdle = scheduleIdle(pump);
