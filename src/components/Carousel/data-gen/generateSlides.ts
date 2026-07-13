@@ -19,12 +19,16 @@ export interface GenVariantWidth {
 export interface GenSourceGroup {
   media: string;
   type?: string;
+  /** Intrinsic aspect (width / height) of this group's crop. */
+  aspect?: number;
   widths: GenVariantWidth[];
 }
 
 export interface GenerateSlidesInput {
   /** Default `<img>` resolution variants. */
   widths: GenVariantWidth[];
+  /** Intrinsic aspect (width / height) of the default crop. */
+  aspect?: number;
   /** Art-directed source groups. */
   sources?: GenSourceGroup[];
   /** Stable slide order (slugs), e.g. sorted by slide number. */
@@ -79,6 +83,7 @@ export function generateSlides(input: GenerateSlidesInput): GeneratedSlide[] {
               media: group.media,
               candidates: groupCandidates,
               ...(group.type !== undefined && { type: group.type }),
+              ...(group.aspect !== undefined && { aspect: group.aspect }),
             },
           ];
     });
@@ -89,6 +94,7 @@ export function generateSlides(input: GenerateSlidesInput): GeneratedSlide[] {
         id: preserved?.id ?? mintId(slug),
         alt: preserved?.alt ?? "", // scaffold; fill by hand, preserved on regen
         candidates,
+        ...(input.aspect !== undefined && { aspect: input.aspect }),
         ...(sources.length > 0 && { sources }),
       }),
     );

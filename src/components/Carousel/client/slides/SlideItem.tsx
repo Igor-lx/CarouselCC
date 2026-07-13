@@ -1,7 +1,6 @@
 import clsx from "clsx";
 import { memo, useEffect, useRef } from "react";
 
-import { SLIDE_PORTRAIT_MEDIA_CONDITION } from "../config";
 import { resolveRenderedImageSrc } from "../domain";
 import { useImageResource } from "./imageResource";
 import { useOrientationSwapVeil } from "./useOrientationSwapVeil";
@@ -43,11 +42,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
   // rule shared with the store retention (see resolveRenderedImageSrc).
   const imageSource =
     isContentImg && slideData
-      ? resolveRenderedImageSrc(
-          slideData,
-          isResponsiveImagesOn,
-          SLIDE_PORTRAIT_MEDIA_CONDITION,
-        )
+      ? resolveRenderedImageSrc(slideData, isResponsiveImagesOn)
       : null;
 
   const { status, generation, reportLoaded, reportError, requestRetry } =

@@ -1,6 +1,5 @@
 import { useEffect, useMemo } from "react";
 
-import { SLIDE_PORTRAIT_MEDIA_CONDITION } from "../../config";
 import { resolveRenderedImageSrc } from "../../domain";
 import type { CarouselSlideRecord } from "../../domain";
 import type { ImageResourceStore } from "./types";
@@ -23,11 +22,7 @@ const collectImageResourceUrls = (
   for (const record of records) {
     // The SAME resolution rule the renderer uses (largest candidate in
     // single-set mode) — retention must never prune the URL a slide keys on.
-    const src = resolveRenderedImageSrc(
-      record.slideData,
-      isResponsiveImagesOn,
-      SLIDE_PORTRAIT_MEDIA_CONDITION,
-    );
+    const src = resolveRenderedImageSrc(record.slideData, isResponsiveImagesOn);
     if (src !== null) urls.add(src);
   }
   return [...urls];

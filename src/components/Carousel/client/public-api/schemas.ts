@@ -49,6 +49,12 @@ export const SlideImageSourceSchema = z.object({
   srcSet: z.string().trim().min(1),
   sizes: z.string().trim().min(1).optional(),
   type: z.string().trim().min(1).optional(),
+  // Intrinsic aspect (width / height) of this set's crop. OPTIONAL metadata:
+  // `w` descriptors carry width only, so pixel AREA is unknowable without
+  // it. When every set declares its aspect, single-set mode ("largest
+  // image") compares candidates by area instead of width — no orientation
+  // heuristics, just declared geometry.
+  aspect: z.number().positive().optional(),
 });
 
 /**
@@ -59,6 +65,9 @@ export const SlideImageSourceSchema = z.object({
 export const SlideImageVariantsSchema = z.object({
   srcSet: z.string().trim().min(1).optional(),
   sizes: z.string().trim().min(1).optional(),
+  // Intrinsic aspect (width / height) of the DEFAULT set's crop — see
+  // `SlideImageSourceSchema.aspect`.
+  aspect: z.number().positive().optional(),
   sources: z.array(SlideImageSourceSchema).readonly().optional(),
 });
 

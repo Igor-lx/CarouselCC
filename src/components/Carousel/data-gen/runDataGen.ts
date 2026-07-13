@@ -35,6 +35,8 @@ export interface DataGenVariant {
 export interface DataGenSource {
   media: string;
   type?: string;
+  /** Intrinsic aspect (width / height) of this group's crop. */
+  aspect?: number;
   variants: DataGenVariant[];
 }
 
@@ -47,6 +49,8 @@ export interface DataGenConfig {
   output: string;
   /** Default `<img>` resolution variants. */
   variants: DataGenVariant[];
+  /** Intrinsic aspect (width / height) of the default crop. */
+  aspect?: number;
   /** Art-directed source groups. */
   sources?: DataGenSource[];
 }
@@ -103,6 +107,7 @@ export async function runDataGen(config: DataGenConfig): Promise<DataGenResult> 
     (config.sources ?? []).map(async (group) => ({
       media: group.media,
       ...(group.type !== undefined && { type: group.type }),
+      ...(group.aspect !== undefined && { aspect: group.aspect }),
       widths: await Promise.all(
         group.variants.map((variant) =>
           readVariant(assetsDir, config.urlBase, variant),
@@ -118,6 +123,7 @@ export async function runDataGen(config: DataGenConfig): Promise<DataGenResult> 
 
   const slides = generateSlides({
     widths,
+    ...(config.aspect !== undefined && { aspect: config.aspect }),
     sources,
     slugs,
     previous: await loadPrevious(output),

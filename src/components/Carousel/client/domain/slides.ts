@@ -72,36 +72,53 @@ export const resolveLargestSrcSetCandidate = (
 };
 
 /**
- * The single-set-mode candidate: the LARGEST across ALL of the slide's sets
- * (the default `srcSet` AND every art-directed `<source>`), not just the
- * default one — "quality first, no economy" means the most pixels the data
- * offers anywhere. Width descriptors are the only size signal, so ties are
- * broken toward the PORTRAIT source when its media condition is known: at
- * equal width the taller crop carries more pixels, and it degrades
- * gracefully in a wide window (a centred crop) — while a wide asset in a
- * tall window discards most of its frame.
+ * The single-set-mode candidate: the LARGEST image across ALL of the slide's
+ * sets (the default `srcSet` AND every art-directed `<source>`) — "quality
+ * first, no economy" means the most pixels the data offers anywhere, with
+ * ZERO orientation/layout semantics: the host fits whatever wins via plain
+ * `object-fit`.
+ *
+ * "Largest" is measured honestly by what the data declares:
+ * - when EVERY set carries its `aspect` metadata (width / height of the
+ *   crop), candidates compare by pixel AREA (`width² / aspect`) — the true
+ *   "biggest image";
+ * - otherwise `w` descriptors are the only size signal and candidates
+ *   compare by WIDTH alone (area is unknowable — the resolver never guesses
+ *   heights).
+ * Exact ties keep the DEFAULT set's candidate (the canonical set), then
+ * earlier source order — deterministic, semantics-free.
  */
-export const resolveLargestImageCandidate = (
-  image: Slide["image"],
-  portraitMediaCondition?: string,
-): string | null => {
-  let best: { url: string; width: number; isPortrait: boolean } | null = null;
-  const consider = (srcSet: string | undefined, isPortrait: boolean) => {
-    const candidate = resolveLargestSrcSetCandidate(srcSet);
-    if (!candidate) return;
-    if (
-      best === null ||
-      candidate.width > best.width ||
-      (candidate.width === best.width && isPortrait && !best.isPortrait)
-    ) {
-      best = { ...candidate, isPortrait };
-    }
-  };
-  consider(image?.srcSet, false);
-  for (const source of image?.sources ?? []) {
-    consider(source.srcSet, source.media === portraitMediaCondition);
+export const resolveLargestImageCandidate = (image: Slide["image"]): string | null => {
+  interface SetCandidate {
+    url: string;
+    width: number;
+    aspect: number | undefined;
   }
-  return best === null ? null : (best as { url: string }).url;
+  const candidates: SetCandidate[] = [];
+  const consider = (srcSet: string | undefined, aspect: number | undefined) => {
+    const largest = resolveLargestSrcSetCandidate(srcSet);
+    if (largest) candidates.push({ ...largest, aspect });
+  };
+  consider(image?.srcSet, image?.aspect);
+  for (const source of image?.sources ?? []) {
+    consider(source.srcSet, source.aspect);
+  }
+  if (candidates.length === 0) return null;
+
+  const isAreaComparable = candidates.every(
+    (candidate) => typeof candidate.aspect === "number" && candidate.aspect > 0,
+  );
+  const score = (candidate: SetCandidate): number =>
+    isAreaComparable
+      ? (candidate.width * candidate.width) / (candidate.aspect as number)
+      : candidate.width;
+
+  // Strictly-greater keeps the earliest (default set first) on exact ties.
+  let best = candidates[0]!;
+  for (const candidate of candidates.slice(1)) {
+    if (score(candidate) > score(best)) best = candidate;
+  }
+  return best.url;
 };
 
 /**
@@ -120,12 +137,11 @@ export const resolveLargestImageCandidate = (
 export const resolveRenderedImageSrc = (
   slideData: Slide,
   isResponsiveImagesOn: boolean,
-  portraitMediaCondition?: string,
 ): string | null => {
   const { content, image } = slideData;
   if (typeof content !== "string") return null;
   if (isResponsiveImagesOn) return content;
-  return resolveLargestImageCandidate(image, portraitMediaCondition) ?? content;
+  return resolveLargestImageCandidate(image) ?? content;
 };
 
 /** Whether any slide in the deck carries responsive image variants. */
