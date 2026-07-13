@@ -93,6 +93,12 @@ the engine keeps its state in refs and talks only through callbacks:
   a brief stick still reads — and rides — as a flick. `uiReleaseVelocity`
   is the EMA-smoothed UI-offset velocity (px/ms).
 
+All gesture math runs on the EVENT's own timestamp (`event.timeStamp`),
+not the handler's processing time: on a congested main thread events queue
+before they are handled, which would inflate dt and deflate every computed
+velocity — the slower the device, the number the flick. Event timestamps
+keep the physics honest under load and identical across devices.
+
 `enabled: false` removes the surface entirely: `hostProps` keeps only the
 `ref` (so re-enabling and the forwarded consumer ref keep working) — no
 listeners, no styles, no native handlers, as if the engine was never wired.

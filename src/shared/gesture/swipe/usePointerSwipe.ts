@@ -86,6 +86,17 @@ const resolveConfig = (config?: PointerSwipeConfig): ResolvedPointerSwipeConfig 
   ...config,
 });
 
+/**
+ * The gesture clock reads the EVENT's hardware-side timestamp, not the
+ * handler's processing time: on a congested main thread events queue before
+ * they are handled, which inflates dt and DEFLATES every computed velocity —
+ * the slower the device, the number the flick. `timeStamp` shares the
+ * `performance.now()` timebase in every modern engine; the fallback covers
+ * synthetic events dispatched with a zero timestamp.
+ */
+const eventTime = (event: { timeStamp: number }): number =>
+  event.timeStamp > 0 ? event.timeStamp : performance.now();
+
 export function usePointerSwipe({
   hostRef: externalHostRef,
   enabled = true,
@@ -237,9 +248,9 @@ export function usePointerSwipe({
   );
 
   const finishInteraction = useCallback(
-    (isCancel = false, currentX?: number) => {
+    (isCancel = false, currentX?: number, timestamp?: number) => {
       const target = hostElementRef.current;
-      const now = performance.now();
+      const now = timestamp ?? performance.now();
       const phase = phaseRef.current;
       const gesture = gestureRef.current;
 
@@ -350,7 +361,7 @@ export function usePointerSwipe({
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent) => {
-      const now = performance.now();
+      const now = eventTime(event);
       if (!enabled || !event.isPrimary || event.pointerType !== "touch" || event.button !== 0) {
         return;
       }
@@ -398,7 +409,7 @@ export function usePointerSwipe({
       if (event.pointerId !== gestureRef.current.pointerId) return;
 
       const gesture = gestureRef.current;
-      const now = performance.now();
+      const now = eventTime(event);
       const dx = event.clientX - gesture.startX;
       const dy = event.clientY - gesture.startY;
       const cfg = settingsRef.current;
@@ -409,7 +420,7 @@ export function usePointerSwipe({
 
         if (absX > cfg.intentThreshold || absY > cfg.intentThreshold) {
           if (absY > absX) {
-            finishInteraction(true);
+            finishInteraction(true, undefined, now);
             return;
           }
 
@@ -453,7 +464,7 @@ export function usePointerSwipe({
     if (!element || !enabled) return;
 
     const suppressClick = (event: MouseEvent) => {
-      if (performance.now() >= lockUntilRef.current) return;
+      if (eventTime(event) >= lockUntilRef.current) return;
       const allowed = allowedClickTargetRef.current;
       const isAllowed =
         allowed instanceof Element &&
@@ -511,9 +522,10 @@ export function usePointerSwipe({
       style: HOST_STYLES,
       onPointerDown: handlePointerDown,
       onPointerMove: handlePointerMove,
-      onPointerUp: (event) => finishInteraction(false, event.clientX),
-      onPointerCancel: (event) => finishInteraction(true, event.clientX),
-      onLostPointerCapture: (event) => finishInteraction(true, event.clientX),
+      onPointerUp: (event) => finishInteraction(false, event.clientX, eventTime(event)),
+      onPointerCancel: (event) => finishInteraction(true, event.clientX, eventTime(event)),
+      onLostPointerCapture: (event) =>
+        finishInteraction(true, event.clientX, eventTime(event)),
     };
   }, [enabled, finishInteraction, handlePointerDown, handlePointerMove, setHostNode]);
 
