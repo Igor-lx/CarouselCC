@@ -75,14 +75,64 @@ describe("resolveSlotAdaptiveSwipeConfig", () => {
     expect(huge.minSwipeDistance).toBe(SWIPE_COMMIT_MAX_PX);
   });
 
+  it("scales the flick qualification WITH the slot (content-relative feel)", () => {
+    const double = resolveSlotAdaptiveSwipeConfig(
+      CAROUSEL_SWIPE_CONFIG,
+      SWIPE_REFERENCE_SLOT_PX * 2,
+    );
+    const half = resolveSlotAdaptiveSwipeConfig(
+      CAROUSEL_SWIPE_CONFIG,
+      SWIPE_REFERENCE_SLOT_PX / 2,
+    );
+    expect(double.quickFlickVelocity).toBeCloseTo(
+      CAROUSEL_SWIPE_CONFIG.quickFlickVelocity * 2,
+      12,
+    );
+    expect(double.quickFlickMinOffset).toBeCloseTo(
+      CAROUSEL_SWIPE_CONFIG.quickFlickMinOffset * 2,
+      12,
+    );
+    expect(half.quickFlickVelocity).toBeCloseTo(
+      CAROUSEL_SWIPE_CONFIG.quickFlickVelocity / 2,
+      12,
+    );
+    expect(half.quickFlickMinOffset).toBeCloseTo(
+      CAROUSEL_SWIPE_CONFIG.quickFlickMinOffset / 2,
+      12,
+    );
+  });
+
+  it("keeps the calibration point intact for the flick thresholds too", () => {
+    const atRef = resolveSlotAdaptiveSwipeConfig(
+      CAROUSEL_SWIPE_CONFIG,
+      SWIPE_REFERENCE_SLOT_PX,
+    );
+    expect(atRef.quickFlickVelocity).toBeCloseTo(
+      CAROUSEL_SWIPE_CONFIG.quickFlickVelocity,
+      12,
+    );
+    expect(atRef.quickFlickMinOffset).toBeCloseTo(
+      CAROUSEL_SWIPE_CONFIG.quickFlickMinOffset,
+      12,
+    );
+  });
+
   it("touches nothing else in the config", () => {
     const resolved = resolveSlotAdaptiveSwipeConfig(CAROUSEL_SWIPE_CONFIG, 500);
-    const { swipeThresholdRatio, minSwipeDistance, resistanceCurvature, ...rest } =
-      resolved;
+    const {
+      swipeThresholdRatio,
+      minSwipeDistance,
+      resistanceCurvature,
+      quickFlickVelocity,
+      quickFlickMinOffset,
+      ...rest
+    } = resolved;
     const {
       swipeThresholdRatio: _r,
       minSwipeDistance: _m,
       resistanceCurvature: _c,
+      quickFlickVelocity: _v,
+      quickFlickMinOffset: _o,
       ...baseRest
     } = CAROUSEL_SWIPE_CONFIG;
     expect(rest).toEqual(baseRest);

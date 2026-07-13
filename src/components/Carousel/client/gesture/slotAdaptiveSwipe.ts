@@ -45,6 +45,7 @@ export const resolveSlotAdaptiveSwipeConfig = (
   slotPx: number | null,
 ): Required<PointerSwipeConfig> => {
   if (slotPx === null || !(slotPx > 0)) return base;
+  const slotScale = slotPx / SWIPE_REFERENCE_SLOT_PX;
   return {
     ...base,
     swipeThresholdRatio: 0,
@@ -55,5 +56,13 @@ export const resolveSlotAdaptiveSwipeConfig = (
     ),
     resistanceCurvature:
       base.resistanceCurvature * (SWIPE_REFERENCE_SLOT_PX / slotPx),
+    // Flick qualification is CONTENT-relative: "fast/far enough to be a
+    // flick" is a judgement about motion relative to one slide, so the
+    // px-domain thresholds scale WITH the slot (unlike the curvature,
+    // which scales inversely — it is a per-px quantity). Without this a
+    // fixed px/ms threshold is proportionally hair-triggered on any slot
+    // larger than the calibration one and numb on smaller ones.
+    quickFlickVelocity: base.quickFlickVelocity * slotScale,
+    quickFlickMinOffset: base.quickFlickMinOffset * slotScale,
   };
 };

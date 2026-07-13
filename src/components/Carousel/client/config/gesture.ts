@@ -38,14 +38,20 @@ export const CAROUSEL_SWIPE_CONFIG: Required<PointerSwipeConfig> = {
   resistance: 0.33,
   // Rubber length: the resistance curve saturates at
   // 1 / (curvature * r/(1-r)) px of UI travel — the "wall" the finger hits.
-  // r=0.33, c=0.0046 -> stiffness 0.4925, wall ~441px (~1.1 of the reference
-  // slot): softer early ramp and longer travel than the previous
-  // r=0.38 calibration (wall ~355px).
+  // (Round-number example: r=0.5, c=0.005 -> wall at 200px.) Lower r or
+  // lower c -> softer early ramp and a farther wall. The curvature is
+  // slot-rescaled at runtime (gesture/slotAdaptiveSwipe.ts), so the wall
+  // sits at the same RELATIVE pull on any slot.
   resistanceCurvature: 0.0046,
   maxVelocity: 5,
   emaAlpha: 0.85,
-  quickFlickVelocity: 0.1,
-  quickFlickMinOffset: 6,
+  // Flick qualification, CONTENT-RELATIVE: both values are calibrated for
+  // the reference slot and rescaled by `slot / reference` at runtime
+  // (gesture/slotAdaptiveSwipe.ts), so "how fast/far counts as a flick"
+  // feels identical on any slot and device. At the reference slot the
+  // velocity reads directly in px/ms and the offset in px.
+  quickFlickVelocity: 0.25,
+  quickFlickMinOffset: 20,
   // Flick memory: the flick decision and the release speed judge the whole
   // gesture (weighted-average velocity), not its last segment, and survive a
   // finger settling before lift-off (grace, then half-life decay).

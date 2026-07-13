@@ -900,9 +900,14 @@ slot (`useMeasuredSlotSize`): the commit distance becomes
 `clamp(SWIPE_COMMIT_MIN_PX, slot × SWIPE_COMMIT_SLOT_SHARE,
 SWIPE_COMMIT_MAX_PX)` delivered via `minSwipeDistance` (with
 `swipeThresholdRatio: 0` — the engine's own host-relative path is retired
-for the carousel), and the rubber curvature is rescaled by
+for the carousel), the rubber curvature is rescaled by
 `SWIPE_REFERENCE_SLOT_PX / slot` so resistance reaches the same relative
-stiffness at the same relative pull on any slot.
+stiffness at the same relative pull on any slot, and the flick
+qualification (`quickFlickVelocity`, `quickFlickMinOffset`) is rescaled by
+`slot / SWIPE_REFERENCE_SLOT_PX` — "fast/far enough to be a flick" is a
+judgement about motion relative to one slide, so the px-domain thresholds
+scale WITH the slot (the curvature scales inversely because it is a
+per-px quantity).
 `SWIPE_REFERENCE_SLOT_PX` is not a knob but a calibration record — the slot
 width at which the rubber numbers were hand-tuned — and lives next to the
 computation it anchors, not among the tuning constants. The engine itself is
