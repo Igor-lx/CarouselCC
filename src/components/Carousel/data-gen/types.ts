@@ -16,17 +16,14 @@ export interface GeneratedImageSource {
   srcSet: string;
   sizes?: string;
   type?: string;
-  /** Intrinsic aspect (width / height) of this set's crop — lets the
-   * component compare candidates across sets by pixel AREA in single-set
-   * mode. Declared by the config (the person who cut the crops knows it). */
-  aspect?: number;
 }
 
 export interface GeneratedImage {
   srcSet?: string;
   sizes?: string;
-  /** Intrinsic aspect (width / height) of the default set's crop. */
-  aspect?: number;
+  /** The publisher's designated single-set asset URL (single-set / no-module
+   * fallback). Emitted only when the config names a `default` set. */
+  defaultSrc?: string;
   sources?: GeneratedImageSource[];
 }
 

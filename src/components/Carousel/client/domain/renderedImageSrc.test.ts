@@ -33,7 +33,7 @@ describe("resolveLargestSrcSetCandidate", () => {
 });
 
 describe("resolveLargestImageCandidate", () => {
-  it("looks across ALL sets: a source can out-width the default", () => {
+  it("scans ALL sets: a source can out-width the default", () => {
     expect(
       resolveLargestImageCandidate({
         srcSet: "/img/wide-720.webp 720w",
@@ -42,68 +42,22 @@ describe("resolveLargestImageCandidate", () => {
     ).toBe("/img/tall-1080.webp");
   });
 
-  it("with aspects on EVERY set, compares by pixel AREA, not width", () => {
-    // wide 720x405 (16:9) = 291600 px; tall 720x1280 (9:16) = 921600 px.
+  it("width is the whole rule — no height/orientation guessing", () => {
+    expect(
+      resolveLargestImageCandidate({
+        srcSet: "/img/wide-1280.webp 1280w",
+        sources: [{ media: "(orientation: portrait)", srcSet: "/img/tall-720.webp 720w" }],
+      }),
+    ).toBe("/img/wide-1280.webp");
+  });
+
+  it("exact width ties keep the default srcSet's candidate", () => {
     expect(
       resolveLargestImageCandidate({
         srcSet: "/img/wide-720.webp 720w",
-        aspect: 16 / 9,
-        sources: [
-          {
-            media: "(orientation: portrait)",
-            srcSet: "/img/tall-720.webp 720w",
-            aspect: 9 / 16,
-          },
-        ],
-      }),
-    ).toBe("/img/tall-720.webp");
-  });
-
-  it("area comparison is symmetric — a wider-aspect set wins when IT has more pixels", () => {
-    // pano 1000x400 (2.5) = 400000 px; square 600x600 (1) = 360000 px.
-    expect(
-      resolveLargestImageCandidate({
-        srcSet: "/img/square-600.webp 600w",
-        aspect: 1,
-        sources: [
-          { media: "(min-width: 800px)", srcSet: "/img/pano-1000.webp 1000w", aspect: 2.5 },
-        ],
-      }),
-    ).toBe("/img/pano-1000.webp");
-  });
-
-  it("any set missing its aspect drops the comparison to WIDTH only (no guessed heights)", () => {
-    // aspects would favour tall, but the default set declares none.
-    expect(
-      resolveLargestImageCandidate({
-        srcSet: "/img/wide-720.webp 720w",
-        sources: [
-          {
-            media: "(orientation: portrait)",
-            srcSet: "/img/tall-720.webp 720w",
-            aspect: 9 / 16,
-          },
-        ],
-      }),
-    ).toBe("/img/wide-720.webp"); // width tie -> the DEFAULT set keeps it
-  });
-
-  it("exact ties keep the default set's candidate", () => {
-    expect(
-      resolveLargestImageCandidate({
-        srcSet: "/img/wide-720.webp 720w",
-        aspect: 1,
-        sources: [
-          { media: "(min-width: 800px)", srcSet: "/img/alt-720.webp 720w", aspect: 1 },
-        ],
+        sources: [{ media: "(min-width: 800px)", srcSet: "/img/alt-720.webp 720w" }],
       }),
     ).toBe("/img/wide-720.webp");
-  });
-
-  it("default set only: plain largest", () => {
-    expect(resolveLargestImageCandidate({ srcSet: SRCSET })).toBe(
-      "/img/a-1280.webp",
-    );
   });
 
   it("no sets at all yields null", () => {
@@ -113,37 +67,40 @@ describe("resolveLargestImageCandidate", () => {
 });
 
 describe("resolveRenderedImageSrc", () => {
-  const slide: Slide = {
-    id: "s1",
-    content: "/img/a-480.webp",
-    image: {
-      srcSet: SRCSET,
-      aspect: 16 / 9,
-      sources: [
-        {
-          media: "(orientation: portrait)",
-          srcSet: "/img/tall-1280.webp 1280w",
-          aspect: 9 / 16,
-        },
-      ],
-    },
+  const image = {
+    srcSet: SRCSET,
+    defaultSrc: "/img/designated.webp",
+    sources: [{ media: "(orientation: portrait)", srcSet: "/img/tall-1280.webp 1280w" }],
   };
+  const slide: Slide = { id: "s1", content: "/img/a-480.webp", image };
 
   it("responsive mode renders the canonical content URL", () => {
     expect(resolveRenderedImageSrc(slide, true)).toBe("/img/a-480.webp");
   });
 
-  it("single-set mode renders the largest-by-AREA candidate across sets", () => {
-    expect(resolveRenderedImageSrc(slide, false)).toBe("/img/tall-1280.webp");
+  it("single-set mode renders the publisher's DESIGNATED defaultSrc when present", () => {
+    expect(resolveRenderedImageSrc(slide, false)).toBe("/img/designated.webp");
   });
 
-  it("falls back to content when there is no srcSet", () => {
-    const plain: Slide = { id: "s2", content: "/img/only.webp" };
+  it("single-set mode falls back to the widest candidate when no defaultSrc", () => {
+    const noDefault: Slide = {
+      id: "s2",
+      content: "/img/a-480.webp",
+      image: {
+        srcSet: SRCSET, // widest here is 1280w
+        sources: [{ media: "(orientation: portrait)", srcSet: "/img/tall-1600.webp 1600w" }],
+      },
+    };
+    expect(resolveRenderedImageSrc(noDefault, false)).toBe("/img/tall-1600.webp");
+  });
+
+  it("falls back to content when there is no image data at all", () => {
+    const plain: Slide = { id: "s3", content: "/img/only.webp" };
     expect(resolveRenderedImageSrc(plain, false)).toBe("/img/only.webp");
   });
 
   it("non-string content is not an image", () => {
-    const text: Slide = { id: "s3", content: 42 };
+    const text: Slide = { id: "s4", content: 42 };
     expect(resolveRenderedImageSrc(text, false)).toBeNull();
   });
 });

@@ -246,9 +246,14 @@ For each logical slide you need, starting from a single high-resolution source:
 
    The whole pairing is scoped to the `<ResponsiveImages />` module's
    presence (`data-responsive-images` on the root): without the module the
-   deck deliberately runs ONE native set — the largest default candidate
-   everywhere (`resolveRenderedImageSrc`), the box keeps the default aspect
-   in any orientation, and none of the machinery below runs.
+   deck deliberately runs ONE native set (`resolveRenderedImageSrc`), the
+   box keeps the default aspect in any orientation, and none of the
+   machinery below runs. Which single asset: the publisher's designated
+   `image.defaultSrc` when the data declares one (a multi-set deck has a
+   human who chose the canonical stand-alone asset — the generator's
+   `default` field records it); otherwise the widest candidate across all
+   sets; otherwise `content`. The rule carries ZERO orientation/layout
+   semantics — the box fits whatever wins via `object-fit`.
 
    On a device ROTATION the two halves of the contract swap at different
    speeds: CSS flips the box aspect instantly, but the browser keeps
@@ -303,7 +308,7 @@ For each logical slide you need, starting from a single high-resolution source:
 | ------------- | ------------------------------- | ----- |
 | `pagination`  | `<Pagination />` or `<PaginationWidget />` | Exactly one may be attached. Renders only when `isPaginationOn` is `true`. |
 | `controls`    | `<Controls />`                  | Renders only when `isControlsOn` is `true`. |
-| `responsive-images` | `<ResponsiveImages />` | Headless. Its PRESENCE switches the responsive-image stack on (art-directed sources, srcSet/sizes, rotation veil, portrait aspect flip); its body warms neighbour pages and the rotation crop (§8.4). Absent: one native set everywhere — the LARGEST default candidate, zero responsive machinery. |
+| `responsive-images` | `<ResponsiveImages />` | Headless. Its PRESENCE switches the responsive-image stack on (art-directed sources, srcSet/sizes, rotation veil, portrait aspect flip); its body warms neighbour pages and the rotation crop (§8.4). Absent: one native set everywhere — the designated `defaultSrc` (else widest candidate), zero responsive machinery. |
 | `diagnostic`  | `<Diagnostic />`                | Always renders if attached. Dev-only; in prod console output is suppressed by the env guard. |
 
 Slot resolution is done by the shared `resolveSlots` against `CAROUSEL_SLOTS`.
@@ -1167,9 +1172,10 @@ Headless (renders `null`). Two effects in one slot:
 1. **Presence switch.** Mounting it turns the responsive stack on: SlideItem
    emits `<source>`/`srcSet`/`sizes`, the rotation veil arms, the portrait
    aspect flip applies, and the image store keys on the canonical `content`
-   URL. Unmounted, a slide is a plain `<img>` of the LARGEST default
-   candidate ("quality first, no economy") and the module's code is
-   tree-shaken out. The same slides JSON works in both modes.
+   URL. Unmounted, a slide is a plain `<img>` of the single-set asset (the
+   designated `image.defaultSrc`, else the widest candidate) and the
+   module's code is tree-shaken out. The same slides JSON works in both
+   modes.
 2. **Warm manager.** ONE transport for every warm: a detached `Image`
    (`fetchPriority: "low"`, `srcset`/`sizes` set — the browser resolves the
    candidate exactly like the rendered markup would; no `<link rel=preload>`

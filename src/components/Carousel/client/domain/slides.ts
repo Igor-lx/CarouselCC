@@ -72,53 +72,24 @@ export const resolveLargestSrcSetCandidate = (
 };
 
 /**
- * The single-set-mode candidate: the LARGEST image across ALL of the slide's
- * sets (the default `srcSet` AND every art-directed `<source>`) — "quality
- * first, no economy" means the most pixels the data offers anywhere, with
- * ZERO orientation/layout semantics: the host fits whatever wins via plain
- * `object-fit`.
- *
- * "Largest" is measured honestly by what the data declares:
- * - when EVERY set carries its `aspect` metadata (width / height of the
- *   crop), candidates compare by pixel AREA (`width² / aspect`) — the true
- *   "biggest image";
- * - otherwise `w` descriptors are the only size signal and candidates
- *   compare by WIDTH alone (area is unknowable — the resolver never guesses
- *   heights).
- * Exact ties keep the DEFAULT set's candidate (the canonical set), then
- * earlier source order — deterministic, semantics-free.
+ * The single-set-mode FALLBACK candidate for data that does not designate
+ * one (`image.defaultSrc` absent): the widest candidate across ALL of the
+ * slide's sets (the default `srcSet` AND every art-directed `<source>`).
+ * `w` descriptors are the only size signal the data carries, so width is
+ * the whole rule — the resolver never guesses heights, orientations or
+ * layouts. Exact ties keep the default `srcSet`'s candidate, then earlier
+ * source order — deterministic, semantics-free.
  */
 export const resolveLargestImageCandidate = (image: Slide["image"]): string | null => {
-  interface SetCandidate {
-    url: string;
-    width: number;
-    aspect: number | undefined;
-  }
-  const candidates: SetCandidate[] = [];
-  const consider = (srcSet: string | undefined, aspect: number | undefined) => {
+  let best: { url: string; width: number } | null = null;
+  const consider = (srcSet: string | undefined) => {
     const largest = resolveLargestSrcSetCandidate(srcSet);
-    if (largest) candidates.push({ ...largest, aspect });
+    // Strictly-greater keeps the earliest (default srcSet first) on ties.
+    if (largest && (best === null || largest.width > best.width)) best = largest;
   };
-  consider(image?.srcSet, image?.aspect);
-  for (const source of image?.sources ?? []) {
-    consider(source.srcSet, source.aspect);
-  }
-  if (candidates.length === 0) return null;
-
-  const isAreaComparable = candidates.every(
-    (candidate) => typeof candidate.aspect === "number" && candidate.aspect > 0,
-  );
-  const score = (candidate: SetCandidate): number =>
-    isAreaComparable
-      ? (candidate.width * candidate.width) / (candidate.aspect as number)
-      : candidate.width;
-
-  // Strictly-greater keeps the earliest (default set first) on exact ties.
-  let best = candidates[0]!;
-  for (const candidate of candidates.slice(1)) {
-    if (score(candidate) > score(best)) best = candidate;
-  }
-  return best.url;
+  consider(image?.srcSet);
+  for (const source of image?.sources ?? []) consider(source.srcSet);
+  return best === null ? null : (best as { url: string }).url;
 };
 
 /**
@@ -129,10 +100,12 @@ export const resolveLargestImageCandidate = (image: Slide["image"]): string | nu
  *
  * - responsive mode (`<ResponsiveImages />` mounted): the canonical
  *   `content` URL — the browser upgrades it via `srcSet` / `<source>`;
- * - single-set mode (module absent): the LARGEST candidate across ALL sets
- *   (see `resolveLargestImageCandidate`) — the deliberate "quality first,
- *   no economy" mode. Slide identity is untouched either way (`dataKey`
- *   stays on `id + content`).
+ * - single-set mode (module absent): the publisher's DESIGNATED asset
+ *   (`image.defaultSrc`) when the data declares one — a human who split the
+ *   deck into sets already knows which asset stands alone; otherwise the
+ *   widest candidate across all sets (`resolveLargestImageCandidate`), and
+ *   finally the `content` URL itself. Slide identity is untouched either
+ *   way (`dataKey` stays on `id + content`).
  */
 export const resolveRenderedImageSrc = (
   slideData: Slide,
@@ -141,7 +114,7 @@ export const resolveRenderedImageSrc = (
   const { content, image } = slideData;
   if (typeof content !== "string") return null;
   if (isResponsiveImagesOn) return content;
-  return resolveLargestImageCandidate(image) ?? content;
+  return image?.defaultSrc ?? resolveLargestImageCandidate(image) ?? content;
 };
 
 /** Whether any slide in the deck carries responsive image variants. */

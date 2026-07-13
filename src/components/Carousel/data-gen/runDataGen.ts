@@ -35,8 +35,6 @@ export interface DataGenVariant {
 export interface DataGenSource {
   media: string;
   type?: string;
-  /** Intrinsic aspect (width / height) of this group's crop. */
-  aspect?: number;
   variants: DataGenVariant[];
 }
 
@@ -49,8 +47,11 @@ export interface DataGenConfig {
   output: string;
   /** Default `<img>` resolution variants. */
   variants: DataGenVariant[];
-  /** Intrinsic aspect (width / height) of the default crop. */
-  aspect?: number;
+  /** The subfolder (under `assetsDir`) whose asset is the designated
+   * single-set / no-module fallback — e.g. `"nature/wide/1600"`. Names a
+   * concrete resolution of the canonical set; usually one already listed in
+   * `variants` or `sources`, by design. Omit for a single-set deck. */
+  default?: string;
   /** Art-directed source groups. */
   sources?: DataGenSource[];
 }
@@ -107,7 +108,6 @@ export async function runDataGen(config: DataGenConfig): Promise<DataGenResult> 
     (config.sources ?? []).map(async (group) => ({
       media: group.media,
       ...(group.type !== undefined && { type: group.type }),
-      ...(group.aspect !== undefined && { aspect: group.aspect }),
       widths: await Promise.all(
         group.variants.map((variant) =>
           readVariant(assetsDir, config.urlBase, variant),
@@ -116,6 +116,14 @@ export async function runDataGen(config: DataGenConfig): Promise<DataGenResult> 
     })),
   );
 
+  // The designated single-set fallback: read its subfolder into a
+  // `slug -> URL` map. Width is irrelevant here (one concrete resolution).
+  const defaultUrlBySlug =
+    config.default === undefined
+      ? undefined
+      : (await readVariant(assetsDir, config.urlBase, { subdir: config.default, width: 0 }))
+          .urlBySlug;
+
   // The first default variant defines the slide set + order.
   const slugs = Object.keys(widths[0]?.urlBySlug ?? {}).sort(
     (a, b) => slideNumber(a) - slideNumber(b),
@@ -123,7 +131,7 @@ export async function runDataGen(config: DataGenConfig): Promise<DataGenResult> 
 
   const slides = generateSlides({
     widths,
-    ...(config.aspect !== undefined && { aspect: config.aspect }),
+    ...(defaultUrlBySlug !== undefined && { defaultUrlBySlug }),
     sources,
     slugs,
     previous: await loadPrevious(output),

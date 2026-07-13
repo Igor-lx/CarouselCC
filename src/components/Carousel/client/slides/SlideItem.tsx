@@ -38,8 +38,8 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
   } = props;
 
   // The rendered (and store-keyed) URL: canonical content in responsive
-  // mode, the LARGEST candidate across ALL sets in single-set mode — one
-  // rule shared with the store retention (see resolveRenderedImageSrc).
+  // mode, the designated defaultSrc (else widest candidate) in single-set
+  // mode — one rule shared with the store retention (resolveRenderedImageSrc).
   const imageSource =
     isContentImg && slideData
       ? resolveRenderedImageSrc(slideData, isResponsiveImagesOn)
@@ -82,7 +82,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
   // `srcSet`, so a plain `<img src>` slide carries none.
   const image = slideData.image;
   // The whole responsive surface is gated by the module's presence: without
-  // it a slide is a plain <img src> of the largest candidate — no sources,
+  // it a slide is a plain <img src> of the single-set asset — no sources,
   // no srcSet, no sizes.
   const sources = isResponsiveImagesOn ? image?.sources ?? [] : [];
   const isResponsive =

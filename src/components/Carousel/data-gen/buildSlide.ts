@@ -29,8 +29,9 @@ export interface BuildSlideInput {
   alt?: string;
   /** Resolution candidates for the default image. At least one required. */
   candidates: ImageCandidate[];
-  /** Intrinsic aspect (width / height) of the default set's crop. */
-  aspect?: number;
+  /** The publisher's designated single-set asset URL — rendered when
+   * responsive selection is off. Omit when the deck has just one set. */
+  defaultSrc?: string;
   /** Art-directed overrides (e.g. an orientation crop). */
   sources?: ArtDirectedSource[];
   /** Canonical identity + fallback URL. Defaults to the smallest candidate. */
@@ -54,7 +55,6 @@ const toImageSource = (source: ArtDirectedSource): GeneratedImageSource => ({
   srcSet: toSrcSet(source.candidates),
   ...(source.sizes !== undefined && { sizes: source.sizes }),
   ...(source.type !== undefined && { type: source.type }),
-  ...(source.aspect !== undefined && { aspect: source.aspect }),
 });
 
 export function buildSlide(input: BuildSlideInput): GeneratedSlide {
@@ -67,7 +67,7 @@ export function buildSlide(input: BuildSlideInput): GeneratedSlide {
     // `sizes` is intentionally omitted unless overridden, so the carousel
     // injects the value derived from its slot count at render time.
     ...(input.sizes !== undefined && { sizes: input.sizes }),
-    ...(input.aspect !== undefined && { aspect: input.aspect }),
+    ...(input.defaultSrc !== undefined && { defaultSrc: input.defaultSrc }),
     ...(input.sources?.length
       ? { sources: input.sources.map(toImageSource) }
       : {}),

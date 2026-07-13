@@ -53,8 +53,10 @@ export type SlideImageSource = z.infer<typeof SlideImageSourceSchema>;
  *
  * Inferred from {@link SlideImageVariantsSchema}. Fields: `srcSet?` — resolution
  * candidates for the default `<img>` (width `w` descriptors); `sizes?` —
- * override the carousel's auto-derived `sizes` (rarely needed); `sources?` —
- * art-directed `<source>` overrides (e.g. a landscape crop).
+ * override the carousel's auto-derived `sizes` (rarely needed); `defaultSrc?`
+ * — the publisher's designated single-set asset, rendered when responsive
+ * selection is off (no `<ResponsiveImages />`); `sources?` — art-directed
+ * `<source>` overrides (e.g. a landscape crop).
  */
 export type SlideImageVariants = z.infer<typeof SlideImageVariantsSchema>;
 

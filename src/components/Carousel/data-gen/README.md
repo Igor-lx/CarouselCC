@@ -7,6 +7,23 @@ wherever your images live (a build box, a server, a CDN pipeline), and run it
 there. It depends only on Node built-ins and imports nothing from the component,
 so it travels on its own.
 
+## This generator is OPTIONAL
+
+`<Carousel>` takes its slides through the `slidesData` prop, which is a plain
+`Slide[]` — a JavaScript array. There are three tiers of effort, all valid:
+
+1. **Hand-written objects.** Build a `Slide[]` in code and pass it straight to
+   `slidesData` — no JSON, no generator. A slide can be as small as
+   `{ id, content: "/my.jpg" }`.
+2. **A tiny JSON, no variants.** Have a folder of images and want a document?
+   Write a three-line config with a single `variants` entry (or even hand-write
+   the JSON array) and load it however you like — `fetch`, import, bundler.
+3. **The full pipeline.** Multiple resolutions and art-directed crops → let this
+   generator assemble `srcSet`/`sources` and keep ids stable across regenerations.
+
+The demo app uses tier 3 and `fetch`es the result, but that is a demo choice, not
+a contract — `slidesData` never cares where the array came from.
+
 ## What it produces
 
 A JSON array of slides:
@@ -19,6 +36,7 @@ A JSON array of slides:
     "alt": "",                          // scaffolded empty; fill by hand
     "image": {
       "srcSet": "…480w, …720w",
+      "defaultSrc": "<base>/nature/wide/1600/carousel1.webp", // only if `default` is set
       "sources": [ { "media": "…", "srcSet": "…", "type": "image/webp" } ]
     }
   }
@@ -56,6 +74,7 @@ tsx src/components/Carousel/data-gen/cli.ts carousel-data.config.json
   "assetsDir": "public/carousel",
   "urlBase": "/CarouselCC/carousel/",
   "output": "public/carousel-slides.json",
+  "default": "nature/wide/1600",
   "variants": [
     { "subdir": "nature/wide/480", "width": 480 },
     { "subdir": "nature/wide/720", "width": 720 },
@@ -79,6 +98,15 @@ tsx src/components/Carousel/data-gen/cli.ts carousel-data.config.json
 - `urlBase` — URL prefix baked into the document (the app origin / base, or a CDN
   origin in production).
 - `output` — where to write the JSON.
+- `default` — **optional**, and only meaningful for a MULTI-set deck. It names
+  the subfolder whose asset is the designated single-set / no-module fallback
+  (`image.defaultSrc`): the one image to render when `<ResponsiveImages />` is
+  not mounted, fitted via `object-fit`. A deck built from several sets already
+  has a human who knows which asset stands alone — this records that choice
+  instead of making the code derive it. It typically names a subfolder already
+  listed in `variants` or `sources` (the value is deliberately duplicated). Omit
+  it for a single-set deck: without it the carousel renders the widest candidate
+  it can find, then `content`.
 - `variants` — the default `<img>` resolutions. The **first** one defines the
   slide set and order.
 - `sources` — optional art-directed groups (e.g. an orientation crop).

@@ -84,6 +84,23 @@ describe("generateSlides", () => {
     expect(first?.id).toBe("carousel1");
   });
 
+  it("emits image.defaultSrc from the designated-default map, per slug", () => {
+    const [first, second] = generateSlides({
+      ...baseInput,
+      defaultUrlBySlug: {
+        carousel1: "/l/720/carousel1.webp",
+        carousel2: "/p/720/carousel2.webp",
+      },
+    });
+    expect(first?.image?.defaultSrc).toBe("/l/720/carousel1.webp");
+    expect(second?.image?.defaultSrc).toBe("/p/720/carousel2.webp");
+  });
+
+  it("omits defaultSrc when no designated default is given (single-set deck)", () => {
+    const [first] = generateSlides(baseInput);
+    expect(first?.image && "defaultSrc" in first.image).toBe(false);
+  });
+
   it("preserves id and hand-written alt for existing slides on regeneration", () => {
     const previous: GeneratedSlide[] = [
       {

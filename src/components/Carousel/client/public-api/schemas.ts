@@ -49,12 +49,6 @@ export const SlideImageSourceSchema = z.object({
   srcSet: z.string().trim().min(1),
   sizes: z.string().trim().min(1).optional(),
   type: z.string().trim().min(1).optional(),
-  // Intrinsic aspect (width / height) of this set's crop. OPTIONAL metadata:
-  // `w` descriptors carry width only, so pixel AREA is unknowable without
-  // it. When every set declares its aspect, single-set mode ("largest
-  // image") compares candidates by area instead of width — no orientation
-  // heuristics, just declared geometry.
-  aspect: z.number().positive().optional(),
 });
 
 /**
@@ -65,9 +59,13 @@ export const SlideImageSourceSchema = z.object({
 export const SlideImageVariantsSchema = z.object({
   srcSet: z.string().trim().min(1).optional(),
   sizes: z.string().trim().min(1).optional(),
-  // Intrinsic aspect (width / height) of the DEFAULT set's crop — see
-  // `SlideImageSourceSchema.aspect`.
-  aspect: z.number().positive().optional(),
+  // The publisher's DESIGNATED single-set asset: the one to render when
+  // responsive selection is off (<ResponsiveImages /> not mounted) or
+  // unavailable. A deck built from several sets already has a human who
+  // knows which asset is the canonical stand-alone one — this field records
+  // that decision instead of making the code derive it. Typically
+  // duplicates one of the srcSet/sources candidates — by design.
+  defaultSrc: z.string().trim().min(1).optional(),
   sources: z.array(SlideImageSourceSchema).readonly().optional(),
 });
 
