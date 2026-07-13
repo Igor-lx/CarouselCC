@@ -2,7 +2,7 @@
   "assetsDir": "public/carousel",
   "urlBase": "/CarouselCC/carousel/",
   "output": "public/carousel-slides2.json",
-  "default": "family/wide/720",
+  "default": "family/tall/720",
   "variants": [
     {
       "subdir": "family/wide/480",
