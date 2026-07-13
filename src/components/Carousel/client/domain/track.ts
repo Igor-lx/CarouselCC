@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 const TRANSFORM_PRECISION = 10_000;
 
 const roundedPx = (value: number) =>
@@ -6,32 +8,59 @@ const roundedPx = (value: number) =>
     : 0;
 
 /**
- * Build a `translate3d(...)` string for the track. Used when a pixel slot
- * size has been measured.
+ * Build a `translate3d(...)` string that SCROLLS the track. Used when a pixel
+ * slot size has been measured.
+ *
+ * `layoutOrigin` is the coordinate base the slides are positioned against
+ * (see `slideLaneStyle`). It is DELIBERATELY not the render-window start: the
+ * window shifts by a slot on every settle (it decides which slides are
+ * mounted), whereas the origin is stable across those shifts — so the scroll
+ * transform re-baselines only on a rare origin recenter, never per ride, and
+ * a window shift moves no slide relative to the track (no re-raster).
  */
 export const trackPixelTransform = (
   position: number,
-  renderWindowStart: number,
+  layoutOrigin: number,
   slotSize: number,
 ): string => {
-  const relative = position - renderWindowStart;
+  const relative = position - layoutOrigin;
   const offset = -relative * slotSize;
   return `translate3d(${roundedPx(offset)}px, 0, 0)`;
 };
 
 /**
- * Fallback transform expressed in `calc(...)` against the viewport width
+ * Fallback scroll transform expressed in `calc(...)` against the track width
  * and the SCSS-provided gap CSS variable. Used before the first pixel
  * measurement and as a safety net if the measurement is unavailable.
  */
 export const trackCssTransform = (
   position: number,
-  renderWindowStart: number,
+  layoutOrigin: number,
   visibleSlidesCount: number,
 ): string => {
-  const relative = position - renderWindowStart;
+  const relative = position - layoutOrigin;
   return `translateX(calc(-${relative} * (100% + var(--slides-gap, 0px)) / ${visibleSlidesCount})) translateX(0px)`;
 };
+
+/**
+ * Inline style POSITIONING one slide at its own virtual lane, independent of
+ * every other slide. Width is `1/visibleSlidesCount` of the track (minus the
+ * shared gaps); the horizontal placement is a `translateX` of the slide's
+ * lane (`virtualIndex - layoutOrigin`) times one slot stride. Because
+ * `translateX(100%)` on an absolutely-positioned slide is its OWN width, and
+ * slide width + gap === one slot stride, `(100% + gap)` is exactly one lane
+ * step. A slide's lane is fixed for its lifetime (its virtualIndex never
+ * changes while mounted, and `layoutOrigin` is stable across window shifts),
+ * so mounting or unmounting a neighbour never moves it — the whole point.
+ */
+export const slideLaneStyle = (
+  virtualIndex: number,
+  layoutOrigin: number,
+  visibleSlidesCount: number,
+): CSSProperties => ({
+  width: `calc((100% - var(--slides-gap, 0px) * ${visibleSlidesCount - 1}) / ${visibleSlidesCount})`,
+  transform: `translateX(calc(${virtualIndex - layoutOrigin} * (100% + var(--slides-gap, 0px))))`,
+});
 
 const parseLength = (raw: string) => {
   const value = Number.parseFloat(raw);
@@ -60,11 +89,13 @@ export const measureSlotSize = (
 };
 
 /**
- * Build a flex style that gives each slide exactly `1/visibleSlidesCount`
- * of the viewport width minus the gaps. Used as inline style for each slide.
+ * Width-only style for the always-present height sizer: one slot wide (so the
+ * track derives its height from `aspect-ratio` exactly as a slide would),
+ * kept in normal flow because absolutely-positioned slides contribute no
+ * height. See `.slideSizer` in the stylesheet.
  */
-export const slideFlexStyle = (visibleSlidesCount: number): { flex: string } => ({
-  flex: `0 0 calc((100% - (var(--slides-gap, 0px) * ${visibleSlidesCount - 1})) / ${visibleSlidesCount})`,
+export const slideSizerStyle = (visibleSlidesCount: number): { width: string } => ({
+  width: `calc((100% - var(--slides-gap, 0px) * ${visibleSlidesCount - 1}) / ${visibleSlidesCount})`,
 });
 
 /**

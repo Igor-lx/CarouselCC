@@ -13,7 +13,7 @@ const RESIZE_EPSILON_PX = 0.5;
 
 interface UseTrackBindingInput {
   trackRef: RefObject<HTMLDivElement | null>;
-  renderWindowStart: number;
+  layoutOrigin: number;
   visibleSlidesCount: number;
   visualPosition: VisualPositionSource;
 }
@@ -73,18 +73,18 @@ export interface TrackBindingApi {
  */
 export function useTrackBinding({
   trackRef,
-  renderWindowStart,
+  layoutOrigin,
   visibleSlidesCount,
   visualPosition,
 }: UseTrackBindingInput): TrackBindingApi {
-  const renderWindowStartRef = useRef(renderWindowStart);
+  const layoutOriginRef = useRef(layoutOrigin);
   const visibleSlidesCountRef = useRef(visibleSlidesCount);
   const slotSizeRef = useRef<number | null>(null);
   const lastTransformRef = useRef<string | null>(null);
   const lastMeasuredWidthRef = useRef<number | null>(null);
   const compositorAnimationRef = useRef<Animation | null>(null);
 
-  renderWindowStartRef.current = renderWindowStart;
+  layoutOriginRef.current = layoutOrigin;
   visibleSlidesCountRef.current = visibleSlidesCount;
 
   const measure = useCallback(
@@ -108,11 +108,11 @@ export function useTrackBinding({
   const resolveTransform = useCallback((position: number): string => {
     const slot = slotSizeRef.current;
     if (slot !== null) {
-      return trackPixelTransform(position, renderWindowStartRef.current, slot);
+      return trackPixelTransform(position, layoutOriginRef.current, slot);
     }
     return trackCssTransform(
       position,
-      renderWindowStartRef.current,
+      layoutOriginRef.current,
       visibleSlidesCountRef.current,
     );
   }, []);
@@ -196,7 +196,7 @@ export function useTrackBinding({
       const keyframes: Keyframe[] = stops.map((progress) => ({
         transform: trackPixelTransform(
           from + span * progress,
-          renderWindowStartRef.current,
+          layoutOriginRef.current,
           slot,
         ),
       }));
@@ -274,7 +274,7 @@ export function useTrackBinding({
 
   useIsomorphicLayoutEffect(() => {
     syncGeometry();
-  }, [renderWindowStart, syncGeometry, visibleSlidesCount]);
+  }, [layoutOrigin, syncGeometry, visibleSlidesCount]);
 
   useIsomorphicLayoutEffect(() => {
     const track = trackRef.current;

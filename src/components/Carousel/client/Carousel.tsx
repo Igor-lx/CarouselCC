@@ -18,7 +18,8 @@ import {
 import {
   carouselBoundaryState,
   deckCarriesImageSets,
-  slideFlexStyle,
+  slideLaneStyle,
+  slideSizerStyle,
 } from "./domain";
 import { useCarouselAutoplay } from "./autoplay/useCarouselAutoplay";
 import { useFocusRecovery } from "./focus/useFocusRecovery";
@@ -205,7 +206,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   });
 
   // --- render model: virtual slides + render window -------------------------
-  const { virtualSlides, renderWindowStart } = useSlideRenderModel({
+  const { virtualSlides, layoutOrigin } = useSlideRenderModel({
     current: state.virtualIndex,
     previous: state.fromVirtualIndex,
     isMoving: status.isMoving,
@@ -222,7 +223,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     cancelCompositorMotion,
   } = useTrackBinding({
     trackRef,
-    renderWindowStart,
+    layoutOrigin,
     visibleSlidesCount: layout.visibleSlidesCount,
     visualPosition,
   });
@@ -371,8 +372,10 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     return map;
   }, [classNames]);
 
-  const slideStyle = useMemo(
-    () => slideFlexStyle(layout.visibleSlidesCount),
+  // The sizer keeps the (absolutely-positioned) slides' height in the track:
+  // one slot wide, its aspect-ratio gives the track its height.
+  const sizerStyle = useMemo(
+    () => slideSizerStyle(layout.visibleSlidesCount),
     [layout.visibleSlidesCount],
   );
 
@@ -405,12 +408,21 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
                 className={classNames.slideContainer}
                 data-carousel-track=""
               >
+                <div
+                  aria-hidden="true"
+                  className={styles.slideSizer}
+                  style={sizerStyle}
+                />
                 {virtualSlides.map((slide) => (
                   <SlideItem
                     key={slide.slideKey}
                     slideData={slide.slideData}
                     className={slideClassMap}
-                    style={slideStyle}
+                    style={slideLaneStyle(
+                      slide.virtualIndex,
+                      layoutOrigin,
+                      layout.visibleSlidesCount,
+                    )}
                     isContentImg={isContentImg}
                     isResponsiveImagesOn={isResponsiveImagesOn}
                     errAltPlaceholder={config.errorAltPlaceholder}

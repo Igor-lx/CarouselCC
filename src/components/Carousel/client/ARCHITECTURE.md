@@ -89,7 +89,7 @@ equal halves with no cruise zone, and Diagnostic reports that normalized shape.
 | Prop          | Type            | Default | Effect |
 | ------------- | --------------- | ------- | ------ |
 | `slidesData`  | `Slide[]`       | —       | Required. `Slide = { id; content; alt?; image? }` — see §1.4.1. `content` must be a trimmed-non-empty string, a number, or a React element, and is the slide's **identity** (it alone, with `id`, feeds `dataKey`). `image` is optional render-only responsive variants. |
-| `visibleSlidesNr` | `number`     | — | How many slides share the viewport. Drives layout flex-basis, slot-size measurement, page math (`pageCount = ceil(slidesData.length / visibleSlidesNr)`), and the PaginationWidget projection slot count. |
+| `visibleSlidesNr` | `number`     | — | How many slides share the viewport. Drives slide lane width, slot-size measurement, page math (`pageCount = ceil(slidesData.length / visibleSlidesNr)`), and the PaginationWidget projection slot count. |
 | `isFullPagesOn` | `boolean`    | — | Guarantees every page is full: when the slide count is not a multiple of `visibleSlidesNr`, the deck is extended with cloned slides so the last page is never partial. |
 | `isContentImg` | `boolean`      | — | When on, treats string `content` as an `<img src>`. When off, renders raw `content`. Image errors fall back to `slide.alt` or `errAltPlaceholder`. |
 | `errAltPlaceholder` | `string`  | — | Used when an image fails to load and the slide has no `alt`. |
@@ -872,6 +872,35 @@ minimum machinery that keeps one curve, continuous retargets, a
 synchronized chorus and a deterministic settle. The accepted cost is
 documented in §10: the JS controller still samples every segment as the
 visual-position SSOT while the compositor paints.
+
+### 4.6 Stable slide lanes (paint-cost decoupling)
+
+Two axes are deliberately separated so that keeping memory bounded does not
+cost a repaint:
+
+- the **render window** (`useSlideRenderModel`) decides which virtual slides
+  are MOUNTED; it follows the position closely and its start shifts by a slot
+  on essentially every settle;
+- the **layout origin** is the coordinate base everything is positioned
+  against; it is STABLE across those window shifts and recenters only when
+  the window has drifted a whole band away (`LAYOUT_ORIGIN_BAND_SLOTS`).
+
+Each slide is absolutely positioned at its own lane —
+`translateX((virtualIndex − layoutOrigin) × slotStride)` via
+`slideLaneStyle`, `virtualIndex` fixed for the slide's mounted life — and
+only the track's own `transform` scrolls (`−(position − layoutOrigin) ×
+slot`). Because a slide's lane depends on the STABLE origin, not the window,
+a per-settle window shift merely mounts one edge slide and unmounts another
+and moves **no other slide** — so the compositor never re-rasters the whole
+track on settle. (The earlier flow layout re-based the transform on
+`renderWindowStart`, which shifted every settle and reflowed every slide,
+forcing a full-track raster that showed as a one-vsync hitch mid-ride on a
+weak GPU.) A finite deck's window never leaves `[0, length)`, so its origin
+never moves; an infinite deck recenters once per band (~hundreds of rides) —
+a rare, atomic re-baseline that also bounds the transform magnitude. The
+track's height comes from an invisible in-flow `.slideSizer` (one slot wide,
+the slide aspect-ratio tall), since absolutely-positioned slides contribute
+none.
 
 ---
 

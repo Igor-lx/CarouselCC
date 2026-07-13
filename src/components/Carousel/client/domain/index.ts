@@ -29,8 +29,9 @@ export { slideVisibilityFlags, buildSlideAriaProps } from "./visibility";
 export {
   trackPixelTransform,
   trackCssTransform,
+  slideLaneStyle,
   measureSlotSize,
-  slideFlexStyle,
+  slideSizerStyle,
   pointerVelocityToVirtual,
 } from "./track";
 export { resolveDragRelease } from "./dragRelease";

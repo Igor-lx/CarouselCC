@@ -25,8 +25,19 @@ interface UseSlideRenderModelInput {
 
 interface UseSlideRenderModelResult {
   virtualSlides: VirtualSlide[];
-  renderWindowStart: number;
+  layoutOrigin: number;
 }
+
+/**
+ * How far (in slots) the render window may drift from the layout origin
+ * before the origin recenters. The origin is the coordinate base for the
+ * scroll transform and every slide's lane; keeping it stable is what makes a
+ * per-settle window shift move no slide (no re-raster). A finite deck's
+ * window never leaves `[0, length)`, so its origin never moves. An infinite
+ * deck recenters only after this many slots of one-way drift — a rare,
+ * atomic re-baseline that also bounds the transform magnitude.
+ */
+const LAYOUT_ORIGIN_BAND_SLOTS = 512;
 
 export function useSlideRenderModel({
   current,
@@ -42,6 +53,10 @@ export function useSlideRenderModel({
   // first render — the carousel always mounts idle — so `buildRenderWindow`
   // is computed only inside the memo, never on every render.
   const persistedWindowRef = useRef<RenderWindow | null>(null);
+  // The layout origin persists across window shifts and recenters only when
+  // the window drifts past the band (see LAYOUT_ORIGIN_BAND_SLOTS). Seeded
+  // lazily by the first window below.
+  const layoutOriginRef = useRef<number | null>(null);
 
   const renderWindow = useMemo(() => {
     const next = buildRenderWindow(previous, current, layout, renderWindowBufferMultiplier);
@@ -63,6 +78,23 @@ export function useSlideRenderModel({
     persistedWindowRef.current = expanded;
     return expanded;
   }, [current, isMoving, layout, previous, renderWindowBufferMultiplier]);
+
+  // Stable coordinate base for the scroll transform and the slide lanes. It
+  // recenters only when the window has drifted a whole band away (or on a
+  // layout reset that puts the window start out of band), so a per-settle
+  // window shift changes NO slide's lane — the crux of the no-re-raster win.
+  const layoutOrigin = useMemo(() => {
+    const origin = layoutOriginRef.current;
+    if (
+      origin === null ||
+      renderWindow.start < origin - LAYOUT_ORIGIN_BAND_SLOTS ||
+      renderWindow.end > origin + LAYOUT_ORIGIN_BAND_SLOTS
+    ) {
+      layoutOriginRef.current = renderWindow.start;
+      return renderWindow.start;
+    }
+    return origin;
+  }, [renderWindow]);
 
   const virtualSlides = useMemo<VirtualSlide[]>(() => {
     const totalSlides = records.length;
@@ -92,6 +124,7 @@ export function useSlideRenderModel({
         slideKey: usesCloneKey
           ? `clone:${record.slideKey}:${virtualIndex}`
           : record.slideKey,
+        virtualIndex,
         isActive,
         isActual,
         ariaProps,
@@ -101,6 +134,6 @@ export function useSlideRenderModel({
 
   return {
     virtualSlides,
-    renderWindowStart: renderWindow.start,
+    layoutOrigin,
   };
 }

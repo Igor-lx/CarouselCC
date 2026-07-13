@@ -26,6 +26,10 @@ export interface SlideAriaProps {
 export interface VirtualSlide {
   slideKey: string;
   slideData: Slide;
+  /** The slide's absolute virtual coordinate — fixed for its mounted
+   * lifetime. Drives its own lane position (`slideLaneStyle`), so a
+   * neighbour mounting or unmounting never moves it. */
+  virtualIndex: number;
   isActive: boolean;
   isActual: boolean;
   ariaProps: SlideAriaProps;

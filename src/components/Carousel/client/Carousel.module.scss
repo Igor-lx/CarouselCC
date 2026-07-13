@@ -70,19 +70,34 @@
   // reads the viewport's offsetWidth (border box) — any border/padding here
   // makes the real slide step smaller than the transform step, so motion
   // overshoots by a couple of pixels and jerks back into place on settle.
+  //
+  // STABLE LAYERS: slides are absolutely positioned by their own virtual
+  // lane (inline `slideLaneStyle`), NOT laid out in flow. Only the track's
+  // `transform` scrolls; a render-window shift mounts/unmounts an edge slide
+  // without moving any other slide, so the compositor never re-rasters the
+  // whole track on settle. The visible inter-slide gap is baked into the
+  // lane stride (`100% + --slides-gap`), so the track needs no flex `gap`.
   .slideContainer {
     position: relative;
-    display: flex;
-    align-items: flex-start;
     width: 100%;
-    gap: var(--slides-gap);
     will-change: transform;
     min-width: 0;
   }
 
+  // Height sizer: the only in-flow child, one slot wide (inline width), its
+  // aspect-ratio gives the otherwise-collapsed track its height. Invisible
+  // and inert; the real slides are absolutely positioned OVER it.
+  .slideSizer {
+    visibility: hidden;
+    aspect-ratio: var(--slide-aspect);
+    pointer-events: none;
+  }
+
   .slide {
+    position: absolute;
+    top: 0;
+    left: 0;
     display: block;
-    width: 100%;
     aspect-ratio: var(--slide-aspect);
     padding: 0;
     margin: 0;
@@ -156,7 +171,7 @@
 
   .outerContainer[data-touch="false"] {
     .slideInteractive:hover {
-      outline-color: rgb(49, 221, 14);
+      outline-color: rgb(17, 227, 42);
     }
   }
 
