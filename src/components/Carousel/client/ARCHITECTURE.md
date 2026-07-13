@@ -1170,9 +1170,16 @@ Headless (renders `null`). Two effects in one slot:
    URL. Unmounted, a slide is a plain `<img>` of the LARGEST default
    candidate ("quality first, no economy") and the module's code is
    tree-shaken out. The same slides JSON works in both modes.
-2. **Preload manager.** While the deck is idle it warms `preloadPagesNr`
-   neighbour pages per side through React 19 `preload()` with
-   `imageSrcSet`/`imageSizes` — the browser picks the exact candidate.
+2. **Warm manager.** While the deck is idle it warms `preloadPagesNr`
+   neighbour pages per side. Network-only warm goes through React 19
+   `preload()` with `imageSrcSet`/`imageSizes` — the browser picks the
+   exact candidate. `isPredecodeOn` (default off) upgrades the warm to
+   network + DECODE: candidates load through detached `Image`s (same
+   browser-side candidate resolution) and are `decode()`d one per idle
+   callback, so the incoming page's bitmap is ready BEFORE a ride starts —
+   the mid-ride decode/raster spike that can hold one frame on a weak GPU
+   never happens. Decoded refs are pruned to the current warm window
+   (bounded memory) and the queue stops whenever the deck moves.
    `isParallelSetPreloadOn` (default off) additionally warms the parallel
    orientation's crop with a heuristic candidate (a `media`-gated source
    cannot preload natively; a miss is masked by the rotation veil).

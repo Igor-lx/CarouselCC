@@ -157,12 +157,13 @@ export default function App() {
               onSlideClick={openSlide}
               onCarouselStatusChange={(snapshot) => setStatus(snapshot)}
             >
-              { isTouch ? <PaginationWidget /> : <Pagination />}
+              {isTouch ? <PaginationWidget /> : <Pagination />}
               <Controls />
               <ResponsiveImages
                 isPreloadOn
-                preloadPagesNr={1}
+                preloadPagesNr={2}
                 isParallelSetPreloadOn
+                isPredecodeOn
               />
               <Diagnostic />
             </Carousel>
