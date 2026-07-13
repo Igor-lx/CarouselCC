@@ -6,6 +6,7 @@ export {
   padDeckToFullPage,
   clampedVisibleSlidesCount,
   deckCarriesImageSets,
+  resolveLargestImageCandidate,
   resolveLargestSrcSetCandidate,
   resolveRenderedImageSrc,
 } from "./slides";

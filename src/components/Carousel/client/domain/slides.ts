@@ -49,28 +49,59 @@ export const padDeckToFullPage = (
 export { clampedVisibleSlidesCount };
 
 /**
- * Parse a `w`-descriptor `srcSet` and return the LARGEST candidate URL.
- * Entries without a width descriptor count as width 0; a malformed or empty
- * srcSet yields `null`.
+ * Parse a `w`-descriptor `srcSet` and return the LARGEST candidate URL with
+ * its width. Entries without a width descriptor count as width 0; a
+ * malformed or empty srcSet yields `null`.
  */
 export const resolveLargestSrcSetCandidate = (
   srcSet: string | undefined,
-): string | null => {
+): { url: string; width: number } | null => {
   if (!srcSet) return null;
-  let bestUrl: string | null = null;
-  let bestWidth = -1;
+  let best: { url: string; width: number } | null = null;
   for (const entry of srcSet.split(",")) {
     const parts = entry.trim().split(/\s+/);
     const url = parts[0];
     if (!url) continue;
     const match = parts[1]?.match(/^(\d+(?:\.\d+)?)w$/);
     const width = match ? Number(match[1]) : 0;
-    if (width > bestWidth) {
-      bestWidth = width;
-      bestUrl = url;
+    if (best === null || width > best.width) {
+      best = { url, width };
     }
   }
-  return bestUrl;
+  return best;
+};
+
+/**
+ * The single-set-mode candidate: the LARGEST across ALL of the slide's sets
+ * (the default `srcSet` AND every art-directed `<source>`), not just the
+ * default one — "quality first, no economy" means the most pixels the data
+ * offers anywhere. Width descriptors are the only size signal, so ties are
+ * broken toward the PORTRAIT source when its media condition is known: at
+ * equal width the taller crop carries more pixels, and it degrades
+ * gracefully in a wide window (a centred crop) — while a wide asset in a
+ * tall window discards most of its frame.
+ */
+export const resolveLargestImageCandidate = (
+  image: Slide["image"],
+  portraitMediaCondition?: string,
+): string | null => {
+  let best: { url: string; width: number; isPortrait: boolean } | null = null;
+  const consider = (srcSet: string | undefined, isPortrait: boolean) => {
+    const candidate = resolveLargestSrcSetCandidate(srcSet);
+    if (!candidate) return;
+    if (
+      best === null ||
+      candidate.width > best.width ||
+      (candidate.width === best.width && isPortrait && !best.isPortrait)
+    ) {
+      best = { ...candidate, isPortrait };
+    }
+  };
+  consider(image?.srcSet, false);
+  for (const source of image?.sources ?? []) {
+    consider(source.srcSet, source.media === portraitMediaCondition);
+  }
+  return best === null ? null : (best as { url: string }).url;
 };
 
 /**
@@ -81,18 +112,20 @@ export const resolveLargestSrcSetCandidate = (
  *
  * - responsive mode (`<ResponsiveImages />` mounted): the canonical
  *   `content` URL — the browser upgrades it via `srcSet` / `<source>`;
- * - single-set mode (module absent): the LARGEST default-set candidate —
- *   the deliberate "quality first, no economy" mode. Slide identity is
- *   untouched either way (`dataKey` stays on `id + content`).
+ * - single-set mode (module absent): the LARGEST candidate across ALL sets
+ *   (see `resolveLargestImageCandidate`) — the deliberate "quality first,
+ *   no economy" mode. Slide identity is untouched either way (`dataKey`
+ *   stays on `id + content`).
  */
 export const resolveRenderedImageSrc = (
   slideData: Slide,
   isResponsiveImagesOn: boolean,
+  portraitMediaCondition?: string,
 ): string | null => {
   const { content, image } = slideData;
   if (typeof content !== "string") return null;
   if (isResponsiveImagesOn) return content;
-  return resolveLargestSrcSetCandidate(image?.srcSet) ?? content;
+  return resolveLargestImageCandidate(image, portraitMediaCondition) ?? content;
 };
 
 /** Whether any slide in the deck carries responsive image variants. */

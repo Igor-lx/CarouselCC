@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { memo, useEffect, useRef } from "react";
 
+import { SLIDE_PORTRAIT_MEDIA_CONDITION } from "../config";
 import { resolveRenderedImageSrc } from "../domain";
 import { useImageResource } from "./imageResource";
 import { useOrientationSwapVeil } from "./useOrientationSwapVeil";
@@ -38,11 +39,15 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
   } = props;
 
   // The rendered (and store-keyed) URL: canonical content in responsive
-  // mode, the LARGEST default candidate in single-set mode — one rule shared
-  // with the store retention (see resolveRenderedImageSrc).
+  // mode, the LARGEST candidate across ALL sets in single-set mode — one
+  // rule shared with the store retention (see resolveRenderedImageSrc).
   const imageSource =
     isContentImg && slideData
-      ? resolveRenderedImageSrc(slideData, isResponsiveImagesOn)
+      ? resolveRenderedImageSrc(
+          slideData,
+          isResponsiveImagesOn,
+          SLIDE_PORTRAIT_MEDIA_CONDITION,
+        )
       : null;
 
   const { status, generation, reportLoaded, reportError, requestRetry } =
