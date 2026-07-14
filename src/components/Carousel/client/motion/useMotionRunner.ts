@@ -216,11 +216,14 @@ export function useMotionRunner({
 
       // The controller runs regardless of compositing: it remains the SSOT for
       // status, handoff, settle, and the follow-mode stream. When composited,
-      // its per-frame samples simply do not reach the track DOM.
+      // nothing reads its per-frame stream — the compositor paints the same
+      // curve — so it runs the segment passively: no frame loop, one wake-up to
+      // settle. That is what keeps the main thread idle behind a ride.
       controller.start({
         segment,
         sampler: sampleCarouselSegment,
         onComplete: settle,
+        isPassive: isComposited,
       });
 
       if (!isComposited) {

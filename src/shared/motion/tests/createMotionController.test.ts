@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createMotionController } from "../runtime/createMotionController";
 import { motionNow } from "../runtime/clock";
@@ -213,5 +213,98 @@ describe("soft lifecycle", () => {
     controller.start({ segment: segment({ from: 0, to: 200 }), sampler: linearSampler });
     expect(controller.isActive()).toBe(true);
     expect(controller.captureHandoff(500).position).toBeCloseTo(100);
+  });
+});
+
+/**
+ * The controller's frame loop is a no-op without a `window` (these tests run
+ * with none — see the windowless-env note above). Stub the two calls the loop
+ * makes, so "did this segment register a frame callback?" becomes observable.
+ */
+const stubFrameLoop = () => {
+  const requestAnimationFrame = vi.fn(() => 1);
+  const host = globalThis as { window?: unknown };
+  host.window = { requestAnimationFrame, cancelAnimationFrame: vi.fn() };
+  return {
+    requestAnimationFrame,
+    restore: () => {
+      delete host.window;
+    },
+  };
+};
+
+describe("passive segments (paint owned elsewhere)", () => {
+  it("runs the segment with no frame loop, and still settles at its end", () => {
+    vi.useFakeTimers();
+    const frameLoop = stubFrameLoop();
+    const controller = createMotionController<string>(0, "idle");
+    const startedAt = motionNow();
+    const settled = vi.fn();
+
+    controller.start({
+      segment: segment({ startedAt, duration: 1000 }),
+      sampler: linearSampler,
+      onComplete: settled,
+      completion: "immediate",
+      isPassive: true,
+    });
+
+    // The whole point: not one frame callback for the whole ride. A frame
+    // callback registered per frame drags the main thread through a full paint
+    // lifecycle behind a ride the compositor is already painting.
+    expect(frameLoop.requestAnimationFrame).not.toHaveBeenCalled();
+
+    // Still the position SSOT: an interruption mid-segment reads the live
+    // curve, exactly as precisely as it would under a frame loop.
+    expect(controller.captureHandoff(startedAt + 500).position).toBeCloseTo(50);
+    expect(controller.isActive()).toBe(true);
+
+    vi.advanceTimersByTime(1000);
+
+    expect(frameLoop.requestAnimationFrame).not.toHaveBeenCalled();
+    expect(settled).toHaveBeenCalledTimes(1);
+    expect(controller.getSnapshot().value).toBe(100);
+    expect(controller.getSnapshot().phase).toBe("settled");
+    expect(controller.isActive()).toBe(false);
+
+    frameLoop.restore();
+    vi.useRealTimers();
+  });
+
+  it("does not settle a passive segment that was superseded", () => {
+    vi.useFakeTimers();
+    const controller = createMotionController<string>(0, "idle");
+    const settled = vi.fn();
+
+    controller.start({
+      segment: segment({ startedAt: motionNow(), duration: 1000 }),
+      sampler: linearSampler,
+      onComplete: settled,
+      completion: "immediate",
+      isPassive: true,
+    });
+
+    controller.set(42);
+    vi.advanceTimersByTime(2000);
+
+    expect(settled).not.toHaveBeenCalled();
+    expect(controller.getSnapshot().value).toBe(42);
+
+    vi.useRealTimers();
+  });
+
+  it("keeps the frame loop for a non-passive segment", () => {
+    const frameLoop = stubFrameLoop();
+    const controller = createMotionController<string>(0, "idle");
+
+    controller.start({
+      segment: segment({ startedAt: motionNow(), duration: 1000 }),
+      sampler: linearSampler,
+    });
+
+    expect(frameLoop.requestAnimationFrame).toHaveBeenCalled();
+
+    controller.cancel();
+    frameLoop.restore();
   });
 });

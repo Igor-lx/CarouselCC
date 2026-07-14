@@ -55,6 +55,20 @@ export interface MotionStartOptions<
   sampler: MotionSegmentSampler<Segment, Strategy>;
   onComplete?: (sample: MotionSample<Strategy>) => void;
   completion?: MotionCompletionMode;
+  /**
+   * Set when this segment's paint is owned elsewhere — a compositor animation
+   * running the same curve — so no subscriber needs the per-frame stream.
+   *
+   * The controller then runs the segment without a frame loop: it sleeps and
+   * wakes once, at the end, to settle. It stays the position SSOT throughout —
+   * on-demand reads (`captureHandoff`, `sampleAt`) sample the live curve, so
+   * an interruption mid-segment is as precise as it is under a frame loop.
+   *
+   * Ticking a segment nobody reads is not free: a frame callback registered
+   * every frame drags the main thread through a full paint lifecycle behind a
+   * ride that needs none of it.
+   */
+  isPassive?: boolean;
 }
 
 export interface MotionSetOptions<Strategy extends string = string> {

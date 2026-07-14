@@ -48,6 +48,7 @@ export function createMotionController<Strategy extends string = string>(
   let sample = createIdleSample(initialValue, initialStrategy);
   let emittedSample = sample;
   let frameId: number | null = null;
+  let settleTimerId: ReturnType<typeof setTimeout> | null = null;
   let completionFrameId: number | null = null;
   let active: ActiveSegment<Strategy> | null = null;
   const subscribers = new Set<MotionSubscriber<Strategy>>();
@@ -55,6 +56,11 @@ export function createMotionController<Strategy extends string = string>(
   const cancelTick = () => {
     cancelFrame(frameId);
     frameId = null;
+
+    if (settleTimerId !== null) {
+      clearTimeout(settleTimerId);
+      settleTimerId = null;
+    }
   };
 
   const cancelCompletion = () => {
@@ -136,6 +142,18 @@ export function createMotionController<Strategy extends string = string>(
     frameId = requestFrame(tick);
   };
 
+  // The passive counterpart of `tick`: one wake-up at the segment's end instead
+  // of one per frame. Settling from `endTime` (never from the timer's own,
+  // possibly early, firing) keeps the final sample exactly the curve's end.
+  const scheduleSettle = (endTime: number) =>
+    setTimeout(
+      () => {
+        settleTimerId = null;
+        if (active) finalize(sampleActive(Math.max(endTime, now())));
+      },
+      Math.max(0, endTime - now()),
+    );
+
   return {
     captureHandoff(timestamp = now()): MotionHandoff<Strategy> {
       // One coherent point: position and velocity from the SAME sample of the
@@ -172,7 +190,13 @@ export function createMotionController<Strategy extends string = string>(
     ) {
       cancelTick();
       cancelCompletion();
-      const { segment, sampler, onComplete, completion = "next-frame" } = options;
+      const {
+        segment,
+        sampler,
+        onComplete,
+        completion = "next-frame",
+        isPassive = false,
+      } = options;
 
       active = {
         segment,
@@ -189,6 +213,11 @@ export function createMotionController<Strategy extends string = string>(
 
       if (initial.progress >= 1) {
         finalize(initial);
+        return;
+      }
+
+      if (isPassive) {
+        settleTimerId = scheduleSettle(segment.startedAt + segment.duration);
         return;
       }
 
