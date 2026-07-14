@@ -441,10 +441,36 @@ The per-recalc cost is still real (3.5 ms — the N-distinct-styles mechanism of
 tax, not a running one**: if anything ever forces main frames every frame again,
 the widget will be expensive again. Worth knowing; not worth a redesign.
 
-The options below are therefore **not needed**. Kept only so the reasoning is not
-re-derived from scratch if that latent cost ever matters.
+### 7.1 Quantisation was proposed, measured, and dropped
 
-### Options (no longer required)
+Option 2 below (round each dot's x/scale so several dots share a `ComputedStyle`)
+was the last plausible lever. It was tested **before writing any code**, by
+measuring its **ceiling**: kill the dot animations outright — nothing that keeps
+the widget's visual can be cheaper than not animating at all.
+
+| widget, 5 rides | dropped | style recalc | main thread |
+| --- | --- | --- | --- |
+| as shipped | **10/576 (1.7 %), all at start** | x16 · 54 ms (**3.40 ms** each) | 131 ms |
+| dot animations **dead** (the ceiling) | **11/577 (1.9 %), all at start** | x16 · 32 ms (**1.99 ms** each) | 92 ms |
+
+The recalc does get cheaper and the main thread saves 40 ms — **and the dropped
+frames do not move.** So the ride-start drops are **not caused by the dots' style
+recalc at all**. If the ceiling buys nothing, quantisation — which cannot even
+reach the ceiling — buys less.
+
+It would not have worked anyway: the dots sit **tens of pixels apart** on the
+strip, so rounding to half a pixel cannot make their values coincide, and Blink
+still computes 11 distinct styles. The sharing the option was built on never
+materialises.
+
+**Do not implement it.** Option 2 was inherited from the world where the recalc
+ran 670 times per ride; at 16 times the arithmetic collapses.
+
+What actually holds those ~10 frames at ride start is the first raster of the
+entering slides and the layer commit — the intrinsic cost of starting to move,
+and not something in this codebase.
+
+### Options (all rejected — kept so the reasoning is not re-derived)
 
 Ordered simple → structural. All must preserve the visual: a continuous strip where dots
 *travel* (never pop in), shrinking and fading toward the edges.
