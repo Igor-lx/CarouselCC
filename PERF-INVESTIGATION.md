@@ -57,6 +57,14 @@ So the hitch is either **finer than these instruments' resolution**, or **not in
 strip's motion at all**. It is not a frame-delivery failure. Both defects below were found
 while hunting it; neither turned out to be its cause.
 
+> **Resolved in [§8](#8-the-micro-hitch--found-a-two-frame-finger-hold-zeroed-the-launch-velocity).**
+> The instruments were not blind — they were looking at the right thing and it was
+> genuinely perfect. Every frame arrived, on time, on the compositor, at the right
+> position. What stalled was the **curve we handed the browser**: a two-frame finger
+> hold before lift-off zeroed the ride's launch velocity, so the strip crawled out of
+> a standstill. A frame counter cannot see that by construction. Reading this section
+> in order is the point — the wrong turns are the lesson.
+
 ---
 
 ## 2. Defect A — the pagination dots cost 7 ms/frame
@@ -635,21 +643,23 @@ px/frame and opened at 0.7. The fix repairs a **zeroing**, it does not inflate s
 
 ---
 
-## 9. Next
+## 9. Where things stand
 
-The main thread is now **idle during a ride** — 13 main frames per 4 rides, against
-a floor of 8 for a bare composited animation. Defect B is closed and the widget
-needs nothing.
+All three defects are closed:
 
-What remains is the question that started all of this: **the micro-hitch**
-([§1](#1-the-original-quest--the-micro-hitch)). It is worth re-testing on the device
-now, because the machine underneath it has changed completely: the main thread no
-longer runs a paint lifecycle behind the ride, so if the hitch was a main-thread
-stall of any kind, it should be gone. If it survives, then every model-side
-instrument agreeing that the motion is smooth means the hitch is not in the
-strip's motion at all — and the hunt moves to what else the eye could be seeing.
+- the main thread is **idle during a ride** — 13 main frames per 4 rides, against a
+  floor of 8 for a bare composited animation ([§3.5](#35-the-cause-a-css-transition-fighting-the-waapi-fade));
+- the widget needs **no rewrite** ([§7](#7-the-widget-needs-no-rewrite));
+- the micro-hitch's cause is **found and fixed** ([§8](#8-the-micro-hitch--found-a-two-frame-finger-hold-zeroed-the-launch-velocity)).
 
-### 8.1 What is left, measured (not guessed)
+**Standing caveat on the hitch.** It was reported gone once before, on shorter use, and
+came back at a lower rate under longer use. It is now reported gone again, and the ride
+"visibly smoother". That is encouraging, not proof — a defect that appears in a fraction
+of swipes needs *time*, not a good first impression. The measurement is unambiguous
+(the ride opens at 96–119 % of the strip's visible speed instead of 52–70 %), and the
+mechanism is understood, but the verdict belongs to extended real use.
+
+### 9.1 What is left, measured (not guessed)
 
 With the main thread idle, whatever remains is now the top cost — so it was measured
 rather than assumed. Live deploy, 5 rides, widget mounted:
