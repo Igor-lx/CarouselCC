@@ -169,7 +169,7 @@ const buildGestureProfile = (
   // the intent cruise. A fast lift-off collapses the ramp by itself.
   const launch = resolveReleaseLaunch({
     distance,
-    visualVelocity: state.gesture.uiVelocity,
+    visualVelocity: state.gesture.launchVelocity,
     handoffVelocity: start.velocity,
     intentSpeed: releaseSpeed,
   });

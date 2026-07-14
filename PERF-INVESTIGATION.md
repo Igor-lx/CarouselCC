@@ -21,7 +21,7 @@ hypothesis, that is recorded too: the disproofs are the most valuable part of th
 | --- | --- |
 | **Defect B — main thread runs a full paint lifecycle every frame of a *composited* ride** | **FOUND AND FIXED** ([§3.5](#35-the-cause-a-css-transition-fighting-the-waapi-fade)). The dot's CSS `transition` covered the same properties as its WAAPI fade, and two effects on one property cannot be composited. A ride went from **452 main frames (2696 ms) to 13 (80 ms)**. |
 | **Defect A — widget dot animations cost ~7 ms/frame** | **No longer a per-frame cost; no rewrite needed** ([§7](#7-the-widget-needs-no-rewrite)). It was 7 ms *per main frame*, and main frames were being forced every frame. With the frame loop gone and the transition conflict fixed, the widget's expensive recalc happens **13 times per 4 rides instead of 670**. A latent tax, not a running one. |
-| **The original micro-hitch** | Still unexplained ([§1](#1-the-original-quest--the-micro-hitch)). Every model-side instrument says the motion is smooth. |
+| **The original micro-hitch** | **FOUND AND FIXED** ([§8](#8-the-micro-hitch--found-a-two-frame-finger-hold-zeroed-the-launch-velocity)). A two-frame finger hold before lift-off zeroed the launch velocity (fast EMA), so the ride crawled out of a standstill. Every frame was perfect — the CURVE stalled, which is why no frame counter could see it. |
 
 ---
 
@@ -349,6 +349,7 @@ compositor? Candidates, all A/B-testable on the standing rig:
 
 | Fix | Commit | Verified by |
 | --- | --- | --- |
+| **A finger hold no longer zeroes the ride's launch velocity** | this branch | Ride opens at **96–119 %** of the strip's visible speed, was 52–70 % |
 | **The dot's CSS transition no longer fights its WAAPI fade** | this branch | Ride: **452 main frames / 2696 ms → 13 / 80 ms** on device |
 | Invisible dots are no longer animated | `6597a48` | Visual unchanged on device |
 | Composited segments run without a frame loop (`isPassive`) | `1bef342` | `FireAnimationFrame` x672 → **x0** on device |
@@ -494,7 +495,147 @@ is not re-attempted blindly.**
 
 ---
 
-## 8. Next
+## 8. The micro-hitch — FOUND. A two-frame finger hold zeroed the launch velocity.
+
+This is the defect the whole investigation started from: **one visible stick per
+ride, on swipe only, never on a button press, and only on SLOW swipes.** It
+survived every fix above (dropping from ~70 % of swipes to ~10–15 %), and every
+frame-level instrument insisted the motion was perfect.
+
+They were all right. **Nothing was wrong with the frames. The CURVE stalled.**
+
+### 8.1 Why every instrument was blind
+
+| Instrument | Verdict |
+| --- | --- |
+| dropped frames inside the ride | **0** |
+| handoff position discontinuity (last JS paint vs the animation's curve) | **0.0 px** |
+| `has_compositor_animation` | on every ride frame |
+| last touch → last paint | **3–7 ms** (the strip tracks the finger perfectly) |
+
+Every frame was delivered, on time, on the compositor, at the right position. A
+frame counter *cannot* see this defect — the browser was flawless. The bug was in
+the values **we handed it**.
+
+### 8.2 What the eye actually saw
+
+Recording real swipes, and capturing the **finger's own touch events** alongside
+the **positions actually painted** (never reading a computed style — that trap is
+in §6), the sequence is unmistakable:
+
+```
+--- ride #19 (before the fix) ---
+    FINGER   last 20ms: 0.0 px/frame   |  last 60ms: 5.4 px/frame
+    RIDE     opens at 2.8 px/frame
+    px/frame: 3  3  4  6  7  8  9 10 10 10 10 ...
+```
+
+**The finger stops before it lifts.** Not slows — *stops*: 0.0 px/frame over the
+final 20 ms, while it had been moving at 5.4. That is simply how a human finishes
+a slow, deliberate swipe: you bring the slide to where you want it, hold for a
+moment, and let go.
+
+The strip faithfully stops with it. Then the ride opens at **2.8 px/frame** and
+takes ~300 ms — a third of a second — to reach its cruise of 10.
+
+So the eye sees: **moving → frozen → crawling → and only then away.** That is the
+hitch. It is not a dropped frame. It is the strip *crawling out of a standstill*.
+
+### 8.3 The cause, and it is written in the code's own comment
+
+The gesture engine keeps two velocities, deliberately:
+
+| | law | purpose |
+| --- | --- | --- |
+| `flickVelocity` | **slow** EMA (`flickVelocityAlpha: 0.45`) **+ pause protection** (`flickPauseGraceMs: 120`, `flickVelocityHalfLifeMs: 250`) | the gesture's INTENT — how fast you meant to throw it |
+| `uiVelocity` | **fast** EMA (`emaAlpha: 0.85`), no protection | the instantaneous visible speed |
+
+And `resolveReleaseLaunch` builds the ride's curve from both:
+
+```
+startSpeed  = visualVelocity   ← was uiVelocity
+cruiseSpeed = max(intentSpeed, startSpeed)   ← flickVelocity × inertiaBoost
+```
+
+A fast EMA (α = 0.85) collapses to ~0 after **two frames** of no movement. And the
+comment sitting directly above the release code says so, in as many words:
+
+> *"The flick memory survives a lift-off hold on the human pause law (grace +
+> half-life) — **NOT the per-frame EMA decay below, which zeroes a fast gesture
+> after a ~2-frame stick**."*
+
+The author **knew** the fast EMA zeroes on a terminal hold, and protected the
+flick memory from it. The **launch** velocity was left on the unprotected fast EMA.
+
+So a two-frame hold — the way every deliberate swipe ends — produced:
+
+```
+startSpeed  = 0        (the hold zeroed the fast EMA)
+cruiseSpeed = high     (the flick memory survived the same hold)
+```
+
+…which is the **maximum possible acceleration ramp**: the ride had to climb from a
+standstill to cruise across the whole `accelerationDistanceShare` (25 % of the
+distance). The strip crawled out of the release.
+
+**Every observation follows without strain:**
+
+- **slow swipes only** — a deliberate swipe ends with a hold; a flick does not;
+- **never on a button** — no gesture, no launch velocity, no ramp to misjudge;
+- **once per ride, near the beginning** — the launch happens once, and the ramp is
+  the first quarter of the distance;
+- **not every time** — it depends on whether you held the finger or tore it away;
+- **invisible on fast swipes** — a fast lift-off keeps the EMA high, the ramp
+  collapses by itself (exactly as designed), and there is nothing to see.
+
+The control case is in the same recording: rides where the finger was **still
+moving** at lift-off (7.1 px/frame) opened at 5.2 and went straight into
+`5 6 8 11 13 15 17 18` — no crawl, no hitch. The only difference was the hold.
+
+### 8.4 The fix: give the launch velocity the same pause law
+
+Not a workaround — a **restored symmetry**. A momentary hold is motor noise, not an
+instruction to stop, and the engine already knows the difference; it simply applied
+that knowledge in one place and not the other.
+
+`launchVelocity` is the UI-domain twin of the flick memory: the same slow EMA, the
+same grace + half-life pause protection. It is what now feeds `visualVelocity` in
+the continuity launch. `uiVelocity` is untouched and still drives everything else.
+
+It does **not** paper over a genuine stop: a long, deliberate hold decays
+`launchVelocity` too, and the ride then correctly starts from rest (there is a test
+for exactly that, so no future tuning can quietly erase it).
+
+### 8.5 Verified on real swipes, on the live deploy
+
+The ride's opening speed against the speed the strip visibly carried (its motion
+over the 60 ms before lift-off):
+
+| | before | after |
+| --- | --- | --- |
+| finger 4.9 px/frame | opens **2.8** (57 %) | — |
+| finger 5.4 | opens **2.8** (52 %) | — |
+| finger 8.0 | — | opens **8.2 (103 %)** |
+| finger 5.6 | — | opens **6.2 (110 %)** |
+| finger 5.7 | — | opens **5.5 (96 %)** |
+| finger 4.9 | — | opens **4.9 (100 %)** |
+| finger 4.3 | — | opens **4.2 (98 %)** |
+
+**52–70 % → 96–119 %.** The strip now picks the motion up instead of restarting it.
+
+And in the curve itself, which is what the eye actually reads:
+
+```
+before:  3  3  4  6  7  8  9 10 ...    (crawling out of a standstill)
+after:   5  6  8  9 11 13 14 14 ...    (already moving)
+```
+
+A genuinely slow swipe stays slow — one recorded ride had the finger at 1.8
+px/frame and opened at 0.7. The fix repairs a **zeroing**, it does not inflate speed.
+
+---
+
+## 9. Next
 
 The main thread is now **idle during a ride** — 13 main frames per 4 rides, against
 a floor of 8 for a bare composited animation. Defect B is closed and the widget

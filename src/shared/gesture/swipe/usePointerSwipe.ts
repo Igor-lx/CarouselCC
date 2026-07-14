@@ -67,6 +67,24 @@ interface InternalSample {
    * the flick decision and the release speed judge the GESTURE, not its
    * last — often decelerating — segment. */
   flickVelocity: number;
+  /**
+   * The velocity the CONTINUITY LAUNCH starts the ride at — `uiVelocity`'s
+   * meaning, but on the flick's slow law instead of the fast per-frame EMA.
+   *
+   * `uiVelocity` uses `emaAlpha` (0.85), which zeroes after a ~2-frame stick.
+   * Humans finishing a slow, deliberate swipe hold the finger still for exactly
+   * that long before lifting — so the launch velocity collapsed to ~0 while the
+   * flick memory (slow law, pause-protected) stayed high. The ride then had to
+   * accelerate the full ramp from a standstill: the strip crawled out of the
+   * release and only picked up speed ~300 ms later. That crawl is what the eye
+   * reads as a hitch mid-ride, and no frame counter can see it — every frame is
+   * delivered on time; the CURVE is what stalls.
+   *
+   * A momentary hold is motor noise, not an instruction to stop. This velocity
+   * survives it on the same grace + half-life law the flick memory already uses;
+   * a genuinely long hold still decays it, and the ride correctly starts at rest.
+   */
+  launchVelocity: number;
   width: number;
   timestamp: number;
 }
@@ -77,6 +95,7 @@ const createIdleSample = (width = 0, timestamp = 0): InternalSample => ({
   rawVelocity: 0,
   uiVelocity: 0,
   flickVelocity: 0,
+  launchVelocity: 0,
   width,
   timestamp,
 });
@@ -221,6 +240,17 @@ export function usePointerSwipe({
         ),
         cfg.maxVelocity,
       );
+      // The launch velocity is the UI-domain twin of the flick memory: same slow
+      // law, so a terminal micro-hold cannot erase the speed the strip was
+      // visibly carrying (see `launchVelocity` on InternalSample).
+      const launchVelocity = clampMagnitude(
+        calculateEma(
+          sampleRef.current.launchVelocity,
+          instantUiVelocity,
+          frameAdjustedAlpha(cfg.flickVelocityAlpha, dt),
+        ),
+        cfg.maxVelocity,
+      );
       const width = gesture.width || sampleRef.current.width;
 
       gesture.lastX = currentX;
@@ -233,6 +263,7 @@ export function usePointerSwipe({
         rawVelocity,
         uiVelocity,
         flickVelocity,
+        launchVelocity,
         width,
         timestamp,
       };
@@ -288,6 +319,16 @@ export function usePointerSwipe({
         settingsRef.current.flickPauseGraceMs,
         settingsRef.current.flickVelocityHalfLifeMs,
       );
+      // The launch velocity gets the SAME pause law. It used to be read off the
+      // fast EMA, which a two-frame hold before lift-off zeroes — and that is
+      // precisely how a deliberate slow swipe ends. The ride then launched from
+      // a standstill and crawled through its whole acceleration ramp.
+      const pausedLaunchVelocity = pauseDecayedVelocity(
+        sampleRef.current.launchVelocity,
+        now - sampleRef.current.timestamp,
+        settingsRef.current.flickPauseGraceMs,
+        settingsRef.current.flickVelocityHalfLifeMs,
+      );
       const sample: InternalSample = hasMovementOnRelease
         ? createSample(currentX, now)
         : {
@@ -309,6 +350,10 @@ export function usePointerSwipe({
         sample.flickVelocity ?? 0,
         pausedFlickVelocity,
       );
+      sample.launchVelocity = dominantMagnitude(
+        sample.launchVelocity ?? 0,
+        pausedLaunchVelocity,
+      );
       sampleRef.current = sample;
 
       const wasDragging = phase === "dragging";
@@ -327,6 +372,7 @@ export function usePointerSwipe({
         direction: resolution.direction,
         pointerReleaseVelocity: resolution.pointerReleaseVelocity,
         uiReleaseVelocity: sample.uiVelocity,
+        launchVelocity: sample.launchVelocity,
       };
 
       onRelease?.(payload);

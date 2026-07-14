@@ -313,6 +313,7 @@ describe("START_DRAG / END_DRAG", () => {
       isSnap: false,
       pointerReleaseVelocity: 0.1,
       uiReleaseVelocity: 0.12,
+      launchVelocity: 0.12,
       releasedAt: 1000,
     });
     expect(released.motionPhase).toBe("step-normal");
@@ -336,6 +337,7 @@ describe("START_DRAG / END_DRAG", () => {
       isSnap: true,
       pointerReleaseVelocity: 0,
       uiReleaseVelocity: 0,
+      launchVelocity: 0,
       releasedAt: 1000,
     });
     expect(released.motionPhase).toBe("step-snap");
@@ -355,6 +357,7 @@ describe("START_DRAG / END_DRAG", () => {
       isSnap: true,
       pointerReleaseVelocity: 0,
       uiReleaseVelocity: 0,
+      launchVelocity: 0,
       releasedAt: 1000,
     });
     expect(released.motionPhase).toBe("idle");

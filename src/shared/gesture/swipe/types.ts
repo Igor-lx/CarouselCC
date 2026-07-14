@@ -49,6 +49,14 @@ export interface PointerSwipeReleasePayload extends PointerSwipeMovePayload {
   direction: PointerSwipeDirection;
   pointerReleaseVelocity: number;
   uiReleaseVelocity: number;
+  /**
+   * The UI-domain speed a continuity launch should start the ride at: what the
+   * strip was visibly carrying, judged over the gesture rather than over its
+   * last two frames. `uiReleaseVelocity` is the raw instantaneous reading and a
+   * momentary hold before lift-off zeroes it — which is how a deliberate slow
+   * swipe ends, so the ride would launch from a standstill and crawl.
+   */
+  launchVelocity: number;
 }
 
 export interface PointerSwipeListeners {

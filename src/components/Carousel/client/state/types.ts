@@ -19,6 +19,11 @@ export type MotionPhase =
 export interface GestureRelease {
   pointerVelocity: number;
   uiVelocity: number;
+  /** The speed the ride's CONTINUITY LAUNCH starts from — the strip's visible
+   * speed, protected from a terminal micro-hold (see `launchVelocity` on the
+   * engine's release payload). `uiVelocity` remains the raw instantaneous
+   * reading and still drives everything else. */
+  launchVelocity: number;
   /** `motionNow()` reading recorded by the END_DRAG dispatch. The motion
    * runner coasts the ride's launch position over the commit gap it measures
    * against this clock (see `gesture/coast.ts`). */
@@ -28,6 +33,7 @@ export interface GestureRelease {
 export const ZERO_GESTURE_RELEASE: GestureRelease = {
   pointerVelocity: 0,
   uiVelocity: 0,
+  launchVelocity: 0,
   releasedAt: 0,
 };
 
@@ -95,6 +101,9 @@ export interface EndDragCommand extends VirtualIndexSource {
   isSnap: boolean;
   pointerReleaseVelocity: number;
   uiReleaseVelocity: number;
+  /** Pause-protected visible speed for the continuity launch (see
+   * `GestureRelease.launchVelocity`). */
+  launchVelocity: number;
   /** `motionNow()` at dispatch — the start of the commit gap. */
   releasedAt: number;
 }

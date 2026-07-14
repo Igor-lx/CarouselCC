@@ -208,6 +208,10 @@ export function useCarouselGesture({
           slotSizeRef.current,
         ),
         uiReleaseVelocity: uiVirtualVelocity,
+        launchVelocity: pointerVelocityToVirtual(
+          payload.launchVelocity,
+          slotSizeRef.current,
+        ),
         // The runner's takeover coasts the launch position over the commit
         // gap measured from this clock reading (see gesture/coast.ts).
         releasedAt: motionNow(),
@@ -257,6 +261,7 @@ export function useCarouselGesture({
         isSnap: releaseTarget.isSnap,
         pointerReleaseVelocity: 0,
         uiReleaseVelocity: 0,
+        launchVelocity: 0,
         releasedAt: motionNow(),
       });
     }

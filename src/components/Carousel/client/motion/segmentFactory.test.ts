@@ -69,6 +69,10 @@ const releasedState = (
     isSnap: false,
     pointerReleaseVelocity: pointerVelocity,
     uiReleaseVelocity: uiVelocity,
+    // The continuity launch reads `launchVelocity` — the visible speed judged
+    // over the gesture, not the last-two-frames reading that a micro-hold before
+    // lift-off zeroes. These cases model the visible finish, so it is that.
+    launchVelocity: uiVelocity,
     releasedAt: 0,
   });
 };
@@ -173,5 +177,61 @@ describe("gesture-release continuity launch", () => {
     );
     // Launch is already at (or близко к) the ride's peak — no dip, no kick.
     expect(Math.abs(launch.velocity)).toBeGreaterThan(cruisePeak * 0.55);
+  });
+});
+
+describe("a micro-hold before lift-off must not launch the ride from a standstill", () => {
+  /**
+   * The defect this guards against, measured on a Redmi Note 11S: finishing a
+   * slow, deliberate swipe, the finger holds still for ~2 frames before lifting.
+   * The launch velocity used to be read off the fast per-frame EMA, which such a
+   * hold zeroes — so the ride launched from rest and crawled through its whole
+   * acceleration ramp (~300 ms at 3 px/frame) before picking up speed. Every
+   * frame was delivered on time and no counter saw a thing: the CURVE stalled.
+   *
+   * `launchVelocity` carries the visible speed on the flick's pause-protected
+   * law, and the segment must launch from THAT — not from the zeroed reading.
+   */
+  it("launches at the pause-protected visible speed, not at the zeroed instant reading", () => {
+    const held = 0.0000001; // the instant reading a 2-frame hold leaves behind
+    const visible = 0.006; // what the strip was visibly carrying
+    const pointerVelocity = 0.01;
+
+    const state = releasedState(held, pointerVelocity);
+    const launched = {
+      ...state,
+      gesture: { ...state.gesture, launchVelocity: visible },
+    };
+
+    const { segment } = buildCarouselSegment({
+      state: launched,
+      config,
+      isInstantMode: false,
+      start: { position: launched.fromVirtualIndex, velocity: 0, strategy: "idle" },
+      startedAt: 0,
+    });
+
+    const launch = sampleCarouselSegment(segment, 1);
+    expect(Math.abs(launch.velocity)).toBeGreaterThan(visible * 0.5);
+  });
+
+  it("still starts from rest when the strip really was at rest", () => {
+    // A long, deliberate stop decays launchVelocity too — and then a ride that
+    // begins at rest is CORRECT. The fix must not paper over that.
+    const state = releasedState(0, 0.01);
+    const stopped = {
+      ...state,
+      gesture: { ...state.gesture, launchVelocity: 0 },
+    };
+
+    const { segment } = buildCarouselSegment({
+      state: stopped,
+      config,
+      isInstantMode: false,
+      start: { position: stopped.fromVirtualIndex, velocity: 0, strategy: "idle" },
+      startedAt: 0,
+    });
+
+    expect(Math.abs(sampleCarouselSegment(segment, 1).velocity)).toBeLessThan(0.001);
   });
 });
