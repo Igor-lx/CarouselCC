@@ -15,10 +15,33 @@ const scss = readFileSync(
   "utf8",
 );
 
+/**
+ * Every declaration that applies to `selector`, across ALL rules that name it
+ * (CSS cascades, and the width is shared through a `.slideSizer, .slide`
+ * list). Brace-matched so nested blocks inside a rule come along.
+ */
 const rule = (selector: string): string => {
-  const start = scss.indexOf(`${selector} {`);
-  if (start === -1) throw new Error(`rule ${selector} not found`);
-  return scss.slice(start, scss.indexOf("}", start));
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const names = new RegExp(`(^|[\\s,])${escaped}(\\s|,|$)`);
+  const bodies: string[] = [];
+
+  for (let open = scss.indexOf("{"); open !== -1; open = scss.indexOf("{", open + 1)) {
+    // The selector list runs back to the previous block boundary.
+    let start = open - 1;
+    while (start >= 0 && !"{};".includes(scss[start]!)) start -= 1;
+    if (!names.test(scss.slice(start + 1, open))) continue;
+
+    let depth = 1;
+    let end = open + 1;
+    for (; end < scss.length && depth > 0; end += 1) {
+      if (scss[end] === "{") depth += 1;
+      else if (scss[end] === "}") depth -= 1;
+    }
+    bodies.push(scss.slice(open + 1, end - 1));
+  }
+
+  if (bodies.length === 0) throw new Error(`no rule targets ${selector}`);
+  return bodies.join("\n");
 };
 
 describe("--slide-height SSOT", () => {

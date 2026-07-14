@@ -18,8 +18,7 @@ import {
 import {
   carouselBoundaryState,
   deckCarriesImageSets,
-  slideLaneStyle,
-  slideSizerStyle,
+  slideLane,
 } from "./domain";
 import { useCarouselAutoplay } from "./autoplay/useCarouselAutoplay";
 import { useFocusRecovery } from "./focus/useFocusRecovery";
@@ -45,14 +44,25 @@ import { useCarouselStatusReporter } from "./host-report/useCarouselStatusReport
 import { SLIDE_CLASS_KEYS } from "./public-api/types";
 import type { CarouselProps, SlideClassMap } from "./public-api/types";
 
-// Config-owned visual timing injected as a CSS custom property: the veil
-// fade is bound to a JS invariant (the fail-open cap), so its SSOT is
-// config/slides.ts — the stylesheet only consumes the variable. Module-level
-// constant: one object identity for the component's whole life.
-const REORIENT_FADE_STYLE = {
-  "--slide-reorient-fade-out": `${SLIDE_REORIENT_FADE_OUT_MS}ms`,
-  "--slide-reorient-fade-in": `${SLIDE_REORIENT_FADE_IN_MS}ms`,
-} as React.CSSProperties;
+/**
+ * The root's CSS custom properties — the ONLY styling JS hands the stylesheet
+ * at this level, and it hands DATA, never rules (the rules live in
+ * `Carousel.module.scss`, so a host can restyle through `className`):
+ *  - the veil fade timings are bound to a JS invariant (the fail-open cap), so
+ *    their SSOT is `config/slides.ts`;
+ *  - `--visible-slides` is the live `visibleSlidesNr`, which the slide/sizer
+ *    width rule needs and CSS cannot know on its own.
+ */
+interface CarouselRootCSSVars extends React.CSSProperties {
+  "--slide-reorient-fade-out": string;
+  "--slide-reorient-fade-in": string;
+  "--visible-slides": number;
+}
+
+/** Per-slide datum: which lane the slide sits in (see `slideLane`). */
+interface SlideLaneCSSVars extends React.CSSProperties {
+  "--slide-lane": number;
+}
 
 const Carousel = memo(function Carousel(props: CarouselProps) {
   const {
@@ -372,10 +382,12 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     return map;
   }, [classNames]);
 
-  // The sizer keeps the (absolutely-positioned) slides' height in the track:
-  // one slot wide, its aspect-ratio gives the track its height.
-  const sizerStyle = useMemo(
-    () => slideSizerStyle(layout.visibleSlidesCount),
+  const rootStyle = useMemo<CarouselRootCSSVars>(
+    () => ({
+      "--slide-reorient-fade-out": `${SLIDE_REORIENT_FADE_OUT_MS}ms`,
+      "--slide-reorient-fade-in": `${SLIDE_REORIENT_FADE_IN_MS}ms`,
+      "--visible-slides": layout.visibleSlidesCount,
+    }),
     [layout.visibleSlidesCount],
   );
 
@@ -385,7 +397,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
         <CarouselDiagnosticContext.Provider value={diagnosticContextValue}>
           <div
             className={classNames.outerContainer}
-            style={REORIENT_FADE_STYLE}
+            style={rootStyle}
             data-responsive-images={isResponsiveImagesOn}
             role="region"
             aria-roledescription="carousel"
@@ -408,21 +420,17 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
                 className={classNames.slideContainer}
                 data-carousel-track=""
               >
-                <div
-                  aria-hidden="true"
-                  className={styles.slideSizer}
-                  style={sizerStyle}
-                />
+                <div aria-hidden="true" className={styles.slideSizer} />
                 {virtualSlides.map((slide) => (
                   <SlideItem
                     key={slide.slideKey}
                     slideData={slide.slideData}
                     className={slideClassMap}
-                    style={slideLaneStyle(
-                      slide.virtualIndex,
-                      layoutOrigin,
-                      layout.visibleSlidesCount,
-                    )}
+                    style={
+                      {
+                        "--slide-lane": slideLane(slide.virtualIndex, layoutOrigin),
+                      } as SlideLaneCSSVars
+                    }
                     isContentImg={isContentImg}
                     isResponsiveImagesOn={isResponsiveImagesOn}
                     errAltPlaceholder={config.errorAltPlaceholder}

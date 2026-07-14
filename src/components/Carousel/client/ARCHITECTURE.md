@@ -892,11 +892,16 @@ cost a repaint:
   against; it is STABLE across those window shifts and recenters only when
   the window has drifted a whole band away (`LAYOUT_ORIGIN_BAND_SLOTS`).
 
-Each slide is absolutely positioned at its own lane —
-`translateX((virtualIndex − layoutOrigin) × slotStride)` via
-`slideLaneStyle`, `virtualIndex` fixed for the slide's mounted life — and
-only the track's own `transform` scrolls (`−(position − layoutOrigin) ×
-slot`). Because a slide's lane depends on the STABLE origin, not the window,
+Each slide is absolutely positioned at its own lane, and only the track's own
+`transform` scrolls (`−(position − layoutOrigin) × slot`). The JS/CSS split
+follows the app's convention — JS publishes DATA as custom properties, the
+stylesheet owns the RULES (so a host can restyle through `className`):
+`slideLane(virtualIndex, layoutOrigin)` (pure, domain) is handed over as
+`--slide-lane`, `visibleSlidesNr` as `--visible-slides` on the root, and
+`Carousel.module.scss` turns them into the slide's `translateX` (one lane
+step is `100% + --slides-gap` — the slide's own width plus a gap, i.e. one
+slot stride) and its width. `virtualIndex` is fixed for the slide's mounted
+life. Because a slide's lane depends on the STABLE origin, not the window,
 a per-settle window shift merely mounts one edge slide and unmounts another
 and moves **no other slide** — so the compositor never re-rasters the whole
 track on settle. (The earlier flow layout re-based the transform on

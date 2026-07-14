@@ -1,5 +1,3 @@
-import type { CSSProperties } from "react";
-
 const TRANSFORM_PRECISION = 10_000;
 
 const roundedPx = (value: number) =>
@@ -43,24 +41,20 @@ export const trackCssTransform = (
 };
 
 /**
- * Inline style POSITIONING one slide at its own virtual lane, independent of
- * every other slide. Width is `1/visibleSlidesCount` of the track (minus the
- * shared gaps); the horizontal placement is a `translateX` of the slide's
- * lane (`virtualIndex - layoutOrigin`) times one slot stride. Because
- * `translateX(100%)` on an absolutely-positioned slide is its OWN width, and
- * slide width + gap === one slot stride, `(100% + gap)` is exactly one lane
- * step. A slide's lane is fixed for its lifetime (its virtualIndex never
+ * The slide's LANE: its position in slot strides from the layout origin. The
+ * only per-slide layout datum JS owns — it is handed to the stylesheet as the
+ * `--slide-lane` custom property, and `.slide` turns it into a `translateX`
+ * (see the stylesheet: one lane step is `100% + --slides-gap`, i.e. the slide's
+ * own width plus a gap === one slot stride). Keeping the RULE in SCSS and only
+ * the NUMBER here is the same split the widget uses for its dot geometry.
+ *
+ * A slide's lane is fixed for its mounted lifetime (its `virtualIndex` never
  * changes while mounted, and `layoutOrigin` is stable across window shifts),
- * so mounting or unmounting a neighbour never moves it — the whole point.
+ * so mounting or unmounting a neighbour never moves it — the whole point of
+ * the stable-lane layout.
  */
-export const slideLaneStyle = (
-  virtualIndex: number,
-  layoutOrigin: number,
-  visibleSlidesCount: number,
-): CSSProperties => ({
-  width: `calc((100% - var(--slides-gap, 0px) * ${visibleSlidesCount - 1}) / ${visibleSlidesCount})`,
-  transform: `translateX(calc(${virtualIndex - layoutOrigin} * (100% + var(--slides-gap, 0px))))`,
-});
+export const slideLane = (virtualIndex: number, layoutOrigin: number): number =>
+  virtualIndex - layoutOrigin;
 
 const parseLength = (raw: string) => {
   const value = Number.parseFloat(raw);
@@ -87,16 +81,6 @@ export const measureSlotSize = (
   const gap = parseLength(gapRaw);
   return (viewportWidth + gap) / visibleSlidesCount;
 };
-
-/**
- * Width-only style for the always-present height sizer: one slot wide (so the
- * track derives its height from `aspect-ratio` exactly as a slide would),
- * kept in normal flow because absolutely-positioned slides contribute no
- * height. See `.slideSizer` in the stylesheet.
- */
-export const slideSizerStyle = (visibleSlidesCount: number): { width: string } => ({
-  width: `calc((100% - var(--slides-gap, 0px) * ${visibleSlidesCount - 1}) / ${visibleSlidesCount})`,
-});
 
 /**
  * Translate pointer pixel velocity into "virtual index per millisecond".

@@ -95,11 +95,22 @@
     min-width: 0;
   }
 
-  // Height sizer: the only in-flow child, one slot wide (inline width), its
-  // aspect-ratio (or the --slide-height override) gives the otherwise-
-  // collapsed track its height. It MUST honour the same height source as the
-  // slide, or the track and the slides would desync. Invisible and inert;
-  // the real slides are absolutely positioned OVER it.
+  // ONE slot wide. `--visible-slides` is the only thing JS supplies here (the
+  // live `visibleSlidesNr`, set on the root); the rule itself stays in the
+  // stylesheet — same split the widget uses (`--visible-dots-count` & co).
+  .slideSizer,
+  .slide {
+    width: calc(
+      (100% - var(--slides-gap, 0px) * (var(--visible-slides, 1) - 1)) /
+        var(--visible-slides, 1)
+    );
+  }
+
+  // Height sizer: the only in-flow child, one slot wide, its aspect-ratio (or
+  // the --slide-height override) gives the otherwise-collapsed track its
+  // height. It MUST honour the same height source as the slide, or the track
+  // and the slides would desync. Invisible and inert; the real slides are
+  // absolutely positioned OVER it.
   .slideSizer {
     visibility: hidden;
     aspect-ratio: var(--slide-aspect);
@@ -114,6 +125,13 @@
     display: block;
     aspect-ratio: var(--slide-aspect);
     height: var(--slide-height);
+    // The slide's own lane. `--slide-lane` (an integer, from JS per slide) is
+    // the ONE per-slide datum; one lane step is the slide's own width plus a
+    // gap — exactly one slot stride, because `translateX(100%)` on an
+    // absolutely-positioned box resolves against its OWN width.
+    transform: translateX(
+      calc(var(--slide-lane, 0) * (100% + var(--slides-gap, 0px)))
+    );
     padding: 0;
     margin: 0;
     border: none;
@@ -186,7 +204,7 @@
 
   .outerContainer[data-touch="false"] {
     .slideInteractive:hover {
-      outline-color: rgb(17, 227, 42);
+      outline-color: rgb(248, 113, 9);
     }
   }
 
