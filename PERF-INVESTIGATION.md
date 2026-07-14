@@ -482,6 +482,41 @@ stall of any kind, it should be gone. If it survives, then every model-side
 instrument agreeing that the motion is smooth means the hitch is not in the
 strip's motion at all — and the hunt moves to what else the eye could be seeing.
 
+### 8.1 What is left, measured (not guessed)
+
+With the main thread idle, whatever remains is now the top cost — so it was measured
+rather than assumed. Live deploy, 5 rides, widget mounted:
+
+```
+dropped 12 of 576 (2.1%)
+
+WHERE they fall:  first 20% of the ride: 11    middle: 1    last 20%: 0
+flags:            affects_smoothness + main_anim
+
+competing work:   GPUTask                   x51  122ms
+                  RasterTask (worker threads) x41   27ms
+                  ImageDecodeTask           x 6    1ms
+```
+
+**Image decode was the obvious suspect and it is innocent** — 1 ms. The old
+"8 decodes / 499 ms" belonged to a world where the main thread was saturated;
+raster and decode now run on worker threads and the GPU, and fit the frame budget.
+
+What is left is a **burst at the START of a step**: 11 of 12 drops land in the
+first 20 % of the ride, where React's render, the active-dot class flip, the WAAPI
+animation setup and the first raster of the entering slides all land in one frame.
+`main_anim` on those frames confirms it — they are the few main frames that remain,
+and they are all at the start.
+
+That also explains the widget's higher drop rate (2.1 % vs 0.6 % for the plain
+pagination): its expensive N-distinct-styles recalc lands squarely in that burst.
+
+**Verdict: stop here.** The drops are at ride start, where the strip has barely
+begun to move and the eye does not catch them — confirmed by hand on the device.
+The only lever left is quantising the widget's per-dot values ([§7](#7-the-widget-needs-no-rewrite)),
+which trades a fraction of a percent of dropped frames against a visual risk. Not
+worth taking blind.
+
 ### A rule this investigation earned
 
 **Never declare a CSS transition on a property that a WAAPI animation also drives.**
