@@ -498,9 +498,25 @@ competing work:   GPUTask                   x51  122ms
                   ImageDecodeTask           x 6    1ms
 ```
 
-**Image decode was the obvious suspect and it is innocent** — 1 ms. The old
-"8 decodes / 499 ms" belonged to a world where the main thread was saturated;
-raster and decode now run on worker threads and the GPU, and fit the frame budget.
+> **Correction — the 1 ms decode figure was confounded, and it was wrong to state
+> it as a property of the system.** That run was taken against a deploy with
+> `isPredecodeOn={true}`: decode was cheap **because the images were decoded ahead
+> of the ride**, not because decode is harmless. Re-measured as a proper A/B, one
+> flag apart:
+>
+> | | dropped | decode DURING the ride | raster | main thread |
+> | --- | --- | --- | --- | --- |
+> | `isPredecodeOn: true` | 12/578 (2.1 %, all at start) | **x18 · 10 ms** | 47 ms | 121 ms |
+> | `isPredecodeOn: false` | 12/578 (2.1 %, all at start) | **x34 · 1000 ms** | 47 ms | 121 ms |
+>
+> Decode is **a second of work**, not a millisecond. `isPredecodeOn` earns its
+> keep: it lifts that second out of the ride. Keep it on (with `preloadPagesNr: 2`).
+>
+> But note what did **not** move: **dropped frames are identical** — same 12, same
+> 2.1 %, same burst at the start. Even a full second of decode does not cost
+> smoothness, because it runs on worker threads and the GPU, past the compositor.
+> Decode is a **CPU/battery** cost, not a jank cost — and the ride-start burst
+> below is unaffected by it.
 
 What is left is a **burst at the START of a step**: 11 of 12 drops land in the
 first 20 % of the ride, where React's render, the active-dot class flip, the WAAPI
