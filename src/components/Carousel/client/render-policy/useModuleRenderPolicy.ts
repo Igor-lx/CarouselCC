@@ -10,15 +10,27 @@ interface UseModuleRenderPolicyInput {
   canSlide: boolean;
 }
 
+/** The slot children ALREADY resolved against the policy: a module the policy
+ * silences is `null` here. The view renders these directly and carries no
+ * conditionals of its own — the policy is the single owner of the decision,
+ * not just of the booleans behind it. */
+export interface GatedModuleSlots {
+  controls: ReactNode;
+  pagination: ReactNode;
+  responsiveImages: ReactNode;
+  diagnostic: ReactNode;
+}
+
 export interface ModuleRenderPolicy {
+  /** Attachment flags — Diagnostics audits the host's wiring against them
+   * (e.g. a prop that only means something with its module attached). */
   hasControlsSlot: boolean;
   hasPaginationSlot: boolean;
   hasDiagnosticSlot: boolean;
   hasResponsiveImagesSlot: boolean;
-  shouldRenderControls: boolean;
-  shouldRenderPagination: boolean;
-  shouldRenderDiagnostic: boolean;
-  shouldRenderResponsiveImages: boolean;
+  /** The Diagnostic module is attached and therefore observing. */
+  isDiagnosticActive: boolean;
+  slots: GatedModuleSlots;
 }
 
 export function useModuleRenderPolicy({
@@ -49,21 +61,29 @@ export function useModuleRenderPolicy({
       hasPaginationSlot,
       hasDiagnosticSlot,
       hasResponsiveImagesSlot,
-      shouldRenderControls: isControlsOn && canSlide && hasControlsSlot,
-      shouldRenderPagination: isPaginationOn && canSlide && hasPaginationSlot,
-      shouldRenderDiagnostic: hasDiagnosticSlot,
-      // Headless like Diagnostic: renders whenever attached — its PRESENCE is
-      // the switch that turns the responsive-image stack on.
-      shouldRenderResponsiveImages: hasResponsiveImagesSlot,
+      isDiagnosticActive: hasDiagnosticSlot,
+      slots: {
+        controls: isControlsOn && canSlide && hasControlsSlot ? controlsSlot : null,
+        pagination:
+          isPaginationOn && canSlide && hasPaginationSlot ? paginationSlot : null,
+        // Headless like Diagnostic: renders whenever attached — its PRESENCE
+        // is the switch that turns the responsive-image stack on.
+        responsiveImages: hasResponsiveImagesSlot ? responsiveImagesSlot : null,
+        diagnostic: hasDiagnosticSlot ? diagnosticSlot : null,
+      },
     }),
     [
       canSlide,
+      controlsSlot,
+      diagnosticSlot,
       hasControlsSlot,
       hasDiagnosticSlot,
       hasPaginationSlot,
       hasResponsiveImagesSlot,
       isControlsOn,
       isPaginationOn,
+      paginationSlot,
+      responsiveImagesSlot,
     ],
   );
 }

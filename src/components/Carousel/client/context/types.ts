@@ -65,6 +65,10 @@ export interface CarouselSlideMediaView {
   src: string;
   srcSet?: string;
   sizes?: string;
+  /** The art-directed sources, so a warm can pick the SAME crop the rendered
+   * `<picture>` would pick for the current viewport. Without them a warm
+   * would fetch the default (e.g. landscape) set while the deck renders the
+   * portrait crop — bytes spent on an asset that never appears. */
   sources?: readonly SlideImageSource[];
 }
 

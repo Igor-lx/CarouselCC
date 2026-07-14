@@ -43,7 +43,7 @@ export const CAROUSEL_SWIPE_CONFIG: Required<PointerSwipeConfig> = {
   // slot-rescaled at runtime (gesture/slotAdaptiveSwipe.ts), so the wall
   // sits at the same RELATIVE pull on any slot.
   resistanceCurvature: 0.0046,
-  maxVelocity: 5,
+  maxVelocity: 4,
   emaAlpha: 0.85,
   // Flick qualification, CONTENT-RELATIVE: both values are calibrated for
   // the reference slot and rescaled by `slot / reference` at runtime
@@ -93,8 +93,8 @@ export const SWIPE_COMMIT_MAX_PX = 120;
  * smooth tail.
  */
 export const CAROUSEL_INERTIAL_RELEASE_CONFIG: CarouselInertialReleaseConfig = {
-  inertiaBoost: 1.35,
+  inertiaBoost: 1.45,
   accelerationDistanceShare: 0.3,
-  decelerationDistanceShare: 0.7,
-  minRideDurationMs: 220,
+  decelerationDistanceShare: 0.55,
+  minRideDurationMs: 210,
 };

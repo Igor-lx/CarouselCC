@@ -5,23 +5,19 @@ import { SLIDE_PORTRAIT_MEDIA_CONDITION } from "../../config";
 import { useCarouselMotion, useCarouselStable } from "../../context";
 import type { CarouselSlotComponent } from "../../slots";
 import { useResponsiveImagesDiagnostic } from "../Diagnostic/useResponsiveImagesDiagnostic";
-import {
-  resolveParallelCandidate,
-  resolveParallelSrcSet,
-  resolveWarmPages,
-} from "./warmCandidates";
+import { resolveRenderedSrcSet, resolveWarmPages } from "./warmCandidates";
 import type { ResponsiveImagesProps } from "./types";
 
-/** One warm target: either a full responsive tuple (the browser resolves the
- * candidate) or a single pre-resolved URL (the parallel-set heuristic). */
+/** One warm target. `srcSet` is the set the rendered `<picture>` would choose
+ * for THIS viewport (see `resolveRenderedSrcSet`); the browser then resolves
+ * the concrete candidate from it exactly as the markup would, so the warm can
+ * never fetch an asset the deck will not use. `src` is the plain fallback for
+ * a slide that carries no set at all. */
 interface WarmTarget {
   key: string;
-  src: string;
+  src?: string;
   srcSet?: string;
   sizes?: string;
-  /** Only current-orientation neighbours are decode-eligible; the parallel
-   * crop is a network-only hint for a rotation that may never happen. */
-  isDecodeEligible: boolean;
 }
 
 interface WarmEntry {
@@ -56,37 +52,40 @@ const scheduleIdle = (work: () => void): (() => void) => {
  * link path cannot decode and spams "preloaded but not used" warnings for
  * ahead-of-time warming by its very nature.
  *
- * What is warmed, while the deck is idle:
- * - `preloadPagesNr` neighbour pages per side, CURRENT orientation. With
- *   `isPredecodeOn` these are also `decode()`d one per idle callback, so the
- *   incoming page's bitmap is ready BEFORE a ride starts — the mid-ride
- *   decode/raster spike that can hold one frame on a weak GPU never happens.
- *   Warm refs are pruned to the current window (bounded memory) and the
- *   decode queue stops whenever the deck moves;
- * - with `isParallelSetPreloadOn`: the CURRENT page's parallel-orientation
- *   crops, network-only — so a rotation swaps the visible slides instantly;
- *   after it the new orientation is current and neighbour warming continues
- *   from there (warming neighbours of an orientation the user may never
- *   enter would double the traffic for nothing). The candidate is picked
- *   heuristically (a `media`-gated source can never be resolved by the
- *   browser ahead of time) — a miss is masked by the rotation veil.
+ * What is warmed, while the deck is idle: `preloadPagesNr` neighbour pages
+ * per side, in the CURRENT orientation — the swipe-ahead warm. With
+ * `isPredecodeOn` these are also `decode()`d one per idle callback, so the
+ * incoming page's bitmap is ready BEFORE a ride starts and the mid-ride
+ * decode/raster spike that can hold one frame on a weak GPU never happens.
+ * Warm refs are pruned to the current window (bounded memory) and the decode
+ * queue stops whenever the deck moves.
+ *
+ * There is deliberately NO speculative warm of the parallel orientation's
+ * crops. It could never be correct: how many slides the OTHER orientation
+ * shows is the host's own responsive policy (`visibleSlidesNr` is a prop this
+ * component receives already resolved for the CURRENT viewport), so the set
+ * to warm is unknowable here — and it cost a full extra crop per slide for a
+ * rotation most users never perform. The rotation veil already guarantees a
+ * correct swap (`useOrientationSwapVeil`); it just fades a little longer on a
+ * cold crop.
  *
  * The host's data-saver signal is ALWAYS respected — a reduced-data user
  * gets zero warm traffic, and there is deliberately no override: the user's
  * preference outranks any product opinion.
  *
- * Unmounted, none of this exists: one native set everywhere (largest
- * candidate), no responsive markup, no warming — and this module's code is
+ * Unmounted, none of this exists: one native set everywhere (the designated
+ * `defaultSrc`), no responsive markup, no warming — and this module's code is
  * tree-shaken out of the bundle.
  */
 const ResponsiveImagesBase = memo(function ResponsiveImages({
   isPreloadOn = true,
   preloadPagesNr = 1,
-  isParallelSetPreloadOn = false,
   isPredecodeOn = false,
 }: ResponsiveImagesProps) {
   const { layout, slides, imageSizes } = useCarouselStable();
   const { status, intent } = useCarouselMotion();
+  // The art-direction axis: which crop the rendered <picture> is choosing
+  // right now. A rotation flips it, and the warm re-runs for the new crop.
   const isPortrait = useMediaQuery(SLIDE_PORTRAIT_MEDIA_CONDITION);
 
   useResponsiveImagesDiagnostic({ preloadPagesNr, isPreloadOn, isPredecodeOn });
@@ -109,41 +108,26 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
       layout.isFinite,
     );
 
-    const targetPx =
-      Math.round(Number.parseFloat(imageSizes) || 0) *
-      (typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1);
-
     const targets: WarmTarget[] = [];
-
-    // Neighbour pages, current orientation — the swipe-ahead warm.
     for (const page of pages) {
       const start = page * layout.visibleSlidesCount;
       for (const slide of slides.slice(start, start + layout.visibleSlidesCount)) {
-        targets.push({
-          key: slide.src,
-          src: slide.src,
-          srcSet: slide.srcSet,
-          sizes: slide.srcSet ? slide.sizes ?? imageSizes : undefined,
-          isDecodeEligible: true,
-        });
-      }
-    }
-
-    // CURRENT page, parallel orientation — the rotation warm (network-only).
-    if (isParallelSetPreloadOn) {
-      const start = intent.targetPageIndex * layout.visibleSlidesCount;
-      for (const slide of slides.slice(start, start + layout.visibleSlidesCount)) {
-        const parallel = resolveParallelCandidate(
-          resolveParallelSrcSet(slide, isPortrait, SLIDE_PORTRAIT_MEDIA_CONDITION),
-          targetPx,
+        // The crop the deck is ACTUALLY rendering for this viewport — never
+        // the default set blindly (that would fetch the landscape asset while
+        // a portrait deck shows the portrait crop).
+        const { srcSet, sizes } = resolveRenderedSrcSet(
+          slide,
+          isPortrait,
+          SLIDE_PORTRAIT_MEDIA_CONDITION,
         );
-        if (parallel !== null) {
-          targets.push({
-            key: parallel,
-            src: parallel,
-            isDecodeEligible: false,
-          });
-        }
+        targets.push({
+          // The chosen set is part of the identity: a rotation picks another
+          // crop for the same slide, and that crop must warm on its own.
+          key: srcSet ? `${slide.src}|${srcSet}` : slide.src,
+          src: srcSet ? undefined : slide.src,
+          srcSet,
+          sizes: srcSet ? sizes ?? imageSizes : undefined,
+        });
       }
     }
 
@@ -162,13 +146,16 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
       const image = new Image();
       image.fetchPriority = "low";
       if (target.srcSet) {
+        // srcset ALONE: setting `src` too would offer the browser the default
+        // (landscape) candidate alongside the art-directed set we chose.
         image.sizes = target.sizes ?? "";
         image.srcset = target.srcSet;
+      } else if (target.src) {
+        image.src = target.src;
       }
-      image.src = target.src;
       const entry: WarmEntry = { image, isDecoded: false };
       warm.set(target.key, entry);
-      if (!target.isDecodeEligible || !isPredecodeOn) {
+      if (!isPredecodeOn) {
         // Network-only warm: release the ref once the bytes are in —
         // holding it would pin nothing useful (no decode was requested).
         image.addEventListener("load", () => {
@@ -186,7 +173,7 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
     if (!isPredecodeOn) return;
 
     const queue = targets.filter(
-      (target) => target.isDecodeEligible && warm.get(target.key)?.isDecoded === false,
+      (target) => warm.get(target.key)?.isDecoded === false,
     );
     let cancelIdle: (() => void) | null = null;
     let isStopped = false;
@@ -229,7 +216,6 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
   }, [
     imageSizes,
     intent.targetPageIndex,
-    isParallelSetPreloadOn,
     isPortrait,
     isPredecodeOn,
     isPreloadOn,

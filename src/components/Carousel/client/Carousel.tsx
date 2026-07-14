@@ -59,8 +59,9 @@ interface CarouselRootCSSVars extends React.CSSProperties {
   "--visible-slides": number;
 }
 
-/** Per-slide datum: which lane the slide sits in (see `slideLane`). */
-interface SlideLaneCSSVars extends React.CSSProperties {
+/** Per-slide datum: which lane the slide sits in (see `slideLane`). The only
+ * style that cannot be shared across slides — each sits in a different lane. */
+interface CarouselSlideCSSVars extends React.CSSProperties {
   "--slide-lane": number;
 }
 
@@ -316,6 +317,9 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   });
 
   // --- module render policy & values ---------------------------------------
+  // The policy owns the whole decision: `moduleSlots` are the slot children
+  // ALREADY gated (a silenced module is `null`), so the view below just renders
+  // them — no per-slot conditionals duplicated in JSX.
   const renderPolicy = useModuleRenderPolicy({
     controlsSlot: slots.controls,
     paginationSlot: slots.pagination,
@@ -325,6 +329,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     isPaginationOn,
     canSlide: layout.canSlide,
   });
+  const moduleSlots = renderPolicy.slots;
 
   const { stable: stableContextValue, motion: motionContextValue } =
     useModuleContextValue({
@@ -339,7 +344,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
       motionPlan: isInstantMode ? null : planChannel.source,
       isAtStart,
       isAtEnd,
-      isDiagnosticActive: renderPolicy.shouldRenderDiagnostic,
+      isDiagnosticActive: renderPolicy.isDiagnosticActive,
     });
 
   // --- diagnostic context ---------------------------------------------------
@@ -391,6 +396,19 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     [layout.visibleSlidesCount],
   );
 
+  // One style object per slide, positionally aligned with `virtualSlides`.
+  // The lane is the ONE datum that cannot be shared (each slide sits in a
+  // different one), so it is the only style the view builds per element —
+  // memoised here rather than in JSX so the objects keep a stable identity
+  // and `SlideItem`'s memo is not defeated by a fresh literal every render.
+  const slideStyles = useMemo<CarouselSlideCSSVars[]>(
+    () =>
+      virtualSlides.map((slide) => ({
+        "--slide-lane": slideLane(slide.virtualIndex, layoutOrigin),
+      })),
+    [layoutOrigin, virtualSlides],
+  );
+
   return (
     <CarouselStableContext.Provider value={stableContextValue}>
       <CarouselMotionContext.Provider value={motionContextValue}>
@@ -421,16 +439,12 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
                 data-carousel-track=""
               >
                 <div aria-hidden="true" className={styles.slideSizer} />
-                {virtualSlides.map((slide) => (
+                {virtualSlides.map((slide, index) => (
                   <SlideItem
                     key={slide.slideKey}
                     slideData={slide.slideData}
                     className={slideClassMap}
-                    style={
-                      {
-                        "--slide-lane": slideLane(slide.virtualIndex, layoutOrigin),
-                      } as SlideLaneCSSVars
-                    }
+                    style={slideStyles[index]!}
                     isContentImg={isContentImg}
                     isResponsiveImagesOn={isResponsiveImagesOn}
                     errAltPlaceholder={config.errorAltPlaceholder}
@@ -445,13 +459,11 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
                   />
                 ))}
               </div>
-              {renderPolicy.shouldRenderControls ? slots.controls : null}
+              {moduleSlots.controls}
             </div>
-            {renderPolicy.shouldRenderPagination ? slots.pagination : null}
-            {renderPolicy.shouldRenderResponsiveImages
-              ? slots["responsive-images"]
-              : null}
-            {renderPolicy.shouldRenderDiagnostic ? slots.diagnostic : null}
+            {moduleSlots.pagination}
+            {moduleSlots.responsiveImages}
+            {moduleSlots.diagnostic}
           </div>
         </CarouselDiagnosticContext.Provider>
       </CarouselMotionContext.Provider>

@@ -1,20 +1,47 @@
 import type { CarouselSlideMediaView } from "../../context";
 
 /**
- * Pure helpers of the preload module.
+ * Pure helpers of the warm manager.
  *
  * `resolveWarmPages` — which pages around the target to warm: `pagesNr` on
  * each side, cyclic decks wrap, finite decks clamp; the target page itself is
  * excluded (its images are already loading eagerly).
  *
- * `resolveParallelCandidate` — the ONLY heuristic in the module: the parallel
- * orientation's `<source>` cannot be preloaded natively (its `media` never
- * matches the current viewport), so a candidate is picked manually — the
- * smallest one that covers `targetPx` (slot × DPR approximation), else the
- * largest available. A one-step miss is acceptable: the warm is a cache hint,
- * and the rotation veil masks a slow swap anyway.
+ * `resolveRenderedSrcSet` — the candidate set the RENDERED `<picture>` would
+ * choose for the current viewport, which is the only set worth warming. A
+ * detached `Image` understands `srcset`/`sizes` (resolution switching) but NOT
+ * `<source media>` (art direction), so the media choice has to be made here:
+ * the portrait `<source>` when the viewport is portrait, the default set
+ * otherwise. (One art-direction axis exists by contract —
+ * `orientationMediaSync.test.ts` pins every generated source to the same
+ * `SLIDE_PORTRAIT_MEDIA_CONDITION`.) Warming `slide.srcSet` blindly would
+ * fetch the LANDSCAPE set while a portrait deck renders the portrait crop:
+ * bytes spent on an asset that never appears, and the needed crop left cold.
+ *
+ * There is deliberately no parallel-orientation ("rotation") warm. The set of
+ * slides the OTHER orientation would show depends on the host's own responsive
+ * policy (`visibleSlidesNr` arrives already resolved for the CURRENT viewport),
+ * so it is not knowable here — and it cost a full extra crop per slide for a
+ * rotation most users never perform. The rotation veil already guarantees a
+ * correct swap.
  */
+export interface RenderedSrcSet {
+  srcSet?: string;
+  sizes?: string;
+}
 
+export const resolveRenderedSrcSet = (
+  slide: CarouselSlideMediaView,
+  isPortrait: boolean,
+  portraitMediaCondition: string,
+): RenderedSrcSet => {
+  const artDirected = isPortrait
+    ? slide.sources?.find((source) => source.media === portraitMediaCondition)
+    : undefined;
+  return artDirected
+    ? { srcSet: artDirected.srcSet, sizes: artDirected.sizes }
+    : { srcSet: slide.srcSet, sizes: slide.sizes };
+};
 export const resolveWarmPages = (
   targetPageIndex: number,
   pageCount: number,
@@ -35,47 +62,4 @@ export const resolveWarmPages = (
   }
   pages.delete(targetPageIndex);
   return [...pages];
-};
-
-interface SrcSetCandidate {
-  url: string;
-  width: number;
-}
-
-const parseSrcSet = (srcSet: string): SrcSetCandidate[] => {
-  const out: SrcSetCandidate[] = [];
-  for (const entry of srcSet.split(",")) {
-    const parts = entry.trim().split(/\s+/);
-    const url = parts[0];
-    if (!url) continue;
-    const match = parts[1]?.match(/^(\d+(?:\.\d+)?)w$/);
-    out.push({ url, width: match ? Number(match[1]) : 0 });
-  }
-  return out;
-};
-
-export const resolveParallelCandidate = (
-  srcSet: string | undefined,
-  targetPx: number,
-): string | null => {
-  if (!srcSet) return null;
-  const candidates = parseSrcSet(srcSet).sort((a, b) => a.width - b.width);
-  if (candidates.length === 0) return null;
-  const covering = candidates.find((candidate) => candidate.width >= targetPx);
-  return (covering ?? candidates[candidates.length - 1]!).url;
-};
-
-/**
- * The parallel set of one slide: when the viewport is portrait the parallel
- * set is the DEFAULT `srcSet` (the landscape asset); otherwise it is the
- * `<source>` whose media equals the portrait condition.
- */
-export const resolveParallelSrcSet = (
-  slide: CarouselSlideMediaView,
-  isPortrait: boolean,
-  portraitMediaCondition: string,
-): string | undefined => {
-  if (isPortrait) return slide.srcSet;
-  return slide.sources?.find((source) => source.media === portraitMediaCondition)
-    ?.srcSet;
 };

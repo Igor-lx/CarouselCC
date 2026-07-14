@@ -1231,12 +1231,14 @@ Headless (renders `null`). Two effects in one slot:
    decode queue stops whenever the deck moves. `isPredecodeOn` is an
    upgrade of the warm, not a sibling: the type union forbids it with
    `isPreloadOn: false`, and Diagnostics reports the dead combination for
-   untyped call sites. `isParallelSetPreloadOn` (default off) warms the
-   CURRENT page's parallel-orientation crops, network-only — a rotation
-   swaps the visible slides instantly, after which the new orientation is
-   current and neighbour warming continues from there (warming neighbours
-   of an orientation the user may never enter would double the traffic for
-   nothing; the heuristic candidate may miss — the rotation veil masks it).
+   untyped call sites. There is deliberately NO speculative warm of the
+   parallel orientation's crops: how many slides the OTHER orientation shows
+   is the host's own responsive policy (`visibleSlidesNr` arrives already
+   resolved for the CURRENT viewport), so the set to warm is not knowable
+   here — any guess under- or over-warms — and it cost a full extra crop per
+   slide for a rotation most users never perform. The rotation veil
+   (`useOrientationSwapVeil`) already guarantees a correct swap; on a cold
+   crop it simply fades a little longer.
    The host's reduced-data signal ALWAYS zeroes warm traffic — there is
    deliberately no override knob: the user's preference outranks any
    product opinion. Props are audited by Diagnostics

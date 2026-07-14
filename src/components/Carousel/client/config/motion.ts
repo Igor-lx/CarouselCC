@@ -4,7 +4,7 @@
  * A repeated click drives straight to the next page boundary and decays to
  * zero speed - there is no intermediate target.
  */
-export const REPEATED_CLICK_SPEED_MULTIPLIER = 7;
+export const REPEATED_CLICK_SPEED_MULTIPLIER = 5;
 
 /** Fraction of the fast segment distance dedicated to ramp-up. */
 export const REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE = 0.3;
@@ -17,7 +17,7 @@ export const REPEATED_CLICK_DECELERATION_DISTANCE_SHARE = 0.35;
  * teleport the carousel shows only the final approach page. GO_TO spans that
  * fit within preflight + final approach animate directly without teleport.
  */
-export const GO_TO_PREFLIGHT_PAGE_SPAN = 2;
+export const GO_TO_PREFLIGHT_PAGE_SPAN = 1;
 
 /**
  * Number of page screens animated AFTER a far-GO_TO teleport. The post-teleport
@@ -34,7 +34,7 @@ export const GO_TO_FINAL_APPROACH_PAGE_SPAN = 1;
  * Must exceed `GO_TO_PREFLIGHT_PAGE_SPAN + GO_TO_FINAL_APPROACH_PAGE_SPAN`,
  * otherwise the skipped middle would be zero or negative.
  */
-export const GO_TO_TELEPORT_MIN_PAGE_SPAN = 4;
+export const GO_TO_TELEPORT_MIN_PAGE_SPAN = 3;
 
 /**
  * Acceleration / deceleration distance shares of the GO_TO profile.
@@ -63,7 +63,7 @@ export const GO_TO_DECELERATION_DISTANCE_SHARE = 0.5;
  */
 
 /** Click step and non-inertial gesture release: soft symmetric-ish ramp. */
-export const STEP_ACCELERATION_DISTANCE_SHARE = 0.35;
+  export const STEP_ACCELERATION_DISTANCE_SHARE = 0.35;
 export const STEP_DECELERATION_DISTANCE_SHARE = 0.4;
 
 /** Autoplay step: front-loaded — moves out early, long calm settle. */

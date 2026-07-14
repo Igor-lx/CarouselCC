@@ -2,16 +2,6 @@ interface ResponsiveImagesBaseProps {
   /** Neighbour pages to warm on EACH side of the target (current
    * orientation only). Default `1`. */
   preloadPagesNr?: number;
-  /**
-   * Also warm the CURRENT page's parallel-orientation crops (heuristic
-   * candidate — see `resolveParallelCandidate`), so a device rotation swaps
-   * the visible slides instantly. Network-only and current page only by
-   * design: after the rotation the new orientation becomes current and the
-   * regular neighbour warming continues from there — warming neighbour
-   * pages of an orientation the user may never enter would double the
-   * traffic for nothing. Default `false`.
-   */
-  isParallelSetPreloadOn?: boolean;
 }
 
 /**
