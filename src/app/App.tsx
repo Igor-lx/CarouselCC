@@ -12,7 +12,6 @@ import Carousel, {
   type Slide,
 } from "../components/Carousel/client";
 import { Controls } from "../components/Carousel/client/modules/Controls";
-import { Pagination } from "../components/Carousel/client/modules/Pagination";
 import { PaginationWidget } from "../components/Carousel/client/modules/PaginationWidget";
 import { Diagnostic } from "../components/Carousel/client/modules/Diagnostic";
 import { ResponsiveImages } from "../components/Carousel/client/modules/ResponsiveImages";
@@ -157,11 +156,11 @@ export default function App() {
               onSlideClick={openSlide}
               onCarouselStatusChange={(snapshot) => setStatus(snapshot)}
             >
-              {isTouch ? <PaginationWidget /> : <Pagination />}
+              <PaginationWidget />
               <Controls />
               <ResponsiveImages
                 isPreloadOn={true}
-                isPredecodeOn={true}
+                isPredecodeOn={false}
                 preloadPagesNr={1}
               />
               <Diagnostic />
