@@ -21,6 +21,14 @@ createServer(async (req, res) => {
   let path = decodeURIComponent(req.url.split("?")[0]);
   if (path.endsWith("/")) path += "index.html";
 
+  // Slide images are addressed with the deployed base (/CarouselCC/...), which
+  // is baked into the image data, not derived from vite's --base. Serve them
+  // from a build's public assets — otherwise every slide 404s into an error
+  // state and the rig measures broken slides instead of a carousel.
+  if (path.startsWith("/CarouselCC/")) {
+    path = `/on${path.slice("/CarouselCC".length)}`;
+  }
+
   const file = join(ROOT, path);
   if (!file.startsWith(ROOT)) {
     res.writeHead(403).end("forbidden");
