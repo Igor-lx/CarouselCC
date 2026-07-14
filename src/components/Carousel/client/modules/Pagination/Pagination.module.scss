@@ -40,10 +40,16 @@
     border-radius: var(--pagination-dot-radius);
     background-color: var(--color);
     opacity: var(--pagination-dot-opacity);
-    // Fallback pacing only: any engine-planned motion overrides this with a
-    // WAAPI cross-fade over the whole step (animations beat transitions);
-    // the transition covers non-planned flips (mount, drag target changes,
-    // the no-WAAPI fallback).
+    // Covers ONLY the non-planned flips (mount, drag retarget, the no-WAAPI
+    // fallback). During a planned step `usePaginationFade` suppresses this
+    // transition inline and the WAAPI cross-fade owns the dot.
+    //
+    // It must never run alongside that fade. An animation does beat a
+    // transition in the cascade — the picture is correct either way — but the
+    // transition still EXISTS as a second effect on opacity/transform, and
+    // Blink refuses to composite a property driven by two effects. It then
+    // ticks the fade on the main thread for the whole ride: measured at 452
+    // main frames per 4 rides instead of 12. See PERF-INVESTIGATION.md §3.5.
     transition:
       opacity 0.4s,
       transform 0.5s;

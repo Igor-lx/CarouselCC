@@ -19,8 +19,8 @@ hypothesis, that is recorded too: the disproofs are the most valuable part of th
 
 | | State |
 | --- | --- |
-| **Defect A — widget dot animations cost ~7 ms/frame** | Proven ([§2](#2-defect-a--the-pagination-dots-cost-7-msframe)). Fix 1 of 4 applied; options 2–4 await a decision. |
-| **Defect B — main thread runs a full paint lifecycle every frame of a *composited* ride** | Proven and open ([§3](#3-defect-b--a-full-paint-lifecycle-on-every-frame-of-a-composited-ride)). Two suspects eliminated; the culprit is now isolated to the track's own animation. |
+| **Defect B — main thread runs a full paint lifecycle every frame of a *composited* ride** | **FOUND AND FIXED** ([§3.5](#35-the-cause-a-css-transition-fighting-the-waapi-fade)). The dot's CSS `transition` covered the same properties as its WAAPI fade, and two effects on one property cannot be composited. A ride went from **452 main frames (2696 ms) to 13 (80 ms)**. |
+| **Defect A — widget dot animations cost ~7 ms/frame** | **No longer a per-frame cost; no rewrite needed** ([§7](#7-the-widget-needs-no-rewrite)). It was 7 ms *per main frame*, and main frames were being forced every frame. With the frame loop gone and the transition conflict fixed, the widget's expensive recalc happens **13 times per 4 rides instead of 670**. A latent tax, not a running one. |
 | **The original micro-hitch** | Still unexplained ([§1](#1-the-original-quest--the-micro-hitch)). Every model-side instrument says the motion is smooth. |
 
 ---
@@ -277,6 +277,51 @@ not the co-running track animation, and not a class mutation in either order.
 Something about *how or when the app creates them* is decisive, and it has not
 been found yet. That is the next target.
 
+### 3.5 The cause: a CSS transition fighting the WAAPI fade
+
+The contradiction in §3.4 had one loose thread. Every hand-made replica of the
+dot animation composited — and in the two variants where I "touched the class"
+I added a **meaningless** class name, which changed no property, so **no
+transition ever started**. I had reproduced everything except the one thing that
+mattered.
+
+`Pagination.module.scss` declares, on the dot:
+
+```scss
+.dot       { transition: opacity 0.4s, transform 0.5s; }
+.dotActive { opacity: …; transform: scaleX(…); }   // the same two properties
+```
+
+and the WAAPI cross-fade animates **`opacity` and `transform`** — the same two.
+During a ride React moves the `.dotActive` class (the trace shows `dot[class] x2`),
+the transition fires, and Blink is left with **two effects driving one property**.
+It cannot composite that, so it drops the fade onto the **main thread** for the
+rest of the ride — and drags a full paint lifecycle through every frame behind a
+ride the compositor was otherwise painting for free.
+
+**Proved on the real app**, changing nothing but the transition (4 rides):
+
+| | `BeginMainFrame` | `Paint` | `Layerize` | `recalcStyle` | `has_main_animation` |
+| --- | --- | --- | --- | --- | --- |
+| as shipped | **x452 (2696 ms)** | x452 | x452 | 256 ms | 896/909 |
+| `transition: none` on the dots | **x12 (81 ms)** | x12 | x12 | 22 ms | **0/462** |
+
+That is the floor a properly composited animation costs on this device (x8).
+
+**The fix** (`usePaginationFade`): the transition is not deleted — it still owns
+every *non-planned* flip (mount, drag retarget, the no-WAAPI fallback). It is
+**suppressed for the duration of a planned step**: `transition: none` is written
+inline *before* `animate()` — which also cancels a transition the class flip may
+have already started — and restored when the fade is cancelled or finishes. The
+visual is unchanged: during the step the WAAPI fade was already the thing you
+saw. Measured with the fix in the build: **x13 (80 ms)** — identical to forcing
+`transition: none` by hand.
+
+**Why it hid for so long.** The code comment said *"animations beat transitions"*.
+That is true **of the value** — the cascade picks the animation, so the picture is
+correct — and completely silent **about the cost**. A defect that renders
+correctly has nothing to show you; it only shows up as a number.
+
 ### 3.3 (superseded) The track's own animation is main-ticked while composited
 
 With **only the track animating**, `has_main_animation` still covers **99 % of ride
@@ -304,6 +349,7 @@ compositor? Candidates, all A/B-testable on the standing rig:
 
 | Fix | Commit | Verified by |
 | --- | --- | --- |
+| **The dot's CSS transition no longer fights its WAAPI fade** | this branch | Ride: **452 main frames / 2696 ms → 13 / 80 ms** on device |
 | Invisible dots are no longer animated | `6597a48` | Visual unchanged on device |
 | Composited segments run without a frame loop (`isPassive`) | `1bef342` | `FireAnimationFrame` x672 → **x0** on device |
 | Stable slide lanes (`layoutOrigin`) — no recenter jump, no layer re-record | earlier | 0 recenter jumps; rAF worst gap 50 ms → 18 ms |
@@ -371,7 +417,34 @@ Recorded because each one nearly shipped a wrong conclusion.
 
 ---
 
-## 7. Remaining fix options for the widget
+## 7. The widget needs no rewrite
+
+Measured after the two fixes, with `PaginationWidget` mounted (4 rides):
+
+| | `BeginMainFrame` | `recalcStyle` | `has_main_animation` |
+| --- | --- | --- | --- |
+| as shipped | **x13 (106 ms)** | x13 (45 ms) | 13/465 |
+| every transition in the widget killed | x12 | x12 | 20/467 |
+| the dot animations killed outright | x13 | x13 | 24/467 |
+
+All three are the same: **the widget is already at the floor.** Its dot
+animations composite, and killing them buys nothing. There is nothing left to fix.
+
+**So why did §2 measure 5031 ms?** Because 7 ms was the cost *per main frame*,
+and at that time main frames were being forced on **every** frame — first by the
+controller's per-frame tick, then by the transition conflict. Both are gone, so
+the widget's expensive recalc now runs **13 times per 4 rides instead of 670**,
+and its total cost collapses from 5031 ms to 45 ms.
+
+The per-recalc cost is still real (3.5 ms — the N-distinct-styles mechanism of
+[§2.4](#24-the-actual-mechanism--found) has not changed). It is now a **latent
+tax, not a running one**: if anything ever forces main frames every frame again,
+the widget will be expensive again. Worth knowing; not worth a redesign.
+
+The options below are therefore **not needed**. Kept only so the reasoning is not
+re-derived from scratch if that latent cost ever matters.
+
+### Options (no longer required)
 
 Ordered simple → structural. All must preserve the visual: a continuous strip where dots
 *travel* (never pop in), shrinking and fading toward the edges.
@@ -397,7 +470,21 @@ is not re-attempted blindly.**
 
 ## 8. Next
 
-Find out why the track's WAAPI animation is composited **and** main-ticked
-([§3.3](#33-what-is-left--the-tracks-own-animation-is-main-ticked-while-composited)). It is
-the last thing standing between a ride and an idle main thread — and the only remaining
-candidate for the micro-hitch that started all of this.
+The main thread is now **idle during a ride** — 13 main frames per 4 rides, against
+a floor of 8 for a bare composited animation. Defect B is closed and the widget
+needs nothing.
+
+What remains is the question that started all of this: **the micro-hitch**
+([§1](#1-the-original-quest--the-micro-hitch)). It is worth re-testing on the device
+now, because the machine underneath it has changed completely: the main thread no
+longer runs a paint lifecycle behind the ride, so if the hitch was a main-thread
+stall of any kind, it should be gone. If it survives, then every model-side
+instrument agreeing that the motion is smooth means the hitch is not in the
+strip's motion at all — and the hunt moves to what else the eye could be seeing.
+
+### A rule this investigation earned
+
+**Never declare a CSS transition on a property that a WAAPI animation also drives.**
+The cascade hides the conflict (the animation wins, the picture is right) while the
+compositor pays for it on every frame. If a transition is needed for the states an
+animation does not cover, suppress it while the animation owns the element.

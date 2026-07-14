@@ -109,27 +109,63 @@ export function usePaginationFade({
     callbacksRef.current.length = pageCount;
   }, [pageCount]);
 
-  const cancelFade = useCallback((pageIndex: number) => {
-    const animation = animationsRef.current.get(pageIndex);
-    if (!animation) return;
-    animationsRef.current.delete(pageIndex);
-    try {
-      animation.cancel();
-    } catch {
-      // already gone
-    }
+  /**
+   * The dot's CSS `transition` covers opacity and transform — the very two
+   * properties the WAAPI fade animates. Whenever the active-dot class moves,
+   * that transition fires, and Blink is left with two effects on one property:
+   * it cannot composite that, so it drops the fade onto the main thread for the
+   * rest of the ride, dragging a full paint lifecycle through every frame.
+   *
+   * The cascade still picks the animation, so the picture stays correct — which
+   * is exactly why the cost stayed invisible. Measured on a Redmi Note 11S,
+   * suppressing the transition for the duration of the fade takes a ride from
+   * 452 main frames (2696 ms) down to 12 (81 ms).
+   *
+   * Suppressing also CANCELS a transition already in flight (a property that
+   * leaves `transition-property` has its transition cancelled), so it is safe
+   * whether the class flip lands before or after the plan arrives.
+   */
+  const suppressTransition = useCallback((pageIndex: number) => {
+    const dot = dotRefs.current[pageIndex];
+    if (dot) dot.style.transition = "none";
   }, []);
 
-  const cancelAllFades = useCallback(() => {
-    animationsRef.current.forEach((animation) => {
+  const restoreTransition = useCallback((pageIndex: number) => {
+    const dot = dotRefs.current[pageIndex];
+    // Back to the stylesheet: the transition still owns every non-planned flip
+    // (mount, drag retarget, the no-WAAPI fallback).
+    if (dot) dot.style.transition = "";
+  }, []);
+
+  const cancelFade = useCallback(
+    (pageIndex: number) => {
+      const animation = animationsRef.current.get(pageIndex);
+      if (!animation) return;
+      animationsRef.current.delete(pageIndex);
       try {
         animation.cancel();
       } catch {
         // already gone
       }
+      // After the cancel: the class styles underneath already hold exactly the
+      // values the fade ended on, so restoring the transition here transitions
+      // nothing.
+      restoreTransition(pageIndex);
+    },
+    [restoreTransition],
+  );
+
+  const cancelAllFades = useCallback(() => {
+    animationsRef.current.forEach((animation, pageIndex) => {
+      try {
+        animation.cancel();
+      } catch {
+        // already gone
+      }
+      restoreTransition(pageIndex);
     });
     animationsRef.current.clear();
-  }, []);
+  }, [restoreTransition]);
 
   const startFade = useCallback(
     (
@@ -141,6 +177,12 @@ export function usePaginationFade({
       onFinish?: () => void,
     ) => {
       cancelFade(pageIndex);
+
+      // Before animate(), never after: this both cancels a transition the class
+      // flip may have already started and stops the next one from starting, so
+      // the fade is the ONLY effect on opacity/transform and can be composited.
+      suppressTransition(pageIndex);
+
       let animation: Animation;
       try {
         animation = element.animate(buildFadeKeyframes(from, to, plan.stops), {
@@ -148,8 +190,9 @@ export function usePaginationFade({
           fill: "both",
         });
       } catch {
-        // No keyframe support: the class flip + CSS transition already
-        // produced an acceptable (instant-ish) switch.
+        // No keyframe support: hand the dot back to the class flip + CSS
+        // transition, which produce an acceptable (instant-ish) switch.
+        restoreTransition(pageIndex);
         return;
       }
       try {
@@ -165,7 +208,7 @@ export function usePaginationFade({
         };
       }
     },
-    [cancelFade],
+    [cancelFade, restoreTransition, suppressTransition],
   );
 
   const applyPlan = useCallback(
