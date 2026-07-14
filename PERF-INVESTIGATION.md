@@ -192,7 +192,36 @@ main-thread JS per 11 s of riding, now zero) and removing it is architecturally 
 it is **not** the source of the per-frame paint. Shipped anyway: it deletes work nobody
 needed, and it clears the field.
 
-### 3.2 Suspect 2: the pagination dots — **not the cause**
+### 3.2 Suspect 2: the pagination dots — **THIS SECTION WAS WRONG. They are the cause.**
+
+> **Correction.** The experiment below removed the dots from the DOM and saw no
+> change, and I concluded the dots were innocent. **That conclusion was false —
+> the experiment was broken.** Removing an element does **not** cancel its WAAPI
+> animation: a detached element has no layout object, so its animation cannot
+> composite and keeps running as a *main-thread* animation. A second attempt,
+> which recreated the animations with empty keyframes, failed the same way — an
+> empty-keyframe animation still **runs** in Blink's timeline and still forces a
+> main frame. Every "suppressed" phase still had live main-thread animations,
+> which is why every phase came out identical.
+>
+> With the dots **truly** killed (cancel + neutered `startTime`/`play`, because
+> the bindings resurrect a cancelled animation by assigning `startTime`):
+>
+> | | live animations | `BeginMainFrame` | `Paint` | `Layerize` | `has_main_animation` |
+> | --- | --- | --- | --- | --- | --- |
+> | as shipped | track + 2 dots | x453 (2467 ms) | x451 | x451 | 895/907 |
+> | **dots truly dead** | track only | **x54 (384 ms)** | **x54** | **x54** | **0/483** |
+>
+> The track's animation, left alone, composites completely and the main thread
+> goes quiet. **The dot animations are the entire source of the per-frame paint
+> lifecycle** — which also unifies Defect B with [Defect A](#2-defect-a--the-pagination-dots-cost-7-msframe): one defect, not two.
+>
+> The open question moved: not *what* drives the frames, but **why the app's dot
+> animations refuse to composite** — see [§3.4](#34-the-standing-contradiction).
+
+The (flawed) original experiment follows, kept because its flaw is the lesson.
+
+
 
 With the tick eliminated, the trace still reported a **main-thread animation driving 1099
 of 1112 ride frames**. The only animations alive during a ride:
@@ -216,7 +245,39 @@ yet plainly were not composited. So: remove pagination from the DOM entirely, re
 **Zero effect.** This independently confirms the user's own finding: they removed every
 slot and the behaviour was unchanged. The slots are not the source.
 
-### 3.3 What is left — the track's own animation is main-ticked while composited
+### 3.4 The standing contradiction
+
+The dots are the source — but **nothing about them explains why**. Every property
+of the app's dot animations was reproduced by hand, on the same elements, and
+every reconstruction **composites for free**:
+
+| Hand-made variant (no ride; app not involved) | `BeginMainFrame` | `has_main_animation` |
+| --- | --- | --- |
+| one dot, as-is | x7 | 0/361 |
+| all 11 dots, identical values | x6 | 0/360 |
+| all 11 dots, **distinct** values | x6 | 0/360 |
+| all dots, **33 keyframes + `fill:both` + pinned `startTime`** (the app's exact shape) | **x5** | **0/361** |
+| track **+** all dots together (a whole ride, by hand) | x7 | 0/362 |
+| …plus a class change on the dots **mid-flight** | x11 | 0/371 |
+| …plus a class change **before** `animate()` (React's order) | x11 | 0/366 |
+
+And the app does **no per-frame work** during a ride. Instrumented over one full
+ride (~114 frames): **3 `animate()` calls** (1 track, 2 dots), **1**
+`getComputedStyle`, **1** inline style write, **0** `getBoundingClientRect`, **0**
+animation cancels. The attribute churn is trivial: `dot[class] x2`,
+`slide[data-active-zone] x4`, `img[fetchPriority] x4`.
+
+Its real keyframes are unremarkable too — 33 stops of `opacity` + `scaleX(1.5 → 1)`,
+`linear`, `fill: both`.
+
+**So: the app's dot animations are main-ticked; byte-for-byte reconstructions of
+them are not.** The blocker is not the element, not the container's clip, not the
+keyframe values, not the keyframe count, not `fill`, not the pinned `startTime`,
+not the co-running track animation, and not a class mutation in either order.
+Something about *how or when the app creates them* is decisive, and it has not
+been found yet. That is the next target.
+
+### 3.3 (superseded) The track's own animation is main-ticked while composited
 
 With **only the track animating**, `has_main_animation` still covers **99 % of ride
 frames** — and `has_compositor_animation` covers them too. The track's WAAPI transform
