@@ -61,6 +61,13 @@ const DOT_COVERAGE_MARGIN = 2;
  * path touches at most this many integer pages with non-zero strength. */
 const ACTIVE_DOT_COUNT = 4;
 
+/** Below this, a dot paints nothing. A dot that never rises above it during a
+ * whole step is pinned statically instead of animated: the animation would be
+ * invisible yet still cost a full per-frame main-thread style recalc, because
+ * every dot's projection is unique and Blink cannot share one ComputedStyle
+ * across them (see WIDGET-PERF-INVESTIGATION.md). */
+const INVISIBLE_OPACITY = 0.001;
+
 const emptyDotState = (): PaginationWidgetDotState => ({
   id: 0,
   x: 0,
@@ -393,6 +400,21 @@ export function usePaginationWidgetBinding({
           geometry,
           plan.stops,
         );
+
+        // A dot that stays INVISIBLE for the whole step never needs an
+        // animation: it would paint nothing while costing a full per-frame
+        // main-thread style recalc (each dot's projection is unique, so Blink
+        // cannot share one ComputedStyle across them — see
+        // WIDGET-PERF-INVESTIGATION.md). Pin it to its (hidden) end state and
+        // skip. The dot stays MOUNTED, so the strip still never runs out of
+        // dots — the coverage margin is untouched, only its animation is.
+        if (keyframes.every((frame) => frame.opacity <= INVISIBLE_OPACITY)) {
+          const last = keyframes[keyframes.length - 1]!;
+          dot.style.transform = last.transform;
+          dot.style.opacity = String(last.opacity);
+          continue;
+        }
+
         let animation: Animation;
         try {
           animation = dot.animate(keyframes, {
@@ -428,6 +450,12 @@ export function usePaginationWidgetBinding({
           geometry,
           plan.stops,
         );
+        // Same rule as the dots: an overlay whose active strength never lifts
+        // off zero across the step paints nothing — pin it, do not animate it.
+        if (keyframes.every((frame) => frame.opacity <= INVISIBLE_OPACITY)) {
+          overlay.style.opacity = "0";
+          continue;
+        }
         try {
           const animation = overlay.animate(keyframes, {
             duration: plan.duration,
