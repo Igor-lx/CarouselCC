@@ -749,6 +749,56 @@ crawl the eye can read as a stall, timed right where a lift often lands. That
 is a feel knob, not a defect: `decelerationDistanceShare` (a smaller share =
 later, crisper braking with less crawl time) is the user's own tuning surface.
 
+### 9.3 CAUGHT: the "backward bounce" lives in the PRESENTATION fences
+
+The refined invariant (user): the artifact fires when THE PAGE STOPS SCROLLING
+— at the lift for held scrolls, at fling-end for sweeping ones — and looks like
+an instant backward jump with an instant return.
+
+Produced frames are provably smooth (screenrecord band analysis: flagged and
+unflagged rides pixel-identical; wide-radius backward-flash search: none). The
+artifact is therefore in PRESENTATION — below everything screenrecord can see.
+SurfaceFlinger --latency is gutted on this ROM; the working instrument is
+Chrome's own PipelineReporter, whose async spans close on the real
+presentation-feedback fence: their end-times ARE the physical present times.
+
+**Result: a 33–50 ms presentation gap (2–3 vsyncs) at EVERY scroll stop**,
+time-locked to the page-side touchUP/scrollend log:
+
+| scroll stop | present gap |
+| --- | --- |
+| lift@668 / scrollend@1048 | 49.9 ms (+33.3) |
+| lift@6097 / scrollend@6110 | 33.3 + 33.3 + 33.3 ms |
+| scrollend@8928 | 33.3 ms (+2 more) |
+| scrollend@11160 | 33.3 ms |
+| lift@16084 / scrollend@16090 | 49.8 ms |
+| lift@18914 / scrollend@18922 | 50.0 + 33.3 ms |
+
+Perception math: at cruise the eye's smooth pursuit continues ~10–15 px during
+a 50 ms hold; when the next frame lands, the image snaps back under the gaze —
+read as "мгновенный отскок назад и возврат". No backward pixel ever exists.
+
+**The trigger, from the same trace:** around each gap the display compositor
+explodes — Graphics.Pipeline x340–547 vs x15 in a cruise control window,
+MainFrame.Draw x28–44 vs 0 (the BROWSER UI drawing: the toolbar settle
+animation), a burst of SurfaceControl transactions — and the renderer's frames
+miss the latch (BufferReadyToLatch backlog). Scroll stop → toolbar settle →
+viz aggregates two live surfaces → on Adreno 610 the strip's frames lose the
+race for 2–3 vsyncs. Stronger devices fit the burst in budget — which is why
+the Samsung A35 and iPhone 13 never showed it.
+
+Every earlier blindness is now explained: traces counted frames as PRESENTED
+(they were — late); screenrecord records the virtual display (composed
+separately from the stalled physical presents); synthetic gestures never move
+the toolbar, so every synthetic run was clean.
+
+**Next discriminator (zero tooling):** scroll so the toolbar does NOT move
+(small same-direction scrolls mid-page, bar already hidden) — if the bounce
+vanishes, the toolbar settle is confirmed as the sole trigger. App-side remedy
+would then be an inner-scroller layout (body non-scrollable, page scrolls in a
+container → the URL bar never moves) — an architectural choice to weigh, not a
+bug fix.
+
 ### A rule this investigation earned
 
 **Never declare a CSS transition on a property that a WAAPI animation also drives.**
