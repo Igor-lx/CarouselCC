@@ -199,7 +199,10 @@ export function usePointerSwipe({
       ensureCapture(target, pointerId);
       if (!gesture.isActivated) {
         gesture.isActivated = true;
-        onPressStart?.();
+        // Where the finger LANDED (not where it is now): a consumer that
+        // freezes motion under the press can settle back onto the element
+        // that was actually pressed.
+        onPressStart?.({ pressClientX: gesture.startX });
       }
     },
     [ensureCapture, onPressStart],
@@ -439,19 +442,22 @@ export function usePointerSwipe({
       sampleRef.current = createIdleSample(gestureRef.current.width, now);
       setPhase("press");
 
-      // Ownership is deferred to horizontal intent for EVERY surface — a bare
-      // press is not an intent. Non-interactive surfaces used to activate here,
-      // on the press itself, and that turned a finger merely LANDING on an
-      // in-flight ride into a full takeover: the strip froze under the press,
-      // and a motionless release then re-resolved the half-ridden position and
-      // could throw the ride away (the entering slide retreated). Interactive
-      // children always activated on intent and never had the problem — this
-      // unifies on that proven path. `activateOwnership` runs in the move
-      // handler once horizontal intent is recognised; the visual origin is
-      // re-anchored there, so nothing about the follow feel changes.
-      ensureCapture(target, event.pointerId);
+      // Ownership split, by design:
+      //  - a NON-interactive surface takes ownership on the press itself — the
+      //    finger landing IS the interaction ("catch the strip"): the consumer
+      //    freezes its motion under the finger and control passes to the
+      //    gesture immediately. What the consumer does with a motionless
+      //    release is its policy — the press payload carries the press point
+      //    so it can settle back onto what was actually pressed.
+      //  - an INTERACTIVE child defers ownership to horizontal intent, so taps
+      //    stay clicks.
+      if (interactive) {
+        ensureCapture(target, event.pointerId);
+      } else {
+        activateOwnership(target, event.pointerId);
+      }
     },
-    [enabled, ensureCapture, setPhase],
+    [activateOwnership, enabled, ensureCapture, setPhase],
   );
 
   const handlePointerMove = useCallback(

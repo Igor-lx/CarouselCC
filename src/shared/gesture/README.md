@@ -67,13 +67,15 @@ via its own `style` prop should merge, not double-assign.
 `press → intent → drag → release/cancel`, all synchronous, zero re-renders —
 the engine keeps its state in refs and talks only through callbacks:
 
-- `onPressStart()` — the engine took ownership of a press. Ownership is
-  always deferred to horizontal intent: a bare press is not an intent. (It
-  used to be taken immediately on a non-interactive surface — which turned a
-  finger merely LANDING on a consumer's in-flight animation into a takeover:
-  the motion froze under the press, and a motionless release then re-resolved
-  a half-way position. A press that never moves now ends without the consumer
-  hearing anything at all.)
+- `onPressStart(payload)` — the engine took ownership of a press. On a
+  NON-interactive surface that happens on the press itself: the finger landing
+  IS the interaction ("catch the strip") — the consumer brakes its motion under
+  the finger and control passes to the gesture immediately. For an interactive
+  child ownership defers to horizontal intent, so taps stay clicks.
+  `payload.pressClientX` is where the finger LANDED — a consumer that brakes
+  under a press uses it to settle a motionless release back onto the element
+  that was actually pressed (so e.g. the browser's long-press menu, which the
+  press may summon, describes the thing that stays in front of the eyes).
 - `onDragStart(payload)` / `onDragMove(payload)` — `payload.uiOffset` is the
   resistance-shaped offset in px: near zero it tracks the finger ~1:1 and lags
   progressively as the pull grows (`resistance` / `resistanceCurvature`).

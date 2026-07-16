@@ -1,16 +1,13 @@
 /**
- * Device verification for the two ride-interruption fixes, on the LIVE deploy:
+ * Device verification of the ride-interruption CONTRACTS on the live deploy.
  *
- *   A) vertical page scroll DURING a ride (synthesized flick, toolbar settles
- *      on release) — the ride must survive: no animation cancel, no freeze, no
- *      teleport at settle.
- *   B) a finger merely LANDING on the strip mid-ride (touch down, hold, up,
- *      zero movement) — the ride must not be grabbed: no cancel, no freeze.
- *
- * Signatures watched, all write-side (no computed-style reads):
- *   - Animation.prototype.cancel on the track  -> the old freeze
- *   - track style.transform writes during the ride -> a grab's follow writes
- *   - the ride's end position vs its keyframes' end -> teleport vs completion
+ *   A) vertical page scroll OUTSIDE the strip during a ride — the ride must
+ *      survive untouched: its animation runs to its finished promise.
+ *   B) catch-and-hold: a finger landing ON the strip mid-ride BRAKES it (by
+ *      design — control passes to the gesture), and a motionless release
+ *      settles onto the pressed page with a NEW ride that completes. Expected
+ *      signature: first animation cancelled (the brake), a second animation
+ *      created after the touch and finished (the settle).
  *
  *   node .perf-probe/rideInterruption.mjs
  */
@@ -68,13 +65,16 @@ await new Promise((r) => setTimeout(r, 5000));
 
 const metrics = await evaluate(`(() => {
   window.scrollTo(0, 0);
-  const el = document.querySelector('[class*="slideContainer"]');
+  // The TRACK is translated by the ride (its rect can sit thousands of px
+  // off-screen) — measure the static VIEWPORT the gesture listens on.
+  const el = document.querySelector('[data-carousel-viewport]');
   const rect = el.getBoundingClientRect();
   // CDP Input takes visual-viewport CSS px — clamp inside it, or the gesture
   // is rejected with "Position out of bounds".
   const x = Math.min(Math.max(rect.x + rect.width / 2, 10), window.innerWidth - 10);
   const y = Math.min(Math.max(rect.y + rect.height / 2, 10), window.innerHeight - 10);
-  return { x, y };
+  const yOutside = Math.round(Math.min(rect.bottom + 60, window.innerHeight - 16));
+  return { x, y, yOutside };
 })()`);
 
 await evaluate(`(() => {
@@ -157,12 +157,12 @@ const report = async (label) => {
   return r;
 };
 
-console.log("A) vertical scroll flick mid-ride (anchored on the carousel)");
+console.log("A) vertical scroll flick mid-ride (anchored OUTSIDE the strip)");
 await startRide();
 await new Promise((r) => setTimeout(r, 400));
 await page.send("Input.synthesizeScrollGesture", {
   x: Math.round(metrics.x),
-  y: Math.round(metrics.y),
+  y: metrics.yOutside,
   yDistance: -260,
   speed: 1400,
 });
@@ -172,14 +172,15 @@ await report("scroll on the strip during the ride");
 // Scroll back up so the strip is in view again.
 await page.send("Input.synthesizeScrollGesture", {
   x: Math.round(metrics.x),
-  y: Math.round(metrics.y),
+  y: metrics.yOutside,
   yDistance: 260,
   speed: 1400,
 });
 await evaluate("window.scrollTo(0, 0), true");
 await new Promise((r) => setTimeout(r, 1200));
 
-console.log("\nB) finger lands mid-ride, holds still 900ms, lifts (no movement)");
+console.log("\nB) catch-and-hold: press mid-ride, hold 900ms, lift (no movement)");
+await evaluate("window.__ride.rides.length = 0, true");
 await startRide();
 await new Promise((r) => setTimeout(r, 350));
 await page.send("Input.dispatchTouchEvent", {
@@ -189,6 +190,22 @@ await page.send("Input.dispatchTouchEvent", {
 await new Promise((r) => setTimeout(r, 900));
 await page.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
 await new Promise((r) => setTimeout(r, RIDE_MS));
-await report("press-and-hold on the strip during the ride");
+{
+  // The contract INVERTED with the catch-and-hold design: the press BRAKES the
+  // ride (its animation dies unfinished), and the motionless release settles
+  // onto the pressed page with a NEW ride that completes.
+  const b = await evaluate(`(() => {
+    const rides = window.__ride.rides;
+    return {
+      count: rides.length,
+      firstFinished: Boolean(rides[0] && rides[0].finished),
+      settleFinished: Boolean(rides[rides.length - 1] && rides[rides.length - 1].finished),
+    };
+  })()`);
+  const braked = b.count >= 2 && !b.firstFinished && b.settleFinished;
+  console.log(
+    `  press-and-hold on the strip                  rides ${b.count}  ride1 finished ${b.firstFinished}  settle finished ${b.settleFinished}   ${braked ? "BRAKE + SETTLE ✅" : "CONTRACT BROKEN ❌"}`,
+  );
+}
 
 page.close();

@@ -20,6 +20,7 @@ describe("resolveDragRelease — directionless release", () => {
       releasePosition: 0.2,
       dragOriginPageIndex: 0,
       isInFlightGrab: false,
+      pressedPageIndex: null,
       layout,
     });
     expect(early.targetPageIndex).toBe(0);
@@ -30,30 +31,63 @@ describe("resolveDragRelease — directionless release", () => {
       releasePosition: 0.7,
       dragOriginPageIndex: 0,
       isInFlightGrab: false,
+      pressedPageIndex: null,
       layout,
     });
     expect(far.targetPageIndex).toBe(1);
   });
 
   /**
-   * The defect this guards against: a ride N -> N+1 grabbed at 30% sits 0.7
-   * slots behind its destination — because the RIDE put it there, not the
-   * finger. Judging that position by geometry ("nearest page") threw the
-   * committed navigation away: the strip returned to N and the slide that was
-   * entering retreated off-screen, right under the user's finger. A grab that
-   * expressed no direction of its own must let the interrupted ride finish.
+   * The catch-and-hold contract: pressing a moving strip brakes it, and a
+   * hold that expressed no direction settles onto the PRESSED page — the
+   * slide in front of the eyes, the one the browser's long-press menu
+   * describes — riding the normal step curve (isSnap false), like a button.
+   *
+   * The geometry judgment this replaces threw a barely-started ride away:
+   * grabbed at 30%, "nearest page" returned the strip to the origin and the
+   * slide that was entering retreated right under the user's finger, while
+   * the long-press menu kept describing it.
    */
-  it("in-flight grab: the interrupted ride's destination stays the target, even at 30%", () => {
+  it("in-flight grab: a directionless release settles onto the PRESSED page", () => {
+    const layout = makeLayout();
+    // Ride 0 -> 1 grabbed early; the finger landed on the still-dominant
+    // outgoing slide (page 0): the strip stays with what was pressed.
+    const onOutgoing = resolveDragRelease({
+      direction: "none",
+      releasePosition: 0.3,
+      dragOriginPageIndex: 1,
+      isInFlightGrab: true,
+      pressedPageIndex: 0,
+      layout,
+    });
+    expect(onOutgoing.targetPageIndex).toBe(0);
+    expect(onOutgoing.isSnap).toBe(false); // normal step curve, not the quick snap
+
+    // Same grab, finger on the ENTERING slide's sliver: it finishes arriving.
+    const onEntering = resolveDragRelease({
+      direction: "none",
+      releasePosition: 0.3,
+      dragOriginPageIndex: 1,
+      isInFlightGrab: true,
+      pressedPageIndex: 1,
+      layout,
+    });
+    expect(onEntering.targetPageIndex).toBe(1);
+    expect(onEntering.isSnap).toBe(false);
+  });
+
+  it("in-flight grab with no press measurement falls back to the ride's destination", () => {
     const layout = makeLayout();
     const release = resolveDragRelease({
       direction: "none",
-      releasePosition: 0.3, // ride 0 -> 1, grabbed early: nearest would be 0
-      dragOriginPageIndex: 1, // the in-flight anchor IS the destination
+      releasePosition: 0.3,
+      dragOriginPageIndex: 1,
       isInFlightGrab: true,
+      pressedPageIndex: null,
       layout,
     });
     expect(release.targetPageIndex).toBe(1);
-    expect(release.isSnap).toBe(true);
+    expect(release.isSnap).toBe(false);
   });
 
   it("in-flight grab: an explicit counter-swipe still redirects", () => {
@@ -64,6 +98,7 @@ describe("resolveDragRelease — directionless release", () => {
       releasePosition: 0.4,
       dragOriginPageIndex: 1,
       isInFlightGrab: true,
+      pressedPageIndex: 0,
       layout,
     });
     expect(release.targetPageIndex).toBe(0);
@@ -77,6 +112,7 @@ describe("resolveDragRelease — directionless release", () => {
       releasePosition: 1.6,
       dragOriginPageIndex: 1,
       isInFlightGrab: true,
+      pressedPageIndex: 1,
       layout,
     });
     expect(release.targetPageIndex).toBe(2);

@@ -51,15 +51,12 @@
     box-sizing: border-box;
   }
 
-  // While the deck moves (ride or drag) a long-press must not open the image
-  // callout: the strip travels on under the press, so the menu would describe
-  // a slide that is no longer the one in front of the eyes. This is the iOS
-  // half of the rule (`-webkit-touch-callout` is CSS-only and inherited);
-  // Android/desktop go through the root's `onContextMenu`. Idle keeps the
-  // callout available (save image etc.).
-  .outerContainer[data-motion="true"] {
-    -webkit-touch-callout: none;
-  }
+  // The browser's long-press image menu stays AVAILABLE, including mid-ride:
+  // pressing a moving strip brakes it (press-time grab), and a hold that
+  // expressed no direction settles onto the PRESSED page — so the menu always
+  // describes the slide that ends up in front of the eyes. Suppressing it was
+  // tried and rejected: the OS still gives tactile feedback for the long-press,
+  // and feedback with no menu reads as breakage.
 
   // Portrait viewports flip the box to 9:16 — regardless of the module. With
   // the module the browser also picks the 9:16 crop (perfect fit); without it

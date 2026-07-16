@@ -422,16 +422,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
             data-carousel-root=""
             data-touch={isTouch}
             data-reduced-motion={isInstantMode}
-            data-motion={!status.isIdle}
-            // While the deck moves (ride or drag), a long-press must not open
-            // the browser's image context menu: the strip travels on under the
-            // press, so the menu would describe a slide that is no longer the
-            // one in front of the eyes. Android/desktop arrive here; the iOS
-            // callout is CSS-only and handled by `[data-motion="true"]` in the
-            // stylesheet. When idle the menu stays available (save image etc.).
-            onContextMenu={(event) => {
-              if (!status.isIdle) event.preventDefault();
-            }}
           >
             <div
               tabIndex={-1}

@@ -41,6 +41,16 @@ export interface PointerSwipeConfig {
 
 export type ResolvedPointerSwipeConfig = Required<PointerSwipeConfig>;
 
+export interface PointerSwipePressPayload {
+  /**
+   * Viewport-domain X where the finger LANDED. A consumer that freezes its
+   * motion under a press (non-interactive surfaces take ownership on the
+   * press itself) uses it to settle a motionless release back onto the
+   * element that was actually pressed.
+   */
+  pressClientX: number;
+}
+
 export interface PointerSwipeMovePayload {
   uiOffset: number;
 }
@@ -94,7 +104,7 @@ export interface PointerSwipeProps {
   hostRef?: PointerSwipeHostRef;
   enabled?: boolean;
   config?: PointerSwipeConfig;
-  onPressStart?: () => void;
+  onPressStart?: (payload: PointerSwipePressPayload) => void;
   onDragStart?: (payload: PointerSwipeMovePayload) => void;
   onDragMove?: (payload: PointerSwipeMovePayload) => void;
   onRelease?: (payload: PointerSwipeReleasePayload) => void;

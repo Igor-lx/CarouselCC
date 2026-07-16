@@ -15,6 +15,7 @@ export {
   buildCarouselLayout,
   alignedVirtualIndex,
   nearestPageIndex,
+  pageContaining,
   carouselBoundaryState,
   reconciledPageIndex,
   loopedSlideIndex,

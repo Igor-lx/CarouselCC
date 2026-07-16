@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";
 
 import {
   nearestPageIndex,
+  pageContaining,
   pointerVelocityToVirtual,
   resolveDragRelease,
   type CarouselLayout,
@@ -72,9 +73,12 @@ export function useCarouselGesture({
   const originPositionRef = useRef<number | null>(null);
   const originPageIndexRef = useRef(0);
   // Whether THIS drag grabbed an in-flight ride (anchor = the ride's
-  // destination). A directionless release then finishes that ride instead of
-  // re-judging the half-ridden position by geometry (see resolveDragRelease).
+  // destination), and which page the finger LANDED on. A directionless
+  // release of an in-flight grab settles onto the pressed page — the slide
+  // under the finger is what the user (and the browser's long-press menu)
+  // is looking at (see resolveDragRelease).
   const isInFlightGrabRef = useRef(false);
+  const pressedPageIndexRef = useRef<number | null>(null);
   const slotSizeRef = useRef(0);
 
   // PRESS-COMMIT DEFERRAL. The follow stream needs no React at all (positions
@@ -114,7 +118,7 @@ export function useCarouselGesture({
     [],
   );
 
-  const startDragFromCurrentPosition = useCallback(() => {
+  const startDragFromCurrentPosition = useCallback((pressClientX?: number) => {
     // Called from two paths: `onPressStart` on a non-interactive surface, and
     // `onDragStart` for an interactive child once horizontal intent is
     // recognised. The early return deduplicates the second path when the first
@@ -134,9 +138,25 @@ export function useCarouselGesture({
     // input doc); idle grab: the geometric nearest page.
     const pageIndex = inFlightTargetPageIndex ?? nearestPageIndex(origin, layout);
 
+    // Which page the finger LANDED on: press X → slot lane under the finger →
+    // its page. One rect read, at interaction start only (the engine itself
+    // reads offsetWidth at press). Falls back to null when unmeasurable —
+    // the release then resolves through the anchor.
+    let pressedPageIndex: number | null = null;
+    const viewport = viewportRef.current;
+    const slot = slotSizeRef.current;
+    if (typeof pressClientX === "number" && viewport && slot > 0) {
+      const rect = viewport.getBoundingClientRect();
+      const lane = (pressClientX - rect.left) / slot;
+      if (Number.isFinite(lane)) {
+        pressedPageIndex = pageContaining(Math.floor(origin + lane), layout);
+      }
+    }
+
     originPositionRef.current = origin;
     originPageIndexRef.current = pageIndex;
     isInFlightGrabRef.current = inFlightTargetPageIndex !== null;
+    pressedPageIndexRef.current = pressedPageIndex;
 
     pendingStartRef.current = {
       fromVirtualIndex: origin,
@@ -155,6 +175,7 @@ export function useCarouselGesture({
     inFlightTargetPageIndex,
     layout,
     readCurrentPosition,
+    viewportRef,
   ]);
 
   const handleDragStart = useCallback(
@@ -193,6 +214,7 @@ export function useCarouselGesture({
         releasePosition,
         dragOriginPageIndex: originPageIndexRef.current,
         isInFlightGrab: isInFlightGrabRef.current,
+        pressedPageIndex: pressedPageIndexRef.current,
         layout,
       });
 
@@ -258,6 +280,7 @@ export function useCarouselGesture({
         releasePosition,
         dragOriginPageIndex: originPageIndexRef.current,
         isInFlightGrab: isInFlightGrabRef.current,
+        pressedPageIndex: pressedPageIndexRef.current,
         layout,
       });
       dispatch({
@@ -313,7 +336,7 @@ export function useCarouselGesture({
     enabled: layout.canSlide && isSwipeOn,
     hostRef: viewportRef,
     config: swipeConfig,
-    onPressStart: startDragFromCurrentPosition,
+    onPressStart: (payload) => startDragFromCurrentPosition(payload.pressClientX),
     onDragStart: handleDragStart,
     onDragMove: handleDragMove,
     onRelease: handleRelease,

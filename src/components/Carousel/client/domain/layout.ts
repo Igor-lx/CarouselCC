@@ -71,6 +71,20 @@ export const alignedVirtualIndex = (
   return start + lane * layout.virtualLength;
 };
 
+/**
+ * The page a given SLIDE (virtual index) belongs to — floor-based, unlike
+ * `nearestPageIndex`, which rounds a fractional strip POSITION to the closest
+ * page boundary. Used to resolve "the slide the finger landed on" into a
+ * navigation target.
+ */
+export const pageContaining = (virtualIndex: number, layout: CarouselLayout) => {
+  if (layout.pageCount <= 0 || layout.visibleSlidesCount <= 0) return 0;
+  const raw = Math.floor(Math.floor(virtualIndex) / layout.visibleSlidesCount);
+  return layout.isFinite
+    ? clamp(raw, 0, layout.pageCount - 1)
+    : normalizePageIndex(raw, layout.pageCount);
+};
+
 export const nearestPageIndex = (virtualIndex: number, layout: CarouselLayout) => {
   if (layout.pageCount <= 0 || layout.visibleSlidesCount <= 0) return 0;
   const raw = Math.round(virtualIndex / layout.visibleSlidesCount);

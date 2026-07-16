@@ -16,10 +16,18 @@ interface ResolveDragReleaseInput {
    * interrupted ride's progress was produced by the RIDE, not by the finger —
    * judging it by geometry re-litigates a navigation that was already
    * committed, and a grab at 30% would throw the ride away and hide the slide
-   * that was entering. A grab that expressed no direction of its own lets the
-   * committed navigation finish: the target stays the anchor.
+   * that was entering.
    */
   isInFlightGrab: boolean;
+  /**
+   * The page whose slide the finger LANDED on (press-point hit), `null` when
+   * unmeasurable. The catch-and-hold contract: pressing a moving strip brakes
+   * it, and a release that expressed no direction of its own settles onto the
+   * PRESSED page — the slide in front of the eyes, the one a long-press menu
+   * describes — riding the normal step curve (`isSnap: false`), like a button
+   * press. Falls back to the anchor (the interrupted ride's destination).
+   */
+  pressedPageIndex: number | null;
   layout: CarouselLayout;
 }
 
@@ -34,9 +42,11 @@ export interface DragReleaseTarget {
  * - direction "left"/"right": commit by ±1 page from origin if possible;
  *   otherwise snap back to origin.
  * - direction "none" from rest: snap to the page nearest the visual release
- *   position.
- * - direction "none" on an in-flight grab: finish the interrupted ride — the
- *   anchor (its destination) stays the target (see `isInFlightGrab`).
+ *   position (quick snap-back curve).
+ * - direction "none" on an in-flight grab: settle onto the PRESSED page
+ *   (`pressedPageIndex`, falling back to the anchor), riding the normal step
+ *   curve — a press braked the strip, and a hold that expressed no direction
+ *   lands on what the finger pressed (see the input docs).
  *
  * The returned `isSnap` flag is `true` when the result is a passive snap
  * (no real navigation), which the runner uses to pick a snap-back curve.
@@ -46,13 +56,16 @@ export const resolveDragRelease = ({
   releasePosition,
   dragOriginPageIndex,
   isInFlightGrab,
+  pressedPageIndex,
   layout,
 }: ResolveDragReleaseInput): DragReleaseTarget => {
   const snapTarget = isInFlightGrab
-    ? dragOriginPageIndex
+    ? pressedPageIndex ?? dragOriginPageIndex
     : nearestPageIndex(releasePosition, layout);
   let targetPageIndex = snapTarget;
-  let isSnap = true;
+  // An in-flight settle is a REAL navigation from a braked strip — it rides
+  // the normal step curve, not the quick snap-back.
+  let isSnap = !isInFlightGrab;
 
   if (direction === "left") {
     targetPageIndex = layout.isFinite
