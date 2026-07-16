@@ -118,9 +118,14 @@ export function useVisualPosition({
     [getSnapshot],
   );
 
+  const wake = useCallback<VisualPositionSource["wake"]>(
+    () => controller.wake(),
+    [controller],
+  );
+
   const source = useMemo<VisualPositionSource>(
-    () => ({ getSnapshot, sampleNow, subscribe }),
-    [getSnapshot, sampleNow, subscribe],
+    () => ({ getSnapshot, sampleNow, wake, subscribe }),
+    [getSnapshot, sampleNow, subscribe, wake],
   );
 
   const applyImmediatePosition = useCallback(

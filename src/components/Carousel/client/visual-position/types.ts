@@ -34,5 +34,13 @@ export interface VisualPositionSource {
    * where the deck visually is, without reading the DOM.
    */
   sampleNow(): number;
+  /**
+   * Take the paint back onto the JS frame loop when the external paint owner
+   * of a passive segment disappears mid-flight (the track's compositor
+   * animation was cancelled by a geometry re-base or rotation). Without it
+   * the strip freezes where the animation died and teleports at the settle.
+   * A no-op when idle or already ticking.
+   */
+  wake(): void;
   subscribe(listener: VisualPositionListener, options?: { emitCurrent?: boolean }): () => void;
 }

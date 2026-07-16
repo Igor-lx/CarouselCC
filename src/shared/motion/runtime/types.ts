@@ -109,6 +109,15 @@ export interface MotionController<Strategy extends string = string> {
   ) => void;
   set: (value: number, options?: MotionSetOptions<Strategy>) => void;
   snap: (value: number, options?: MotionSnapOptions<Strategy>) => void;
+  /**
+   * Resume the frame loop for a passive segment whose external paint owner
+   * disappeared mid-flight (its compositor animation was cancelled — a
+   * geometry re-base, a rotation). The controller takes the paint back and
+   * emits the segment's remaining frames itself; without this the strip
+   * freezes where the animation died and teleports at the settle. A no-op
+   * when idle or already ticking.
+   */
+  wake: () => void;
   cancel: () => void;
   destroy: () => void;
 }

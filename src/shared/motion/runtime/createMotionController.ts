@@ -224,6 +224,17 @@ export function createMotionController<Strategy extends string = string>(
       frameId = requestFrame(tick);
     },
 
+    wake() {
+      if (!active || frameId !== null) return;
+      // The settle timer was the passive segment's only wake-up; the frame
+      // loop it hands over to finalizes at the curve's end on its own.
+      if (settleTimerId !== null) {
+        clearTimeout(settleTimerId);
+        settleTimerId = null;
+      }
+      frameId = requestFrame(tick);
+    },
+
     set(value: number, options: MotionSetOptions<Strategy> = {}) {
       cancelTick();
       cancelCompletion();

@@ -308,3 +308,56 @@ describe("passive segments (paint owned elsewhere)", () => {
     frameLoop.restore();
   });
 });
+
+describe("wake — a passive segment's paint owner disappeared", () => {
+  it("resumes the frame loop and cancels the settle timer", () => {
+    vi.useFakeTimers();
+    const frameLoop = stubFrameLoop();
+    const controller = createMotionController<string>(0, "idle");
+    const settled = vi.fn();
+
+    controller.start({
+      segment: segment({ startedAt: motionNow(), duration: 1000 }),
+      sampler: linearSampler,
+      onComplete: settled,
+      completion: "immediate",
+      isPassive: true,
+    });
+    expect(frameLoop.requestAnimationFrame).not.toHaveBeenCalled();
+
+    // Mid-flight, the compositor animation dies (geometry re-base, rotation).
+    controller.wake();
+
+    // The paint is back on the JS loop…
+    expect(frameLoop.requestAnimationFrame).toHaveBeenCalledTimes(1);
+    // …and the settle timer no longer fires a teleport at the segment's end:
+    // finalization now belongs to the frame loop (stubbed here, so nothing
+    // finalizes — which is exactly the assertion).
+    vi.advanceTimersByTime(2000);
+    expect(settled).not.toHaveBeenCalled();
+    expect(controller.isActive()).toBe(true);
+
+    frameLoop.restore();
+    vi.useRealTimers();
+  });
+
+  it("is a no-op when idle and when already ticking", () => {
+    const frameLoop = stubFrameLoop();
+    const controller = createMotionController<string>(0, "idle");
+
+    controller.wake(); // idle — nothing to resume
+    expect(frameLoop.requestAnimationFrame).not.toHaveBeenCalled();
+
+    controller.start({
+      segment: segment({ startedAt: motionNow(), duration: 1000 }),
+      sampler: linearSampler,
+    });
+    expect(frameLoop.requestAnimationFrame).toHaveBeenCalledTimes(1);
+
+    controller.wake(); // already ticking — must not double the loop
+    expect(frameLoop.requestAnimationFrame).toHaveBeenCalledTimes(1);
+
+    controller.cancel();
+    frameLoop.restore();
+  });
+});

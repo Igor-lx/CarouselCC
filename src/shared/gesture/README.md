@@ -67,9 +67,13 @@ via its own `style` prop should merge, not double-assign.
 `press → intent → drag → release/cancel`, all synchronous, zero re-renders —
 the engine keeps its state in refs and talks only through callbacks:
 
-- `onPressStart()` — the engine took ownership of a press (fires immediately
-  on a non-interactive surface; for an interactive child — only after
-  horizontal intent, so taps stay clicks).
+- `onPressStart()` — the engine took ownership of a press. Ownership is
+  always deferred to horizontal intent: a bare press is not an intent. (It
+  used to be taken immediately on a non-interactive surface — which turned a
+  finger merely LANDING on a consumer's in-flight animation into a takeover:
+  the motion froze under the press, and a motionless release then re-resolved
+  a half-way position. A press that never moves now ends without the consumer
+  hearing anything at all.)
 - `onDragStart(payload)` / `onDragMove(payload)` — `payload.uiOffset` is the
   resistance-shaped offset in px: near zero it tracks the finger ~1:1 and lags
   progressively as the pull grows (`resistance` / `resistanceCurvature`).
@@ -91,7 +95,13 @@ the engine keeps its state in refs and talks only through callbacks:
   finger settling before lift-off (`flickPauseGraceMs` grace, then
   `flickVelocityHalfLifeMs` half-life decay), so a fast swipe that ends in
   a brief stick still reads — and rides — as a flick. `uiReleaseVelocity`
-  is the EMA-smoothed UI-offset velocity (px/ms).
+  is the EMA-smoothed UI-offset velocity (px/ms). `launchVelocity` is its
+  continuity-launch counterpart: the same UI-domain speed, but on the flick's
+  slow law WITH the same pause protection. The fast EMA zeroes after a
+  ~2-frame terminal hold — exactly how a deliberate slow swipe ends — and a
+  ride launched from that zeroed reading crawls out of a standstill instead
+  of picking the visible motion up. Launch rides from `launchVelocity`;
+  everything else keeps reading `uiReleaseVelocity`.
 
 All gesture math runs on the EVENT's own timestamp (`event.timeStamp`),
 not the handler's processing time: on a congested main thread events queue
@@ -124,7 +134,7 @@ add the sibling `motion` library and connect three lines:
 ```ts
 // 1. what the release MEANS (this library):
 const intent = resolveInertialRelease({ gestureReleaseVelocity, distanceToTarget, baseDuration, config });
-const launch = resolveReleaseLaunch({ distance, visualVelocity: uiReleaseVelocity, intentSpeed: intent.effectiveReleaseSpeed });
+const launch = resolveReleaseLaunch({ distance, visualVelocity: launchVelocity, intentSpeed: intent.effectiveReleaseSpeed });
 // 2. what the ride LOOKS like (motion/profile):
 const profile = buildProfile({ from, to, startSpeed: launch.startSpeed, peakSpeed: launch.cruiseSpeed, endSpeed: 0, accelerationDistanceShare, decelerationDistanceShare });
 // 3. who EXECUTES it (motion/runtime, or WAAPI via profileProgressStops):

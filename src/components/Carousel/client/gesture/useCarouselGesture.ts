@@ -71,6 +71,10 @@ export function useCarouselGesture({
 }: UseCarouselGestureInput): CarouselGestureResult {
   const originPositionRef = useRef<number | null>(null);
   const originPageIndexRef = useRef(0);
+  // Whether THIS drag grabbed an in-flight ride (anchor = the ride's
+  // destination). A directionless release then finishes that ride instead of
+  // re-judging the half-ridden position by geometry (see resolveDragRelease).
+  const isInFlightGrabRef = useRef(false);
   const slotSizeRef = useRef(0);
 
   // PRESS-COMMIT DEFERRAL. The follow stream needs no React at all (positions
@@ -132,6 +136,7 @@ export function useCarouselGesture({
 
     originPositionRef.current = origin;
     originPageIndexRef.current = pageIndex;
+    isInFlightGrabRef.current = inFlightTargetPageIndex !== null;
 
     pendingStartRef.current = {
       fromVirtualIndex: origin,
@@ -187,6 +192,7 @@ export function useCarouselGesture({
         direction: payload.direction,
         releasePosition,
         dragOriginPageIndex: originPageIndexRef.current,
+        isInFlightGrab: isInFlightGrabRef.current,
         layout,
       });
 
@@ -251,6 +257,7 @@ export function useCarouselGesture({
         direction: "none",
         releasePosition,
         dragOriginPageIndex: originPageIndexRef.current,
+        isInFlightGrab: isInFlightGrabRef.current,
         layout,
       });
       dispatch({

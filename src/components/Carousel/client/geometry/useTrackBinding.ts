@@ -83,6 +83,10 @@ export function useTrackBinding({
   const lastTransformRef = useRef<string | null>(null);
   const lastMeasuredWidthRef = useRef<number | null>(null);
   const compositorAnimationRef = useRef<Animation | null>(null);
+  // The layoutOrigin the last full geometry sync was based on — lets
+  // `syncGeometry` recognise a call where nothing the transform math depends
+  // on has changed, and leave a live compositor ride alone.
+  const lastSyncedLayoutOriginRef = useRef<number | null>(null);
 
   layoutOriginRef.current = layoutOrigin;
   visibleSlidesCountRef.current = visibleSlidesCount;
@@ -166,8 +170,16 @@ export function useTrackBinding({
         track.style.transform = transform;
         lastTransformRef.current = transform;
       }
+
+      // The compositor was this segment's paint owner, and the controller may
+      // be running it passively (no frame loop — see MotionStartOptions.
+      // isPassive). Hand the paint back to the JS loop, or the strip freezes
+      // right here and teleports when the settle fires. For cancels that
+      // immediately start a new segment (takeover, retarget) the wake is
+      // harmlessly superseded by that segment's own start.
+      visualPosition.wake();
     },
-    [resolveTransform, trackRef],
+    [resolveTransform, trackRef, visualPosition],
   );
 
   const startCompositorMotion = useCallback(
@@ -268,15 +280,33 @@ export function useTrackBinding({
 
   const syncGeometry = useCallback(
     (width?: number) => {
-      // A geometry change re-bases the transform math (slot size /
+      const previousSlot = slotSizeRef.current;
+      const nextSlot = measure(width);
+
+      // Bail when nothing the transform math depends on changed: same slot,
+      // same layoutOrigin. The canonical arrival here is the mobile URL bar
+      // collapsing on a scroll release — a height-only viewport change that
+      // used to tear down a perfectly healthy compositor ride (the strip
+      // froze under the finger lift and teleported at the settle). Width is
+      // judged through the SLOT, not raw pixels, because the slot is the only
+      // thing the transform consumes.
+      if (
+        nextSlot !== null &&
+        nextSlot === previousSlot &&
+        lastSyncedLayoutOriginRef.current === layoutOriginRef.current
+      ) {
+        return;
+      }
+      lastSyncedLayoutOriginRef.current = layoutOriginRef.current;
+
+      // A real geometry change re-bases the transform math (slot size /
       // layoutOrigin), so any compositor animation keyed off the old baseline
-      // must be torn down first and the track re-pinned to the live visual
+      // must be torn down and the track re-pinned to the live visual
       // position. Read that position BEFORE the teardown: afterwards the
       // compositor is no longer the painter, and `readCurrentPosition` would
       // answer for a JS-driven track that never painted these frames.
       const position = readCurrentPosition();
       cancelCompositorMotion(position);
-      measure(width);
       writePosition(position, "geometry");
     },
     [cancelCompositorMotion, measure, readCurrentPosition, writePosition],

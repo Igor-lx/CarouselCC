@@ -13,6 +13,14 @@
   background-color: var(--bg-global);
   transition: background-color var(--transition-bg);
   overflow-x: hidden;
+  // The page canvas runs edge-to-edge under the notch (`viewport-fit=cover`,
+  // see index.html) so this background tints the camera strip; the insets
+  // keep the actual CONTENT out of the cutout. Zero on notchless devices,
+  // so nothing shifts anywhere else.
+  padding-top: env(safe-area-inset-top);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
 }
 
 .page {

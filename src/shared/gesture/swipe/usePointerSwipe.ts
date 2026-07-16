@@ -439,13 +439,19 @@ export function usePointerSwipe({
       sampleRef.current = createIdleSample(gestureRef.current.width, now);
       setPhase("press");
 
-      if (interactive) {
-        ensureCapture(target, event.pointerId);
-      } else {
-        activateOwnership(target, event.pointerId);
-      }
+      // Ownership is deferred to horizontal intent for EVERY surface — a bare
+      // press is not an intent. Non-interactive surfaces used to activate here,
+      // on the press itself, and that turned a finger merely LANDING on an
+      // in-flight ride into a full takeover: the strip froze under the press,
+      // and a motionless release then re-resolved the half-ridden position and
+      // could throw the ride away (the entering slide retreated). Interactive
+      // children always activated on intent and never had the problem — this
+      // unifies on that proven path. `activateOwnership` runs in the move
+      // handler once horizontal intent is recognised; the visual origin is
+      // re-anchored there, so nothing about the follow feel changes.
+      ensureCapture(target, event.pointerId);
     },
-    [activateOwnership, enabled, ensureCapture, setPhase],
+    [enabled, ensureCapture, setPhase],
   );
 
   const handlePointerMove = useCallback(
