@@ -79,6 +79,12 @@ export function useCarouselGesture({
   // is looking at (see resolveDragRelease).
   const isInFlightGrabRef = useRef(false);
   const pressedPageIndexRef = useRef<number | null>(null);
+  // Whether the browser's context menu opened during THIS gesture. On Android
+  // the menu ends the gesture as an external cancel — indistinguishable from
+  // the browser stealing the pointer for a page scroll — and the two must
+  // settle differently: a menu-hold lands on the PRESSED slide (the one the
+  // menu describes), a scroll hand-off RESUMES the interrupted ride.
+  const contextMenuSeenRef = useRef(false);
   const slotSizeRef = useRef(0);
 
   // PRESS-COMMIT DEFERRAL. The follow stream needs no React at all (positions
@@ -157,6 +163,7 @@ export function useCarouselGesture({
     originPageIndexRef.current = pageIndex;
     isInFlightGrabRef.current = inFlightTargetPageIndex !== null;
     pressedPageIndexRef.current = pressedPageIndex;
+    contextMenuSeenRef.current = false;
 
     pendingStartRef.current = {
       fromVirtualIndex: origin,
@@ -209,12 +216,25 @@ export function useCarouselGesture({
       }
 
       const releasePosition = offsetToPosition(payload.uiOffset);
+      // A directionless END of an owned in-flight grab means one of two things:
+      //  - the hold was deliberate (a lift, or the long-press menu opening):
+      //    settle onto the PRESSED slide — what the eye and the menu look at;
+      //  - the touch turned out to be a page scroll crossing the strip (the
+      //    engine saw vertical intent, or the browser stole the pointer with
+      //    no menu open): the catch was a false positive — RESUME the
+      //    interrupted ride to its own destination instead of re-routing it.
+      const isScrollHandOff =
+        payload.direction === "none" &&
+        isInFlightGrabRef.current &&
+        payload.endReason !== "release" &&
+        !contextMenuSeenRef.current;
       const releaseTarget = resolveDragRelease({
         direction: payload.direction,
         releasePosition,
         dragOriginPageIndex: originPageIndexRef.current,
         isInFlightGrab: isInFlightGrabRef.current,
-        pressedPageIndex: pressedPageIndexRef.current,
+        // null falls back to the anchor — the interrupted ride's destination.
+        pressedPageIndex: isScrollHandOff ? null : pressedPageIndexRef.current,
         layout,
       });
 
@@ -319,6 +339,19 @@ export function useCarouselGesture({
     () => resolveSlotAdaptiveSwipeConfig(config.swipeConfig, slotPx),
     [config.swipeConfig, slotPx],
   );
+
+  // The menu-vs-scroll discriminator for external cancels (see
+  // contextMenuSeenRef): the contextmenu event fires on the host right as the
+  // long-press menu opens, before the pointer is cancelled.
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const onContextMenu = () => {
+      contextMenuSeenRef.current = true;
+    };
+    viewport.addEventListener("contextmenu", onContextMenu);
+    return () => viewport.removeEventListener("contextmenu", onContextMenu);
+  }, [viewportRef]);
 
   // Unmount: the deferred dispatch may not outlive us.
   useEffect(

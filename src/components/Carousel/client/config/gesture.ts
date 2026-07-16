@@ -65,10 +65,13 @@ export const CAROUSEL_SWIPE_CONFIG: Required<PointerSwipeConfig> = {
   // gesture to the browser with the ride untouched — this is what keeps a
   // page scroll STARTED on the strip from hitching it — a horizontal intent
   // activates the takeover immediately, and a quicker lift stays a clean
-  // tap. 0 = brake on contact (re-introduces the scroll hitch). Must stay
-  // well below the OS long-press (~500ms), or the context menu would open
-  // before the catch (see the relation check).
-  catchDelayMs: 90,
+  // tap. Measured on device: a human finger INTENDING to scroll rests
+  // 100-250ms on the glass before its first move (90ms caught most real
+  // scrolls and braked the ride they crossed). A deliberate catch rests far
+  // longer. 0 = brake on contact. Must stay well below the OS long-press
+  // (~500ms), or the context menu would open before the catch (relation
+  // check enforces it).
+  catchDelayMs: 250,
 };
 
 /**

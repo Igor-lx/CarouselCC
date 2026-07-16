@@ -19,6 +19,7 @@ import {
 } from "./internals/index";
 import type {
   PointerSwipeConfig,
+  PointerSwipeEndReason,
   PointerSwipeHostProps,
   PointerSwipeMovePayload,
   PointerSwipePhase,
@@ -47,12 +48,11 @@ export const POINTER_SWIPE_DEFAULTS: ResolvedPointerSwipeConfig = {
   flickVelocityHalfLifeMs: 250,
   minSwipeDistance: 20,
   swipeThresholdRatio: 0.2,
-  // Below the ~100ms a scroll's first move events need to declare vertical
-  // intent would defeat the window's purpose; near the OS long-press (~500ms)
-  // the context menu would beat the catch. 90ms lets virtually every real
-  // page scroll pass through untouched while a resting finger still feels
-  // caught "immediately".
-  catchDelayMs: 90,
+  // Measured on device: a human finger INTENDING to scroll rests 100-250ms
+  // on the glass before its first move — 90ms caught most real scrolls and
+  // braked the ride they crossed. 250ms lets them through; a deliberate
+  // catch-and-hold rests far longer (the long-press menu itself is ~500ms).
+  catchDelayMs: 250,
 };
 
 /** Styles the engine needs on its host element to own horizontal touch input. */
@@ -321,7 +321,12 @@ export function usePointerSwipe({
   );
 
   const finishInteraction = useCallback(
-    (isCancel = false, currentX?: number, timestamp?: number) => {
+    (
+      endReason: PointerSwipeEndReason,
+      currentX?: number,
+      timestamp?: number,
+    ) => {
+      const isCancel = endReason !== "release";
       // A pending catch dies with the gesture: a lift inside the window is a
       // tap, a vertical hand-off means the motion was never ours to brake.
       clearCatchTimer();
@@ -414,6 +419,7 @@ export function usePointerSwipe({
 
       const payload: PointerSwipeReleasePayload = {
         uiOffset: sample.uiOffset,
+        endReason,
         direction: resolution.direction,
         pointerReleaseVelocity: resolution.pointerReleaseVelocity,
         uiReleaseVelocity: sample.uiVelocity,
@@ -517,7 +523,7 @@ export function usePointerSwipe({
 
         if (absX > cfg.intentThreshold || absY > cfg.intentThreshold) {
           if (absY > absX) {
-            finishInteraction(true, undefined, now);
+            finishInteraction("vertical-scroll", undefined, now);
             return;
           }
 
@@ -620,10 +626,15 @@ export function usePointerSwipe({
       style: HOST_STYLES,
       onPointerDown: handlePointerDown,
       onPointerMove: handlePointerMove,
-      onPointerUp: (event) => finishInteraction(false, event.clientX, eventTime(event)),
-      onPointerCancel: (event) => finishInteraction(true, event.clientX, eventTime(event)),
+      onPointerUp: (event) =>
+        finishInteraction("release", event.clientX, eventTime(event)),
+      // The browser stealing the pointer mid-press (native pan, a context
+      // menu, a system gesture) — the consumer decides what an owned press
+      // that ended this way MEANS (see PointerSwipeEndReason).
+      onPointerCancel: (event) =>
+        finishInteraction("external-cancel", event.clientX, eventTime(event)),
       onLostPointerCapture: (event) =>
-        finishInteraction(true, event.clientX, eventTime(event)),
+        finishInteraction("external-cancel", event.clientX, eventTime(event)),
     };
   }, [enabled, finishInteraction, handlePointerDown, handlePointerMove, setHostNode]);
 

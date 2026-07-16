@@ -4,6 +4,20 @@ export type PointerSwipePhase = "idle" | "press" | "dragging" | "cooldown";
 
 export type PointerSwipeDirection = "left" | "right" | "none";
 
+/**
+ * How an owned gesture ended. The distinction carries MEANING for a consumer
+ * that brakes motion on the press (catch-and-hold):
+ *  - "release": the finger lifted — a deliberate hold ends here (and a
+ *    long-press menu also ends here on iOS);
+ *  - "vertical-scroll": the engine itself recognised vertical intent — the
+ *    touch was a page scroll crossing the surface, never a catch;
+ *  - "external-cancel": the browser stole the pointer (native pan already in
+ *    progress, a context menu opening, a system gesture). On Android the
+ *    long-press menu arrives THIS way, so consumers that must tell "menu"
+ *    from "scroll" watch the `contextmenu` event alongside.
+ */
+export type PointerSwipeEndReason = "release" | "vertical-scroll" | "external-cancel";
+
 export interface PointerSwipeConfig {
   /** Quiet period after a release before new gestures are accepted. */
   cooldownMs?: number;
@@ -75,6 +89,8 @@ export interface PointerSwipeMovePayload {
 }
 
 export interface PointerSwipeReleasePayload extends PointerSwipeMovePayload {
+  /** How the gesture ended (see PointerSwipeEndReason). */
+  endReason: PointerSwipeEndReason;
   direction: PointerSwipeDirection;
   pointerReleaseVelocity: number;
   uiReleaseVelocity: number;
