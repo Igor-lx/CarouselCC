@@ -710,6 +710,45 @@ The only lever left is quantising the widget's per-dot values ([§7](#7-the-widg
 which trades a fraction of a percent of dropped frames against a visual risk. Not
 worth taking blind.
 
+### 9.2 The post-lift "freeze": ground truth vs the eye
+
+The report: external-button rides + vertical scrolls entirely OUTSIDE the
+carousel; ~0.5s after the finger lifts, a single visible horizontal freeze of
+the strip. Persisted "one-in-one" through every fix.
+
+The decisive instrument: an armed screen recording where every touch
+auto-launches a ride (so lifts land mid-flight by construction), a big
+on-screen ride counter (the user calls out WHICH rides froze), an in-content
+anchor line (vertical motion factored out of the horizontal measurement), and
+a synchronized page event log.
+
+The user flagged rides #1, #3, #5 (of the six on film). Frame-by-frame:
+
+| ride | painted horizontal motion | verdict |
+| --- | --- | --- |
+| #1 (flagged) | 1250ms continuous, mean 12.4 px/frame, zero still-frames | clean |
+| #2 (not flagged) | 1386ms continuous, 11.9 | clean |
+| #3 (flagged) | 1719ms continuous, 9.9 | clean |
+| #4 (not flagged) | 1753ms continuous, 10.0 | clean |
+| #5 (flagged) | 1652ms continuous, 10.5 | clean |
+
+Flagged and unflagged rides are pixel-identical, in BOTH axes (vertical
+dynamics also match). Eliminated with ground truth along the way: catch-brake
+(fixed, verified), syncGeometry resize cancel (guarded, verified), dvh relayout
+(svh, verified), toolbar settle + scrollend crossings (rides cruise straight
+through), off-screen layer re-entry (returns at full cruise from the first
+visible frame), panel cadence (the display runs 60Hz matched to content), any
+animation cancel (event log shows only onfinish cleanups).
+
+**Verdict: the freeze is not present in the strip's painted motion** at the
+instrument's resolution (±2 device px, ~30–60 fps effective). What remains is
+below that resolution (a single 16ms frame — not what a "real, concrete,
+visible" freeze is) or is perceptual. The one structural candidate left is the
+ride's own DECELERATION TAIL: every ride ends with ~400ms at 1–4 px/frame — a
+crawl the eye can read as a stall, timed right where a lift often lands. That
+is a feel knob, not a defect: `decelerationDistanceShare` (a smaller share =
+later, crisper braking with less crawl time) is the user's own tuning surface.
+
 ### A rule this investigation earned
 
 **Never declare a CSS transition on a property that a WAAPI animation also drives.**
