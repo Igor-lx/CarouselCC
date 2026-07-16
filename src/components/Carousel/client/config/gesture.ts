@@ -60,6 +60,15 @@ export const CAROUSEL_SWIPE_CONFIG: Required<PointerSwipeConfig> = {
   flickVelocityHalfLifeMs: 250,
   minSwipeDistance: 20,
   swipeThresholdRatio: 0.23,
+  // The catch window: a press must rest this long before it BRAKES a moving
+  // strip (catch-and-hold). Inside the window a vertical intent hands the
+  // gesture to the browser with the ride untouched — this is what keeps a
+  // page scroll STARTED on the strip from hitching it — a horizontal intent
+  // activates the takeover immediately, and a quicker lift stays a clean
+  // tap. 0 = brake on contact (re-introduces the scroll hitch). Must stay
+  // well below the OS long-press (~500ms), or the context menu would open
+  // before the catch (see the relation check).
+  catchDelayMs: 90,
 };
 
 /**

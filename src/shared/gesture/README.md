@@ -67,11 +67,13 @@ via its own `style` prop should merge, not double-assign.
 `press → intent → drag → release/cancel`, all synchronous, zero re-renders —
 the engine keeps its state in refs and talks only through callbacks:
 
-- `onPressStart(payload)` — the engine took ownership of a press. On a
-  NON-interactive surface that happens on the press itself: the finger landing
-  IS the interaction ("catch the strip") — the consumer brakes its motion under
-  the finger and control passes to the gesture immediately. For an interactive
-  child ownership defers to horizontal intent, so taps stay clicks.
+- `onPressStart(payload)` — the engine took ownership of a press, which
+  happens on the press itself for EVERY target: the finger landing IS the
+  interaction ("catch the strip") — the consumer brakes its motion under the
+  finger and control passes to the gesture immediately. Clicks are not
+  sacrificed: click suppression is tied to a completed drag (the post-swipe
+  cooldown), never to press ownership, so a tap on an interactive child still
+  clicks — it just also brakes whatever was moving first.
   `payload.pressClientX` is where the finger LANDED — a consumer that brakes
   under a press uses it to settle a motionless release back onto the element
   that was actually pressed (so e.g. the browser's long-press menu, which the
@@ -118,9 +120,10 @@ listeners, no styles, no native handlers, as if the engine was never wired.
 ## Interactive children and the escape hatch
 
 A press starting on a button, link, form control, editable element or common
-interactive `role` never starts a drag by itself; it becomes one only after
-clear horizontal intent, and a post-swipe click on it is suppressed during the
-cooldown window. To opt any other element out of drag-starting, mark it (or an
+interactive `role` keeps its CLICK: a drag begins only after clear horizontal
+intent, and a post-swipe click on it is suppressed during the cooldown window.
+(Ownership — and the consumer's press-brake — still happens at the press, like
+everywhere else; only the click semantics distinguish these targets.) To opt any other element out of drag-starting, mark it (or an
 ancestor) with the exported `DRAG_IGNORE_ATTRIBUTE`:
 
 ```tsx

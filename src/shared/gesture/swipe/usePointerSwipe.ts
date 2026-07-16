@@ -47,6 +47,12 @@ export const POINTER_SWIPE_DEFAULTS: ResolvedPointerSwipeConfig = {
   flickVelocityHalfLifeMs: 250,
   minSwipeDistance: 20,
   swipeThresholdRatio: 0.2,
+  // Below the ~100ms a scroll's first move events need to declare vertical
+  // intent would defeat the window's purpose; near the OS long-press (~500ms)
+  // the context menu would beat the catch. 90ms lets virtually every real
+  // page scroll pass through untouched while a resting finger still feels
+  // caught "immediately".
+  catchDelayMs: 90,
 };
 
 /** Styles the engine needs on its host element to own horizontal touch input. */
@@ -193,8 +199,21 @@ export function usePointerSwipe({
     }
   }, []);
 
+  // The pending catch (see `catchDelayMs`): a press only becomes a brake if
+  // it outlasts the intent window. Vertical intent, a lift, or a new press
+  // all void it; horizontal intent activates ahead of it.
+  const catchTimerRef = useRef<number | null>(null);
+
+  const clearCatchTimer = useCallback(() => {
+    if (catchTimerRef.current !== null) {
+      window.clearTimeout(catchTimerRef.current);
+      catchTimerRef.current = null;
+    }
+  }, []);
+
   const activateOwnership = useCallback(
     (target: HTMLElement, pointerId: number) => {
+      clearCatchTimer();
       const gesture = gestureRef.current;
       ensureCapture(target, pointerId);
       if (!gesture.isActivated) {
@@ -205,7 +224,27 @@ export function usePointerSwipe({
         onPressStart?.({ pressClientX: gesture.startX });
       }
     },
-    [ensureCapture, onPressStart],
+    [clearCatchTimer, ensureCapture, onPressStart],
+  );
+
+  const scheduleCatch = useCallback(
+    (target: HTMLElement, pointerId: number) => {
+      clearCatchTimer();
+      const cfg = settingsRef.current;
+      if (cfg.catchDelayMs <= 0) {
+        activateOwnership(target, pointerId);
+        return;
+      }
+      catchTimerRef.current = window.setTimeout(() => {
+        catchTimerRef.current = null;
+        const gesture = gestureRef.current;
+        if (phaseRef.current !== "press" || gesture.pointerId !== pointerId) {
+          return;
+        }
+        activateOwnership(target, pointerId);
+      }, cfg.catchDelayMs);
+    },
+    [activateOwnership, clearCatchTimer],
   );
 
   const createSample = useCallback(
@@ -283,6 +322,9 @@ export function usePointerSwipe({
 
   const finishInteraction = useCallback(
     (isCancel = false, currentX?: number, timestamp?: number) => {
+      // A pending catch dies with the gesture: a lift inside the window is a
+      // tap, a vertical hand-off means the motion was never ours to brake.
+      clearCatchTimer();
       const target = hostElementRef.current;
       const now = timestamp ?? performance.now();
       const phase = phaseRef.current;
@@ -405,7 +447,7 @@ export function usePointerSwipe({
       gesture.isActivated = false;
       gesture.width = 0;
     },
-    [createSample, onRelease, setPhase],
+    [clearCatchTimer, createSample, onRelease, setPhase],
   );
 
   const handlePointerDown = useCallback(
@@ -442,22 +484,19 @@ export function usePointerSwipe({
       sampleRef.current = createIdleSample(gestureRef.current.width, now);
       setPhase("press");
 
-      // Ownership split, by design:
-      //  - a NON-interactive surface takes ownership on the press itself — the
-      //    finger landing IS the interaction ("catch the strip"): the consumer
-      //    freezes its motion under the finger and control passes to the
-      //    gesture immediately. What the consumer does with a motionless
-      //    release is its policy — the press payload carries the press point
-      //    so it can settle back onto what was actually pressed.
-      //  - an INTERACTIVE child defers ownership to horizontal intent, so taps
-      //    stay clicks.
-      if (interactive) {
-        ensureCapture(target, event.pointerId);
-      } else {
-        activateOwnership(target, event.pointerId);
-      }
+      // Ownership goes to any press that OUTLASTS the catch window, whatever
+      // the target — a resting finger IS the interaction ("catch the strip"),
+      // and the consumer brakes its motion under it. The window is what keeps
+      // a page scroll STARTED on the surface from hitching that motion: at
+      // press time a catch and a scroll are indistinguishable, so the engine
+      // waits `catchDelayMs` — vertical intent inside it hands the gesture to
+      // the browser untouched, horizontal intent activates ahead of it, and a
+      // quick lift stays a clean tap (click suppression is tied to a completed
+      // DRAG, never to ownership, so interactive children keep their clicks).
+      ensureCapture(target, event.pointerId);
+      scheduleCatch(target, event.pointerId);
     },
-    [activateOwnership, enabled, ensureCapture, setPhase],
+    [enabled, ensureCapture, scheduleCatch, setPhase],
   );
 
   const handlePointerMove = useCallback(
@@ -566,8 +605,9 @@ export function usePointerSwipe({
         window.clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
+      clearCatchTimer();
     };
-  }, [enabled, hostElement]);
+  }, [clearCatchTimer, enabled, hostElement]);
 
   // One inseparable bundle: the ref that MAKES an element the host travels
   // together with the listeners and the required styles, so they cannot be

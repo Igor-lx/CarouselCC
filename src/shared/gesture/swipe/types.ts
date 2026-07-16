@@ -37,6 +37,25 @@ export interface PointerSwipeConfig {
   minSwipeDistance?: number;
   /** Distance threshold expressed as fraction of viewport width. */
   swipeThresholdRatio?: number;
+  /**
+   * How long a press must rest before the engine takes ownership (fires
+   * `onPressStart` — the consumer's "catch/brake"), in ms.
+   *
+   * This window is what reconciles two truths that collide on a moving
+   * surface: a finger LANDING should catch the motion, but a finger that is
+   * merely STARTING A PAGE SCROLL across the surface should not hitch it.
+   * At press time the two are indistinguishable — only the next few input
+   * events tell. Within the window: vertical intent hands the gesture to the
+   * browser with the motion never touched; horizontal intent activates the
+   * takeover immediately (no added latency for real swipes); a lift ends as
+   * a clean tap (clicks unaffected). Only a press that OUTLASTS the window is
+   * a deliberate catch — and brakes.
+   *
+   * `0` restores brake-on-contact (and re-introduces the scroll hitch).
+   * Values at or above the OS long-press (~500 ms) would let the context
+   * menu open before the catch — keep it well below.
+   */
+  catchDelayMs?: number;
 }
 
 export type ResolvedPointerSwipeConfig = Required<PointerSwipeConfig>;

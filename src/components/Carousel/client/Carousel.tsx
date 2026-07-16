@@ -220,7 +220,14 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   const { virtualSlides, layoutOrigin } = useSlideRenderModel({
     current: state.virtualIndex,
     previous: state.fromVirtualIndex,
-    isMoving: status.isMoving,
+    // Any non-idle phase, INCLUDING dragging. A catch-and-hold brakes the
+    // strip at a fractional position and the reducer sits in "dragging"; with
+    // the flag false the active band collapsed to [current, current+visible)
+    // — which a fractional current tilts PAST the leftmost on-screen slide.
+    // That slide went inert under the user's finger: hit-testing died, so the
+    // browser's long-press menu gave its haptic and then refused to open
+    // (always the LEFT slide, in both scroll directions — measured on device).
+    isMoving: !status.isIdle,
     layout,
     records,
     renderWindowBufferMultiplier: config.layout.renderWindowBufferMultiplier,

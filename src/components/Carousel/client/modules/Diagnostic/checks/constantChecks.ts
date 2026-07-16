@@ -341,6 +341,20 @@ const numericRules: NumericRule[] = [
   },
   {
     layer: "Gesture",
+    field: "CAROUSEL_SWIPE_CONFIG.catchDelayMs",
+    value: CAROUSEL_SWIPE_CONFIG.catchDelayMs,
+    severity: "LOGICAL",
+    // The OS long-press sits near 500ms: a catch window at or beyond it lets
+    // the context menu open BEFORE the strip is braked, so the menu would
+    // describe a slide that is still riding away.
+    expected:
+      "Expected 0 <= catchDelayMs < 400ms (well below the OS long-press ~500ms)",
+    consequence:
+      "A press never brakes the strip before the long-press menu opens — the menu describes a slide that rides away",
+    predicate: (value) => atLeast(0)(value) && value < 400,
+  },
+  {
+    layer: "Gesture",
     field: "CAROUSEL_SWIPE_CONFIG.intentThreshold",
     value: CAROUSEL_SWIPE_CONFIG.intentThreshold,
     severity: "LOGICAL",
