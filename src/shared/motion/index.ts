@@ -35,6 +35,7 @@ export type {
   BrakeProfileInput,
   MotionProfile,
   MotionProfileZone,
+  MotionZoneEasing,
   ResumeProfileInput,
 } from "./profile/profile";
 export {

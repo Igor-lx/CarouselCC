@@ -4,18 +4,13 @@ import {
   motionNow,
   profileProgressStops,
   type MotionController,
-  type MotionProfile,
   type MotionSample,
 } from "../../../../shared";
 import type { CarouselRuntimeConfig } from "../config";
 import type { TrackBindingApi } from "../geometry";
 import type { MotionPlanChannel, MotionPlanSource } from "./planChannel";
 import { sampleCarouselSegment } from "./sampler";
-import {
-  buildBrakeSegment,
-  buildResumeSegment,
-  profileSpeedAtDistanceProgress,
-} from "./yieldSegment";
+import { buildBrakeSegment, buildResumeSegment } from "./yieldSegment";
 import type { CarouselMotionStrategy, CarouselSegment } from "./types";
 
 export interface UseScrollRideYieldInput {
@@ -28,16 +23,14 @@ export interface UseScrollRideYieldInput {
   onSettle: (settledPosition: number) => void;
 }
 
-/** What the brake stashed for the quiet-time resume: the REPLACED ride's own
- * curve. The resume returns the ride to the speed this curve prescribes at
- * the point where the strip then is — never to the instantaneous speed the
- * brake happened to sample (a brake in the deceleration tail would otherwise
- * freeze a decaying speed as the new cruise, and the arrival would read
- * slower than the ride "should" have been). */
+/** What the dive stashed for the exit: the speed it dropped from (the exit
+ * ramps symmetrically back up to it) and the ride's own duration (the tempo
+ * the exit ramp scales off). Deliberately NOT the original profile — the
+ * yield is a self-contained visual; the exit does not consult the ride's
+ * shape, only its speed and tempo. */
 interface ActiveYield {
-  profile: MotionProfile;
-  from: number;
-  to: number;
+  entrySpeed: number;
+  rideDurationMs: number;
 }
 
 /**
@@ -71,15 +64,19 @@ const yieldStopIntervals = (duration: number): number =>
  * a strip moving slowly is unaffected — the held frame is imperceptible.
  * The page cannot prevent the stall, but it can not be fast during it.
  *
- * WHAT: on the first page-scroll signal while a ride is in flight, the ride
- * is re-timed through an atomic handoff into a brake segment — ramp to a
- * crawl, crawl on toward the SAME destination. Signals arriving during the
- * scroll and the chrome settle keep re-arming a quiet timer (a resting
- * finger holds the slow-mo — the resume waits for the lift); when the tail
- * goes silent the ride ramps back to the speed its ORIGINAL curve prescribed
- * for the point it has crawled to, and finishes normally. Same mechanism as
- * a repeated-click retarget: the old compositor animation carries the pixels
- * until the new one replaces it.
+ * WHAT ("vinyl brake"): on the first page-scroll signal while a ride is in
+ * flight, the ride is re-timed through an atomic handoff into a DIVE segment
+ * — an ease-out ramp down to a crawl (steepest at the very start, so it drops
+ * into slow-mo the instant the scroll begins), then crawl on toward the SAME
+ * destination. The EXIT is event-driven for responsiveness: the moment the
+ * finger lifts with the scroll already settled, the ride ramps (ease-out,
+ * symmetric) back up to the speed it dived from and finishes — no delay, the
+ * record spins free under the released finger. A resting finger HOLDS the
+ * slow-mo; a fling that outlives the lift exits when the scroll goes idle
+ * (a short ≈2-frame detector). Same mechanism as a repeated-click retarget:
+ * the old compositor animation carries the pixels until the new one replaces
+ * it. The dive/exit ramp durations are PROPORTIONAL to the ride's own tempo,
+ * so the effect is one self-contained visual across every ride kind.
  *
  * Triggers are PAGE-SCROLL signals only (window scroll, window resize,
  * visualViewport resize) — never touch events: a horizontal swipe on the
@@ -129,14 +126,15 @@ export function useScrollRideYield({
     if (typeof window === "undefined") return;
 
     const yieldRef = { current: null as ActiveYield | null };
-    let quietTimer: ReturnType<typeof setTimeout> | null = null;
+    let scrollIdleTimer: ReturnType<typeof setTimeout> | null = null;
     let isSelfPublishing = false;
     let fingersOnGlass = 0;
+    let lastScrollSignalAt = -Infinity;
 
-    const clearQuietTimer = () => {
-      if (quietTimer !== null) {
-        clearTimeout(quietTimer);
-        quietTimer = null;
+    const clearScrollIdleTimer = () => {
+      if (scrollIdleTimer !== null) {
+        clearTimeout(scrollIdleTimer);
+        scrollIdleTimer = null;
       }
     };
 
@@ -212,8 +210,8 @@ export function useScrollRideYield({
       const target = motion.getSnapshot().target;
       if (Math.abs(target - handoff.position) < cfg.motion.epsilon) return;
 
-      // Stash the ride's own curve BEFORE the brake replaces it — it stays
-      // the authority on the speeds the ride "should" have had (see resume).
+      // The ride's authored duration — the tempo the dive/exit ramps scale
+      // off. Read before the brake replaces the active segment.
       const replaced = motion.getActiveSegment() as CarouselSegment | null;
       if (!replaced) return;
 
@@ -223,19 +221,20 @@ export function useScrollRideYield({
         target,
         strategy: handoff.strategy,
         startedAt: handoff.timestamp,
+        rideDurationMs: replaced.duration,
         settings: cfg.scrollYield,
       });
       if (!brake) return;
 
       yieldRef.current = {
-        profile: replaced.profile,
-        from: replaced.from,
-        to: replaced.to,
+        entrySpeed: brake.entrySpeed,
+        rideDurationMs: replaced.duration,
       };
       applySegment(brake.segment);
     };
 
     const resume = () => {
+      clearScrollIdleTimer();
       const active = yieldRef.current;
       yieldRef.current = null;
       if (!active) return;
@@ -251,47 +250,41 @@ export function useScrollRideYield({
       const target = motion.getSnapshot().target;
       if (Math.abs(target - handoff.position) < cfg.motion.epsilon) return;
 
-      // The cruise to return to: what the ORIGINAL curve prescribed for the
-      // point the strip has crawled to by now — never below the current
-      // speed, so the ramp never dips before rising.
-      const originalSpan = active.to - active.from;
-      const prescribedSpeed = profileSpeedAtDistanceProgress(
-        active.profile,
-        originalSpan,
-        originalSpan !== 0 ? (handoff.position - active.from) / originalSpan : 1,
-      );
-
+      // Symmetric exit: ramp back up to the speed the dive dropped from — the
+      // yield is a self-contained visual, so we do NOT consult the original
+      // ride's shape, only the speed it was travelling and its tempo.
       const segment = buildResumeSegment({
         position: handoff.position,
         velocity: handoff.velocity,
         target,
         strategy: handoff.strategy,
         startedAt: handoff.timestamp,
-        cruiseSpeed: prescribedSpeed,
+        rideDurationMs: active.rideDurationMs,
+        cruiseSpeed: active.entrySpeed,
         settings: cfg.scrollYield,
       });
       if (segment) applySegment(segment);
     };
 
-    // Self-extending quiet window: every scroll frame and every chrome resize
-    // during the settle pushes the resume out; the delay only has to cover
-    // the silent tail after the LAST signal. A quiet that arrives while a
-    // finger still rests on the glass does NOT resume — the scroll merely
-    // paused under the finger, and the hand still owns the viewport; the
-    // window re-arms at the lift instead. A fling that outlives the lift
-    // resolves through the scroll signals alone (fingers are already zero).
-    const armQuietTimer = () => {
-      clearQuietTimer();
-      quietTimer = setTimeout(() => {
-        quietTimer = null;
-        if (fingersOnGlass > 0) return; // the lift will re-arm
+    // The exit is EVENT-driven, not delay-driven — a finger lift with the
+    // scroll already idle resumes on the touch event itself (no "залипон").
+    // The scroll-idle timer is only a fling-settle DETECTOR: it fires
+    // `scrollIdleMs` (≈2 frames) after the LAST scroll signal, and resumes
+    // only if no finger is left on the glass. A finger still down means the
+    // hand is holding the slow-mo — the lift will resume it.
+    const armScrollIdleTimer = () => {
+      clearScrollIdleTimer();
+      scrollIdleTimer = setTimeout(() => {
+        scrollIdleTimer = null;
+        if (fingersOnGlass > 0) return; // the lift resumes it
         resume();
-      }, inputRef.current.config.scrollYield.resumeQuietDelayMs);
+      }, inputRef.current.config.scrollYield.scrollIdleMs);
     };
 
     const onScrollSignal = () => {
+      lastScrollSignalAt = motionNow();
       if (yieldRef.current === null) engage();
-      if (yieldRef.current !== null) armQuietTimer();
+      if (yieldRef.current !== null) armScrollIdleTimer();
     };
 
     // Touch listeners maintain the finger count ONLY — a touch never engages
@@ -302,16 +295,22 @@ export function useScrollRideYield({
     };
     const onTouchSettle = (event: TouchEvent) => {
       fingersOnGlass = event.touches.length;
-      if (fingersOnGlass === 0 && yieldRef.current !== null) armQuietTimer();
+      if (fingersOnGlass > 0 || yieldRef.current === null) return;
+      // Last finger up. If the scroll has already settled, the record spins
+      // free NOW — resume on this very event. If a fling is still running
+      // (scroll signals still arriving), let the idle detector catch its end.
+      const scrollIdle =
+        motionNow() - lastScrollSignalAt >= inputRef.current.config.scrollYield.scrollIdleMs;
+      if (scrollIdle) resume();
     };
 
     // Any plan publish that is not ours means the engine replaced or ended
-    // the ride we re-timed — the stashed cruise no longer describes anything.
+    // the ride we re-timed — the stashed speed no longer describes anything.
     const unsubscribePlans = inputRef.current.planSource.subscribe(() => {
       if (isSelfPublishing) return;
       if (yieldRef.current !== null) {
         yieldRef.current = null;
-        clearQuietTimer();
+        clearScrollIdleTimer();
       }
     });
 
@@ -332,7 +331,7 @@ export function useScrollRideYield({
       document.removeEventListener("touchend", onTouchSettle, touchOptions);
       document.removeEventListener("touchcancel", onTouchSettle, touchOptions);
       unsubscribePlans();
-      clearQuietTimer();
+      clearScrollIdleTimer();
       yieldRef.current = null;
     };
   }, []);

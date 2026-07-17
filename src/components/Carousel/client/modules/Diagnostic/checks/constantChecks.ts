@@ -45,10 +45,10 @@ import {
   VISIBILITY_THRESHOLD,
   AUTOPLAY_RESETTLE_DELAY_MS,
   SCROLL_YIELD_CRAWL_SPEED_SHARE,
-  SCROLL_YIELD_BRAKE_DURATION_MS,
-  SCROLL_YIELD_RESUME_QUIET_DELAY_MS,
-  SCROLL_YIELD_RESUME_RAMP_DURATION_MS,
-  SCROLL_YIELD_RESUME_DECELERATION_DISTANCE_SHARE,
+  SCROLL_YIELD_ENTRY_DURATION_SHARE,
+  SCROLL_YIELD_EXIT_DURATION_SHARE,
+  SCROLL_YIELD_ARRIVAL_DECELERATION_DISTANCE_SHARE,
+  SCROLL_YIELD_SCROLL_IDLE_MS,
 } from "../../../config";
 import { normalizeMotionProfileShares } from "../../../../../../shared";
 // The calibration record lives with the computation it anchors, not among
@@ -318,7 +318,7 @@ const numericRules: NumericRule[] = [
     predicate: inRangeExclusiveLower(0, 1),
   },
 
-  // Scroll yield (mid-ride slowdown under page scrolling)
+  // Scroll yield (mid-ride "vinyl brake" under page scrolling)
   {
     layer: "ScrollYield",
     field: "SCROLL_YIELD_CRAWL_SPEED_SHARE",
@@ -326,47 +326,47 @@ const numericRules: NumericRule[] = [
     severity: "CRITICAL",
     expected: "Expected a finite number in the range (0, 1]",
     consequence:
-      "A non-positive crawl share degenerates the brake profile toward a near-infinite crawl; above 1 the 'brake' would speed the ride up",
+      "A non-positive crawl share degenerates the dive profile toward a near-infinite crawl; above 1 the 'brake' would speed the ride up",
     predicate: inRangeExclusiveLower(0, 1),
   },
   {
     layer: "ScrollYield",
-    field: "SCROLL_YIELD_BRAKE_DURATION_MS",
-    value: SCROLL_YIELD_BRAKE_DURATION_MS,
+    field: "SCROLL_YIELD_ENTRY_DURATION_SHARE",
+    value: SCROLL_YIELD_ENTRY_DURATION_SHARE,
     severity: "LOGICAL",
-    expected: "Expected a non-negative finite number of milliseconds",
+    expected: "Expected a non-negative finite number (share of ride duration)",
     consequence:
-      "Negative or NaN brake time malforms the ramp zone; the yield either snaps or never engages coherently",
+      "Negative or NaN dive share malforms the ramp zone; the slow-mo dive either snaps or never engages coherently",
     predicate: atLeast(0),
   },
   {
     layer: "ScrollYield",
-    field: "SCROLL_YIELD_RESUME_QUIET_DELAY_MS",
-    value: SCROLL_YIELD_RESUME_QUIET_DELAY_MS,
+    field: "SCROLL_YIELD_EXIT_DURATION_SHARE",
+    value: SCROLL_YIELD_EXIT_DURATION_SHARE,
     severity: "LOGICAL",
-    expected: "Expected a non-negative finite number of milliseconds",
+    expected: "Expected a non-negative finite number (share of ride duration)",
     consequence:
-      "The ride would accelerate back to cruise inside the browser-chrome settle window — the exact stall the yield exists to avoid",
+      "Negative or NaN exit share malforms the crawl-to-cruise zone; the whoosh back to speed either snaps or never completes",
     predicate: atLeast(0),
   },
   {
     layer: "ScrollYield",
-    field: "SCROLL_YIELD_RESUME_RAMP_DURATION_MS",
-    value: SCROLL_YIELD_RESUME_RAMP_DURATION_MS,
-    severity: "LOGICAL",
-    expected: "Expected a non-negative finite number of milliseconds",
-    consequence:
-      "Negative or NaN ramp time malforms the crawl-to-cruise zone; the slow-mo exit either snaps or never completes coherently",
-    predicate: atLeast(0),
-  },
-  {
-    layer: "ScrollYield",
-    field: "SCROLL_YIELD_RESUME_DECELERATION_DISTANCE_SHARE",
-    value: SCROLL_YIELD_RESUME_DECELERATION_DISTANCE_SHARE,
+    field: "SCROLL_YIELD_ARRIVAL_DECELERATION_DISTANCE_SHARE",
+    value: SCROLL_YIELD_ARRIVAL_DECELERATION_DISTANCE_SHARE,
     severity: "CRITICAL",
     expected: "Expected a finite number in the range [0, 1]",
     consequence: "Deceleration zone share outside [0,1] leads to malformed motion profile zones",
     predicate: inRangeInclusive(0, 1),
+  },
+  {
+    layer: "ScrollYield",
+    field: "SCROLL_YIELD_SCROLL_IDLE_MS",
+    value: SCROLL_YIELD_SCROLL_IDLE_MS,
+    severity: "LOGICAL",
+    expected: "Expected a non-negative finite number of milliseconds",
+    consequence:
+      "Negative or NaN scroll-idle threshold breaks fling-settle detection; the exit after a fling never fires or fires instantly",
+    predicate: atLeast(0),
   },
 
   // Gesture (swipe config)

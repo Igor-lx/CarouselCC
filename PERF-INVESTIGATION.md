@@ -888,6 +888,57 @@ scroll stop now yield too. Deliberately visible behaviour — the user's eye
 decides whether it stays; rollback is one hook unmount (Carousel keeps
 working without it), with the tuning constants preserved.
 
+### 9.6 The yield became an interaction: the "vinyl brake"
+
+The eye liked the slow-mo but not the seams, and the spec turned from
+"hide the bounce" into "design a feel." Final model, after two on-device
+passes:
+
+**The metaphor (the user's):** a record spinning on its own; you brake it
+by pressing a finger to the disc, and it spins free the instant you lift.
+Press → slow NOW; release → fast NOW. Responsiveness is the whole point.
+
+**One self-contained visual, unified across ride kinds.** The dive and the
+exit no longer try to blend back into the original profile (step and
+autoplay can be shaped oppositely — all-accel/instant-stop vs
+instant-start/all-decel; blending into either is fragile). The yield reads
+only the ride's live (position, velocity) and its *tempo*; it is the same
+two-ramp shape whether the ride began from a drag, a button, or autoplay.
+The prescribed-speed coupling from the first cut (sampling the original
+curve's speed at the crawl point) is gone.
+
+**Durations are PROPORTIONAL, not absolute.** Dive and exit ramps are
+`SCROLL_YIELD_ENTRY/EXIT_DURATION_SHARE × the ride's own duration`
+(read from `controller.getActiveSegment().duration`). A fast step dives in
+a blink, a slow autoplay a touch more deliberately — each of a piece with
+its own tempo, under any tuning. This retired the absolute `*_MS` brake and
+resume constants.
+
+**Ease-out ramps (new per-zone easing).** The dive/exit ramps use a
+quadratic ease-out (steepest change at the START of the ramp), so the strip
+drops into — and launches out of — slow-mo *instantly* on the triggering
+event, then levels off. Standard motions keep smoothstep; the profile zone
+gained an optional `easing` field, defaulting to smoothstep so every other
+curve is byte-identical. (`zoneDuration` had to become easing-aware: a
+zone's mean speed is `s0 + (s1−s0)·∫₀¹easing`, and the ramp distance is
+derived from that same integral so a "duration share" means exactly what it
+says regardless of the speed ratio.)
+
+**The exit is event-driven — this was the "залипон".** The first cut waited
+a 300 ms quiet timer after finger-up/scroll-stop before *starting* the
+exit, then ramped gently — the strip "thought for ages," crawled on, and
+sluggishly regained speed. Now: a finger lift with the scroll already
+settled resumes on the touch event itself, zero delay. A resting finger
+HOLDS the slow-mo (the hand still owns the viewport); the lift resumes it.
+A fling that outlives the lift resumes when the scroll goes idle — detected
+by a short `SCROLL_YIELD_SCROLL_IDLE_MS` (≈2 frames), a settle detector, not
+a deliberate hold.
+
+**Trade-off on record:** in the fling case the exit fires roughly when the
+toolbar begins to settle, so the bounce can peek back there; in the
+finger-held case the settle already passed under the finger, so the lift
+exit is clean. Accepted for feel.
+
 ### A rule this investigation earned
 
 **Never declare a CSS transition on a property that a WAAPI animation also drives.**

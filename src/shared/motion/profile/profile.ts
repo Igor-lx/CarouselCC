@@ -1,5 +1,16 @@
 import { clamp } from "./clamp";
 
+/**
+ * Speed-interpolation shape inside one zone.
+ * - `smoothstep` — the symmetric S every standard motion uses (soft in, soft
+ *   out); the default when a zone omits the field.
+ * - `easeOut` — quadratic ease-out: the speed changes MOST at the very start
+ *   of the zone and levels off. A yield ramp uses it so the strip drops into
+ *   (and launches out of) slow-mo instantly on the triggering event and
+ *   settles smoothly — the "vinyl brake" feel, which the gentle S cannot give.
+ */
+export type MotionZoneEasing = "smoothstep" | "easeOut";
+
 export interface MotionProfileZone {
   startDistanceProgress: number;
   endDistanceProgress: number;
@@ -7,6 +18,8 @@ export interface MotionProfileZone {
   duration: number;
   startSpeed: number;
   endSpeed: number;
+  /** Speed easing within the zone; absent means `smoothstep`. */
+  easing?: MotionZoneEasing;
 }
 
 export interface MotionProfile {
@@ -31,10 +44,32 @@ export interface MotionProfileInput {
  */
 const MIN_PROFILE_SPEED = 1e-6;
 const OVERALLOCATED_PROFILE_SHARE = 0.5;
-const smoothstep = (progress: number) => progress * progress * (3 - 2 * progress);
 
-const smoothstepIntegral = (progress: number) =>
-  progress * progress * progress - 0.5 * progress * progress * progress * progress;
+// Each easing pairs its speed shape `fn(u)` with its exact integral `∫₀ᵘ`,
+// used to advance distance analytically inside a zone (no numeric integration).
+const EASING_FN: Record<MotionZoneEasing, (u: number) => number> = {
+  smoothstep: (u) => u * u * (3 - 2 * u),
+  easeOut: (u) => u * (2 - u), // 1 - (1-u)²: derivative 2 at u=0, 0 at u=1
+};
+
+const EASING_INTEGRAL: Record<MotionZoneEasing, (u: number) => number> = {
+  smoothstep: (u) => u * u * u - 0.5 * u * u * u * u,
+  easeOut: (u) => u * u - (u * u * u) / 3,
+};
+
+const easingFn = (easing: MotionZoneEasing | undefined) =>
+  EASING_FN[easing ?? "smoothstep"];
+const easingIntegral = (easing: MotionZoneEasing | undefined) =>
+  EASING_INTEGRAL[easing ?? "smoothstep"];
+
+// Yield ramps ease-out; their mean speed over the ramp is s0 + (s1−s0)·∫₀¹.
+// Computing a ramp's DISTANCE from `duration × thisMean` makes the zone's
+// solved duration come back out to exactly the requested time budget (the
+// distance sampler integrates with the same fraction) — so an entry/exit
+// "duration share" means what it says regardless of the speed ratio.
+const RAMP_EASING: MotionZoneEasing = "easeOut";
+const rampMeanSpeed = (from: number, to: number) =>
+  from + (to - from) * EASING_INTEGRAL[RAMP_EASING](1);
 
 const lerp = (from: number, to: number, progress: number) =>
   from + (to - from) * progress;
@@ -69,9 +104,23 @@ export const normalizeMotionProfileShares = (
   };
 };
 
-const zoneDuration = (distance: number, startSpeed: number, endSpeed: number) => {
+// The zone's mean speed is not (s0+s1)/2 in general — it is
+// s0 + (s1−s0)·∫₀¹easing, which the distance sampler integrates to. Using the
+// same integral here keeps duration and distance consistent, so the zone fills
+// exactly its distance share at its time end (no kink at the boundary).
+// smoothstep's ∫₀¹ is 0.5, so standard profiles are byte-identical to before.
+const zoneDuration = (
+  distance: number,
+  startSpeed: number,
+  endSpeed: number,
+  easing?: MotionZoneEasing,
+) => {
   if (!(distance > 0)) return 0;
-  const averageSpeed = Math.max(MIN_PROFILE_SPEED, (startSpeed + endSpeed) * 0.5);
+  const meanFraction = easingIntegral(easing)(1);
+  const averageSpeed = Math.max(
+    MIN_PROFILE_SPEED,
+    startSpeed + (endSpeed - startSpeed) * meanFraction,
+  );
   return distance / averageSpeed;
 };
 
@@ -83,13 +132,19 @@ const pushZone = (
     startSpeed: number;
     endSpeed: number;
     distance: number;
+    easing?: MotionZoneEasing;
   },
 ) => {
   if (input.share <= 0) return input.distanceProgress;
   const startTime = zones.length > 0
     ? zones[zones.length - 1]!.startTime + zones[zones.length - 1]!.duration
     : 0;
-  const duration = zoneDuration(input.distance * input.share, input.startSpeed, input.endSpeed);
+  const duration = zoneDuration(
+    input.distance * input.share,
+    input.startSpeed,
+    input.endSpeed,
+    input.easing,
+  );
   zones.push({
     startDistanceProgress: input.distanceProgress,
     endDistanceProgress: input.distanceProgress + input.share,
@@ -97,6 +152,7 @@ const pushZone = (
     duration,
     startSpeed: input.startSpeed,
     endSpeed: input.endSpeed,
+    ...(input.easing ? { easing: input.easing } : {}),
   });
   return input.distanceProgress + input.share;
 };
@@ -189,7 +245,7 @@ export const createBrakeProfile = ({
   const entrySpeed = Math.max(0, startSpeed);
   const crawl = Math.max(MIN_PROFILE_SPEED, crawlSpeed);
 
-  const rampDistance = Math.max(0, brakeDurationMs) * (entrySpeed + crawl) * 0.5;
+  const rampDistance = Math.max(0, brakeDurationMs) * rampMeanSpeed(entrySpeed, crawl);
   const rampShare =
     absDistance > 0 ? clamp(rampDistance / absDistance, 0, 1) : 1;
 
@@ -201,6 +257,10 @@ export const createBrakeProfile = ({
     startSpeed: entrySpeed,
     endSpeed: crawl,
     distance: absDistance,
+    // easeOut: the drop is steepest the instant the ramp begins, so the strip
+    // dives into slow-mo the moment the scroll starts, then levels into the
+    // crawl — the responsive "press the finger onto the record" feel.
+    easing: RAMP_EASING,
   });
   pushZone(zones, {
     distanceProgress: progress,
@@ -253,7 +313,7 @@ export const createResumeProfile = ({
   const cruise = Math.max(MIN_PROFILE_SPEED, cruiseSpeed, entrySpeed);
 
   const decelerationShare = clamp(decelerationDistanceShare, 0, 1);
-  const rampDistance = Math.max(0, rampDurationMs) * (entrySpeed + cruise) * 0.5;
+  const rampDistance = Math.max(0, rampDurationMs) * rampMeanSpeed(entrySpeed, cruise);
   const rampShare =
     absDistance > 0
       ? clamp(rampDistance / absDistance, 0, 1 - decelerationShare)
@@ -267,6 +327,10 @@ export const createResumeProfile = ({
     startSpeed: entrySpeed,
     endSpeed: cruise,
     distance: absDistance,
+    // easeOut: the rise is steepest the instant the finger lifts — the strip
+    // whooshes back to speed immediately, then levels at cruise. Symmetric to
+    // the brake's dive; the record spins free the moment the finger releases.
+    easing: RAMP_EASING,
   });
   progress = pushZone(zones, {
     distanceProgress: progress,
@@ -300,7 +364,7 @@ const zoneDistanceProgress = (
   const localDistance =
     zone.duration *
     (zone.startSpeed * localProgress +
-      (zone.endSpeed - zone.startSpeed) * smoothstepIntegral(localProgress));
+      (zone.endSpeed - zone.startSpeed) * easingIntegral(zone.easing)(localProgress));
   return clamp(
     zone.startDistanceProgress + localDistance / distance,
     zone.startDistanceProgress,
@@ -329,7 +393,7 @@ export const sampleMotionProfile = (
 
   return {
     distanceProgress: zoneDistanceProgress(zone, localProgress, distance),
-    speed: lerp(zone.startSpeed, zone.endSpeed, smoothstep(localProgress)),
+    speed: lerp(zone.startSpeed, zone.endSpeed, easingFn(zone.easing)(localProgress)),
   };
 };
 
