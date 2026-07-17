@@ -934,6 +934,24 @@ A fling that outlives the lift resumes when the scroll goes idle — detected
 by a short `SCROLL_YIELD_SCROLL_IDLE_MS` (≈2 frames), a settle detector, not
 a deliberate hold.
 
+**The stranding bug — the exit must key on SCROLL, not the toolbar.** The
+first cut fed `resize` and `visualViewport resize` into the same idle
+detector as `scroll`. But those fire in a BURST while the toolbar settles —
+which is a scroll's aftermath — so each one re-armed the idle timer and
+pushed `lastScrollSignalAt` forward. The exit chased the toolbar's tail
+instead of the finger, and in bad timings the strip stayed stuck in slow-mo
+crawling to the end. Fix: the engage/hold trigger is the page `scroll`
+ALONE. The scroll is the structural cause (the toolbar moves because the
+page scrolled); the settle it kicks off is now irrelevant to the exit, which
+answers only to the finger and the scroll going quiet.
+
+**Same speed in and out (the record spins at one rate).** The dive captures
+the live speed ONCE (`entrySpeed`); a second scroll under a held finger does
+NOT re-capture it (engage is a no-op while already yielding), so it never
+degrades toward the crawl. The exit ramps back to exactly that speed —
+before and after the slow-mo the strip travels at the same rate, like a
+finger lifted off a still-spinning disc.
+
 **Trade-off on record:** in the fling case the exit fires roughly when the
 toolbar begins to settle, so the bounce can peek back there; in the
 finger-held case the settle already passed under the finger, so the lift

@@ -148,7 +148,7 @@ export default function App() {
               isPaginationOn
               isInteractive={isInteractive}
               durationAutoplay={4000}
-              durationStep={2000}
+              durationStep={1500}
               jumpSpeedMultiplier={12}
               intervalAutoplay={3000}
               isFullPagesOn

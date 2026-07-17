@@ -78,10 +78,13 @@ const yieldStopIntervals = (duration: number): number =>
  * it. The dive/exit ramp durations are PROPORTIONAL to the ride's own tempo,
  * so the effect is one self-contained visual across every ride kind.
  *
- * Triggers are PAGE-SCROLL signals only (window scroll, window resize,
- * visualViewport resize) — never touch events: a horizontal swipe on the
- * carousel itself never moves the browser chrome, so a gesture ride must not
- * brake itself. Structural cause, not a heuristic.
+ * The engage/hold trigger is the page `scroll` ONLY — never touch (a swipe
+ * on the deck never moves the browser chrome, so a gesture ride must not
+ * brake itself) and never `resize`/`visualViewport` (those fire in a burst
+ * while the toolbar settles AFTER a scroll, and would chain the exit to the
+ * toolbar's tail instead of the finger). The scroll is the structural cause;
+ * the toolbar moves because of it. Touch is read only to know when the finger
+ * has left the glass — the moment the record spins free.
  *
  * DELIBERATELY RENDER-FREE: everything runs imperatively inside event
  * listeners on refs — the same law as useViewportBusy. A React state flip on
@@ -266,42 +269,53 @@ export function useScrollRideYield({
       if (segment) applySegment(segment);
     };
 
-    // The exit is EVENT-driven, not delay-driven — a finger lift with the
-    // scroll already idle resumes on the touch event itself (no "залипон").
-    // The scroll-idle timer is only a fling-settle DETECTOR: it fires
-    // `scrollIdleMs` (≈2 frames) after the LAST scroll signal, and resumes
-    // only if no finger is left on the glass. A finger still down means the
-    // hand is holding the slow-mo — the lift will resume it.
+    // The single exit decision. Resume iff: a yield is live, NO finger is on
+    // the glass, and the page SCROLL has been idle for `scrollIdleMs`. Called
+    // both on finger-up (instant when the scroll already settled) and by the
+    // idle timer (catching a fling's end after an early lift).
+    const maybeResume = () => {
+      if (yieldRef.current === null || fingersOnGlass > 0) return;
+      const idle =
+        motionNow() - lastScrollSignalAt >=
+        inputRef.current.config.scrollYield.scrollIdleMs;
+      if (idle) resume();
+    };
+
+    // One-shot fling-settle detector: fires `scrollIdleMs` (≈2 frames) after
+    // the LAST scroll, then tries to resume. Re-armed on every scroll.
     const armScrollIdleTimer = () => {
       clearScrollIdleTimer();
       scrollIdleTimer = setTimeout(() => {
         scrollIdleTimer = null;
-        if (fingersOnGlass > 0) return; // the lift resumes it
-        resume();
+        maybeResume();
       }, inputRef.current.config.scrollYield.scrollIdleMs);
     };
 
-    const onScrollSignal = () => {
+    // ONLY the page `scroll` engages and holds the yield — deliberately NOT
+    // `resize` / `visualViewport` `resize`. Those fire in a burst WHILE the
+    // browser toolbar settles (a scroll's aftermath), and feeding them here
+    // kept re-arming the idle detector and pushing `lastScrollSignalAt`
+    // forward, so the exit chased the toolbar's tail instead of the finger —
+    // the strip stayed stuck in slow-mo. The scroll itself is the true
+    // structural cause (the toolbar moves BECAUSE the page scrolled), so it is
+    // the sole signal; the toolbar settle is now irrelevant to the exit.
+    const onScroll = () => {
       lastScrollSignalAt = motionNow();
       if (yieldRef.current === null) engage();
       if (yieldRef.current !== null) armScrollIdleTimer();
     };
 
     // Touch listeners maintain the finger count ONLY — a touch never engages
-    // the yield (a swipe on the deck itself must not brake its own ride; the
-    // structural trigger stays the page-scroll signal).
+    // the yield (a swipe on the deck itself must not brake its own ride).
     const onTouchStart = (event: TouchEvent) => {
       fingersOnGlass = event.touches.length;
     };
+    // Last finger up: the record spins free THIS instant when the scroll has
+    // already settled (the common careful-scroll case — no delay). If a fling
+    // is still running, the idle timer catches its end.
     const onTouchSettle = (event: TouchEvent) => {
       fingersOnGlass = event.touches.length;
-      if (fingersOnGlass > 0 || yieldRef.current === null) return;
-      // Last finger up. If the scroll has already settled, the record spins
-      // free NOW — resume on this very event. If a fling is still running
-      // (scroll signals still arriving), let the idle detector catch its end.
-      const scrollIdle =
-        motionNow() - lastScrollSignalAt >= inputRef.current.config.scrollYield.scrollIdleMs;
-      if (scrollIdle) resume();
+      if (fingersOnGlass === 0) maybeResume();
     };
 
     // Any plan publish that is not ours means the engine replaced or ended
@@ -315,18 +329,13 @@ export function useScrollRideYield({
     });
 
     const touchOptions = { capture: true, passive: true } as const;
-    window.addEventListener("scroll", onScrollSignal, { passive: true });
-    window.addEventListener("resize", onScrollSignal);
-    const viewport = window.visualViewport;
-    viewport?.addEventListener("resize", onScrollSignal);
+    window.addEventListener("scroll", onScroll, { passive: true });
     document.addEventListener("touchstart", onTouchStart, touchOptions);
     document.addEventListener("touchend", onTouchSettle, touchOptions);
     document.addEventListener("touchcancel", onTouchSettle, touchOptions);
 
     return () => {
-      window.removeEventListener("scroll", onScrollSignal);
-      window.removeEventListener("resize", onScrollSignal);
-      viewport?.removeEventListener("resize", onScrollSignal);
+      window.removeEventListener("scroll", onScroll);
       document.removeEventListener("touchstart", onTouchStart, touchOptions);
       document.removeEventListener("touchend", onTouchSettle, touchOptions);
       document.removeEventListener("touchcancel", onTouchSettle, touchOptions);
