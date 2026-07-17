@@ -54,6 +54,9 @@ export interface RepeatedClickSettings {
 export interface InteractionSettings {
   hoverPauseDelay: number;
   visibilityThreshold: number;
+  /** Quiet window after glass/viewport activity before an autoplay tick may
+   * fire (see AUTOPLAY_RESETTLE_DELAY_MS). */
+  autoplayResettleDelayMs: number;
 }
 
 export interface LayoutSettings {

@@ -43,6 +43,7 @@ import {
   STEP_ACCELERATION_DISTANCE_SHARE,
   STEP_DECELERATION_DISTANCE_SHARE,
   VISIBILITY_THRESHOLD,
+  AUTOPLAY_RESETTLE_DELAY_MS,
 } from "../../../config";
 import { normalizeMotionProfileShares } from "../../../../../../shared";
 // The calibration record lives with the computation it anchors, not among
@@ -290,6 +291,16 @@ const numericRules: NumericRule[] = [
     severity: "LOGICAL",
     expected: "Expected a non-negative finite number of milliseconds",
     consequence: "setTimeout receives an invalid delay; hover-pause debounce becomes unreliable",
+    predicate: atLeast(0),
+  },
+  {
+    layer: "Interaction",
+    field: "AUTOPLAY_RESETTLE_DELAY_MS",
+    value: AUTOPLAY_RESETTLE_DELAY_MS,
+    severity: "LOGICAL",
+    expected: "Expected a non-negative finite number of milliseconds",
+    consequence:
+      "Autoplay would tick into the browser-chrome settle window, where weak GPUs miss the presentation latch and rides visibly bounce",
     predicate: atLeast(0),
   },
   {

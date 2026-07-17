@@ -799,6 +799,47 @@ would then be an inner-scroller layout (body non-scrollable, page scrolls in a
 container → the URL bar never moves) — an architectural choice to weigh, not a
 bug fix.
 
+### 9.4 The decision: adapt to the jam, don't fight the road
+
+With the mechanism proven (§9.3) the option space collapsed to three:
+
+1. **Inner-scroller layout** (root pinned, toolbar never moves) — kills the
+   artifact with certainty, but costs the auto-hiding URL bar and native
+   pull-to-refresh. **Rejected by the user** — the trade is not worth it here.
+2. **Rewrite our code** — examined exhaustively and honestly impossible: the
+   stall happens between Chrome's GPU-process output and the panel, two
+   levels below the web sandbox. Our frames are provably on time; there is no
+   JS/CSS/WAAPI shape that changes how the system compositor aggregates the
+   browser's own UI surface. (The WAAPI-migration analogy does not transfer:
+   that conflict lived INSIDE our process, this one lives outside it.)
+3. **Adapt: know the jam's schedule and don't ship into rush hour.** The
+   vulnerable window is fully predictable from the page: finger on the glass →
+   scroll/fling frames → browser-chrome resizes, then a short silent tail.
+
+**Implemented (option A): autoplay yields to an unsettled viewport.**
+`useViewportBusy` (shared/hooks/environment) raises synchronously on the
+first touch ANYWHERE on the glass — not just the carousel — and decays
+`AUTOPLAY_RESETTLE_DELAY_MS` (600 ms, diagnosed tunable) after the LAST
+observed signal. The window self-extends on every scroll frame and every
+chrome resize, so it covers flings and settles of ANY duration without being
+tuned to either — per the project law that architecture must hold under any
+legitimate settings, never the current knobs. `useCarouselAutoplay` adds it
+to the pause rule; carousel-local pauses (drag, in-flight, off-screen, hover)
+are unchanged. Zero cost with autoplay off (no listeners), no public API
+change, every host benefits.
+
+**Parked (option B): mid-ride graceful yield** — an in-flight CRUISE-phase
+ride smoothly dropping to a crawl through the settle window and
+re-accelerating (bounce magnitude = velocity x present-gap; a crawl makes a
+50 ms gap sub-perceptual). All machinery exists (captureHandoff, curve
+rebuild, continuity launch). Deliberately visible behaviour — awaits the
+user's eye, not more analysis. Scope guard, when built, must key on the
+CURVE PHASE, not on current knob values.
+
+Button-commanded rides overlapping a scroll stop remain exposed until B: a
+narrow, user-instigated overlap, accepted for now with the mechanism on
+record.
+
 ### A rule this investigation earned
 
 **Never declare a CSS transition on a property that a WAAPI animation also drives.**

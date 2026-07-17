@@ -1,6 +1,6 @@
 import { useCallback, type RefObject } from "react";
 
-import { useViewportVisibility } from "../../../../shared";
+import { useViewportBusy, useViewportVisibility } from "../../../../shared";
 import type { CarouselRuntimeConfig } from "../config";
 import type { CarouselNavigation } from "../navigation";
 import { motionStatus, type CarouselState } from "../state";
@@ -29,7 +29,11 @@ interface UseCarouselAutoplayInput {
  * an autoplay loop). Owns everything the loop needs:
  * - viewport visibility (IntersectionObserver + tab visibility) — consumed by
  *   autoplay alone, so the subscription lives here, not in the root;
- * - the pause rule (off-screen, dragging, or already moving);
+ * - the pause rule (off-screen, dragging, already moving, or the glass /
+ *   viewport unsettled — see useViewportBusy: an autoplay tick fired into the
+ *   browser-chrome settle window lands on a display compositor that is busy
+ *   aggregating two live surfaces, and on weak GPUs the ride's first frames
+ *   miss the presentation latch and visibly bounce);
  * - referentially stable step handlers (they sit in the deps of the interval
  *   effect — a fresh identity per render would restart the timer, measuring
  *   the interval from the last render instead of the last tick).
@@ -59,9 +63,16 @@ export function useCarouselAutoplay({
 
   const { isDragging, isMoving } = motionStatus(state.motionPhase);
 
+  // A finger anywhere on the glass (not just on the carousel), an ongoing
+  // scroll/fling, or the browser chrome settling: no NEW rides until quiet.
+  const isViewportBusy = useViewportBusy({
+    enabled: isAuto && state.layout.canSlide,
+    quietDelayMs: config.interaction.autoplayResettleDelayMs,
+  });
+
   return useAutoplay({
     enabled: isAuto && state.layout.canSlide,
-    isPaused: !visible || isDragging || isMoving,
+    isPaused: !visible || isDragging || isMoving || isViewportBusy,
     isAtEnd,
     intervalMs: config.autoplayInterval,
     hoverPauseDelayMs: config.interaction.hoverPauseDelay,

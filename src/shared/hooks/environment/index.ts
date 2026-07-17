@@ -11,4 +11,5 @@ export { useIsReducedMotion } from "./useIsReducedMotion";
 export { useIsTouchDevice } from "./useIsTouchDevice";
 export { useDataSaver } from "./useDataSaver";
 export { useUserEnvironment } from "./useUserEnvironment";
+export { useViewportBusy } from "./useViewportBusy";
 export type { UserEnvironment } from "./useUserEnvironment";

@@ -23,7 +23,7 @@ import {
   STEP_ACCELERATION_DISTANCE_SHARE,
   STEP_DECELERATION_DISTANCE_SHARE,
 } from "./motion";
-import { HOVER_PAUSE_DELAY, VISIBILITY_THRESHOLD } from "./interaction";
+import { HOVER_PAUSE_DELAY, VISIBILITY_THRESHOLD, AUTOPLAY_RESETTLE_DELAY_MS } from "./interaction";
 import type { CarouselRuntimeConfig, RawConfigInput } from "./types";
 
 const useDefault = <T>(value: unknown, fallback: T): T =>
@@ -81,6 +81,7 @@ export const buildCarouselConfig = ({
   interaction: {
     hoverPauseDelay: HOVER_PAUSE_DELAY,
     visibilityThreshold: VISIBILITY_THRESHOLD,
+    autoplayResettleDelayMs: AUTOPLAY_RESETTLE_DELAY_MS,
   },
   layout: {
     renderWindowBufferMultiplier: RENDER_WINDOW_BUFFER_MULTIPLIER,
