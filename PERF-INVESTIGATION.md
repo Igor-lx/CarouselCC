@@ -840,6 +840,54 @@ Button-commanded rides overlapping a scroll stop remain exposed until B: a
 narrow, user-instigated overlap, accepted for now with the mechanism on
 record.
 
+### 9.5 Option B built: the scroll yield (awaiting the eye)
+
+Two refinements happened between §9.4 and the build.
+
+**Option A's first cut regressed, and the regression set a law.** The v1
+`useViewportBusy` flipped React state inside the `touchstart` handler; with
+autoplay on, that re-rendered the deck at the exact moment a finger landed —
+a visible hitch of the in-flight ride, the very artifact class being fought.
+Rewritten non-reactive (refs + timestamps, stable getter, checked when the
+autoplay timer FIRES via `shouldDeferTick`; a deferred tick re-arms a full
+interval). The law: **nothing on the input path may re-render anything** —
+signals are read at decision time, never pushed through React.
+
+**Option B shipped as `useScrollRideYield`** (motion/), same law, fully
+imperative:
+
+- **Trigger — structural, and NOT touch.** Only page-scroll signals engage
+  it: `window` scroll, `window` resize, `visualViewport` resize. The chrome
+  settle is CAUSED by page scrolling; a horizontal swipe on the deck never
+  moves the toolbar, so gesture rides cannot brake themselves. This replaced
+  §9.4's "CURVE PHASE" guard sketch — the phase idea gated by ride geometry,
+  but the real structural fact is the signal's ORIGIN.
+- **Brake**: on the first signal mid-ride, an atomic `captureHandoff` +
+  segment rebuild (the repeated-click retarget path — old animation paints
+  until the new one replaces it) re-times the ride: ramp from the LIVE speed
+  down to `SCROLL_YIELD_CRAWL_SPEED_SHARE` of it within
+  `SCROLL_YIELD_BRAKE_DURATION_MS`, then crawl toward the SAME destination.
+  The crawl is a share of the observed speed — never an absolute — so it
+  scales with any ride tuning. Needed a new profile shape
+  (`createBrakeProfile`): the standard accel/cruise/decel builder can never
+  cruise BELOW its entry speed by construction.
+- **Resume**: every signal re-arms a quiet timer
+  (`SCROLL_YIELD_RESUME_QUIET_DELAY_MS` past the LAST signal — the
+  self-extending window again); on silence the ride re-times back to its
+  pre-brake cruise (the captured entry speed, a structural value, not a knob)
+  and finishes normally. The widget follows both re-timings as plan
+  retimings (same `targetKey`), staying in phase by construction.
+- **Scope guard, structural**: GO_TO slices (`strategy: "jump"`) are
+  excluded — a far GO_TO's widget plan is authored over the whole
+  preflight/teleport/approach command; re-timing one slice would desync the
+  chain. Sign checks (velocity must point at the remaining distance), no
+  magnitude thresholds anywhere.
+
+This also closes §9.4's known gap: button-commanded rides overlapping a
+scroll stop now yield too. Deliberately visible behaviour — the user's eye
+decides whether it stays; rollback is one hook unmount (Carousel keeps
+working without it), with the tuning constants preserved.
+
 ### A rule this investigation earned
 
 **Never declare a CSS transition on a property that a WAAPI animation also drives.**

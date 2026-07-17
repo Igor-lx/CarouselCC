@@ -25,11 +25,16 @@ export type {
 } from "./runtime/types";
 export {
   buildProfile,
+  createBrakeProfile,
   createMotionProfile,
   normalizeMotionProfileShares,
   sampleMotionProfile,
 } from "./profile/profile";
-export type { MotionProfile, MotionProfileZone } from "./profile/profile";
+export type {
+  BrakeProfileInput,
+  MotionProfile,
+  MotionProfileZone,
+} from "./profile/profile";
 export {
   isWaapiSupported,
   profileProgressStops,

@@ -151,6 +151,73 @@ export const createMotionProfile = ({
   return { duration, endSpeed, zones };
 };
 
+export interface BrakeProfileInput {
+  /** Signed remaining distance the segment still has to cover. */
+  distance: number;
+  /** Current speed along the remaining distance (non-negative). */
+  startSpeed: number;
+  /** Speed to settle into after the ramp (non-negative). */
+  crawlSpeed: number;
+  /** Time budget of the ramp from `startSpeed` down to `crawlSpeed`. */
+  brakeDurationMs: number;
+}
+
+/**
+ * A yield profile: ramp from the current speed down to a crawl within a TIME
+ * budget, then hold the crawl for the whole remaining distance. This shape
+ * cannot be expressed through `createMotionProfile` — its cruise always runs
+ * at `max(peak, startSpeed)`, so it can never cruise BELOW the entry speed.
+ *
+ * The ramp is authored in time, not distance, deliberately: the profile
+ * exists to make the strip slow BEFORE an external visual disturbance ends
+ * (a browser-chrome settle), and that deadline does not scale with how far
+ * the ride still has to travel. The ramp distance falls out of the speeds;
+ * when it does not fit into the remaining distance, the whole remainder
+ * becomes the ramp and the profile simply arrives at crawl speed early.
+ *
+ * Ends at `crawlSpeed`, not zero: the caller either retargets to a normal
+ * profile before arrival (the quiet resume) or lets the segment settle from
+ * the crawl — a discontinuity of at most the crawl speed itself.
+ */
+export const createBrakeProfile = ({
+  distance,
+  startSpeed,
+  crawlSpeed,
+  brakeDurationMs,
+}: BrakeProfileInput): MotionProfile => {
+  const absDistance = Math.abs(distance);
+  const entrySpeed = Math.max(0, startSpeed);
+  const crawl = Math.max(MIN_PROFILE_SPEED, crawlSpeed);
+
+  const rampDistance = Math.max(0, brakeDurationMs) * (entrySpeed + crawl) * 0.5;
+  const rampShare =
+    absDistance > 0 ? clamp(rampDistance / absDistance, 0, 1) : 1;
+
+  const zones: MotionProfileZone[] = [];
+  let progress = 0;
+  progress = pushZone(zones, {
+    distanceProgress: progress,
+    share: rampShare,
+    startSpeed: entrySpeed,
+    endSpeed: crawl,
+    distance: absDistance,
+  });
+  pushZone(zones, {
+    distanceProgress: progress,
+    share: 1 - rampShare,
+    startSpeed: crawl,
+    endSpeed: crawl,
+    distance: absDistance,
+  });
+
+  const duration =
+    zones.length > 0
+      ? zones[zones.length - 1]!.startTime + zones[zones.length - 1]!.duration
+      : 0;
+
+  return { duration, endSpeed: crawl, zones };
+};
+
 const zoneDistanceProgress = (
   zone: MotionProfileZone,
   localProgress: number,

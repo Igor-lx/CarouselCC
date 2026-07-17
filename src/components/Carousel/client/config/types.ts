@@ -63,11 +63,25 @@ export interface LayoutSettings {
   renderWindowBufferMultiplier: number;
 }
 
+/** Mid-ride graceful slowdown under page scrolling — see useScrollRideYield
+ * and the SCROLL_YIELD_* constants for the semantics of each knob. */
+export interface ScrollYieldSettings {
+  /** @see SCROLL_YIELD_CRAWL_SPEED_SHARE */
+  crawlSpeedShare: number;
+  /** @see SCROLL_YIELD_BRAKE_DURATION_MS */
+  brakeDurationMs: number;
+  /** @see SCROLL_YIELD_RESUME_QUIET_DELAY_MS */
+  resumeQuietDelayMs: number;
+  /** Crawl-to-cruise resume profile shape. */
+  resumeProfile: MotionProfileSharesSettings;
+}
+
 export interface CarouselRuntimeConfig extends PropDerivedSettings {
   motion: MotionSettings;
   repeatedClick: RepeatedClickSettings;
   interaction: InteractionSettings;
   layout: LayoutSettings;
+  scrollYield: ScrollYieldSettings;
   swipeConfig: Required<PointerSwipeConfig>;
   releaseConfig: CarouselInertialReleaseConfig;
   dragReleaseEpsilon: number;

@@ -24,6 +24,13 @@ import {
   STEP_DECELERATION_DISTANCE_SHARE,
 } from "./motion";
 import { HOVER_PAUSE_DELAY, VISIBILITY_THRESHOLD, AUTOPLAY_RESETTLE_DELAY_MS } from "./interaction";
+import {
+  SCROLL_YIELD_BRAKE_DURATION_MS,
+  SCROLL_YIELD_CRAWL_SPEED_SHARE,
+  SCROLL_YIELD_RESUME_ACCELERATION_DISTANCE_SHARE,
+  SCROLL_YIELD_RESUME_DECELERATION_DISTANCE_SHARE,
+  SCROLL_YIELD_RESUME_QUIET_DELAY_MS,
+} from "./scrollYield";
 import type { CarouselRuntimeConfig, RawConfigInput } from "./types";
 
 const useDefault = <T>(value: unknown, fallback: T): T =>
@@ -85,6 +92,15 @@ export const buildCarouselConfig = ({
   },
   layout: {
     renderWindowBufferMultiplier: RENDER_WINDOW_BUFFER_MULTIPLIER,
+  },
+  scrollYield: {
+    crawlSpeedShare: SCROLL_YIELD_CRAWL_SPEED_SHARE,
+    brakeDurationMs: SCROLL_YIELD_BRAKE_DURATION_MS,
+    resumeQuietDelayMs: SCROLL_YIELD_RESUME_QUIET_DELAY_MS,
+    resumeProfile: {
+      accelerationDistanceShare: SCROLL_YIELD_RESUME_ACCELERATION_DISTANCE_SHARE,
+      decelerationDistanceShare: SCROLL_YIELD_RESUME_DECELERATION_DISTANCE_SHARE,
+    },
   },
   swipeConfig: { ...CAROUSEL_SWIPE_CONFIG },
   releaseConfig: { ...CAROUSEL_INERTIAL_RELEASE_CONFIG },

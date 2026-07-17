@@ -44,6 +44,11 @@ import {
   STEP_DECELERATION_DISTANCE_SHARE,
   VISIBILITY_THRESHOLD,
   AUTOPLAY_RESETTLE_DELAY_MS,
+  SCROLL_YIELD_CRAWL_SPEED_SHARE,
+  SCROLL_YIELD_BRAKE_DURATION_MS,
+  SCROLL_YIELD_RESUME_QUIET_DELAY_MS,
+  SCROLL_YIELD_RESUME_ACCELERATION_DISTANCE_SHARE,
+  SCROLL_YIELD_RESUME_DECELERATION_DISTANCE_SHARE,
 } from "../../../config";
 import { normalizeMotionProfileShares } from "../../../../../../shared";
 // The calibration record lives with the computation it anchors, not among
@@ -311,6 +316,56 @@ const numericRules: NumericRule[] = [
     expected: "Expected a finite number in the range (0, 1]",
     consequence: "IntersectionObserver threshold outside (0,1] makes visibility detection break",
     predicate: inRangeExclusiveLower(0, 1),
+  },
+
+  // Scroll yield (mid-ride slowdown under page scrolling)
+  {
+    layer: "ScrollYield",
+    field: "SCROLL_YIELD_CRAWL_SPEED_SHARE",
+    value: SCROLL_YIELD_CRAWL_SPEED_SHARE,
+    severity: "CRITICAL",
+    expected: "Expected a finite number in the range (0, 1]",
+    consequence:
+      "A non-positive crawl share degenerates the brake profile toward a near-infinite crawl; above 1 the 'brake' would speed the ride up",
+    predicate: inRangeExclusiveLower(0, 1),
+  },
+  {
+    layer: "ScrollYield",
+    field: "SCROLL_YIELD_BRAKE_DURATION_MS",
+    value: SCROLL_YIELD_BRAKE_DURATION_MS,
+    severity: "LOGICAL",
+    expected: "Expected a non-negative finite number of milliseconds",
+    consequence:
+      "Negative or NaN brake time malforms the ramp zone; the yield either snaps or never engages coherently",
+    predicate: atLeast(0),
+  },
+  {
+    layer: "ScrollYield",
+    field: "SCROLL_YIELD_RESUME_QUIET_DELAY_MS",
+    value: SCROLL_YIELD_RESUME_QUIET_DELAY_MS,
+    severity: "LOGICAL",
+    expected: "Expected a non-negative finite number of milliseconds",
+    consequence:
+      "The ride would accelerate back to cruise inside the browser-chrome settle window — the exact stall the yield exists to avoid",
+    predicate: atLeast(0),
+  },
+  {
+    layer: "ScrollYield",
+    field: "SCROLL_YIELD_RESUME_ACCELERATION_DISTANCE_SHARE",
+    value: SCROLL_YIELD_RESUME_ACCELERATION_DISTANCE_SHARE,
+    severity: "CRITICAL",
+    expected: "Expected a finite number in the range [0, 1]",
+    consequence: "Acceleration zone share outside [0,1] leads to malformed motion profile zones",
+    predicate: inRangeInclusive(0, 1),
+  },
+  {
+    layer: "ScrollYield",
+    field: "SCROLL_YIELD_RESUME_DECELERATION_DISTANCE_SHARE",
+    value: SCROLL_YIELD_RESUME_DECELERATION_DISTANCE_SHARE,
+    severity: "CRITICAL",
+    expected: "Expected a finite number in the range [0, 1]",
+    consequence: "Deceleration zone share outside [0,1] leads to malformed motion profile zones",
+    predicate: inRangeInclusive(0, 1),
   },
 
   // Gesture (swipe config)

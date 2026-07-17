@@ -29,6 +29,13 @@ export {
   AUTOPLAY_RESETTLE_DELAY_MS,
 } from "./interaction";
 export {
+  SCROLL_YIELD_CRAWL_SPEED_SHARE,
+  SCROLL_YIELD_BRAKE_DURATION_MS,
+  SCROLL_YIELD_RESUME_QUIET_DELAY_MS,
+  SCROLL_YIELD_RESUME_ACCELERATION_DISTANCE_SHARE,
+  SCROLL_YIELD_RESUME_DECELERATION_DISTANCE_SHARE,
+} from "./scrollYield";
+export {
   CAROUSEL_SWIPE_CONFIG,
   CAROUSEL_INERTIAL_RELEASE_CONFIG,
   SWIPE_COMMIT_SLOT_SHARE,
@@ -55,5 +62,6 @@ export type {
   RepeatedClickSettings,
   InteractionSettings,
   LayoutSettings,
+  ScrollYieldSettings,
 } from "./types";
 export type { CarouselInertialReleaseConfig } from "./gesture";
