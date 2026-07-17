@@ -160,8 +160,8 @@ export default function App() {
               <Controls />
               <ResponsiveImages
                 isPreloadOn={true}
-                isPredecodeOn={false}
-                preloadPagesNr={1}
+                isPredecodeOn={true}
+                preloadPagesNr={2}
               />
               <Diagnostic />
             </Carousel>

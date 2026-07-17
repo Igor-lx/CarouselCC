@@ -101,7 +101,10 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   const isDataSaverEnabled = userEnvironment?.dataSaver ?? false;
 
   // --- slots ----------------------------------------------------------------
-  const slots = useMemo(() => resolveSlots(children, CAROUSEL_SLOTS), [children]);
+  const slots = useMemo(
+    () => resolveSlots(children, CAROUSEL_SLOTS),
+    [children]
+  );
 
   // The responsive-image stack (art-directed sources, srcSet/sizes, rotation
   // veil, aspect flip) is switched by the PRESENCE of the <ResponsiveImages>
@@ -140,7 +143,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // The motion / autoplay paths below consume the same memo.
   const { isAtStart, isAtEnd } = useMemo(
     () => carouselBoundaryState(state.targetPageIndex, layout),
-    [layout, state.targetPageIndex],
+    [layout, state.targetPageIndex]
   );
 
   // --- image-resource SSOT --------------------------------------------------
@@ -168,12 +171,12 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
             ];
           })
         : [],
-    [isContentImg, records],
+    [isContentImg, records]
   );
 
   const useMemoDeckCarriesImageSets = useMemo(
     () => deckCarriesImageSets(records),
-    [records],
+    [records]
   );
 
   const imageResourceStore = useImageResourceStore({
@@ -286,7 +289,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
       prev: navigation.handlePrev,
       next: navigation.handleNext,
     }),
-    [navigation.handlePrev, navigation.handleNext],
+    [navigation.handlePrev, navigation.handleNext]
   );
 
   // --- gesture --------------------------------------------------------------
@@ -383,7 +386,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // --- style mapping --------------------------------------------------------
   const classNames = useMemo(
     () => (className ? mergeStyleMaps(styles, className) : styles),
-    [className],
+    [className]
   );
 
   const slideClassMap = useMemo<SlideClassMap>(() => {
@@ -400,7 +403,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
       "--slide-reorient-fade-in": `${SLIDE_REORIENT_FADE_IN_MS}ms`,
       "--visible-slides": layout.visibleSlidesCount,
     }),
-    [layout.visibleSlidesCount],
+    [layout.visibleSlidesCount]
   );
 
   // One style object per slide, positionally aligned with `virtualSlides`.
@@ -413,7 +416,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
       virtualSlides.map((slide) => ({
         "--slide-lane": slideLane(slide.virtualIndex, layoutOrigin),
       })),
-    [layoutOrigin, virtualSlides],
+    [layoutOrigin, virtualSlides]
   );
 
   return (
@@ -451,7 +454,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
                     key={slide.slideKey}
                     slideData={slide.slideData}
                     className={slideClassMap}
-                    style={slideStyles[index]!}
+                    style={slideStyles[index]}
                     isContentImg={isContentImg}
                     isResponsiveImagesOn={isResponsiveImagesOn}
                     errAltPlaceholder={config.errorAltPlaceholder}

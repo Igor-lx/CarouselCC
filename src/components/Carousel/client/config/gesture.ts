@@ -106,7 +106,7 @@ export const SWIPE_COMMIT_MAX_PX = 120;
  */
 export const CAROUSEL_INERTIAL_RELEASE_CONFIG: CarouselInertialReleaseConfig = {
   inertiaBoost: 1.45,
-  accelerationDistanceShare: 0.3,
-  decelerationDistanceShare: 0.55,
+  accelerationDistanceShare: 0.25,
+  decelerationDistanceShare: 0.45,
   minRideDurationMs: 210,
 };

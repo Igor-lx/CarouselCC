@@ -18,4 +18,4 @@ export const VISIBILITY_THRESHOLD = 0.2;
  * window self-extends on every observed signal, so this value only needs to
  * cover the silent tail after the LAST signal — not whole flings or settles.
  */
-export const AUTOPLAY_RESETTLE_DELAY_MS = 600;
+export const AUTOPLAY_RESETTLE_DELAY_MS = 300;
