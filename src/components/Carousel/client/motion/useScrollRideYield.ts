@@ -4,13 +4,18 @@ import {
   motionNow,
   profileProgressStops,
   type MotionController,
+  type MotionProfile,
   type MotionSample,
 } from "../../../../shared";
 import type { CarouselRuntimeConfig } from "../config";
 import type { TrackBindingApi } from "../geometry";
 import type { MotionPlanChannel, MotionPlanSource } from "./planChannel";
 import { sampleCarouselSegment } from "./sampler";
-import { buildBrakeSegment, buildResumeSegment } from "./yieldSegment";
+import {
+  buildBrakeSegment,
+  buildResumeSegment,
+  profileSpeedAtDistanceProgress,
+} from "./yieldSegment";
 import type { CarouselMotionStrategy, CarouselSegment } from "./types";
 
 export interface UseScrollRideYieldInput {
@@ -23,11 +28,37 @@ export interface UseScrollRideYieldInput {
   onSettle: (settledPosition: number) => void;
 }
 
-/** What the brake stashed for the quiet-time resume. */
+/** What the brake stashed for the quiet-time resume: the REPLACED ride's own
+ * curve. The resume returns the ride to the speed this curve prescribes at
+ * the point where the strip then is — never to the instantaneous speed the
+ * brake happened to sample (a brake in the deceleration tail would otherwise
+ * freeze a decaying speed as the new cruise, and the arrival would read
+ * slower than the ride "should" have been). */
 interface ActiveYield {
-  /** The ride's along-track speed at the brake point — the resume cruise. */
-  entrySpeed: number;
+  profile: MotionProfile;
+  from: number;
+  to: number;
 }
+
+/**
+ * Keyframe density for yield curves. The default 32-interval grid is authored
+ * for profiles whose curvature spreads over the whole duration; a yield curve
+ * concentrates ALL of it in a short time-ramp at the head of a long crawl, so
+ * on a multi-second segment the uniform 32-grid leaves the ramp only 2–3
+ * keyframes and the eye reads the polyline as an abrupt, angular stop. One
+ * stop per display frame period makes the piecewise-linear approximation
+ * invisible; the cap bounds keyframe cost on very long crawls (the spacing
+ * then widens, but only ever inside the crawl, where the curve is flat).
+ * Implementation granularity, not a feel knob.
+ */
+const YIELD_STOP_SPACING_MS = 17;
+const YIELD_MAX_STOP_INTERVALS = 160;
+
+const yieldStopIntervals = (duration: number): number =>
+  Math.min(
+    YIELD_MAX_STOP_INTERVALS,
+    Math.max(32, Math.ceil(duration / YIELD_STOP_SPACING_MS)),
+  );
 
 /**
  * Mid-ride graceful yield to page scrolling — the perceptual complement of
@@ -43,10 +74,12 @@ interface ActiveYield {
  * WHAT: on the first page-scroll signal while a ride is in flight, the ride
  * is re-timed through an atomic handoff into a brake segment — ramp to a
  * crawl, crawl on toward the SAME destination. Signals arriving during the
- * scroll and the chrome settle keep re-arming a quiet timer; when the tail
- * goes silent the ride is re-timed again back to its pre-brake cruise and
- * finishes normally. Same mechanism as a repeated-click retarget: the old
- * compositor animation carries the pixels until the new one replaces it.
+ * scroll and the chrome settle keep re-arming a quiet timer (a resting
+ * finger holds the slow-mo — the resume waits for the lift); when the tail
+ * goes silent the ride ramps back to the speed its ORIGINAL curve prescribed
+ * for the point it has crawled to, and finishes normally. Same mechanism as
+ * a repeated-click retarget: the old compositor animation carries the pixels
+ * until the new one replaces it.
  *
  * Triggers are PAGE-SCROLL signals only (window scroll, window resize,
  * visualViewport resize) — never touch events: a horizontal swipe on the
@@ -98,6 +131,7 @@ export function useScrollRideYield({
     const yieldRef = { current: null as ActiveYield | null };
     let quietTimer: ReturnType<typeof setTimeout> | null = null;
     let isSelfPublishing = false;
+    let fingersOnGlass = 0;
 
     const clearQuietTimer = () => {
       if (quietTimer !== null) {
@@ -118,7 +152,11 @@ export function useScrollRideYield({
         onSettle: settle,
       } = inputRef.current;
 
-      const stops = profileProgressStops(segment.profile, segment.to - segment.from);
+      const stops = profileProgressStops(
+        segment.profile,
+        segment.to - segment.from,
+        yieldStopIntervals(segment.duration),
+      );
       const isComposited = startMotion({
         from: segment.from,
         to: segment.to,
@@ -174,6 +212,11 @@ export function useScrollRideYield({
       const target = motion.getSnapshot().target;
       if (Math.abs(target - handoff.position) < cfg.motion.epsilon) return;
 
+      // Stash the ride's own curve BEFORE the brake replaces it — it stays
+      // the authority on the speeds the ride "should" have had (see resume).
+      const replaced = motion.getActiveSegment() as CarouselSegment | null;
+      if (!replaced) return;
+
       const brake = buildBrakeSegment({
         position: handoff.position,
         velocity: handoff.velocity,
@@ -184,7 +227,11 @@ export function useScrollRideYield({
       });
       if (!brake) return;
 
-      yieldRef.current = { entrySpeed: brake.entrySpeed };
+      yieldRef.current = {
+        profile: replaced.profile,
+        from: replaced.from,
+        to: replaced.to,
+      };
       applySegment(brake.segment);
     };
 
@@ -204,30 +251,58 @@ export function useScrollRideYield({
       const target = motion.getSnapshot().target;
       if (Math.abs(target - handoff.position) < cfg.motion.epsilon) return;
 
+      // The cruise to return to: what the ORIGINAL curve prescribed for the
+      // point the strip has crawled to by now — never below the current
+      // speed, so the ramp never dips before rising.
+      const originalSpan = active.to - active.from;
+      const prescribedSpeed = profileSpeedAtDistanceProgress(
+        active.profile,
+        originalSpan,
+        originalSpan !== 0 ? (handoff.position - active.from) / originalSpan : 1,
+      );
+
       const segment = buildResumeSegment({
         position: handoff.position,
         velocity: handoff.velocity,
         target,
         strategy: handoff.strategy,
         startedAt: handoff.timestamp,
-        cruiseSpeed: active.entrySpeed,
-        shares: cfg.scrollYield.resumeProfile,
+        cruiseSpeed: prescribedSpeed,
+        settings: cfg.scrollYield,
       });
       if (segment) applySegment(segment);
     };
 
+    // Self-extending quiet window: every scroll frame and every chrome resize
+    // during the settle pushes the resume out; the delay only has to cover
+    // the silent tail after the LAST signal. A quiet that arrives while a
+    // finger still rests on the glass does NOT resume — the scroll merely
+    // paused under the finger, and the hand still owns the viewport; the
+    // window re-arms at the lift instead. A fling that outlives the lift
+    // resolves through the scroll signals alone (fingers are already zero).
+    const armQuietTimer = () => {
+      clearQuietTimer();
+      quietTimer = setTimeout(() => {
+        quietTimer = null;
+        if (fingersOnGlass > 0) return; // the lift will re-arm
+        resume();
+      }, inputRef.current.config.scrollYield.resumeQuietDelayMs);
+    };
+
     const onScrollSignal = () => {
       if (yieldRef.current === null) engage();
-      if (yieldRef.current !== null) {
-        // Self-extending quiet window: every scroll frame and every chrome
-        // resize during the settle pushes the resume out; the delay only has
-        // to cover the silent tail after the LAST signal.
-        clearQuietTimer();
-        quietTimer = setTimeout(() => {
-          quietTimer = null;
-          resume();
-        }, inputRef.current.config.scrollYield.resumeQuietDelayMs);
-      }
+      if (yieldRef.current !== null) armQuietTimer();
+    };
+
+    // Touch listeners maintain the finger count ONLY — a touch never engages
+    // the yield (a swipe on the deck itself must not brake its own ride; the
+    // structural trigger stays the page-scroll signal).
+    const onTouchStart = (event: TouchEvent) => {
+      fingersOnGlass = event.touches.length;
+    };
+    const onTouchSettle = (event: TouchEvent) => {
+      fingersOnGlass = event.touches.length;
+      if (fingersOnGlass === 0 && yieldRef.current !== null) armQuietTimer();
     };
 
     // Any plan publish that is not ours means the engine replaced or ended
@@ -240,15 +315,22 @@ export function useScrollRideYield({
       }
     });
 
+    const touchOptions = { capture: true, passive: true } as const;
     window.addEventListener("scroll", onScrollSignal, { passive: true });
     window.addEventListener("resize", onScrollSignal);
     const viewport = window.visualViewport;
     viewport?.addEventListener("resize", onScrollSignal);
+    document.addEventListener("touchstart", onTouchStart, touchOptions);
+    document.addEventListener("touchend", onTouchSettle, touchOptions);
+    document.addEventListener("touchcancel", onTouchSettle, touchOptions);
 
     return () => {
       window.removeEventListener("scroll", onScrollSignal);
       window.removeEventListener("resize", onScrollSignal);
       viewport?.removeEventListener("resize", onScrollSignal);
+      document.removeEventListener("touchstart", onTouchStart, touchOptions);
+      document.removeEventListener("touchend", onTouchSettle, touchOptions);
+      document.removeEventListener("touchcancel", onTouchSettle, touchOptions);
       unsubscribePlans();
       clearQuietTimer();
       yieldRef.current = null;

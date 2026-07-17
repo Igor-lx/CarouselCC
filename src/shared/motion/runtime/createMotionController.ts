@@ -173,6 +173,10 @@ export function createMotionController<Strategy extends string = string>(
       return emittedSample;
     },
 
+    getActiveSegment() {
+      return active?.segment ?? null;
+    },
+
     isActive() {
       return active !== null;
     },

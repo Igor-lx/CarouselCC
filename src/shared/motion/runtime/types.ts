@@ -99,6 +99,13 @@ export interface MotionController<Strategy extends string = string> {
   captureHandoff: (timestamp?: number) => MotionHandoff<Strategy>;
   /** The last *emitted* visual frame — for UI reads, not motion handoff. */
   getSnapshot: () => MotionSample<Strategy>;
+  /**
+   * The segment currently being run, or `null` when idle. Read-only reference
+   * for callers that RE-TIME a live segment (the scroll yield) and need the
+   * original curve as the authority on what the motion "should" have been at
+   * a given point — a handoff alone carries only one instantaneous sample.
+   */
+  getActiveSegment: () => MotionSegmentBase<Strategy> | null;
   isActive: () => boolean;
   subscribe: (
     listener: MotionSubscriber<Strategy>,

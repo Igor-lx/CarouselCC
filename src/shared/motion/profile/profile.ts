@@ -218,6 +218,79 @@ export const createBrakeProfile = ({
   return { duration, endSpeed: crawl, zones };
 };
 
+export interface ResumeProfileInput {
+  /** Signed remaining distance the segment still has to cover. */
+  distance: number;
+  /** Current speed along the remaining distance (non-negative) — the crawl. */
+  startSpeed: number;
+  /** Speed to ramp back up to (non-negative) — the pre-brake cruise. */
+  cruiseSpeed: number;
+  /** Time budget of the ramp from `startSpeed` up to `cruiseSpeed`. */
+  rampDurationMs: number;
+  /** Fraction of the distance spent decelerating into the arrival. */
+  decelerationDistanceShare: number;
+}
+
+/**
+ * The brake profile's counterpart: ramp from the crawl back up to the cruise
+ * within a TIME budget, cruise, then decelerate into the arrival over a
+ * distance share. The ramp is time-authored for the same reason the brake's
+ * is — the "snap back to life" must feel identical whether one tenth of a
+ * slide remains or three: a distance-share ramp at crawl speeds stretches
+ * with the remaining distance and reads as sluggish. When ramp + deceleration
+ * do not both fit, the ramp gives way first (a shorter ramp merely arrives at
+ * cruise sooner; a squeezed arrival would overshoot the stop).
+ */
+export const createResumeProfile = ({
+  distance,
+  startSpeed,
+  cruiseSpeed,
+  rampDurationMs,
+  decelerationDistanceShare,
+}: ResumeProfileInput): MotionProfile => {
+  const absDistance = Math.abs(distance);
+  const entrySpeed = Math.max(0, startSpeed);
+  const cruise = Math.max(MIN_PROFILE_SPEED, cruiseSpeed, entrySpeed);
+
+  const decelerationShare = clamp(decelerationDistanceShare, 0, 1);
+  const rampDistance = Math.max(0, rampDurationMs) * (entrySpeed + cruise) * 0.5;
+  const rampShare =
+    absDistance > 0
+      ? clamp(rampDistance / absDistance, 0, 1 - decelerationShare)
+      : 0;
+
+  const zones: MotionProfileZone[] = [];
+  let progress = 0;
+  progress = pushZone(zones, {
+    distanceProgress: progress,
+    share: rampShare,
+    startSpeed: entrySpeed,
+    endSpeed: cruise,
+    distance: absDistance,
+  });
+  progress = pushZone(zones, {
+    distanceProgress: progress,
+    share: 1 - rampShare - decelerationShare,
+    startSpeed: cruise,
+    endSpeed: cruise,
+    distance: absDistance,
+  });
+  pushZone(zones, {
+    distanceProgress: progress,
+    share: decelerationShare,
+    startSpeed: cruise,
+    endSpeed: 0,
+    distance: absDistance,
+  });
+
+  const duration =
+    zones.length > 0
+      ? zones[zones.length - 1]!.startTime + zones[zones.length - 1]!.duration
+      : 0;
+
+  return { duration, endSpeed: 0, zones };
+};
+
 const zoneDistanceProgress = (
   zone: MotionProfileZone,
   localProgress: number,

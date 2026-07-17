@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { createMotionProfile } from "../../../../shared";
 import { sampleCarouselSegment } from "./sampler";
-import { buildBrakeSegment, buildResumeSegment } from "./yieldSegment";
+import {
+  buildBrakeSegment,
+  buildResumeSegment,
+  profileSpeedAtDistanceProgress,
+} from "./yieldSegment";
 
 /**
  * Yield re-timings are velocity-continuous replacements of an in-flight ride:
@@ -72,15 +77,20 @@ describe("buildBrakeSegment", () => {
 });
 
 describe("buildResumeSegment", () => {
-  const shares = { accelerationDistanceShare: 0.35, decelerationDistanceShare: 0.4 };
+  const resumeSettings = {
+    resumeRampDurationMs: 300,
+    resumeDecelerationDistanceShare: 0.4,
+  };
 
-  it("accelerates from the crawl back to the pre-brake cruise and arrives at zero", () => {
+  it("ramps from the crawl back to the cruise within the time budget and arrives at zero", () => {
+    // Remaining span large enough for a real cruise plateau (with a small
+    // remainder the ramp and the arrival legitimately consume everything).
     const segment = buildResumeSegment({
       ...base,
-      position: 3,
+      position: 1,
       velocity: 0.0006,
       cruiseSpeed: 0.004,
-      shares,
+      settings: resumeSettings,
     });
     expect(segment).not.toBeNull();
     expect(segment!.to).toBe(4);
@@ -89,9 +99,10 @@ describe("buildResumeSegment", () => {
     const launch = sampleCarouselSegment(segment!, 10_000);
     expect(launch.velocity).toBeCloseTo(0.0006, 10);
 
-    // Mid-cruise the ride is back at the captured pre-brake speed.
-    const mid = sampleCarouselSegment(segment!, 10_000 + segment!.duration * 0.5);
-    expect(Math.abs(mid.velocity)).toBeCloseTo(0.004, 10);
+    // The ramp is TIME-authored: shortly past the budget the ride is back at
+    // the cruise, however much distance remains.
+    const afterRamp = sampleCarouselSegment(segment!, 10_000 + 320);
+    expect(Math.abs(afterRamp.velocity)).toBeCloseTo(0.004, 10);
 
     const arrival = sampleCarouselSegment(segment!, 10_000 + segment!.duration + 1);
     expect(arrival.value).toBe(4);
@@ -105,8 +116,37 @@ describe("buildResumeSegment", () => {
         position: 4,
         velocity: 0.0006,
         cruiseSpeed: 0.004,
-        shares,
+        settings: resumeSettings,
       }),
     ).toBeNull();
+  });
+});
+
+describe("profileSpeedAtDistanceProgress", () => {
+  // A front-loaded profile (autoplay-like): short accel, long decel — the
+  // shape where "return to the speed the brake sampled" goes wrong.
+  const profile = createMotionProfile({
+    distance: 1,
+    startSpeed: 0,
+    peakSpeed: 0.004,
+    endSpeed: 0,
+    accelerationDistanceShare: 0.1,
+    decelerationDistanceShare: 0.6,
+  });
+
+  it("prescribes the cruise speed inside the cruise zone", () => {
+    expect(profileSpeedAtDistanceProgress(profile, 1, 0.2)).toBeCloseTo(0.004, 6);
+  });
+
+  it("prescribes a decayed speed deep in the deceleration tail", () => {
+    const tail = profileSpeedAtDistanceProgress(profile, 1, 0.9);
+    expect(tail).toBeGreaterThan(0);
+    expect(tail).toBeLessThan(0.004 * 0.75);
+  });
+
+  it("is monotonic across the deceleration tail", () => {
+    const early = profileSpeedAtDistanceProgress(profile, 1, 0.5);
+    const late = profileSpeedAtDistanceProgress(profile, 1, 0.95);
+    expect(late).toBeLessThan(early);
   });
 });

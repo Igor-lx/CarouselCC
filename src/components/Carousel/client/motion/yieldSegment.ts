@@ -1,5 +1,10 @@
-import { buildProfile, createBrakeProfile } from "../../../../shared";
-import type { MotionProfileSharesSettings, ScrollYieldSettings } from "../config";
+import {
+  createBrakeProfile,
+  createResumeProfile,
+  sampleMotionProfile,
+  type MotionProfile,
+} from "../../../../shared";
+import type { ScrollYieldSettings } from "../config";
 import { sameDirectionSpeed } from "./speed";
 import type { CarouselMotionStrategy, CarouselSegment } from "./types";
 
@@ -10,6 +15,38 @@ import type { CarouselMotionStrategy, CarouselSegment } from "./types";
  * already in flight: same destination, same strategy, new temporal curve,
  * launched velocity-continuously from an atomic handoff point.
  */
+
+/** Sampling density for the distance→speed inversion below. The profile is
+ * time-indexed; scanning its uniform time-samples for the requested distance
+ * progress is exact enough at this grid (the speed between neighbours changes
+ * by a smoothstep step) and costs one 64-iteration loop, once per resume. */
+const SPEED_LOOKUP_SAMPLES = 64;
+
+/**
+ * The speed a profile PRESCRIBES at a given distance progress (0..1) — the
+ * authority on what a re-timed ride "should" be doing at the point where it
+ * now is. The resume returns the ride to this speed rather than to whatever
+ * instantaneous speed the brake happened to sample: a brake that engaged in
+ * the ride's deceleration tail must not freeze that decaying speed as the
+ * ride's new cruise, and one that engaged mid-cruise gets the cruise back.
+ */
+export const profileSpeedAtDistanceProgress = (
+  profile: MotionProfile,
+  distance: number,
+  distanceProgress: number,
+): number => {
+  const absDistance = Math.abs(distance);
+  if (!(profile.duration > 0) || !(absDistance > 0)) return profile.endSpeed;
+  if (distanceProgress <= 0) {
+    return sampleMotionProfile(profile, 0, absDistance).speed;
+  }
+  for (let i = 1; i <= SPEED_LOOKUP_SAMPLES; i += 1) {
+    const elapsed = (profile.duration * i) / SPEED_LOOKUP_SAMPLES;
+    const sampled = sampleMotionProfile(profile, elapsed, absDistance);
+    if (sampled.distanceProgress >= distanceProgress) return sampled.speed;
+  }
+  return profile.endSpeed;
+};
 
 interface YieldSegmentBase {
   /** Handoff position — where the ride visually is right now. */
@@ -85,14 +122,18 @@ export const buildBrakeSegment = ({
 export interface ResumeSegmentInput extends YieldSegmentBase {
   /** The speed the ride had when the brake engaged — the cruise to return to. */
   cruiseSpeed: number;
-  shares: MotionProfileSharesSettings;
+  settings: Pick<
+    ScrollYieldSettings,
+    "resumeRampDurationMs" | "resumeDecelerationDistanceShare"
+  >;
 }
 
 /**
- * The resume slice: accelerate from the crawl back to the pre-brake cruise
- * and finish the ride, decelerating into the target as any step does. The
- * peak is the captured pre-brake speed, so the ride returns to exactly the
- * flight the eye last saw — under any tuning.
+ * The resume slice: ramp from the crawl back up to the pre-brake cruise
+ * within the resume TIME budget — so the snap-back feels the same however
+ * much distance remains — then cruise and decelerate into the target. The
+ * cruise is the captured pre-brake speed, so the ride returns to exactly the
+ * flight the eye last saw, under any tuning.
  */
 export const buildResumeSegment = ({
   position,
@@ -101,20 +142,18 @@ export const buildResumeSegment = ({
   strategy,
   startedAt,
   cruiseSpeed,
-  shares,
+  settings,
 }: ResumeSegmentInput): CarouselSegment | null => {
   const remaining = target - position;
   if (!(Math.abs(remaining) > 0)) return null;
   const startSpeed = sameDirectionSpeed(velocity, remaining);
 
-  const profile = buildProfile({
-    from: position,
-    to: target,
+  const profile = createResumeProfile({
+    distance: remaining,
     startSpeed,
-    peakSpeed: cruiseSpeed,
-    endSpeed: 0,
-    accelerationDistanceShare: shares.accelerationDistanceShare,
-    decelerationDistanceShare: shares.decelerationDistanceShare,
+    cruiseSpeed,
+    rampDurationMs: settings.resumeRampDurationMs,
+    decelerationDistanceShare: settings.resumeDecelerationDistanceShare,
   });
   if (!(profile.duration > 0)) return null;
 

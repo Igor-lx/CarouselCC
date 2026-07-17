@@ -47,7 +47,7 @@ import {
   SCROLL_YIELD_CRAWL_SPEED_SHARE,
   SCROLL_YIELD_BRAKE_DURATION_MS,
   SCROLL_YIELD_RESUME_QUIET_DELAY_MS,
-  SCROLL_YIELD_RESUME_ACCELERATION_DISTANCE_SHARE,
+  SCROLL_YIELD_RESUME_RAMP_DURATION_MS,
   SCROLL_YIELD_RESUME_DECELERATION_DISTANCE_SHARE,
 } from "../../../config";
 import { normalizeMotionProfileShares } from "../../../../../../shared";
@@ -351,12 +351,13 @@ const numericRules: NumericRule[] = [
   },
   {
     layer: "ScrollYield",
-    field: "SCROLL_YIELD_RESUME_ACCELERATION_DISTANCE_SHARE",
-    value: SCROLL_YIELD_RESUME_ACCELERATION_DISTANCE_SHARE,
-    severity: "CRITICAL",
-    expected: "Expected a finite number in the range [0, 1]",
-    consequence: "Acceleration zone share outside [0,1] leads to malformed motion profile zones",
-    predicate: inRangeInclusive(0, 1),
+    field: "SCROLL_YIELD_RESUME_RAMP_DURATION_MS",
+    value: SCROLL_YIELD_RESUME_RAMP_DURATION_MS,
+    severity: "LOGICAL",
+    expected: "Expected a non-negative finite number of milliseconds",
+    consequence:
+      "Negative or NaN ramp time malforms the crawl-to-cruise zone; the slow-mo exit either snaps or never completes coherently",
+    predicate: atLeast(0),
   },
   {
     layer: "ScrollYield",

@@ -72,8 +72,10 @@ export interface ScrollYieldSettings {
   brakeDurationMs: number;
   /** @see SCROLL_YIELD_RESUME_QUIET_DELAY_MS */
   resumeQuietDelayMs: number;
-  /** Crawl-to-cruise resume profile shape. */
-  resumeProfile: MotionProfileSharesSettings;
+  /** @see SCROLL_YIELD_RESUME_RAMP_DURATION_MS */
+  resumeRampDurationMs: number;
+  /** @see SCROLL_YIELD_RESUME_DECELERATION_DISTANCE_SHARE */
+  resumeDecelerationDistanceShare: number;
 }
 
 export interface CarouselRuntimeConfig extends PropDerivedSettings {

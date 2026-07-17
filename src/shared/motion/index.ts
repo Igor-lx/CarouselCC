@@ -27,6 +27,7 @@ export {
   buildProfile,
   createBrakeProfile,
   createMotionProfile,
+  createResumeProfile,
   normalizeMotionProfileShares,
   sampleMotionProfile,
 } from "./profile/profile";
@@ -34,6 +35,7 @@ export type {
   BrakeProfileInput,
   MotionProfile,
   MotionProfileZone,
+  ResumeProfileInput,
 } from "./profile/profile";
 export {
   isWaapiSupported,
