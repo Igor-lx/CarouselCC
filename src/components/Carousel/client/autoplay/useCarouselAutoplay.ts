@@ -65,14 +65,16 @@ export function useCarouselAutoplay({
 
   // A finger anywhere on the glass (not just on the carousel), an ongoing
   // scroll/fling, or the browser chrome settling: no NEW rides until quiet.
-  const isViewportBusy = useViewportBusy({
+  // A GETTER, checked when a tick fires — never a render trigger.
+  const getIsViewportBusy = useViewportBusy({
     enabled: isAuto && state.layout.canSlide,
     quietDelayMs: config.interaction.autoplayResettleDelayMs,
   });
 
   return useAutoplay({
     enabled: isAuto && state.layout.canSlide,
-    isPaused: !visible || isDragging || isMoving || isViewportBusy,
+    isPaused: !visible || isDragging || isMoving,
+    shouldDeferTick: getIsViewportBusy,
     isAtEnd,
     intervalMs: config.autoplayInterval,
     hoverPauseDelayMs: config.interaction.hoverPauseDelay,

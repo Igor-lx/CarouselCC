@@ -117,11 +117,14 @@ const frames = await page.evaluate(async (meta) => {
         gray[x] = cur[i] * 0.3 + cur[i + 1] * 0.6 + cur[i + 2] * 0.1;
       }
       if (prevBand) {
-        const R = 34; // search radius in band samples (band is 1/2 scale)
+        // WIDE radius: a one-frame backward FLASH to the ride's launch pin can
+        // be hundreds of device px — the old ±34-sample radius could not even
+        // represent it and wrote it off as noise.
+        const R = 150;
         let best = 0, bestErr = Infinity;
         for (let s = -R; s <= R; s += 1) {
           let err = 0, n = 0;
-          for (let x = R; x < BAND_W - R; x += 4) {
+          for (let x = R; x < BAND_W - R; x += 6) {
             const d = gray[x] - prevBand[x - s];
             err += d * d;
             n += 1;

@@ -7,18 +7,24 @@ import { useViewportBusy } from "./useViewportBusy";
 
 /**
  * Contract of the "viewport is unsettled" signal (see the hook's WHY): busy
- * rises synchronously on the first touch, survives the whole activity tail
- * (fling scroll frames, browser-chrome resizes — the window SELF-EXTENDS on
- * every signal, so it is not tuned to any fling/settle duration), and decays
- * quietDelayMs after the LAST signal with no finger down.
+ * rises with the first touch, survives the whole activity tail (fling scroll
+ * frames, chrome resizes — the window SELF-EXTENDS on every signal), and
+ * decays quietDelayMs after the LAST signal with no finger down.
+ *
+ * And the headline regression contract: the hook is a GETTER, and NOTHING
+ * about a touch may re-render the consumer — the reactive first version
+ * re-rendered the deck at the exact moment a finger landed and visibly
+ * hitched an in-flight autoplay ride on a weak device.
  */
 
 let root: Root;
 let host: HTMLDivElement;
-let latest: boolean;
+let getBusy: () => boolean;
+let renders = 0;
 
 const Probe = ({ enabled }: { enabled: boolean }) => {
-  latest = useViewportBusy({ enabled, quietDelayMs: 600 });
+  renders += 1;
+  getBusy = useViewportBusy({ enabled, quietDelayMs: 600 });
   return null;
 };
 
@@ -45,7 +51,10 @@ const advance = (ms: number) =>
   });
 
 beforeEach(() => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({
+    toFake: ["setTimeout", "clearTimeout", "Date", "performance"],
+  });
+  renders = 0;
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
@@ -58,22 +67,35 @@ afterEach(() => {
 });
 
 describe("useViewportBusy", () => {
-  it("rises on touch, stays through the hold, decays quietDelayMs after the lift", () => {
+  it("NEVER re-renders the consumer — touches, scrolls, resizes are ref-only", () => {
     mount(true);
-    expect(latest).toBe(false);
+    const after = renders;
 
     fire("touchstart", 1);
-    expect(latest).toBe(true);
+    fireWindow("scroll");
+    fireWindow("resize");
+    fire("touchend", 0);
+    advance(1000);
+
+    expect(renders).toBe(after);
+  });
+
+  it("rises on touch, stays through the hold, decays quietDelayMs after the lift", () => {
+    mount(true);
+    expect(getBusy()).toBe(false);
+
+    fire("touchstart", 1);
+    expect(getBusy()).toBe(true);
 
     advance(5000); // a long hold never expires while the finger is down
-    expect(latest).toBe(true);
+    expect(getBusy()).toBe(true);
 
     fire("touchend", 0);
-    expect(latest).toBe(true); // the settle window is still open
+    expect(getBusy()).toBe(true); // the settle window is still open
     advance(599);
-    expect(latest).toBe(true);
+    expect(getBusy()).toBe(true);
     advance(2);
-    expect(latest).toBe(false);
+    expect(getBusy()).toBe(false);
   });
 
   it("the window self-extends on fling scrolls and chrome resizes after the lift", () => {
@@ -82,20 +104,20 @@ describe("useViewportBusy", () => {
     fire("touchend", 0);
 
     // A fling: scroll frames keep arriving long after the lift — each one
-    // re-arms the window, regardless of how long the fling runs.
+    // refreshes the window, regardless of how long the fling runs.
     for (let i = 0; i < 5; i += 1) {
       advance(400);
       fireWindow("scroll");
     }
-    expect(latest).toBe(true);
+    expect(getBusy()).toBe(true);
 
-    // The browser-chrome settle after the fling re-arms it too.
+    // The browser-chrome settle after the fling refreshes it too.
     advance(400);
     fireWindow("resize");
-    expect(latest).toBe(true);
+    expect(getBusy()).toBe(true);
 
     advance(601); // finally quiet
-    expect(latest).toBe(false);
+    expect(getBusy()).toBe(false);
   });
 
   it("a second finger keeps it busy until the LAST finger lifts", () => {
@@ -104,16 +126,16 @@ describe("useViewportBusy", () => {
     fire("touchstart", 2);
     fire("touchend", 1); // one finger remains
     advance(5000);
-    expect(latest).toBe(true);
+    expect(getBusy()).toBe(true);
 
     fire("touchend", 0);
     advance(601);
-    expect(latest).toBe(false);
+    expect(getBusy()).toBe(false);
   });
 
   it("disabled: no listeners, constant false", () => {
     mount(false);
     fire("touchstart", 1);
-    expect(latest).toBe(false);
+    expect(getBusy()).toBe(false);
   });
 });

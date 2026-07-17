@@ -5,6 +5,15 @@ interface UseAutoplayInput {
   isPaused: boolean;
   isAtEnd: boolean;
   intervalMs: number;
+  /**
+   * Poll-time tick gate, checked when the timer FIRES — deliberately a getter
+   * and not a reactive flag: its sources (touch anywhere on the glass, scroll
+   * and browser-chrome activity) change at input frequency, and flipping
+   * React state on a touchstart re-rendered the whole deck at the exact
+   * moment a finger landed, visibly hitching an in-flight ride. A deferred
+   * tick re-arms a full interval — the same resume feel as every other pause.
+   */
+  shouldDeferTick?: () => boolean;
   hoverPauseDelayMs: number;
   ignoreHover: boolean;
   onStep: () => void;
@@ -28,6 +37,7 @@ export function useAutoplay({
   isPaused,
   isAtEnd,
   intervalMs,
+  shouldDeferTick,
   hoverPauseDelayMs,
   ignoreHover,
   onStep,
@@ -75,12 +85,20 @@ export function useAutoplay({
   useEffect(() => {
     if (!enabled || isPaused || internalPaused) return;
 
-    const timer = setTimeout(() => {
-      if (isAtEnd) onGoToStart();
-      else onStep();
-    }, intervalMs);
+    let timer: ReturnType<typeof setTimeout>;
+    const arm = () => {
+      timer = setTimeout(() => {
+        if (shouldDeferTick?.()) {
+          arm();
+          return;
+        }
+        if (isAtEnd) onGoToStart();
+        else onStep();
+      }, intervalMs);
+    };
+    arm();
     return () => clearTimeout(timer);
-  }, [enabled, internalPaused, intervalMs, isAtEnd, isPaused, onGoToStart, onStep]);
+  }, [enabled, internalPaused, intervalMs, isAtEnd, isPaused, onGoToStart, onStep, shouldDeferTick]);
 
   useEffect(() => () => clearHoverTimer(), [clearHoverTimer]);
 
