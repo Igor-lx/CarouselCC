@@ -1,3 +1,10 @@
+// SOLUTION-STYLE ROOT — it deliberately owns NO files of its own; the three
+// referenced projects below hold every source file (app / node tooling / tests).
+//
+// Consequence, and it is a trap: `tsc --noEmit` against THIS file typechecks
+// ZERO files and exits 0 — a green result that proves nothing. Always run
+// `npm run typecheck` (= `tsc -b`, which builds the references) or
+// `npm run build`; only those actually check the code.
 {
   "files": [],
   "references": [
