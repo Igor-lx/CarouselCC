@@ -10,7 +10,8 @@ import type { PaginationProps } from "./types";
 
 const PaginationBase = memo(function Pagination({ className }: PaginationProps) {
   const { intent } = useCarouselMotion();
-  const { layout, navigation, motionPlan } = useCarouselStable();
+  const { layout, navigation, motionPlan, isPaginationInteractiveOn } =
+    useCarouselStable();
 
   const classNames = useMemo(
     () => (className ? mergeStyleMaps(styles, className) : styles),
@@ -40,6 +41,7 @@ const PaginationBase = memo(function Pagination({ className }: PaginationProps) 
           ref={bindDotRef(pageIndex)}
           pageIndex={pageIndex}
           isActive={pageIndex === intent.targetPageIndex}
+          isInteractiveOn={isPaginationInteractiveOn}
           classNames={classNames}
           onPageSelect={navigation.handlePageSelect}
         />

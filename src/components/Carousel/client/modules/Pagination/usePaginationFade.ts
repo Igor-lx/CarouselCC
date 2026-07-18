@@ -75,7 +75,8 @@ interface UsePaginationFadeInput {
 }
 
 export interface PaginationFadeBinding {
-  bindDotRef: (pageIndex: number) => (node: HTMLButtonElement | null) => void;
+  /** Accepts either element: a non-interactive dot renders as a <div>. */
+  bindDotRef: (pageIndex: number) => (node: HTMLElement | null) => void;
 }
 
 export function usePaginationFade({
@@ -83,9 +84,9 @@ export function usePaginationFade({
   targetPageIndex,
   pageCount,
 }: UsePaginationFadeInput): PaginationFadeBinding {
-  const dotRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const dotRefs = useRef<Array<HTMLElement | null>>([]);
   const callbacksRef = useRef<
-    Array<((node: HTMLButtonElement | null) => void) | null>
+    Array<((node: HTMLElement | null) => void) | null>
   >([]);
   const animationsRef = useRef(new Map<number, Animation>());
 
@@ -97,7 +98,7 @@ export function usePaginationFade({
   const bindDotRef = useCallback((pageIndex: number) => {
     const cached = callbacksRef.current[pageIndex];
     if (cached) return cached;
-    const callback = (node: HTMLButtonElement | null) => {
+    const callback = (node: HTMLElement | null) => {
       dotRefs.current[pageIndex] = node;
     };
     callbacksRef.current[pageIndex] = callback;
@@ -169,7 +170,7 @@ export function usePaginationFade({
 
   const startFade = useCallback(
     (
-      element: HTMLButtonElement,
+      element: HTMLElement,
       pageIndex: number,
       from: DotVisualState,
       to: DotVisualState,

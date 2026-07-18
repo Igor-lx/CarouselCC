@@ -27,6 +27,7 @@ interface UseModuleContextValueInput {
   isAtStart: boolean;
   isAtEnd: boolean;
   isDiagnosticActive: boolean;
+  isPaginationInteractiveOn: boolean;
 }
 
 export function useModuleContextValue({
@@ -42,6 +43,7 @@ export function useModuleContextValue({
   isAtStart,
   isAtEnd,
   isDiagnosticActive,
+  isPaginationInteractiveOn,
 }: UseModuleContextValueInput): {
   stable: CarouselStableContextValue;
   motion: CarouselMotionContextValue;
@@ -114,8 +116,17 @@ export function useModuleContextValue({
       motionPlan,
       slides,
       imageSizes,
+      isPaginationInteractiveOn,
     }),
-    [imageSizes, layoutView, motionPlan, navigationView, slides, visualPosition],
+    [
+      imageSizes,
+      isPaginationInteractiveOn,
+      layoutView,
+      motionPlan,
+      navigationView,
+      slides,
+      visualPosition,
+    ],
   );
 
   const motion = useMemo<CarouselMotionContextValue>(

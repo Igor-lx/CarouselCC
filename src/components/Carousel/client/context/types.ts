@@ -88,6 +88,13 @@ export interface CarouselStableContextValue {
   slides: readonly CarouselSlideMediaView[];
   /** The carousel-derived default `sizes` hint (see useResponsiveImageSizes). */
   imageSizes: string;
+  /**
+   * Whether the <Pagination> dots accept clicks (the `isPaginationInteractiveOn`
+   * public prop). A slot child cannot be handed props by the carousel, so this
+   * behaviour flag reaches the module through the stable context. Off renders
+   * the dots as inert `<div>`s — see PaginationDot.
+   */
+  isPaginationInteractiveOn: boolean;
 }
 
 /**

@@ -77,7 +77,8 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     isContentImg = CAROUSEL_DEFAULTS.isContentImg,
     isAutoplayOn = CAROUSEL_DEFAULTS.isAutoplayOn,
     isPaginationOn = CAROUSEL_DEFAULTS.isPaginationOn,
-    isInteractiveOn = CAROUSEL_DEFAULTS.isInteractiveOn,
+    isSlideInteractiveOn = CAROUSEL_DEFAULTS.isSlideInteractiveOn,
+    isPaginationInteractiveOn = CAROUSEL_DEFAULTS.isPaginationInteractiveOn,
     isFinite: isFiniteProp = CAROUSEL_DEFAULTS.isFinite,
     isControlsOn = CAROUSEL_DEFAULTS.isControlsOn,
     isSwipeOn = CAROUSEL_DEFAULTS.isSwipeOn,
@@ -353,6 +354,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
       isAtStart,
       isAtEnd,
       isDiagnosticActive: renderPolicy.isDiagnosticActive,
+      isPaginationInteractiveOn,
     });
 
   // --- diagnostic context ---------------------------------------------------
@@ -455,7 +457,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
                     isContentImg={isContentImg}
                     isResponsiveImagesOn={isResponsiveImagesOn}
                     errAltPlaceholder={config.errorAltPlaceholder}
-                    isInteractiveOn={isInteractiveOn}
+                    isInteractiveOn={isSlideInteractiveOn}
                     isActive={slide.isActive}
                     isActual={slide.isActual}
                     isDataSaverEnabled={isDataSaverEnabled}

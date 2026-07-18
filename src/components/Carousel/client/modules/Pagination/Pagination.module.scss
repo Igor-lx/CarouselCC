@@ -62,6 +62,16 @@
     will-change: transform, opacity;
     flex-shrink: 0;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  // The pointer affordance lives here, not on `.dot`: it is applied only when
+  // the dots accept clicks (`isPaginationInteractiveOn`). Without it the dot
+  // is a plain <div> that the wrapper's `pointer-events: none` leaves inert —
+  // no cursor, no hover, no click target.
+  //
+  // Declared BEFORE `.dotActive` on purpose: both are single-class selectors,
+  // so source order decides, and the active dot must keep `cursor: default`.
+  .dotInteractive {
     cursor: pointer;
     pointer-events: auto;
 

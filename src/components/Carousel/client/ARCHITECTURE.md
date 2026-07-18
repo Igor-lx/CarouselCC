@@ -130,13 +130,14 @@ This document does not restate them, so it cannot drift from the code.
 | `isPaginationOn` | — | Gates the rendering of the attached `Pagination`/`PaginationWidget` slot. If the prop is `true` but no pagination slot is attached, nothing renders; the slot must opt in by being placed in `children`. |
 | `isControlsOn`   | — | Same contract as `isPaginationOn`, for the `Controls` slot. |
 | `isSwipeOn`      | — | Master gesture switch. When `false` the pointer-swipe primitive attaches **no listeners at all** — the viewport carries zero pointer handlers and touch input behaves natively, as if the gesture surface did not exist. Flipped off under a live finger, the orphaned drag is ended by the adapter as a passive snap from the live position (§5). Unlike the slot gates this is not a render gate — gesture has no slot. |
-| `isInteractiveOn`  | — | When on, a slide whose image has loaded successfully and that has an `onSlideClick` handler renders as a `<button>`. When off, slides are never interactive even with a handler. |
+| `isSlideInteractiveOn`  | — | When on, a slide whose image has loaded successfully and that has an `onSlideClick` handler renders as a `<button>`. When off, slides are never interactive even with a handler. |
+| `isPaginationInteractiveOn` | — | Same rule, for the `<Pagination>` dots: on renders each dot as a `<button>` (the active one `disabled`) carrying the pointer affordance; off renders inert `<div>`s with no click handler and no cursor/hover. The dots are `aria-hidden` and unfocusable either way, so this is a pointer affordance only. The carousel honours the prop verbatim — a host that wants dots inert under a finger passes `isPaginationInteractiveOn={!isTouch}` itself. |
 
 #### Callbacks
 
 | Prop                       | Type | Effect |
 | -------------------------- | ---- | ------ |
-| `onSlideClick`             | `(slide: Slide) => void` | Fires when an interactive slide is clicked. The slide is interactive only when `isInteractiveOn`, the image (if any) loaded successfully, and this handler is provided. |
+| `onSlideClick`             | `(slide: Slide) => void` | Fires when an interactive slide is clicked. The slide is interactive only when `isSlideInteractiveOn`, the image (if any) loaded successfully, and this handler is provided. |
 | `onCarouselStatusChange`   | `(snapshot: CarouselStatusSnapshot) => void` | Low-frequency, **observation-only** status. `CarouselStatusSnapshot = { isIdle, currentPageIndex, pageCount, isAtStart, isAtEnd }` — two numbers (which page, of how many), the idle flag, and the two boundary flags (always `false` in cyclic mode). Fires on mount and whenever one of those changes; `currentPageIndex` is the *target* page, so it reflects intent immediately on click/gesture. `isAtStart` / `isAtEnd` are the same boundary flags the internal `<Controls>` slot uses to hide its zones — hosts driving the carousel through the imperative handle can wire them to `disabled` on external prev/next buttons. Carries no per-frame data (position, velocity) and no reducer internals. Deduplicated by a shallow snapshot compare. |
 
 #### Imperative handle
@@ -486,7 +487,7 @@ These are the user-facing behaviours the implementation guarantees.
   between adjacent page indexes so the active highlight tracks the visual
   progress, not the logical target.
 - **Slide click.** A slide is interactive (rendered as `<button>`) when
-  `isInteractiveOn` is true, the image loaded successfully, and an
+  `isSlideInteractiveOn` is true, the image loaded successfully, and an
   `onSlideClick` handler was provided. Otherwise rendered as `<div>`.
   Slides outside the active visual band are `inert`.
 - **Focus management.** When the carousel settles after a step, if focus

@@ -146,7 +146,10 @@ export default function App() {
               isSwipeOn={true}
               isAutoplayOn={isAutoplay}
               isPaginationOn
-              isInteractiveOn={isInteractive}
+              isSlideInteractiveOn={isInteractive}
+              // Pointer affordance only: dots are clickable on desktop, inert
+              // under a finger (the host owns this rule — see isTouch).
+              isPaginationInteractiveOn={!isTouch}
               durationAutoplay={4000}
               durationStep={2000}
               intervalAutoplay={3000}
