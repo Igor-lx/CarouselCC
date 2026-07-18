@@ -63,6 +63,19 @@ export const collectSlotWarnings = (
     });
   }
 
+  if (slots.isPaginationInteractiveOn && !slots.isPaginationOn) {
+    out.push({
+      severity: "LOGICAL",
+      layer: SLOT_LAYER,
+      field: "isPaginationInteractiveOn",
+      actual: true,
+      expected:
+        "Expected isPaginationOn to be true when isPaginationInteractiveOn is true, or isPaginationInteractiveOn={false}",
+      consequence:
+        "The flag decides nothing: with pagination off there are no dots to make clickable",
+    });
+  }
+
   return out;
 };
 

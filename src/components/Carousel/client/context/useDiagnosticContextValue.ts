@@ -29,6 +29,7 @@ interface UseDiagnosticContextValueInput {
   hasControlsSlot: boolean;
   isPaginationOn: boolean;
   hasPaginationSlot: boolean;
+  isPaginationInteractiveOn: boolean;
   hasResponsiveImagesSlot: boolean;
   deckCarriesImageSets: boolean;
 }
@@ -58,6 +59,7 @@ export function useDiagnosticContextValue({
   hasControlsSlot,
   isPaginationOn,
   hasPaginationSlot,
+  isPaginationInteractiveOn,
   hasResponsiveImagesSlot,
   deckCarriesImageSets,
 }: UseDiagnosticContextValueInput): CarouselDiagnosticContextValue {
@@ -105,6 +107,7 @@ export function useDiagnosticContextValue({
       hasControlsSlot,
       isPaginationOn,
       hasPaginationSlot,
+      isPaginationInteractiveOn,
       hasResponsiveImagesSlot,
       deckCarriesImageSets,
     }),
@@ -114,6 +117,7 @@ export function useDiagnosticContextValue({
       hasPaginationSlot,
       hasResponsiveImagesSlot,
       isControlsOn,
+      isPaginationInteractiveOn,
       isPaginationOn,
     ],
   );

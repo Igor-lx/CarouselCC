@@ -141,6 +141,8 @@ export interface CarouselDiagnosticContextValue {
     hasControlsSlot: boolean;
     isPaginationOn: boolean;
     hasPaginationSlot: boolean;
+    /** Whether the <Pagination> dots accept clicks (isPaginationInteractiveOn). */
+    isPaginationInteractiveOn: boolean;
     hasResponsiveImagesSlot: boolean;
     /** Any slide in the deck carries image variants (srcSet / sources). */
     deckCarriesImageSets: boolean;

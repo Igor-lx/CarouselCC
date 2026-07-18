@@ -378,6 +378,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     hasControlsSlot: renderPolicy.hasControlsSlot,
     isPaginationOn,
     hasPaginationSlot: renderPolicy.hasPaginationSlot,
+    isPaginationInteractiveOn,
     hasResponsiveImagesSlot: renderPolicy.hasResponsiveImagesSlot,
     deckCarriesImageSets: useMemoDeckCarriesImageSets,
   });

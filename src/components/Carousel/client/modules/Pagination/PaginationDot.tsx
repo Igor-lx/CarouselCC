@@ -6,8 +6,7 @@ import type { PaginationClassMap } from "./types";
 interface PaginationDotProps {
   pageIndex: number;
   isActive: boolean;
-  /** Mirrors the slide's rule: interactive dots render as `<button>`,
-   * non-interactive ones as an inert `<div>` (see the component note). */
+  /** Whether the dots accept clicks (`isPaginationInteractiveOn`). */
   isInteractiveOn: boolean;
   classNames: PaginationClassMap;
   onPageSelect: (pageIndex: number) => void;
@@ -17,19 +16,18 @@ interface PaginationDotProps {
 }
 
 /**
- * One pagination dot.
+ * One pagination dot: a `<button>` when the dots accept clicks, a plain
+ * `<div>` when they do not — no handler, and the stylesheet withholds the
+ * pointer affordance with the `dotInteractive` class.
  *
- * Interactivity follows the same rule as a slide (see `SlideItem`): when it is
- * off the dot is not a disabled button but a plain `<div>` — no click handler,
- * no button semantics, and the stylesheet withholds `cursor`/`hover`/
- * `pointer-events` with it (the `dotInteractive` class). The dots are already
- * `aria-hidden` and `tabIndex={-1}` at the wrapper, so nothing is lost for
- * assistive tech or keyboard users — this is a pointer affordance only.
+ * Unlike a slide, whose clickability is conditional on runtime state (a click
+ * handler being supplied, the image having loaded), a dot's is pure
+ * configuration: it depends on nothing but the flag. `isActive` only marks the
+ * current page — it drives the active styling and `disabled`, never the tag.
  *
- * The TAG depends solely on `isInteractiveOn`, never on `isActive`: the active
- * dot stays a `<button disabled>` rather than swapping to a `<div>`, because a
- * tag change remounts the element and would tear the cross-fade's ref binding
- * out from under a running WAAPI animation on every page change.
+ * Dots are `aria-hidden` at the wrapper and `tabIndex={-1}`, so this is a
+ * pointer affordance only; assistive tech and keyboard users are unaffected
+ * either way and navigate through `<Controls>` or the host's own buttons.
  */
 export const PaginationDot = memo(function PaginationDot({
   pageIndex,
