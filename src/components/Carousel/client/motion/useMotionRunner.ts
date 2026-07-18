@@ -278,6 +278,7 @@ export function useMotionRunner({
         startedAt: resolvedStartedAt,
         targetKey: state.teleportVirtualIndex ?? state.virtualIndex,
         isContinuation: state.isTeleportApproach,
+        isJump: segment.strategy === "jump",
       });
     };
 

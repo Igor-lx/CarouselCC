@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  blendDotStates,
   buildDotKeyframes,
+  dotKeyframesBetween,
   dotActiveStrength,
   dotStateAt,
   offsetDistance,
@@ -167,5 +169,33 @@ describe("reachedDotIndexes", () => {
   it("folds past the ends when cyclic — a wrap touches the far dots", () => {
     // 0 -> -1 sweeps positions -2..1, i.e. dots 10, 11, 0, 1.
     expect(reachedDotIndexes(0, -1, PAGES, CYCLIC)).toEqual([0, 1, 10, 11]);
+  });
+});
+
+describe("dotKeyframesBetween (the GO_TO direct fade)", () => {
+  it("blends straight between two looks along the temporal stops", () => {
+    const stops = [0, 0.25, 1];
+    const frames = dotKeyframesBetween(INACTIVE, ACTIVE, stops);
+    expect(frames[0]!.opacity).toBeCloseTo(0.2, 10);
+    expect(frames[1]!.opacity).toBeCloseTo(0.2 + 0.6 * 0.25, 10);
+    expect(frames[2]!.opacity).toBeCloseTo(0.8, 10);
+    expect(frames[2]!.transform).toBe("scaleX(1.4)");
+  });
+
+  /** The point of the direct fade: it is MONOTONIC — a dot never rises on the
+   * way down (or vice versa), so nothing "hops" no matter how far the jump. */
+  it("never overshoots or reverses between its endpoints", () => {
+    const stops = [0, 0.2, 0.4, 0.6, 0.8, 1];
+    const frames = dotKeyframesBetween(ACTIVE, INACTIVE, stops);
+    for (let i = 1; i < frames.length; i += 1) {
+      expect(frames[i]!.opacity).toBeLessThanOrEqual(frames[i - 1]!.opacity + 1e-12);
+    }
+  });
+
+  it("can start from a mid-flight look (interrupted-motion continuation)", () => {
+    const caught = blendDotStates(INACTIVE, ACTIVE, 0.4);
+    const frames = dotKeyframesBetween(caught, INACTIVE, [0, 1]);
+    expect(frames[0]!.opacity).toBeCloseTo(0.2 + 0.6 * 0.4, 10);
+    expect(frames[1]!.opacity).toBeCloseTo(0.2, 10);
   });
 });

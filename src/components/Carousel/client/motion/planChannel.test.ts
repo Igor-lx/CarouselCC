@@ -11,6 +11,7 @@ const waapiPlan = (targetKey: number) =>
     startedAt: 0,
     targetKey,
     isContinuation: false,
+    isJump: false,
   }) as const;
 
 describe("createMotionPlanChannel", () => {

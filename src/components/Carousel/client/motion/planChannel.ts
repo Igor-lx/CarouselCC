@@ -75,6 +75,16 @@ export interface WaapiMotionPlan extends MotionPlanBase {
    * continuations.
    */
   isContinuation: boolean;
+  /**
+   * True when the deck's segment is a GO_TO (strategy "jump"). A far GO_TO
+   * TELEPORTS its middle — the deck never shows the pages in between — so a
+   * consumer that would otherwise travel through intermediate positions (the
+   * plain pagination's offset) must cross-fade DIRECTLY to the destination.
+   * One-step consumers (the widget) ignore it. Structural, not a magnitude:
+   * even an adjacent-dot GO_TO is a jump, and a two-step repeated click is
+   * not.
+   */
+  isJump: boolean;
 }
 
 export type CarouselMotionPlan =

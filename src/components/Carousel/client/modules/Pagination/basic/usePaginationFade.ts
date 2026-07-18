@@ -8,8 +8,11 @@ import {
   type MotionPlanSource,
 } from "../../../motion";
 import {
+  blendDotStates,
   buildDotKeyframes,
   dotActiveStrength,
+  dotKeyframesBetween,
+  dotStateAt,
   offsetDistance,
   reachedDotIndexes,
   resolveOffsetTarget,
@@ -85,6 +88,25 @@ export interface PaginationFadeBinding {
   bindDotRef: (pageIndex: number) => (node: HTMLElement | null) => void;
 }
 
+/**
+ * The motion currently masking the class flip.
+ * - `sweep`: the offset TRAVELS the span — steps, repeats, wraps; passed-over
+ *   pages light up because the offset really visits them.
+ * - `direct`: each involved dot cross-fades straight to its final look —
+ *   GO_TO, where the deck teleports its middle and the dots must not tour
+ *   pages the deck never shows. The span runs 0 → 1, so `positionAtNow` on
+ *   it yields plain temporal progress for mid-flight continuation.
+ */
+interface ActiveFade {
+  span: InFlightSpan;
+  kind: "sweep" | "direct";
+  /** direct only: the endpoints each animated dot travels between. */
+  blends: Map<number, { from: DotVisualState; to: DotVisualState }> | null;
+  /** The page the motion lands on (in range) — the offset a direct fade
+   * reports while running, since it has no travelling position. */
+  landing: number;
+}
+
 export function usePaginationFade({
   motionPlan,
   targetPageIndex,
@@ -97,7 +119,7 @@ export function usePaginationFade({
 
   /** Where the carousel LOOKS to be, in pages — fractional while a step runs. */
   const offsetRef = useRef(targetPageIndex);
-  const stepRef = useRef<InFlightSpan | null>(null);
+  const stepRef = useRef<ActiveFade | null>(null);
   const targetRef = useRef(targetPageIndex);
   targetRef.current = targetPageIndex;
 
@@ -155,15 +177,15 @@ export function usePaginationFade({
     animationsRef.current.clear();
   }, [restoreTransition]);
 
-  /** Where the offset is now: sampled from the running step's own curve —
-   * never read back from the DOM. */
-  const liveOffset = useCallback(
-    () =>
-      stepRef.current
-        ? positionAtNow(stepRef.current, motionNow())
-        : offsetRef.current,
-    [],
-  );
+  /** Where the offset is now: sampled from the running motion's own curve —
+   * never read back from the DOM. A direct fade has no travelling offset (the
+   * deck teleported), so it reports its landing page. */
+  const liveOffset = useCallback(() => {
+    const fade = stepRef.current;
+    if (!fade) return offsetRef.current;
+    if (fade.kind === "direct") return fade.landing;
+    return positionAtNow(fade.span, motionNow());
+  }, []);
 
   const settle = useCallback(
     (landedOn: number) => {
@@ -184,6 +206,106 @@ export function usePaginationFade({
           // whole command for one-step consumers.
           if (plan.isContinuation) return;
 
+          const anyDot = dotRefs.current.find((dot) => dot) ?? null;
+          if (!anyDot) {
+            settle(targetRef.current);
+            return;
+          }
+          const { inactive, active } = readDotStates(anyDot);
+
+          // GO_TO: the deck TELEPORTS its middle, so the dots must not tour
+          // it. Each involved dot cross-fades straight to its final look —
+          // still on the plan's curve, duration and clock, so the landing dot
+          // arrives WITH the picture exactly as a swept one does.
+          if (plan.isJump) {
+            const target = targetRef.current;
+            const previous = stepRef.current;
+            // Continue from what the PREVIOUS motion has painted by now,
+            // resolved from its own curve (never the DOM): a sweep gives an
+            // offset to evaluate dots at, a direct fade gives per-dot blends
+            // at its temporal progress.
+            const previousProgress =
+              previous?.kind === "direct"
+                ? positionAtNow(previous.span, motionNow())
+                : null;
+            const previousOffset =
+              previous?.kind === "sweep"
+                ? positionAtNow(previous.span, motionNow())
+                : offsetRef.current;
+            const startStateOf = (index: number): DotVisualState => {
+              if (previous?.kind === "direct") {
+                const blend = previous.blends?.get(index);
+                return blend
+                  ? blendDotStates(blend.from, blend.to, previousProgress!)
+                  : dotStateAt(index, previous.landing, inactive, active, pageCount, isFinite);
+              }
+              return dotStateAt(index, previousOffset, inactive, active, pageCount, isFinite);
+            };
+
+            const blends = new Map<number, { from: DotVisualState; to: DotVisualState }>();
+            for (let index = 0; index < pageCount; index += 1) {
+              const fromState = startStateOf(index);
+              const toState = index === target ? active : inactive;
+              const isAlreadyThere =
+                Math.abs(fromState.opacity - toState.opacity) < 1e-3 &&
+                Math.abs(fromState.scale - toState.scale) < 1e-3;
+              if (!isAlreadyThere) blends.set(index, { from: fromState, to: toState });
+            }
+
+            cancelAllFades();
+            if (blends.size === 0) {
+              settle(target);
+              return;
+            }
+
+            let settleOwner: Animation | null = null;
+            for (const [index, blend] of blends) {
+              const dot = dotRefs.current[index];
+              if (!dot) continue;
+              suppressTransition(index);
+              let animation: Animation;
+              try {
+                animation = dot.animate(
+                  dotKeyframesBetween(blend.from, blend.to, plan.stops),
+                  { duration: plan.duration, fill: "both" },
+                );
+              } catch {
+                restoreTransition(index);
+                continue;
+              }
+              try {
+                animation.startTime = plan.startedAt;
+              } catch {
+                // play-pending fallback keeps the fade, merely unpinned.
+              }
+              animationsRef.current.set(index, animation);
+              // The landing dot preferred; any animation will do if the
+              // target happens to already look active.
+              if (index === target || settleOwner === null) settleOwner = animation;
+            }
+            if (settleOwner) {
+              const owner = settleOwner;
+              owner.onfinish = () => {
+                if (![...animationsRef.current.values()].includes(owner)) return;
+                settle(target);
+              };
+            }
+
+            stepRef.current = {
+              span: {
+                from: 0,
+                to: 1,
+                duration: plan.duration,
+                startedAt: plan.startedAt,
+                stops: plan.stops,
+              },
+              kind: "direct",
+              blends,
+              landing: target,
+            };
+            return;
+          }
+
           const from = liveOffset();
           const to = resolveOffsetTarget(
             from,
@@ -193,13 +315,6 @@ export function usePaginationFade({
             isFinite,
           );
           if (from === to) return;
-
-          const anyDot = dotRefs.current.find((dot) => dot) ?? null;
-          if (!anyDot) {
-            settle(to);
-            return;
-          }
-          const { inactive, active } = readDotStates(anyDot);
 
           // One motion for the whole strip: every dot the offset passes near
           // gets the SAME curve over the SAME duration on the SAME clock.
@@ -263,11 +378,16 @@ export function usePaginationFade({
           }
 
           stepRef.current = {
-            from,
-            to,
-            duration: plan.duration,
-            startedAt: plan.startedAt,
-            stops: plan.stops,
+            span: {
+              from,
+              to,
+              duration: plan.duration,
+              startedAt: plan.startedAt,
+              stops: plan.stops,
+            },
+            kind: "sweep",
+            blends: null,
+            landing: targetRef.current,
           };
           return;
         }

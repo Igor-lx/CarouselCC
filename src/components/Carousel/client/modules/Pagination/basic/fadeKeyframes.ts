@@ -115,6 +115,32 @@ export const buildDotKeyframes = (
     return { opacity: state.opacity, transform: `scaleX(${state.scale})` };
   });
 
+/** Linear blend of two dot looks — the direct cross-fade's path. */
+export const blendDotStates = (
+  from: DotVisualState,
+  to: DotVisualState,
+  progress: number,
+): DotVisualState => ({
+  opacity: from.opacity + (to.opacity - from.opacity) * progress,
+  scale: from.scale + (to.scale - from.scale) * progress,
+});
+
+/**
+ * Keyframes fading one dot STRAIGHT between two looks along the plan's
+ * temporal stops — the GO_TO delivery. The deck teleports a far jump's
+ * middle, so a dot must not ride the offset through pages the deck never
+ * shows; it blends directly, still on the deck's own curve and clock.
+ */
+export const dotKeyframesBetween = (
+  from: DotVisualState,
+  to: DotVisualState,
+  stops: readonly number[],
+): DotFadeKeyframe[] =>
+  keyframesAlongStops(0, 1, stops, (progress) => {
+    const state = blendDotStates(from, to, progress);
+    return { opacity: state.opacity, transform: `scaleX(${state.scale})` };
+  });
+
 /** Dots that can show anything at all along `fromOffset -> toOffset`: strength
  * reaches zero a full step away, so only these need animating — the rest stay
  * on their class styles. */
