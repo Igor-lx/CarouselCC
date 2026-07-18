@@ -1,3 +1,4 @@
+import { keyframesAlongStops } from "../../../../motion";
 import { writeDotProjection } from "./projection";
 import type {
   PaginationWidgetDotState,
@@ -45,19 +46,14 @@ const sampleTrajectory = (
   geometry: PaginationWidgetGeometry,
   stops: readonly number[],
   opacityOf: (state: PaginationWidgetDotState) => number,
-): DotTrajectoryKeyframe[] => {
-  const span = toOffset - fromOffset;
-  const frames: DotTrajectoryKeyframe[] = new Array(stops.length);
-  for (let i = 0; i < stops.length; i += 1) {
-    const offset = fromOffset + span * stops[i]!;
+): DotTrajectoryKeyframe[] =>
+  keyframesAlongStops(fromOffset, toOffset, stops, (offset) => {
     const state = writeDotProjection(scratch, id, offset, geometry);
-    frames[i] = {
+    return {
       transform: toTransform(state.x, state.scale),
       opacity: opacityOf(state),
     };
-  }
-  return frames;
-};
+  });
 
 /** Keyframes of a regular dot (`id`) as the widget offset travels
  * `fromOffset -> toOffset` along the temporal `stops`. */

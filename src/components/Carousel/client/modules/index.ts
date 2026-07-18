@@ -1,13 +1,12 @@
 export { Controls } from "./Controls";
 export type { ControlsProps, ControlsClassMap } from "./Controls";
 
-export { Pagination } from "./Pagination";
-export type { PaginationProps, PaginationClassMap } from "./Pagination";
-
-export { PaginationWidget } from "./PaginationWidget";
+export { Pagination, PaginationWidget } from "./Pagination";
 export type {
+  PaginationProps,
+  PaginationClassMap,
   PaginationWidgetProps,
   PaginationWidgetClassMap,
-} from "./PaginationWidget";
+} from "./Pagination";
 
 export { Diagnostic } from "./Diagnostic";

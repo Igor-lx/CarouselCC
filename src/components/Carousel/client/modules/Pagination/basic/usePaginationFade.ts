@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef } from "react";
 
-import { motionNow, useIsomorphicLayoutEffect } from "../../../../../shared";
+import { motionNow, useIsomorphicLayoutEffect } from "../../../../../../shared";
 import {
-  sampleProgressStops,
+  positionAtNow,
   type CarouselMotionPlan,
+  type InFlightSpan,
   type MotionPlanSource,
-} from "../../motion";
+} from "../../../motion";
 import {
   buildDotKeyframes,
   dotActiveStrength,
@@ -68,16 +69,6 @@ const readDotStates = (
   };
 };
 
-/** The step currently in flight — everything needed to resolve where the
- * offset is RIGHT NOW without reading the DOM (the widget's practice). */
-interface ActiveStep {
-  from: number;
-  to: number;
-  duration: number;
-  startedAt: number;
-  stops: readonly number[];
-}
-
 interface UsePaginationFadeInput {
   motionPlan: MotionPlanSource | null;
   targetPageIndex: number;
@@ -100,7 +91,7 @@ export function usePaginationFade({
 
   /** Where the carousel LOOKS to be, in pages — fractional while a step runs. */
   const offsetRef = useRef(targetPageIndex);
-  const stepRef = useRef<ActiveStep | null>(null);
+  const stepRef = useRef<InFlightSpan | null>(null);
   const targetRef = useRef(targetPageIndex);
   targetRef.current = targetPageIndex;
 
@@ -160,13 +151,13 @@ export function usePaginationFade({
 
   /** Where the offset is now: sampled from the running step's own curve —
    * never read back from the DOM. */
-  const liveOffset = useCallback(() => {
-    const step = stepRef.current;
-    if (!step) return offsetRef.current;
-    const fraction =
-      step.duration > 0 ? (motionNow() - step.startedAt) / step.duration : 1;
-    return step.from + (step.to - step.from) * sampleProgressStops(step.stops, fraction);
-  }, []);
+  const liveOffset = useCallback(
+    () =>
+      stepRef.current
+        ? positionAtNow(stepRef.current, motionNow())
+        : offsetRef.current,
+    [],
+  );
 
   const settle = useCallback(
     (landedOn: number) => {

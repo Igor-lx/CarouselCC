@@ -11,6 +11,8 @@
  * widget's dot does when the strip slides it past the centre.
  */
 
+import { keyframesAlongStops } from "../../../motion";
+
 export interface DotVisualState {
   opacity: number;
   /** Horizontal scale of the dot (the active dot is stretched). */
@@ -63,15 +65,11 @@ export const buildDotKeyframes = (
   stops: readonly number[],
   inactive: DotVisualState,
   active: DotVisualState,
-): DotFadeKeyframe[] => {
-  const span = toOffset - fromOffset;
-  const frames: DotFadeKeyframe[] = new Array(stops.length);
-  for (let i = 0; i < stops.length; i += 1) {
-    const state = dotStateAt(index, fromOffset + span * stops[i]!, inactive, active);
-    frames[i] = { opacity: state.opacity, transform: `scaleX(${state.scale})` };
-  }
-  return frames;
-};
+): DotFadeKeyframe[] =>
+  keyframesAlongStops(fromOffset, toOffset, stops, (offset) => {
+    const state = dotStateAt(index, offset, inactive, active);
+    return { opacity: state.opacity, transform: `scaleX(${state.scale})` };
+  });
 
 /** Dots that can show anything at all along `fromOffset -> toOffset`: strength
  * reaches zero a full step away, so only these need animating — the rest stay

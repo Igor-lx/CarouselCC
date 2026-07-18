@@ -4,7 +4,7 @@ import {
   isPositiveFinite,
   isPositiveInteger,
 } from "../../../../../../shared";
-import type { PaginationWidgetProps } from "../../PaginationWidget/types";
+import type { PaginationWidgetProps } from "../../Pagination/widget/types";
 import type { CarouselDiagnosticWarning } from "../types";
 
 const LAYER = "PaginationWidget";

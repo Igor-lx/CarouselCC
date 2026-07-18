@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useRef } from "react";
 
-import { motionNow, useIsomorphicLayoutEffect } from "../../../../../shared";
+import { motionNow, useIsomorphicLayoutEffect } from "../../../../../../shared";
 import {
-  sampleProgressStops,
+  positionAtNow,
   type CarouselMotionPlan,
+  type InFlightSpan,
   type MotionPlanSource,
   type WaapiMotionPlan,
-} from "../../motion";
+} from "../../../motion";
 import {
   isDroppedFallbackFrame,
   type VisualPositionSource,
-} from "../../visual-position";
+} from "../../../visual-position";
 import {
   DOT_OPACITY_EPSILON,
   DOT_POSITION_EPSILON_PX,
@@ -111,14 +112,12 @@ const shouldWriteOpacity = (
 
 /** One in-flight WAAPI step: target + the plan data needed to sample the
  * live offset without touching the DOM. */
-interface ActiveStep {
-  from: number;
-  target: number;
+/** The shared plan span (from/to/duration/startedAt/stops) plus what only the
+ * widget needs: which way it was going, which destination it belongs to, and
+ * the animations painting it. */
+interface ActiveStep extends InFlightSpan {
   direction: -1 | 0 | 1;
   targetKey: number;
-  duration: number;
-  startedAt: number;
-  stops: readonly number[];
   animations: Animation[];
 }
 
@@ -318,14 +317,13 @@ export function usePaginationWidgetBinding({
 
   /** Live widget offset: mid-step it is sampled from the plan's progress
    * stops (the same interpolation the compositor applies), never the DOM. */
-  const currentOffset = useCallback(() => {
-    const step = stepRef.current;
-    if (!step) return offsetRef.current;
-    const fraction =
-      step.duration > 0 ? (motionNow() - step.startedAt) / step.duration : 1;
-    const progress = sampleProgressStops(step.stops, fraction);
-    return step.from + (step.target - step.from) * progress;
-  }, []);
+  const currentOffset = useCallback(
+    () =>
+      stepRef.current
+        ? positionAtNow(stepRef.current, motionNow())
+        : offsetRef.current,
+    [],
+  );
 
   const cancelStepAnimations = useCallback(() => {
     const step = stepRef.current;
@@ -372,7 +370,7 @@ export function usePaginationWidgetBinding({
         from,
         previous: previous
           ? {
-              target: previous.target,
+              target: previous.to,
               direction: previous.direction,
               targetKey: previous.targetKey,
             }
@@ -482,7 +480,7 @@ export function usePaginationWidgetBinding({
 
       const step: ActiveStep = {
         from,
-        target,
+        to: target,
         direction: plan.direction,
         targetKey: plan.targetKey,
         duration: plan.duration,
@@ -494,7 +492,7 @@ export function usePaginationWidgetBinding({
 
       animations[0]!.onfinish = () => {
         if (stepRef.current !== step) return;
-        finalizeStep(step.target);
+        finalizeStep(step.to);
       };
     },
     [
@@ -525,7 +523,7 @@ export function usePaginationWidgetBinding({
       const start = currentOffset();
       interruptedStepRef.current = stepRef.current
         ? {
-            target: stepRef.current.target,
+            target: stepRef.current.to,
             direction: stepRef.current.direction,
             targetKey: stepRef.current.targetKey,
           }
@@ -592,7 +590,7 @@ export function usePaginationWidgetBinding({
         case "idle": {
           stopFollowing();
           if (stepRef.current) {
-            finalizeStep(stepRef.current.target);
+            finalizeStep(stepRef.current.to);
           }
           return;
         }

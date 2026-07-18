@@ -12,8 +12,10 @@ import Carousel, {
   type Slide,
 } from "../components/Carousel/client";
 import { Controls } from "../components/Carousel/client/modules/Controls";
-import { Pagination } from "../components/Carousel/client/modules/Pagination";
-import { PaginationWidget } from "../components/Carousel/client/modules/PaginationWidget";
+import {
+  Pagination,
+  PaginationWidget,
+} from "../components/Carousel/client/modules/Pagination";
 import { Diagnostic } from "../components/Carousel/client/modules/Diagnostic";
 import { ResponsiveImages } from "../components/Carousel/client/modules/ResponsiveImages";
 import { useTheme } from "../theme/useTheme";
@@ -148,8 +150,6 @@ export default function App() {
               isAutoplayOn={isAutoplay}
               isPaginationOn
               isSlideInteractiveOn={isInteractive}
-              // Pointer affordance only: dots are clickable on desktop, inert
-              // under a finger (the host owns this rule — see isTouch).
               isPaginationInteractiveOn={!isTouch}
               durationAutoplay={4000}
               durationStep={2000}
@@ -159,7 +159,7 @@ export default function App() {
               onSlideClick={openSlide}
               onCarouselStatusChange={(snapshot) => setStatus(snapshot)}
             >
-              {!isTouch ? <PaginationWidget /> : <Pagination />}
+              {isTouch ? <PaginationWidget /> : <Pagination />}
               <Controls />
               <ResponsiveImages
                 isPreloadOn={true}

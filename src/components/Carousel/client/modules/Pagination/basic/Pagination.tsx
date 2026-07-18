@@ -1,8 +1,8 @@
 import { memo, useMemo } from "react";
 
-import { mergeStyleMaps } from "../../../../../shared";
-import { useCarouselMotion, useCarouselStable } from "../../context";
-import type { CarouselSlotComponent } from "../../slots";
+import { mergeStyleMaps } from "../../../../../../shared";
+import { useCarouselMotion, useCarouselStable } from "../../../context";
+import type { CarouselSlotComponent } from "../../../slots";
 import { PaginationDot } from "./PaginationDot";
 import styles from "./Pagination.module.scss";
 import { usePaginationFade } from "./usePaginationFade";

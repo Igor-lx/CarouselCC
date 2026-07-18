@@ -1,10 +1,10 @@
 import clsx from "clsx";
 import { memo, useMemo } from "react";
 
-import { mergeStyleMaps } from "../../../../../shared";
-import { useCarouselMotion, useCarouselStable } from "../../context";
-import type { CarouselSlotComponent } from "../../slots";
-import { useWidgetDiagnostic } from "../Diagnostic/useWidgetDiagnostic";
+import { mergeStyleMaps } from "../../../../../../shared";
+import { useCarouselMotion, useCarouselStable } from "../../../context";
+import type { CarouselSlotComponent } from "../../../slots";
+import { useWidgetDiagnostic } from "../../Diagnostic/useWidgetDiagnostic";
 import { buildPaginationWidgetGeometry } from "./math/spatialField";
 import { projectDot } from "./math/projection";
 import { usePaginationWidgetBinding } from "./usePaginationWidgetBinding";

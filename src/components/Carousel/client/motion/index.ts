@@ -7,6 +7,8 @@ export type {
   MotionPlanSource,
   WaapiMotionPlan,
 } from "./planChannel";
+export { positionAtNow, keyframesAlongStops } from "./stopSampling";
+export type { InFlightSpan } from "./stopSampling";
 // Re-exported from the shared motion library so carousel modules keep one
 // import root for motion concerns.
 export { isWaapiSupported, sampleProgressStops } from "../../../../shared";
