@@ -9,8 +9,9 @@ facade (`index.ts`).
 
 - `profile/` — the CURVE mathematics (the record): accel/cruise/decel
   profiles from speeds and distance shares, percent-progress stops (the
-  WAAPI keyframe transport), the peak-speed-for-duration solver, the WAAPI
-  gate;
+  WAAPI keyframe transport) with both ends of that transport — producing
+  the stops AND consuming them (`keyframesAlongStops`, `positionAtNow`) —
+  the peak-speed-for-duration solver, the WAAPI gate;
 - `runtime/` — the EXECUTION engine (the player): the RAF controller, the
   motion clock;
 - `tests/` — the library's own suite.

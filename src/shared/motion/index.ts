@@ -32,7 +32,10 @@ export {
 export type { MotionProfile, MotionProfileZone } from "./profile/profile";
 export {
   isWaapiSupported,
+  keyframesAlongStops,
+  positionAtNow,
   profileProgressStops,
   resolvePeakSpeedForDuration,
   sampleProgressStops,
 } from "./profile/progressCurve";
+export type { InFlightSpan } from "./profile/progressCurve";

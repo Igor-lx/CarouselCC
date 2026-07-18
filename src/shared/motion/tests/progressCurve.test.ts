@@ -5,6 +5,8 @@ import {
   profileProgressStops,
   resolvePeakSpeedForDuration,
   sampleProgressStops,
+  keyframesAlongStops,
+  positionAtNow,
 } from "../profile/progressCurve";
 
 const stepProfile = (shares = { a: 0.35, d: 0.4 }, startSpeed = 0, duration = 2000) => {
@@ -131,5 +133,33 @@ describe("sampleProgressStops", () => {
       ).distanceProgress;
       expect(Math.abs(approx - exact)).toBeLessThan(0.01);
     }
+  });
+});
+
+describe("positionAtNow", () => {
+  const span = { from: 2, to: 4, duration: 1000, startedAt: 10_000, stops: [0, 0.5, 1] };
+
+  it("reads the span's own curve, endpoints exact", () => {
+    expect(positionAtNow(span, 10_000)).toBe(2);
+    expect(positionAtNow(span, 10_500)).toBeCloseTo(3, 10);
+    expect(positionAtNow(span, 11_000)).toBe(4);
+  });
+
+  it("clamps outside the window and treats a degenerate duration as finished", () => {
+    expect(positionAtNow(span, 9_000)).toBe(2);
+    expect(positionAtNow(span, 12_000)).toBe(4);
+    expect(positionAtNow({ ...span, duration: 0 }, 10_000)).toBe(4);
+  });
+});
+
+describe("keyframesAlongStops", () => {
+  it("evaluates the caller's domain at the position each stop reaches", () => {
+    const frames = keyframesAlongStops(10, 20, [0, 0.25, 1], (position) => position * 2);
+    expect(frames).toEqual([20, 25, 40]);
+  });
+
+  it("supports a reversed span and a single-stop degenerate curve", () => {
+    expect(keyframesAlongStops(5, 3, [0, 1], (p) => p)).toEqual([5, 3]);
+    expect(keyframesAlongStops(1, 1, [0, 1], (p) => p)).toEqual([1, 1]);
   });
 });

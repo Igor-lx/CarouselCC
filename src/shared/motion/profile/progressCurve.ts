@@ -129,6 +129,52 @@ export const resolvePeakSpeedForDuration = ({
   return Math.max(0, root);
 };
 
+/** A plan slice a consumer is currently running: the span a motion travels
+ * plus the temporal curve it travels it on. */
+export interface InFlightSpan {
+  from: number;
+  to: number;
+  duration: number;
+  /** Plan clock origin (`performance.now()` domain). */
+  startedAt: number;
+  stops: readonly number[];
+}
+
+/**
+ * Where the span has reached at `now` — sampled from the curve itself, never
+ * read back from the DOM. A finished (or degenerate) span reads as its end.
+ * The consumer-side twin of `profileProgressStops`: whoever runs a stop-encoded
+ * motion needs this the moment a NEW motion arrives mid-flight and must be
+ * continued from the live position.
+ */
+export const positionAtNow = (span: InFlightSpan, now: number): number => {
+  const fraction = span.duration > 0 ? (now - span.startedAt) / span.duration : 1;
+  return span.from + (span.to - span.from) * sampleProgressStops(span.stops, fraction);
+};
+
+/**
+ * One keyframe per stop: the i-th is `evaluate` applied to the position the
+ * motion has reached by `stops[i]`. Uniform time offsets with linear
+ * interpolation between them — the same delivery `profileProgressStops` was
+ * designed for, closing the transport loop inside the engine: produce the
+ * stops here, turn them into keyframes here. Each consumer supplies only the
+ * mapping from a position to whatever it paints (pixels, projections,
+ * opacities), which is what keeps this domain-agnostic.
+ */
+export const keyframesAlongStops = <T>(
+  from: number,
+  to: number,
+  stops: readonly number[],
+  evaluate: (position: number) => T,
+): T[] => {
+  const span = to - from;
+  const frames: T[] = new Array(stops.length);
+  for (let i = 0; i < stops.length; i += 1) {
+    frames[i] = evaluate(from + span * stops[i]!);
+  }
+  return frames;
+};
+
 let waapiSupport: boolean | null = null;
 
 /**
