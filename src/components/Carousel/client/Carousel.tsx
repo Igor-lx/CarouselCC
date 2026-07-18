@@ -270,7 +270,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     startCompositorMotion,
     cancelCompositorMotion,
     publishPlan: planChannel.publish,
-    planSource: planChannel.source,
   });
 
   // --- navigation -----------------------------------------------------------
