@@ -1,34 +1,44 @@
 import { useCallback, useEffect, useRef } from "react";
 
-import { useIsomorphicLayoutEffect } from "../../../../../shared";
-import type { CarouselMotionPlan, MotionPlanSource } from "../../motion";
-import { RETARGET_PULSE_DURATION_SHARE } from "./defaults";
+import { motionNow, useIsomorphicLayoutEffect } from "../../../../../shared";
 import {
-  buildFadeKeyframes,
-  buildPulseKeyframes,
-  type DotFadeKeyframe,
+  sampleProgressStops,
+  type CarouselMotionPlan,
+  type MotionPlanSource,
+} from "../../motion";
+import {
+  buildDotKeyframes,
+  dotActiveStrength,
+  reachedDotIndexes,
   type DotVisualState,
 } from "./fadeKeyframes";
 
 /**
- * Engine-driven cross-fade for the pagination dots — the third consumer of
- * the motion plan (track: pixels, widget: dot steps, pagination: OPACITY).
+ * Engine-driven dot binding — the third consumer of the motion plan (track:
+ * pixels, widget: dot steps, pagination: the LOOK of fixed dots).
+ *
+ * The model is the widget's, in a different domain: one continuous `offset`
+ * travels from the page being left to the page being entered along the plan's
+ * percent-progress stops, over the plan's duration, pinned to the plan's
+ * clock; each dot's look is a function of its distance from that offset (see
+ * fadeKeyframes). Because there is exactly ONE motion and ONE clock, a page
+ * merely passed through by a repeated click rises to the active look and falls
+ * again in step with the deck — no separate, faster curve is authored for it.
  *
  * React flips the `dotActive` class to the target page immediately on every
- * command; this binding masks that flip for planned motions with two WAAPI
- * animations — the outgoing dot fades to its resting look, the incoming dot
- * fades to the active look — built from the plan's percent-progress stops,
- * over the plan's duration, pinned to the plan's clock. The dot therefore
- * arrives WITH the picture (decelerating on the same curve), which is what
- * the old fixed "switch after 30% of the autoplay" delay only approximated.
+ * command; the animations mask that flip while a planned motion runs, and the
+ * class styles underneath are exactly the values the animations end on.
  *
  * Non-planned changes (mount, drag target flips, the no-WAAPI fallback,
- * reduced motion where the plan source is null) keep the plain CSS
- * transition / static rendering.
+ * reduced motion where the plan source is null) keep the plain CSS transition.
  */
 
 const FALLBACK_INACTIVE: DotVisualState = { opacity: 0.2, scale: 1 };
 const FALLBACK_ACTIVE: DotVisualState = { opacity: 0.8, scale: 1.4 };
+
+/** Below this the dot shows nothing for the whole step — pin it instead of
+ * paying for an animation that paints no difference (the widget's rule). */
+const INVISIBLE_STRENGTH = 0.001;
 
 const readVar = (styles: CSSStyleDeclaration, name: string, fallback: number) => {
   const parsed = Number.parseFloat(styles.getPropertyValue(name));
@@ -36,8 +46,8 @@ const readVar = (styles: CSSStyleDeclaration, name: string, fallback: number) =>
 };
 
 /** The dot look is CSS-owned (custom properties on the wrapper); read the
- * same three vars the classes consume so the fade and the resting styles can
- * never disagree. */
+ * same three vars the classes consume so the animation and the resting styles
+ * can never disagree. */
 const readDotStates = (
   element: HTMLElement,
 ): { inactive: DotVisualState; active: DotVisualState } => {
@@ -53,26 +63,20 @@ const readDotStates = (
         "--pagination-dot-opacity-active",
         FALLBACK_ACTIVE.opacity,
       ),
-      scale: readVar(
-        styles,
-        "--pagination-dot-scale-active",
-        FALLBACK_ACTIVE.scale,
-      ),
+      scale: readVar(styles, "--pagination-dot-scale-active", FALLBACK_ACTIVE.scale),
     },
   };
 };
 
-/** Mid-fade retarget: continue from what is actually painted (the live
- * animation's current values), not from the logical endpoint. */
-const readLiveState = (element: HTMLElement): DotVisualState => {
-  const styles = getComputedStyle(element);
-  const opacity = Number.parseFloat(styles.opacity);
-  const matrix = new DOMMatrixReadOnly(styles.transform);
-  return {
-    opacity: Number.isFinite(opacity) ? opacity : FALLBACK_INACTIVE.opacity,
-    scale: matrix.a || 1,
-  };
-};
+/** The step currently in flight — everything needed to resolve where the
+ * offset is RIGHT NOW without reading the DOM (the widget's practice). */
+interface ActiveStep {
+  from: number;
+  to: number;
+  duration: number;
+  startedAt: number;
+  stops: readonly number[];
+}
 
 interface UsePaginationFadeInput {
   motionPlan: MotionPlanSource | null;
@@ -91,13 +95,12 @@ export function usePaginationFade({
   pageCount,
 }: UsePaginationFadeInput): PaginationFadeBinding {
   const dotRefs = useRef<Array<HTMLElement | null>>([]);
-  const callbacksRef = useRef<
-    Array<((node: HTMLElement | null) => void) | null>
-  >([]);
+  const callbacksRef = useRef<Array<((node: HTMLElement | null) => void) | null>>([]);
   const animationsRef = useRef(new Map<number, Animation>());
 
-  /** The page whose dot currently LOOKS active (lags target while fading). */
-  const displayedRef = useRef(targetPageIndex);
+  /** Where the carousel LOOKS to be, in pages — fractional while a step runs. */
+  const offsetRef = useRef(targetPageIndex);
+  const stepRef = useRef<ActiveStep | null>(null);
   const targetRef = useRef(targetPageIndex);
   targetRef.current = targetPageIndex;
 
@@ -118,19 +121,16 @@ export function usePaginationFade({
 
   /**
    * The dot's CSS `transition` covers opacity and transform — the very two
-   * properties the WAAPI fade animates. Whenever the active-dot class moves,
+   * properties these animations drive. Whenever the active-dot class moves,
    * that transition fires, and Blink is left with two effects on one property:
-   * it cannot composite that, so it drops the fade onto the main thread for the
-   * rest of the ride, dragging a full paint lifecycle through every frame.
+   * it cannot composite that, so it drops the animation onto the main thread
+   * for the rest of the ride, dragging a full paint lifecycle through every
+   * frame.
    *
-   * The cascade still picks the animation, so the picture stays correct — which
-   * is exactly why the cost stayed invisible. Measured on a Redmi Note 11S,
-   * suppressing the transition for the duration of the fade takes a ride from
-   * 452 main frames (2696 ms) down to 12 (81 ms).
-   *
-   * Suppressing also CANCELS a transition already in flight (a property that
-   * leaves `transition-property` has its transition cancelled), so it is safe
-   * whether the class flip lands before or after the plan arrives.
+   * The cascade still picks the animation, so the picture stays correct —
+   * which is exactly why the cost stayed invisible. Measured on a Redmi Note
+   * 11S, suppressing the transition for the duration takes a ride from 452
+   * main frames (2696 ms) down to 12 (81 ms). See PERF-INVESTIGATION §3.5.
    */
   const suppressTransition = useCallback((pageIndex: number) => {
     const dot = dotRefs.current[pageIndex];
@@ -139,29 +139,13 @@ export function usePaginationFade({
 
   const restoreTransition = useCallback((pageIndex: number) => {
     const dot = dotRefs.current[pageIndex];
-    // Back to the stylesheet: the transition still owns every non-planned flip
-    // (mount, drag retarget, the no-WAAPI fallback).
+    // Back to the stylesheet: the transition still owns every non-planned flip.
     if (dot) dot.style.transition = "";
   }, []);
 
-  const cancelFade = useCallback(
-    (pageIndex: number) => {
-      const animation = animationsRef.current.get(pageIndex);
-      if (!animation) return;
-      animationsRef.current.delete(pageIndex);
-      try {
-        animation.cancel();
-      } catch {
-        // already gone
-      }
-      // After the cancel: the class styles underneath already hold exactly the
-      // values the fade ended on, so restoring the transition here transitions
-      // nothing.
-      restoreTransition(pageIndex);
-    },
-    [restoreTransition],
-  );
-
+  /** One motion owns the whole strip, so cancellation is always collective:
+   * after the cancel the class styles underneath already hold exactly the
+   * values the animations ended on, so restoring transitions nothing. */
   const cancelAllFades = useCallback(() => {
     animationsRef.current.forEach((animation, pageIndex) => {
       try {
@@ -174,48 +158,23 @@ export function usePaginationFade({
     animationsRef.current.clear();
   }, [restoreTransition]);
 
-  const startFade = useCallback(
-    (
-      element: HTMLElement,
-      pageIndex: number,
-      keyframes: DotFadeKeyframe[],
-      duration: number,
-      startedAt: number,
-      onFinish?: () => void,
-    ) => {
-      cancelFade(pageIndex);
+  /** Where the offset is now: sampled from the running step's own curve —
+   * never read back from the DOM. */
+  const liveOffset = useCallback(() => {
+    const step = stepRef.current;
+    if (!step) return offsetRef.current;
+    const fraction =
+      step.duration > 0 ? (motionNow() - step.startedAt) / step.duration : 1;
+    return step.from + (step.to - step.from) * sampleProgressStops(step.stops, fraction);
+  }, []);
 
-      // Before animate(), never after: this both cancels a transition the class
-      // flip may have already started and stops the next one from starting, so
-      // the fade is the ONLY effect on opacity/transform and can be composited.
-      suppressTransition(pageIndex);
-
-      let animation: Animation;
-      try {
-        animation = element.animate(keyframes, {
-          duration,
-          fill: "both",
-        });
-      } catch {
-        // No keyframe support: hand the dot back to the class flip + CSS
-        // transition, which produce an acceptable (instant-ish) switch.
-        restoreTransition(pageIndex);
-        return;
-      }
-      try {
-        animation.startTime = startedAt;
-      } catch {
-        // play-pending fallback keeps the fade, merely unpinned.
-      }
-      animationsRef.current.set(pageIndex, animation);
-      if (onFinish) {
-        animation.onfinish = () => {
-          if (animationsRef.current.get(pageIndex) !== animation) return;
-          onFinish();
-        };
-      }
+  const settle = useCallback(
+    (landedOn: number) => {
+      offsetRef.current = landedOn;
+      stepRef.current = null;
+      cancelAllFades();
     },
-    [cancelFade, restoreTransition, suppressTransition],
+    [cancelAllFades],
   );
 
   const applyPlan = useCallback(
@@ -225,76 +184,71 @@ export function usePaginationFade({
           // A far-GO_TO approach slice: the preflight plan already spans the
           // whole command for one-step consumers.
           if (plan.isContinuation) return;
-          const from = displayedRef.current;
+
+          const from = liveOffset();
           const to = targetRef.current;
           if (from === to) return;
 
-          const outgoing = dotRefs.current[from];
-          const incoming = dotRefs.current[to];
-          const anyDot = outgoing ?? incoming;
+          const anyDot = dotRefs.current.find((dot) => dot) ?? null;
           if (!anyDot) {
-            displayedRef.current = to;
+            settle(to);
             return;
           }
-          const states = readDotStates(anyDot);
+          const { inactive, active } = readDotStates(anyDot);
 
-          // A dot with a live animation was still on its way to the active
-          // look when this command arrived — the repeated-click case. Read the
-          // flag now, while the animation is still in the map: `startFade`
-          // cancels it.
-          const wasStillRising = Boolean(outgoing) && animationsRef.current.has(from);
+          // One motion for the whole strip: every dot the offset passes near
+          // gets the SAME curve over the SAME duration on the SAME clock.
+          cancelAllFades();
+          for (const index of reachedDotIndexes(from, to, pageCount)) {
+            const dot = dotRefs.current[index];
+            if (!dot) continue;
 
-          // Read live values BEFORE cancelling (cancel drops the fill and the
-          // element snaps to its class styles).
-          const outgoingFrom =
-            outgoing && animationsRef.current.has(from)
-              ? readLiveState(outgoing)
-              : states.active;
-          const incomingFrom =
-            incoming && animationsRef.current.has(to)
-              ? readLiveState(incoming)
-              : states.inactive;
+            // A dot the offset never comes within a step of paints nothing all
+            // the way through — leave it to its class styles.
+            const staysInvisible =
+              plan.stops.every(
+                (p) =>
+                  dotActiveStrength(index - (from + (to - from) * p)) <=
+                  INVISIBLE_STRENGTH,
+              ) && index !== to;
+            if (staysInvisible) continue;
 
-          if (outgoing) {
-            // Passed-through dot: let it finish the cycle it started — up to
-            // the active look and back down — but compressed, so it is resting
-            // again well before the real destination arrives. A dot that was
-            // already settled at active just fades out on the plan's own curve.
-            startFade(
-              outgoing,
-              from,
-              wasStillRising
-                ? buildPulseKeyframes(
-                    outgoingFrom,
-                    states.active,
-                    states.inactive,
-                    plan.stops,
-                  )
-                : buildFadeKeyframes(outgoingFrom, states.inactive, plan.stops),
-              wasStillRising
-                ? plan.duration * RETARGET_PULSE_DURATION_SHARE
-                : plan.duration,
-              plan.startedAt,
-            );
+            suppressTransition(index);
+            let animation: Animation;
+            try {
+              animation = dot.animate(
+                buildDotKeyframes(index, from, to, plan.stops, inactive, active),
+                { duration: plan.duration, fill: "both" },
+              );
+            } catch {
+              // No keyframe support: hand the dot back to the class flip + CSS
+              // transition, which produce an acceptable instant-ish switch.
+              restoreTransition(index);
+              continue;
+            }
+            try {
+              animation.startTime = plan.startedAt;
+            } catch {
+              // play-pending fallback keeps the animation, merely unpinned.
+            }
+            animationsRef.current.set(index, animation);
+
+            // The destination dot outlives every other: settle on its finish.
+            if (index === to) {
+              animation.onfinish = () => {
+                if (animationsRef.current.get(index) !== animation) return;
+                settle(to);
+              };
+            }
           }
-          if (incoming) {
-            // Unchanged: the destination dot rides the plan's own curve over
-            // the plan's own duration, so it lands WITH the slide.
-            startFade(
-              incoming,
-              to,
-              buildFadeKeyframes(incomingFrom, states.active, plan.stops),
-              plan.duration,
-              plan.startedAt,
-              () => {
-                // Settle: drop both fills — the class styles beneath already
-                // show exactly these final values.
-                cancelFade(to);
-                cancelFade(from);
-              },
-            );
-          }
-          displayedRef.current = to;
+
+          stepRef.current = {
+            from,
+            to,
+            duration: plan.duration,
+            startedAt: plan.startedAt,
+            stops: plan.stops,
+          };
           return;
         }
         case "instant":
@@ -302,13 +256,12 @@ export function usePaginationFade({
         case "follow": {
           // Snap / rest / finger-follow (or the no-WAAPI fallback): the class
           // flip plus the plain CSS transition own the dots.
-          cancelAllFades();
-          displayedRef.current = targetRef.current;
+          settle(targetRef.current);
           return;
         }
       }
     },
-    [cancelAllFades, cancelFade, startFade],
+    [liveOffset, pageCount, restoreTransition, settle, suppressTransition, cancelAllFades],
   );
 
   useIsomorphicLayoutEffect(() => {

@@ -1,9 +1,14 @@
 /**
- * Pure keyframe math for the pagination cross-fade. The engine's plan carries
- * the TEMPORAL shape as percent-progress stops; a dot's fade is the linear
- * blend of its visual state (opacity + active scale) evaluated at each stop —
- * the same stop-encoded keyframe transport the track and the widget use, so
- * the dot's fade decelerates exactly with the deck.
+ * Dot look as a FUNCTION OF POSITION — the pagination's half of the model the
+ * widget already runs.
+ *
+ * The dots do not move, but the carousel's position between them does. The
+ * binding animates one continuous `offset` from the page being left to the
+ * page being entered, along the plan's percent-progress stops; every dot's
+ * look is then read off its distance from that offset. Nothing about a dot is
+ * authored in time, so a page merely PASSED THROUGH (a repeated click) rises
+ * to the active look and falls again on the deck's own clock, exactly as the
+ * widget's dot does when the strip slides it past the centre.
  */
 
 export interface DotVisualState {
@@ -19,44 +24,66 @@ export type DotFadeKeyframe = {
   transform: string;
 };
 
-export const buildFadeKeyframes = (
-  from: DotVisualState,
-  to: DotVisualState,
+/**
+ * How strongly the ACTIVE look applies to a dot `distance` steps away from the
+ * live offset: fully right under it, not at all a whole step away or further.
+ *
+ * Linear deliberately: across a single step it reproduces exactly the blend
+ * the old two-dot cross-fade produced (a dot one step ahead has strength
+ * `progress`), so an ordinary click looks the way it always did — only the
+ * repeated click changes.
+ */
+export const dotActiveStrength = (distance: number): number =>
+  Math.max(0, 1 - Math.abs(distance));
+
+/** The dot at integer `index` as seen from a live `offset`. */
+export const dotStateAt = (
+  index: number,
+  offset: number,
+  inactive: DotVisualState,
+  active: DotVisualState,
+): DotVisualState => {
+  const strength = dotActiveStrength(index - offset);
+  return {
+    opacity: inactive.opacity + (active.opacity - inactive.opacity) * strength,
+    scale: inactive.scale + (active.scale - inactive.scale) * strength,
+  };
+};
+
+/**
+ * Keyframes for one dot as the offset travels `fromOffset -> toOffset` along
+ * the temporal `stops`: the i-th keyframe is the dot's look at the offset the
+ * plan has reached by stop i. Same stop-encoded transport the track and the
+ * widget use, so the dot rides the deck's curve without an easing function.
+ */
+export const buildDotKeyframes = (
+  index: number,
+  fromOffset: number,
+  toOffset: number,
   stops: readonly number[],
+  inactive: DotVisualState,
+  active: DotVisualState,
 ): DotFadeKeyframe[] => {
+  const span = toOffset - fromOffset;
   const frames: DotFadeKeyframe[] = new Array(stops.length);
   for (let i = 0; i < stops.length; i += 1) {
-    const p = stops[i]!;
-    frames[i] = {
-      opacity: from.opacity + (to.opacity - from.opacity) * p,
-      transform: `scaleX(${from.scale + (to.scale - from.scale) * p})`,
-    };
+    const state = dotStateAt(index, fromOffset + span * stops[i]!, inactive, active);
+    frames[i] = { opacity: state.opacity, transform: `scaleX(${state.scale})` };
   }
   return frames;
 };
 
-/**
- * The RETARGET pulse: a dot that was still rising when a repeated command
- * arrived rides its whole cycle anyway — on up to the active look, then back
- * down to resting — instead of being turned around from wherever it had got to.
- *
- * Without it a fast second click catches the incoming dot a few percent into
- * its rise and immediately walks it back, so the eye sees a barely-there
- * twitch and the dot never reads as "this page was passed through".
- *
- * Both halves are blended along the SAME plan stops the normal fade uses, so
- * the pulse carries the deck's own curve; because those stops decelerate into
- * their endpoint, the dot eases into the active look and out of it again,
- * giving a natural beat at the peak rather than a corner.
- */
-export const buildPulseKeyframes = (
-  from: DotVisualState,
-  peak: DotVisualState,
-  to: DotVisualState,
-  stops: readonly number[],
-): DotFadeKeyframe[] => [
-  ...buildFadeKeyframes(from, peak, stops),
-  // Drop the duplicated peak frame so the two halves stay evenly distributed
-  // across the animation and the peak lands exactly at its midpoint.
-  ...buildFadeKeyframes(peak, to, stops).slice(1),
-];
+/** Dots that can show anything at all along `fromOffset -> toOffset`: strength
+ * reaches zero a full step away, so only these need animating — the rest stay
+ * on their class styles. */
+export const reachedDotIndexes = (
+  fromOffset: number,
+  toOffset: number,
+  pageCount: number,
+): number[] => {
+  const low = Math.max(0, Math.ceil(Math.min(fromOffset, toOffset) - 1));
+  const high = Math.min(pageCount - 1, Math.floor(Math.max(fromOffset, toOffset) + 1));
+  const ids: number[] = [];
+  for (let id = low; id <= high; id += 1) ids.push(id);
+  return ids;
+};

@@ -1,86 +1,99 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildFadeKeyframes,
-  buildPulseKeyframes,
+  buildDotKeyframes,
+  dotActiveStrength,
+  dotStateAt,
+  reachedDotIndexes,
   type DotVisualState,
 } from "./fadeKeyframes";
 
 const INACTIVE: DotVisualState = { opacity: 0.2, scale: 1 };
 const ACTIVE: DotVisualState = { opacity: 0.8, scale: 1.4 };
 
-describe("buildFadeKeyframes", () => {
-  it("emits one keyframe per stop, endpoints exactly at from/to", () => {
-    const frames = buildFadeKeyframes(INACTIVE, ACTIVE, [0, 0.25, 0.6, 1]);
-    expect(frames).toHaveLength(4);
-    expect(frames[0]).toEqual({ opacity: 0.2, transform: "scaleX(1)" });
-    expect(frames[3]).toEqual({ opacity: 0.8, transform: "scaleX(1.4)" });
+describe("dotActiveStrength", () => {
+  it("is full under the offset and gone a whole step away", () => {
+    expect(dotActiveStrength(0)).toBe(1);
+    expect(dotActiveStrength(1)).toBe(0);
+    expect(dotActiveStrength(-1)).toBe(0);
+    expect(dotActiveStrength(2.5)).toBe(0);
   });
 
-  it("blends both channels linearly by distance progress", () => {
-    const frames = buildFadeKeyframes(INACTIVE, ACTIVE, [0, 0.5, 1]);
-    expect(frames[1]!.opacity).toBeCloseTo(0.5, 10);
-    expect(frames[1]!.transform).toBe(`scaleX(${1 + 0.4 * 0.5})`);
-  });
-
-  it("keeps monotonic stops monotonic in opacity (fade never reverses)", () => {
-    const stops = [0, 0.1, 0.35, 0.7, 0.9, 1];
-    const frames = buildFadeKeyframes(INACTIVE, ACTIVE, stops);
-    for (let i = 1; i < frames.length; i += 1) {
-      expect(frames[i]!.opacity).toBeGreaterThanOrEqual(frames[i - 1]!.opacity);
-    }
-  });
-
-  it("supports the reverse direction (active -> inactive)", () => {
-    const frames = buildFadeKeyframes(ACTIVE, INACTIVE, [0, 1]);
-    expect(frames[0]!.opacity).toBeCloseTo(0.8, 10);
-    expect(frames[1]!.opacity).toBeCloseTo(0.2, 10);
-    expect(frames[1]!.transform).toBe("scaleX(1)");
+  it("is symmetric and linear between", () => {
+    expect(dotActiveStrength(0.25)).toBeCloseTo(0.75, 10);
+    expect(dotActiveStrength(-0.25)).toBeCloseTo(0.75, 10);
   });
 });
 
-/**
- * The retarget pulse: a dot caught mid-rise still rides its whole cycle —
- * on up to the active look, then back to resting — so a repeated click reads
- * as "this page was passed through" instead of a twitch.
- */
-describe("buildPulseKeyframes", () => {
-  /** Where the dot had got to when the repeated command landed. */
-  const CAUGHT_MID_RISE: DotVisualState = { opacity: 0.35, scale: 1.1 };
+describe("dotStateAt", () => {
+  it("blends both channels by strength", () => {
+    expect(dotStateAt(0, 0, INACTIVE, ACTIVE)).toEqual(ACTIVE);
+    expect(dotStateAt(0, 1, INACTIVE, ACTIVE)).toEqual(INACTIVE);
+    const half = dotStateAt(0, 0.5, INACTIVE, ACTIVE);
+    expect(half.opacity).toBeCloseTo(0.5, 10);
+    expect(half.scale).toBeCloseTo(1.2, 10);
+  });
+});
 
-  it("starts where the dot actually is, peaks at active, ends at resting", () => {
-    const frames = buildPulseKeyframes(CAUGHT_MID_RISE, ACTIVE, INACTIVE, [0, 0.5, 1]);
-    expect(frames[0]).toEqual({ opacity: 0.35, transform: "scaleX(1.1)" });
-    const last = frames[frames.length - 1]!;
-    expect(last.opacity).toBeCloseTo(0.2, 10);
-    expect(last.transform).toBe("scaleX(1)");
+describe("buildDotKeyframes", () => {
+  /**
+   * The ordinary click must look exactly as it did under the old two-dot
+   * cross-fade: a dot one step ahead blends by the plan's progress itself.
+   * That equivalence is why the strength ramp is linear.
+   */
+  it("reproduces the plain cross-fade across a single step", () => {
+    const stops = [0, 0.25, 0.6, 1];
+    const incoming = buildDotKeyframes(1, 0, 1, stops, INACTIVE, ACTIVE);
+    const outgoing = buildDotKeyframes(0, 0, 1, stops, INACTIVE, ACTIVE);
+
+    stops.forEach((p, i) => {
+      expect(incoming[i]!.opacity).toBeCloseTo(0.2 + 0.6 * p, 10);
+      expect(outgoing[i]!.opacity).toBeCloseTo(0.8 - 0.6 * p, 10);
+    });
+    expect(incoming[3]!.transform).toBe("scaleX(1.4)");
+    expect(outgoing[3]!.transform).toBe("scaleX(1)");
   });
 
-  it("puts the peak exactly at the midpoint (halves stay evenly distributed)", () => {
+  /**
+   * The repeated click: the offset travels two steps, so the middle dot is
+   * PASSED THROUGH — it must reach the full active look on the way and be back
+   * at rest by the end, all on this one curve. No separate pulse exists.
+   */
+  it("carries a passed-through dot up to active and back down", () => {
+    const stops = [0, 0.25, 0.5, 0.75, 1];
+    const middle = buildDotKeyframes(1, 0, 2, stops, INACTIVE, ACTIVE);
+
+    expect(middle[0]!.opacity).toBeCloseTo(0.2, 10);
+    expect(middle[2]!.opacity).toBeCloseTo(0.8, 10); // offset is exactly 1 here
+    expect(middle[4]!.opacity).toBeCloseTo(0.2, 10);
+    expect(middle[2]!.transform).toBe("scaleX(1.4)");
+  });
+
+  it("keeps a far dot at rest for the whole step", () => {
+    const frames = buildDotKeyframes(5, 0, 1, [0, 0.5, 1], INACTIVE, ACTIVE);
+    frames.forEach((f) => expect(f.opacity).toBeCloseTo(0.2, 10));
+  });
+
+  it("works backwards as well as forwards", () => {
     const stops = [0, 0.5, 1];
-    const frames = buildPulseKeyframes(CAUGHT_MID_RISE, ACTIVE, INACTIVE, stops);
-    // 3 rise frames + 2 fall frames (the duplicated peak is dropped) = 5.
-    expect(frames).toHaveLength(2 * stops.length - 1);
-    const middle = (frames.length - 1) / 2;
-    expect(Number.isInteger(middle)).toBe(true);
-    expect(frames[middle]).toEqual({ opacity: 0.8, transform: "scaleX(1.4)" });
+    const incoming = buildDotKeyframes(0, 1, 0, stops, INACTIVE, ACTIVE);
+    expect(incoming[0]!.opacity).toBeCloseTo(0.2, 10);
+    expect(incoming[2]!.opacity).toBeCloseTo(0.8, 10);
+  });
+});
+
+describe("reachedDotIndexes", () => {
+  it("covers every dot the offset comes within a step of", () => {
+    expect(reachedDotIndexes(0, 1, 9)).toEqual([0, 1, 2]);
+    expect(reachedDotIndexes(0, 2, 9)).toEqual([0, 1, 2, 3]);
   });
 
-  it("rises then falls — the active look is actually reached, not approached", () => {
-    const frames = buildPulseKeyframes(CAUGHT_MID_RISE, ACTIVE, INACTIVE, [0, 0.5, 1]);
-    const peak = (frames.length - 1) / 2;
-    for (let i = 1; i <= peak; i += 1) {
-      expect(frames[i]!.opacity).toBeGreaterThanOrEqual(frames[i - 1]!.opacity);
-    }
-    for (let i = peak + 1; i < frames.length; i += 1) {
-      expect(frames[i]!.opacity).toBeLessThanOrEqual(frames[i - 1]!.opacity);
-    }
-    expect(Math.max(...frames.map((f) => f.opacity))).toBeCloseTo(0.8, 10);
+  it("is direction-agnostic — the same span covers the same dots either way", () => {
+    expect(reachedDotIndexes(2, 0, 9)).toEqual(reachedDotIndexes(0, 2, 9));
   });
 
-  it("never emits a duplicate frame at the seam", () => {
-    const frames = buildPulseKeyframes(CAUGHT_MID_RISE, ACTIVE, INACTIVE, [0, 0.25, 1]);
-    const peak = (frames.length - 1) / 2;
-    expect(frames[peak]).not.toEqual(frames[peak + 1]);
+  it("clamps to the deck at both ends", () => {
+    expect(reachedDotIndexes(0, 0, 3)).toEqual([0, 1]);
+    expect(reachedDotIndexes(7, 8, 9)).toEqual([6, 7, 8]);
   });
 });
