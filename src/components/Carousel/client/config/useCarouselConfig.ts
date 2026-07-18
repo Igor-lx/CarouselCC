@@ -13,7 +13,6 @@ export function useCarouselConfig({
   visibleSlidesNr,
   durationAutoplay,
   durationStep,
-  jumpSpeedMultiplier,
   intervalAutoplay,
   errAltPlaceholder,
 }: RawConfigInput): CarouselRuntimeConfig {
@@ -23,7 +22,6 @@ export function useCarouselConfig({
         visibleSlidesNr,
         durationAutoplay,
         durationStep,
-        jumpSpeedMultiplier,
         intervalAutoplay,
         errAltPlaceholder,
       }),
@@ -32,7 +30,6 @@ export function useCarouselConfig({
       durationStep,
       errAltPlaceholder,
       intervalAutoplay,
-      jumpSpeedMultiplier,
       visibleSlidesNr,
     ]
   );

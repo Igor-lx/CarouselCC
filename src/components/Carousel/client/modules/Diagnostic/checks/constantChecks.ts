@@ -21,6 +21,7 @@ import {
   GO_TO_DECELERATION_DISTANCE_SHARE,
   GO_TO_FINAL_APPROACH_PAGE_SPAN,
   GO_TO_PREFLIGHT_PAGE_SPAN,
+  GO_TO_SPEED_MULTIPLIER,
   GO_TO_TELEPORT_MIN_PAGE_SPAN,
   HOVER_PAUSE_DELAY,
   IMAGE_RETRY_BASE_DELAY_MS,
@@ -145,6 +146,26 @@ const numericRules: NumericRule[] = [
     predicate: (v) =>
       isPositiveInteger(v) &&
       v > GO_TO_PREFLIGHT_PAGE_SPAN + GO_TO_FINAL_APPROACH_PAGE_SPAN,
+  },
+  {
+    layer: "Motion",
+    field: "GO_TO_SPEED_MULTIPLIER",
+    value: GO_TO_SPEED_MULTIPLIER,
+    severity: "CRITICAL",
+    expected: "Expected a positive finite number",
+    consequence:
+      "GO_TO peak speed becomes zero, negative or NaN and far jumps freeze or break",
+    predicate: greaterThan(0),
+  },
+  {
+    layer: "Motion",
+    field: "GO_TO_SPEED_MULTIPLIER",
+    value: GO_TO_SPEED_MULTIPLIER,
+    severity: "LOGICAL",
+    expected: "Expected a finite number >= 1 (a jump at least as fast as a step)",
+    consequence:
+      "A GO_TO slower than a single step inverts the visual contract and feels wrong",
+    predicate: atLeast(1),
   },
   {
     layer: "Motion",

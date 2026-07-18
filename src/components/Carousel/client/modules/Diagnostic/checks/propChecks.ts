@@ -58,21 +58,6 @@ export const collectPropWarnings = (
   }
 
   if (
-    typeof props.jumpSpeedMultiplier !== "undefined" &&
-    !isPositiveFinite(props.jumpSpeedMultiplier)
-  ) {
-    out.push({
-      severity: "CRITICAL",
-      layer: LAYER,
-      field: "jumpSpeedMultiplier",
-      actual: props.jumpSpeedMultiplier,
-      expected: "Expected a positive finite number",
-      consequence:
-        "GO_TO peak speed becomes zero, negative or NaN and far jumps freeze or break",
-    });
-  }
-
-  if (
     typeof props.intervalAutoplay !== "undefined" &&
     !isNonNegativeFinite(props.intervalAutoplay)
   ) {
@@ -99,21 +84,6 @@ export const collectPropWarnings = (
       expected: "Expected a non-empty string",
       consequence:
         "Slides whose image fails to load will render an empty alt fallback and become invisible",
-    });
-  }
-
-  if (
-    isPositiveFinite(props.jumpSpeedMultiplier) &&
-    props.jumpSpeedMultiplier < 1
-  ) {
-    out.push({
-      severity: "LOGICAL",
-      layer: LAYER,
-      field: "jumpSpeedMultiplier",
-      actual: props.jumpSpeedMultiplier,
-      expected: "Expected jumpSpeedMultiplier >= 1 (a jump at least as fast as a step)",
-      consequence:
-        "A GO_TO slower than a single step inverts the visual contract and feels wrong",
     });
   }
 

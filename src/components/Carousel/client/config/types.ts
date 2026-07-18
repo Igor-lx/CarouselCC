@@ -5,12 +5,6 @@ export interface PropDerivedSettings {
   visibleSlidesCount: number;
   autoplayDuration: number;
   stepDuration: number;
-  /**
-   * GO_TO peak cruise speed relative to a normal one-step MOVE. The jump
-   * duration is derived from distance and this multiplier, so short and far
-   * jumps keep a consistent visual speed.
-   */
-  jumpSpeedMultiplier: number;
   autoplayInterval: number;
   errorAltPlaceholder: string;
 }
@@ -43,6 +37,8 @@ export interface MotionSettings {
   goToAccelerationDistanceShare: number;
   /** @see GO_TO_DECELERATION_DISTANCE_SHARE */
   goToDecelerationDistanceShare: number;
+  /** @see GO_TO_SPEED_MULTIPLIER */
+  goToSpeedMultiplier: number;
 }
 
 export interface RepeatedClickSettings {
@@ -79,7 +75,6 @@ export interface RawConfigInput {
   visibleSlidesNr?: unknown;
   durationAutoplay?: unknown;
   durationStep?: unknown;
-  jumpSpeedMultiplier?: unknown;
   intervalAutoplay?: unknown;
   errAltPlaceholder?: unknown;
 }

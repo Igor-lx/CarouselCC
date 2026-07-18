@@ -10,7 +10,6 @@ const baseProps = (overrides: Partial<DiagnosticProps> = {}): DiagnosticProps =>
   visibleSlidesNr: undefined,
   durationAutoplay: undefined,
   durationStep: undefined,
-  jumpSpeedMultiplier: undefined,
   intervalAutoplay: undefined,
   errAltPlaceholder: undefined,
   userEnvironment: undefined,

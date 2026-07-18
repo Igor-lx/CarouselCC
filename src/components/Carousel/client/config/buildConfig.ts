@@ -13,6 +13,7 @@ import {
   GO_TO_DECELERATION_DISTANCE_SHARE,
   GO_TO_FINAL_APPROACH_PAGE_SPAN,
   GO_TO_PREFLIGHT_PAGE_SPAN,
+  GO_TO_SPEED_MULTIPLIER,
   GO_TO_TELEPORT_MIN_PAGE_SPAN,
   REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
   REPEATED_CLICK_DECELERATION_DISTANCE_SHARE,
@@ -39,17 +40,12 @@ export const buildCarouselConfig = ({
   visibleSlidesNr,
   durationAutoplay,
   durationStep,
-  jumpSpeedMultiplier,
   intervalAutoplay,
   errAltPlaceholder,
 }: RawConfigInput): CarouselRuntimeConfig => ({
   visibleSlidesCount: useDefault(visibleSlidesNr, CAROUSEL_DEFAULTS.visibleSlidesNr),
   autoplayDuration: useDefault(durationAutoplay, CAROUSEL_DEFAULTS.durationAutoplay),
   stepDuration: useDefault(durationStep, CAROUSEL_DEFAULTS.durationStep),
-  jumpSpeedMultiplier: useDefault(
-    jumpSpeedMultiplier,
-    CAROUSEL_DEFAULTS.jumpSpeedMultiplier,
-  ),
   autoplayInterval: useDefault(intervalAutoplay, CAROUSEL_DEFAULTS.intervalAutoplay),
   errorAltPlaceholder: useDefault(errAltPlaceholder, CAROUSEL_DEFAULTS.errAltPlaceholder),
   motion: {
@@ -72,6 +68,7 @@ export const buildCarouselConfig = ({
     goToFinalApproachPageSpan: GO_TO_FINAL_APPROACH_PAGE_SPAN,
     goToAccelerationDistanceShare: GO_TO_ACCELERATION_DISTANCE_SHARE,
     goToDecelerationDistanceShare: GO_TO_DECELERATION_DISTANCE_SHARE,
+    goToSpeedMultiplier: GO_TO_SPEED_MULTIPLIER,
   },
   repeatedClick: {
     speedMultiplier: REPEATED_CLICK_SPEED_MULTIPLIER,

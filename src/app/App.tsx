@@ -149,7 +149,6 @@ export default function App() {
               isInteractiveOn={isInteractive}
               durationAutoplay={4000}
               durationStep={2000}
-              jumpSpeedMultiplier={12}
               intervalAutoplay={3000}
               isFullPagesOn
               userEnvironment={userEnvironment}

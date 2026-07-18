@@ -60,7 +60,6 @@ const userEnvironment = useUserEnvironment(); // from "@/shared"
   isAuto
   isFullPagesOn
   durationStep={2000}
-  jumpSpeedMultiplier={8}
   intervalAutoplay={3000}
   userEnvironment={userEnvironment}
   onSlideClick={(slide) => openInNewTab(String(slide.content))}
@@ -119,7 +118,6 @@ referentially-stable object.
 | `durationAutoplay` | — | Duration of an autoplay-driven page step. |
 | `intervalAutoplay` | — | Idle interval between two autoplay steps. |
 | `durationStep`    | — | Base duration of duration-authored click / gesture-driven steps. Repeated-click profile segments instead derive their duration from their speed profile. Multi-page click distances scale linearly. |
-| `jumpSpeedMultiplier` | — | `GO_TO` peak cruise speed as a multiple of the normal one-step speed. A jump's duration is derived from distance and this multiplier, so a near and a far jump share one consistent speed. Drives short jumps and the bounded segments of a far-jump teleport alike. |
 
 All public-prop defaults (and every tunable) live in `config/` — see §1.7.
 This document does not restate them, so it cannot drift from the code.
@@ -659,7 +657,7 @@ halves with no cruise zone. Two authoring modes feed the same builder:
   profile's start speed, so retargets stay velocity-continuous.
 - **Speed-authored**: start / peak / end speeds plus zone distances derive the
   segment duration.
-  - `"jump"` — **every GO_TO**, at `jumpSpeedMultiplier × normalStepSpeed`. A
+  - `"jump"` — **every GO_TO**, at `GO_TO_SPEED_MULTIPLIER × normalStepSpeed`. A
     short jump uses one segment with local first-screen acceleration and local
     final-screen deceleration; a far jump uses a preflight segment, a position
     teleport, and a fixed one-page approach (§4.4).
@@ -756,7 +754,7 @@ profile can never drift apart:
   to rest at the target.
 
 The speed intent is shared by short and far jumps:
-`jumpSpeedMultiplier × normalStepSpeed`. The geometry differs only in how much
+`GO_TO_SPEED_MULTIPLIER × normalStepSpeed`. The geometry differs only in how much
 of the invisible middle is cut out. Acceleration and deceleration are local
 page-screen budgets, so `GO_TO_DECELERATION_DISTANCE_SHARE = 1` means "slow
 down over the whole final page screen", not "slow down over the whole jump".

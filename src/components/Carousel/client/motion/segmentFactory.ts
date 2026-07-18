@@ -345,7 +345,7 @@ export function buildCarouselSegment({
       startedAt,
       config.motion,
       stepSize,
-      resolveJumpPeakSpeed(stepSize, config.stepDuration, config.jumpSpeedMultiplier),
+      resolveJumpPeakSpeed(stepSize, config.stepDuration, config.motion.goToSpeedMultiplier),
       goToProfilePhase(intent),
     );
     return { segment, duration: segment.duration };

@@ -130,7 +130,6 @@ export interface CarouselProps {
   durationAutoplay?: number;
   intervalAutoplay?: number;
   durationStep?: number;
-  jumpSpeedMultiplier?: number;
   isContentImg?: boolean;
   errAltPlaceholder?: string;
   isAuto?: boolean;

@@ -8,7 +8,6 @@ export const CAROUSEL_DEFAULTS = {
   durationAutoplay: 3000,
   intervalAutoplay: 3000,
   durationStep: 2000,
-  jumpSpeedMultiplier: 8,
   errAltPlaceholder: "Downloading Error",
   isFullPagesOn: false,
   isContentImg: true,

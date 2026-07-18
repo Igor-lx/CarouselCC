@@ -14,7 +14,6 @@ interface UseDiagnosticContextValueInput {
   visibleSlidesNr: number | undefined;
   durationAutoplay: number | undefined;
   durationStep: number | undefined;
-  jumpSpeedMultiplier: number | undefined;
   intervalAutoplay: number | undefined;
   errAltPlaceholder: string | undefined;
   userEnvironment: UserEnvironment | undefined;
@@ -46,7 +45,6 @@ export function useDiagnosticContextValue({
   visibleSlidesNr,
   durationAutoplay,
   durationStep,
-  jumpSpeedMultiplier,
   intervalAutoplay,
   errAltPlaceholder,
   userEnvironment,
@@ -68,7 +66,6 @@ export function useDiagnosticContextValue({
       visibleSlidesNr,
       durationAutoplay,
       durationStep,
-      jumpSpeedMultiplier,
       intervalAutoplay,
       errAltPlaceholder,
       userEnvironment,
@@ -78,7 +75,6 @@ export function useDiagnosticContextValue({
       durationStep,
       errAltPlaceholder,
       intervalAutoplay,
-      jumpSpeedMultiplier,
       userEnvironment,
       visibleSlidesNr,
     ],

@@ -50,6 +50,21 @@ export const GO_TO_ACCELERATION_DISTANCE_SHARE = 0.5;
 export const GO_TO_DECELERATION_DISTANCE_SHARE = 0.5;
 
 /**
+ * GO_TO peak cruise speed as a multiple of the normal one-step MOVE speed.
+ * A jump's duration then falls out of distance and profile, so a near and a
+ * far jump share one consistent cruise speed.
+ *
+ * A tuning constant, not a prop: it is a DIMENSIONLESS internal ratio, only
+ * meaningful next to the step-speed derivation it multiplies
+ * (`resolveJumpPeakSpeed` = stepSpeed x this). The host already sets the jump
+ * tempo through `durationStep` — jump speed scales with it — so what is left
+ * here is the engine's own feel decision, exactly like the accel/decel shares
+ * above. Values below 1 make a GO_TO slower than a single step, which inverts
+ * the visual contract (diagnostics flag it).
+ */
+export const GO_TO_SPEED_MULTIPLIER = 12;
+
+/**
  * Motion-profile distance shares for the duration-authored steps. Every
  * carousel motion is a single accel/cruise/decel profile (there are no
  * cubic-bezier curves anywhere): the shares below shape each step kind, the

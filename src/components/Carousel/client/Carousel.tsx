@@ -71,7 +71,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     visibleSlidesNr,
     durationAutoplay,
     durationStep,
-    jumpSpeedMultiplier,
     intervalAutoplay,
     errAltPlaceholder,
     isFullPagesOn = CAROUSEL_DEFAULTS.isFullPagesOn,
@@ -117,7 +116,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     visibleSlidesNr,
     durationAutoplay,
     durationStep,
-    jumpSpeedMultiplier,
     intervalAutoplay,
     errAltPlaceholder,
   });
@@ -365,7 +363,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     visibleSlidesNr,
     durationAutoplay,
     durationStep,
-    jumpSpeedMultiplier,
     intervalAutoplay,
     errAltPlaceholder,
     userEnvironment,

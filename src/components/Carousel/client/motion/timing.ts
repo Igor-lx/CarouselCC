@@ -17,15 +17,15 @@ export const resolveSpeed = (distance: number, duration: number): number =>
 
 /**
  * Peak cruise speed of a GO_TO profile, expressed as a multiple of the normal
- * one-step MOVE speed. `jumpSpeedMultiplier` is the public knob; the duration
- * of any jump then falls out of distance / profile, so short and far jumps
- * keep one consistent cruise speed.
+ * one-step MOVE speed. `goToSpeedMultiplier` is the tuning knob (see
+ * GO_TO_SPEED_MULTIPLIER); the duration of any jump then falls out of
+ * distance / profile, so short and far jumps keep one consistent cruise speed.
  */
 export const resolveJumpPeakSpeed = (
   stepSize: number,
   stepDuration: number,
-  jumpSpeedMultiplier: number,
-): number => resolveSpeed(stepSize, stepDuration) * jumpSpeedMultiplier;
+  goToSpeedMultiplier: number,
+): number => resolveSpeed(stepSize, stepDuration) * goToSpeedMultiplier;
 
 export interface GoToProfileZones {
   /** Acceleration distance, local to the first page screen of any GO_TO. */

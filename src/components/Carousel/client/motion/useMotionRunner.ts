@@ -245,7 +245,7 @@ export function useMotionRunner({
         const jumpPeak = resolveJumpPeakSpeed(
           stepSize,
           config.stepDuration,
-          config.jumpSpeedMultiplier,
+          config.motion.goToSpeedMultiplier,
         );
         const totalDuration =
           segment.duration +
