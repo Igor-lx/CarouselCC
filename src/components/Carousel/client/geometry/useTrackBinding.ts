@@ -7,6 +7,7 @@ import {
 } from "../domain";
 import { useIsomorphicLayoutEffect } from "../../../../shared";
 import { isWaapiSupported } from "../../../../shared";
+import { keyframesAlongStops } from "../motion";
 import { isDroppedFallbackFrame, type VisualPositionSource } from "../visual-position";
 
 const RESIZE_EPSILON_PX = 0.5;
@@ -203,15 +204,17 @@ export function useTrackBinding({
 
       // One keyframe per progress stop: the temporal curve is carried by the
       // keyframe values themselves (evenly distributed offsets, default linear
-      // interpolation between them), so no easing function is involved.
-      const span = to - from;
-      const keyframes: Keyframe[] = stops.map((progress) => ({
-        transform: trackPixelTransform(
-          from + span * progress,
-          layoutOriginRef.current,
-          slot,
-        ),
-      }));
+      // interpolation between them), so no easing function is involved. The
+      // same builder the pagination variants use — one reading of a plan's
+      // stops for all three consumers (see motion/stopSampling).
+      const keyframes: Keyframe[] = keyframesAlongStops(
+        from,
+        to,
+        stops,
+        (position) => ({
+          transform: trackPixelTransform(position, layoutOriginRef.current, slot),
+        }),
+      );
       const fromTransform = keyframes[0]!.transform as string;
       const toTransform = keyframes[keyframes.length - 1]!.transform as string;
 
