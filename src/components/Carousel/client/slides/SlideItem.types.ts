@@ -13,7 +13,7 @@ export interface SlideItemProps extends SlideAriaProps {
    * rendered URL rule (see resolveRenderedImageSrc). */
   isResponsiveImagesOn: boolean;
   errAltPlaceholder: string;
-  isInteractive: boolean;
+  isInteractiveOn: boolean;
   isActive: boolean;
   isActual: boolean;
   /** The carousel's image-resource store, or `null` when image content is off. */

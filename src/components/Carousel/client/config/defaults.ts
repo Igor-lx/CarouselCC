@@ -16,6 +16,6 @@ export const CAROUSEL_DEFAULTS = {
   isPaginationOn: true,
   isControlsOn: true,
   isSwipeOn: true,
-  isInteractive: true,
+  isInteractiveOn: true,
   isFinite: false,
 } as const;

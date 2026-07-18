@@ -146,7 +146,7 @@ export default function App() {
               isSwipeOn={true}
               isAuto={isAutoplay}
               isPaginationOn
-              isInteractive={isInteractive}
+              isInteractiveOn={isInteractive}
               durationAutoplay={4000}
               durationStep={2000}
               jumpSpeedMultiplier={12}

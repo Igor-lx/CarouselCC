@@ -27,7 +27,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
     isContentImg,
     isResponsiveImagesOn,
     errAltPlaceholder,
-    isInteractive,
+    isInteractiveOn,
     isActive,
     isActual,
     isDataSaverEnabled,
@@ -74,7 +74,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
 
   const isContentReady = !isImageSlide || status === "loaded";
   const isClickable =
-    Boolean(onSlideClick) && isInteractive && isContentReady;
+    Boolean(onSlideClick) && isInteractiveOn && isContentReady;
   const Tag = isClickable ? "button" : "div";
 
   // Render-only responsive sources (see `Slide.image`). The browser selects the

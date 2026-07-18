@@ -135,7 +135,7 @@ export interface CarouselProps {
   errAltPlaceholder?: string;
   isAuto?: boolean;
   isPaginationOn?: boolean;
-  isInteractive?: boolean;
+  isInteractiveOn?: boolean;
   isFinite?: boolean;
   isControlsOn?: boolean;
   isSwipeOn?: boolean;
