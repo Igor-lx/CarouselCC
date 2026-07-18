@@ -2,7 +2,13 @@ import { useCallback, useEffect, useRef } from "react";
 
 import { useIsomorphicLayoutEffect } from "../../../../../shared";
 import type { CarouselMotionPlan, MotionPlanSource } from "../../motion";
-import { buildFadeKeyframes, type DotVisualState } from "./fadeKeyframes";
+import { RETARGET_PULSE_DURATION_SHARE } from "./defaults";
+import {
+  buildFadeKeyframes,
+  buildPulseKeyframes,
+  type DotFadeKeyframe,
+  type DotVisualState,
+} from "./fadeKeyframes";
 
 /**
  * Engine-driven cross-fade for the pagination dots — the third consumer of
@@ -172,9 +178,9 @@ export function usePaginationFade({
     (
       element: HTMLElement,
       pageIndex: number,
-      from: DotVisualState,
-      to: DotVisualState,
-      plan: Extract<CarouselMotionPlan, { kind: "waapi" }>,
+      keyframes: DotFadeKeyframe[],
+      duration: number,
+      startedAt: number,
       onFinish?: () => void,
     ) => {
       cancelFade(pageIndex);
@@ -186,8 +192,8 @@ export function usePaginationFade({
 
       let animation: Animation;
       try {
-        animation = element.animate(buildFadeKeyframes(from, to, plan.stops), {
-          duration: plan.duration,
+        animation = element.animate(keyframes, {
+          duration,
           fill: "both",
         });
       } catch {
@@ -197,7 +203,7 @@ export function usePaginationFade({
         return;
       }
       try {
-        animation.startTime = plan.startedAt;
+        animation.startTime = startedAt;
       } catch {
         // play-pending fallback keeps the fade, merely unpinned.
       }
@@ -232,6 +238,12 @@ export function usePaginationFade({
           }
           const states = readDotStates(anyDot);
 
+          // A dot with a live animation was still on its way to the active
+          // look when this command arrived — the repeated-click case. Read the
+          // flag now, while the animation is still in the map: `startFade`
+          // cancels it.
+          const wasStillRising = Boolean(outgoing) && animationsRef.current.has(from);
+
           // Read live values BEFORE cancelling (cancel drops the fill and the
           // element snaps to its class styles).
           const outgoingFrom =
@@ -244,15 +256,43 @@ export function usePaginationFade({
               : states.inactive;
 
           if (outgoing) {
-            startFade(outgoing, from, outgoingFrom, states.inactive, plan);
+            // Passed-through dot: let it finish the cycle it started — up to
+            // the active look and back down — but compressed, so it is resting
+            // again well before the real destination arrives. A dot that was
+            // already settled at active just fades out on the plan's own curve.
+            startFade(
+              outgoing,
+              from,
+              wasStillRising
+                ? buildPulseKeyframes(
+                    outgoingFrom,
+                    states.active,
+                    states.inactive,
+                    plan.stops,
+                  )
+                : buildFadeKeyframes(outgoingFrom, states.inactive, plan.stops),
+              wasStillRising
+                ? plan.duration * RETARGET_PULSE_DURATION_SHARE
+                : plan.duration,
+              plan.startedAt,
+            );
           }
           if (incoming) {
-            startFade(incoming, to, incomingFrom, states.active, plan, () => {
-              // Settle: drop both fills — the class styles beneath already
-              // show exactly these final values.
-              cancelFade(to);
-              cancelFade(from);
-            });
+            // Unchanged: the destination dot rides the plan's own curve over
+            // the plan's own duration, so it lands WITH the slide.
+            startFade(
+              incoming,
+              to,
+              buildFadeKeyframes(incomingFrom, states.active, plan.stops),
+              plan.duration,
+              plan.startedAt,
+              () => {
+                // Settle: drop both fills — the class styles beneath already
+                // show exactly these final values.
+                cancelFade(to);
+                cancelFade(from);
+              },
+            );
           }
           displayedRef.current = to;
           return;
