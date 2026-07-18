@@ -11,7 +11,7 @@ export const CAROUSEL_DEFAULTS = {
   errAltPlaceholder: "Downloading Error",
   isFullPagesOn: false,
   isContentImg: true,
-  isAuto: true,
+  isAutoplayOn: true,
   isPaginationOn: true,
   isControlsOn: true,
   isSwipeOn: true,

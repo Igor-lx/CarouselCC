@@ -57,7 +57,7 @@ const userEnvironment = useUserEnvironment(); // from "@/shared"
 <Carousel
   slidesData={slides}
   visibleSlidesNr={3}
-  isAuto
+  isAutoplayOn
   isFullPagesOn
   durationStep={2000}
   intervalAutoplay={3000}
@@ -126,7 +126,7 @@ This document does not restate them, so it cannot drift from the code.
 
 | Prop             | Default | Effect |
 | ---------------- | ------- | ------ |
-| `isAuto`         | — | Master autoplay switch. When `false`, the `setTimeout` loop never runs. Autoplay also auto-pauses when (a) the viewport is less than `VISIBILITY_THRESHOLD` on screen, (b) the user is dragging or motion is in progress, (c) on desktop only, the pointer hovers the viewport (`HOVER_PAUSE_DELAY` debounce). On the final page in finite mode it loops back to page 0 via `GO_TO`. |
+| `isAutoplayOn`   | — | Master autoplay switch. When `false`, the `setTimeout` loop never runs. Autoplay also auto-pauses when (a) the viewport is less than `VISIBILITY_THRESHOLD` on screen, (b) the user is dragging or motion is in progress, (c) on desktop only, the pointer hovers the viewport (`HOVER_PAUSE_DELAY` debounce). On the final page in finite mode it loops back to page 0 via `GO_TO`. |
 | `isPaginationOn` | — | Gates the rendering of the attached `Pagination`/`PaginationWidget` slot. If the prop is `true` but no pagination slot is attached, nothing renders; the slot must opt in by being placed in `children`. |
 | `isControlsOn`   | — | Same contract as `isPaginationOn`, for the `Controls` slot. |
 | `isSwipeOn`      | — | Master gesture switch. When `false` the pointer-swipe primitive attaches **no listeners at all** — the viewport carries zero pointer handlers and touch input behaves natively, as if the gesture surface did not exist. Flipped off under a live finger, the orphaned drag is ended by the adapter as a passive snap from the live position (§5). Unlike the slot gates this is not a render gate — gesture has no slot. |
@@ -417,7 +417,7 @@ These are the user-facing behaviours the implementation guarantees.
   gesture.
 - **Autoplay.** A `setTimeout(intervalAutoplay)` schedules the next step
   whenever the carousel is in the eligible state described under
-  `isAuto`. On the final page in finite mode, the next step loops back to
+  `isAutoplayOn`. On the final page in finite mode, the next step loops back to
   page 0 via `GO_TO`.
 - **External status signal.** `onCarouselStatusChange` fires on mount and on
   every change of `{ isIdle, currentPageIndex, pageCount, isAtStart, isAtEnd }`

@@ -132,7 +132,7 @@ export interface CarouselProps {
   durationStep?: number;
   isContentImg?: boolean;
   errAltPlaceholder?: string;
-  isAuto?: boolean;
+  isAutoplayOn?: boolean;
   isPaginationOn?: boolean;
   isInteractiveOn?: boolean;
   isFinite?: boolean;

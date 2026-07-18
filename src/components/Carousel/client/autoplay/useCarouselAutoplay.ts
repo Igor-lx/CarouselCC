@@ -10,8 +10,8 @@ interface UseCarouselAutoplayInput {
   state: CarouselState;
   config: CarouselRuntimeConfig;
   navigation: CarouselNavigation;
-  /** Master autoplay switch (the `isAuto` public prop). */
-  isAuto: boolean;
+  /** Master autoplay switch (the `isAutoplayOn` public prop). */
+  isAutoplayOn: boolean;
   /** Touch environments keep autoplay running under hover. */
   isTouch: boolean;
   /** Finite-mode end boundary — the next tick loops back to page 0. */
@@ -42,7 +42,7 @@ export function useCarouselAutoplay({
   state,
   config,
   navigation,
-  isAuto,
+  isAutoplayOn,
   isTouch,
   isAtEnd,
   viewportRef,
@@ -67,12 +67,12 @@ export function useCarouselAutoplay({
   // scroll/fling, or the browser chrome settling: no NEW rides until quiet.
   // A GETTER, checked when a tick fires — never a render trigger.
   const getIsViewportBusy = useViewportBusy({
-    enabled: isAuto && state.layout.canSlide,
+    enabled: isAutoplayOn && state.layout.canSlide,
     quietDelayMs: config.interaction.autoplayResettleDelayMs,
   });
 
   return useAutoplay({
-    enabled: isAuto && state.layout.canSlide,
+    enabled: isAutoplayOn && state.layout.canSlide,
     isPaused: !visible || isDragging || isMoving,
     shouldDeferTick: getIsViewportBusy,
     isAtEnd,

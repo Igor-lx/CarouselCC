@@ -144,7 +144,7 @@ export default function App() {
               visibleSlidesNr={visibleSlidesNr}
               slidesData={slidesData}
               isSwipeOn={true}
-              isAuto={isAutoplay}
+              isAutoplayOn={isAutoplay}
               isPaginationOn
               isInteractiveOn={isInteractive}
               durationAutoplay={4000}
