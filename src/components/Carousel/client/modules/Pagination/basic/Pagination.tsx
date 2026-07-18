@@ -26,6 +26,7 @@ const PaginationBase = memo(function Pagination({ className }: PaginationProps) 
     motionPlan,
     targetPageIndex: intent.targetPageIndex,
     pageCount: layout.pageCount,
+    isFinite: layout.isFinite,
   });
 
   const pageIndexes = useMemo(

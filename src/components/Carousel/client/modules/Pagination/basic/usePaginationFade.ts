@@ -10,7 +10,9 @@ import {
 import {
   buildDotKeyframes,
   dotActiveStrength,
+  offsetDistance,
   reachedDotIndexes,
+  resolveOffsetTarget,
   type DotVisualState,
 } from "./fadeKeyframes";
 
@@ -73,6 +75,9 @@ interface UsePaginationFadeInput {
   motionPlan: MotionPlanSource | null;
   targetPageIndex: number;
   pageCount: number;
+  /** Cyclic decks have no ends: a step off page 0 lands on the last page one
+   * step away, and the offset must travel that way, not across the strip. */
+  isFinite: boolean;
 }
 
 export interface PaginationFadeBinding {
@@ -84,6 +89,7 @@ export function usePaginationFade({
   motionPlan,
   targetPageIndex,
   pageCount,
+  isFinite,
 }: UsePaginationFadeInput): PaginationFadeBinding {
   const dotRefs = useRef<Array<HTMLElement | null>>([]);
   const callbacksRef = useRef<Array<((node: HTMLElement | null) => void) | null>>([]);
@@ -161,11 +167,13 @@ export function usePaginationFade({
 
   const settle = useCallback(
     (landedOn: number) => {
-      offsetRef.current = landedOn;
+      // Normalise: a cyclic step may have taken the offset past either end.
+      offsetRef.current =
+        pageCount > 0 ? ((landedOn % pageCount) + pageCount) % pageCount : landedOn;
       stepRef.current = null;
       cancelAllFades();
     },
-    [cancelAllFades],
+    [cancelAllFades, pageCount],
   );
 
   const applyPlan = useCallback(
@@ -177,7 +185,13 @@ export function usePaginationFade({
           if (plan.isContinuation) return;
 
           const from = liveOffset();
-          const to = targetRef.current;
+          const to = resolveOffsetTarget(
+            from,
+            targetRef.current,
+            pageCount,
+            plan.direction,
+            isFinite,
+          );
           if (from === to) return;
 
           const anyDot = dotRefs.current.find((dot) => dot) ?? null;
@@ -190,7 +204,7 @@ export function usePaginationFade({
           // One motion for the whole strip: every dot the offset passes near
           // gets the SAME curve over the SAME duration on the SAME clock.
           cancelAllFades();
-          for (const index of reachedDotIndexes(from, to, pageCount)) {
+          for (const index of reachedDotIndexes(from, to, pageCount, isFinite)) {
             const dot = dotRefs.current[index];
             if (!dot) continue;
 
@@ -199,16 +213,31 @@ export function usePaginationFade({
             const staysInvisible =
               plan.stops.every(
                 (p) =>
-                  dotActiveStrength(index - (from + (to - from) * p)) <=
-                  INVISIBLE_STRENGTH,
-              ) && index !== to;
+                  dotActiveStrength(
+                    offsetDistance(
+                      index,
+                      from + (to - from) * p,
+                      pageCount,
+                      isFinite,
+                    ),
+                  ) <= INVISIBLE_STRENGTH,
+              ) && index !== targetRef.current;
             if (staysInvisible) continue;
 
             suppressTransition(index);
             let animation: Animation;
             try {
               animation = dot.animate(
-                buildDotKeyframes(index, from, to, plan.stops, inactive, active),
+                buildDotKeyframes(
+                  index,
+                  from,
+                  to,
+                  plan.stops,
+                  inactive,
+                  active,
+                  pageCount,
+                  isFinite,
+                ),
                 { duration: plan.duration, fill: "both" },
               );
             } catch {
@@ -225,7 +254,7 @@ export function usePaginationFade({
             animationsRef.current.set(index, animation);
 
             // The destination dot outlives every other: settle on its finish.
-            if (index === to) {
+            if (index === targetRef.current) {
               animation.onfinish = () => {
                 if (animationsRef.current.get(index) !== animation) return;
                 settle(to);
@@ -252,7 +281,15 @@ export function usePaginationFade({
         }
       }
     },
-    [liveOffset, pageCount, restoreTransition, settle, suppressTransition, cancelAllFades],
+    [
+      cancelAllFades,
+      isFinite,
+      liveOffset,
+      pageCount,
+      restoreTransition,
+      settle,
+      suppressTransition,
+    ],
   );
 
   useIsomorphicLayoutEffect(() => {
