@@ -526,7 +526,7 @@ here only invites doc/code drift. The single source of truth is `config/`:
 - `config/interaction.ts` — hover delay, visibility threshold.
 - `config/gesture.ts` — swipe + inertial-release config, the slot-adaptive
   normalization constants and their pure resolver (§5).
-- `config/layout.ts` — render-window buffer; `config/fallback.ts` — legacy-fallback frame-drop cadence.
+- `config/layout.ts` — render-window buffer; `config/legacyPaint.ts` — frame-drop cadence of the legacy (no-WAAPI) paint path.
 - `modules/PaginationWidget/defaults.ts` — widget geometry + write epsilons.
 
 These values are part of the visual contract: changing them changes how the
@@ -1302,7 +1302,7 @@ src/components/Carousel/client/
 ├── config/                        config resolution
 │   ├── defaults.ts                public-prop defaults
 │   ├── layout.ts                  render-window buffer
-│   ├── fallback.ts                legacy-fallback frame-drop cadence
+│   ├── legacyPaint.ts             frame-drop cadence of the legacy (no-WAAPI) paint path
 │   ├── motion.ts                  profile distance shares (step/autoplay/snap-back/repeated/GO_TO)
 │   ├── gesture.ts                 drag config + inertial release config
 │   ├── interaction.ts             hover delay, visibility threshold

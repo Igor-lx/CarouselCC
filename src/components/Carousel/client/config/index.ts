@@ -3,7 +3,7 @@
  * feel, product or performance knob a developer may change freely to taste,
  * with every value guarded by the Diagnostic layer. Each file groups the
  * knobs of one concern (motion, gesture, interaction, layout, slides,
- * fallback pacing). Implementation constants (tolerances, sanity clamps,
+ * legacy paint pacing). Implementation constants (tolerances, sanity clamps,
  * calibration records, private thresholds) do NOT live here — they live WITH
  * the code they serve, documented in place (e.g. `MOTION_EPSILON` in
  * motion/, `DRAG_RELEASE_EPSILON` in domain/dragRelease.ts,
@@ -13,7 +13,7 @@
  */
 export { CAROUSEL_DEFAULTS } from "./defaults";
 export { RENDER_WINDOW_BUFFER_MULTIPLIER } from "./layout";
-export { FALLBACK_DROP_EVERY_NTH_FRAME } from "./fallback";
+export { FALLBACK_DROP_EVERY_NTH_FRAME } from "./legacyPaint";
 export {
   SNAP_BACK_DURATION,
   REPEATED_CLICK_SPEED_MULTIPLIER,
