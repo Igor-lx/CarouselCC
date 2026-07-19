@@ -7,6 +7,21 @@ wherever your images live (a build box, a server, a CDN pipeline), and run it
 there. It depends only on Node built-ins and imports nothing from the component,
 so it travels on its own.
 
+## Running it in THIS repo
+
+```bash
+npm run gen:carousel
+```
+
+That is the whole command. It processes BOTH demo configs
+(`carousel-data.config1.json` and `carousel-data.config2.json` in the repo
+root) and rewrites `public/carousel-slides1.json` / `public/carousel-slides2.json`.
+Edit a config by hand → run this → the app picks the fresh document up on
+the next reload (the demo fetches `carousel-slides${SLIDES_SET}.json`;
+which set is live is `DEFAULT_SLIDES_SET` in `App.tsx`, overridable per
+visit with `?slides=1|2`). Anywhere else, the raw form is
+`tsx cli.ts <config.json>` — see "CLI" below.
+
 ## This generator is OPTIONAL
 
 `<Carousel>` takes its slides through the `slidesData` prop, which is a plain
@@ -112,6 +127,19 @@ tsx src/components/Carousel/data-gen/cli.ts carousel-data.config.json
 - `sources` — optional art-directed groups (e.g. an orientation crop).
 
 ## Idempotent
+
+## What `default` actually controls (read before debugging crops)
+
+`default` designates the SINGLE-SET asset — the one candidate a slide
+renders when the `<ResponsiveImages />` module is NOT mounted (it becomes
+`image.defaultSrc` in the document). **With the module mounted it plays no
+role at all**: the browser then picks the crop through the art-directed
+`<source media>` queries, and a landscape viewport (any desktop) matches
+the wide crop by design — pointing `default` at a tall crop will not and
+must not change what a desktop shows in responsive mode. To SEE the
+`default` asset, unmount `<ResponsiveImages />` and reload. (Runtime rule:
+`resolveRenderedImageSrc` — responsive mode returns the canonical URL,
+single-set mode returns `defaultSrc` → widest candidate → content.)
 
 Re-running merges against the existing `output`: a slide is matched by its slug,
 so its `id` and hand-written `alt` are preserved, new assets get a fresh id, and
