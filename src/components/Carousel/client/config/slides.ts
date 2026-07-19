@@ -35,6 +35,12 @@ export const SLIDE_PORTRAIT_MEDIA_CONDITION = "(orientation: portrait)";
  * in the open. It must cover a full fade out PLUS fade in.
  */
 export const SLIDE_REORIENT_FADE_OUT_MS = 650;
+/**
+ * Also times the SLOW-LOAD reveal (data-awaiting-image): a still-loading
+ * image is held invisible and the complete bitmap fades in over this same
+ * duration — the two are the same perceptual act (an image appearing on a
+ * calm, settled screen), so they deliberately share one knob.
+ */
 export const SLIDE_REORIENT_FADE_IN_MS = 550;
 export const SLIDE_REORIENT_VEIL_MAX_MS = 2250;
 

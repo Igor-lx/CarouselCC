@@ -55,8 +55,8 @@ export const GO_TO_TELEPORT_MIN_PAGE_SPAN = 3;
  * A deceleration share of `1` means "use the whole final page screen to slow
  * down"; `0` means cruise to the target and stop sharply there.
  */
-export const GO_TO_ACCELERATION_DISTANCE_SHARE = 0.5;
-export const GO_TO_DECELERATION_DISTANCE_SHARE = 0.5;
+export const GO_TO_ACCELERATION_DISTANCE_SHARE = 0.35;
+export const GO_TO_DECELERATION_DISTANCE_SHARE = 0.35;
 
 /**
  * GO_TO peak cruise speed as a multiple of the normal one-step MOVE speed.

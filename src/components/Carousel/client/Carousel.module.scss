@@ -196,6 +196,22 @@
         opacity: 0;
         transition-duration: var(--slide-reorient-fade-out);
       }
+
+      // Slow-load reveal (data-awaiting-image, set by SlideItem while the
+      // resource is still loading, ResponsiveImages module only): a network
+      // image paints PROGRESSIVELY — stripes crawling top-to-bottom — and on
+      // a slow connection that crawl is the whole first impression. Hidden
+      // instantly here (transition: none — there must be no fade TO
+      // invisible), the bitmap arrives complete behind the veil; dropping
+      // the attribute lands on the base rule above, so the finished image
+      // fades in over the same calm-screen timing the reorient veil uses —
+      // one shared "image appears" duration, not a second knob. The
+      // image-resource store keeps status per URL, so an image seen once
+      // reappears instantly on every later mount.
+      &[data-awaiting-image="true"] {
+        opacity: 0;
+        transition: none;
+      }
     }
   }
 

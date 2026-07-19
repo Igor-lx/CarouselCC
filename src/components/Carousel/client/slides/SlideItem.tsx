@@ -97,6 +97,13 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
         key={sources.length === 0 ? generation : undefined}
         ref={imgRef}
         data-reorienting={isReorienting || undefined}
+        // Slow-load reveal (see Carousel.module.scss): hold the image
+        // invisible while it still loads, then fade the COMPLETE bitmap in —
+        // instead of the browser's progressive stripe paint. Responsive
+        // module only; plain single-set mode keeps the native behaviour.
+        data-awaiting-image={
+          isResponsiveImagesOn && status === "loading" ? "true" : undefined
+        }
         src={imageSource}
         srcSet={isResponsiveImagesOn ? image?.srcSet : undefined}
         sizes={isResponsive ? resolvedSizes : undefined}
