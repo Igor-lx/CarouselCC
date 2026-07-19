@@ -82,18 +82,6 @@
   min-width: 0;
 }
 
-// Tall (9/16) slides are the default art direction; on big LANDSCAPE screens
-// an unbounded deck would make each slide taller than the viewport (slide
-// height = slot width x 16/9). Bound the deck width so a slide fits the
-// height budget: 2 visible slides x (~76svh x 9/16) each — mirrors
-// VISIBLE_BY_BREAKPOINT in App.tsx. No cap needed elsewhere: portrait slots
-// are naturally narrow, and compact landscape flips the box to 16:9.
-@media (orientation: landscape) and (height > 520px) {
-  .component > * {
-    max-width: calc(2 * 76svh * 9 / 16);
-  }
-}
-
 @media (width <= 1023px) {
   .app {
     --page-padding-block: 20px;
