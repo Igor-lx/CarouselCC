@@ -129,6 +129,35 @@ export type PointerSwipeHostRef =
   | ((node: HTMLElement | null) => void)
   | { current: HTMLElement | null };
 
+/**
+ * Turnkey "the finger drags your value" — the binding that removes the last
+ * consumer-side drag boilerplate (the anchor ref and the per-move write).
+ *
+ * When present, the engine anchors itself at drag ACTIVATION (`read()`) and
+ * calls `write(anchor + uiOffset)` on activation and on every move. The
+ * anchor is read at activation, not at press: `uiOffset` is measured from
+ * the finger's re-anchored position and starts at ~0 there, so the first
+ * write equals `read()` — the value continues from exactly where it was,
+ * whatever the OS swallowed as touch slop.
+ *
+ * The binding is 1:1 with the finger: one pixel of travel is one unit of
+ * value. A consumer whose value lives in another unit (the carousel's
+ * slot-adaptive pixels→slides mapping) keeps the plain callbacks — a unit
+ * conversion is domain knowledge the engine must not guess.
+ *
+ * `write` is where a motion-library consumer plugs its controller
+ * (`controller.set(v, { phase: "dragging" })`), and `read` is where a flying
+ * value gets caught: cancel the ride inside `read` and return the live
+ * position — the drag then picks the value up mid-flight without a seam.
+ * The callbacks (`onDragStart`/`onDragMove`) still fire after each write.
+ */
+export interface PointerSwipeValueBinding {
+  /** The value's live position at drag activation — the drag's anchor. */
+  read: () => number;
+  /** Receives `anchor + uiOffset` on activation and on every move. */
+  write: (value: number) => void;
+}
+
 export interface PointerSwipeProps {
   /**
    * OPTIONAL consumer ref: the engine owns the host element itself through
@@ -139,6 +168,8 @@ export interface PointerSwipeProps {
   hostRef?: PointerSwipeHostRef;
   enabled?: boolean;
   config?: PointerSwipeConfig;
+  /** Optional turnkey drag→value binding — see {@link PointerSwipeValueBinding}. */
+  value?: PointerSwipeValueBinding;
   onPressStart?: (payload: PointerSwipePressPayload) => void;
   onDragStart?: (payload: PointerSwipeMovePayload) => void;
   onDragMove?: (payload: PointerSwipeMovePayload) => void;

@@ -19,6 +19,7 @@ export type {
   PointerSwipeReleasePayload,
   PointerSwipeResult,
   PointerSwipeDirection,
+  PointerSwipeValueBinding,
 } from "./swipe/types";
 export { resolveInertialRelease } from "./inertia/inertialRelease";
 export { resolveReleaseLaunch } from "./inertia/releaseLaunch";

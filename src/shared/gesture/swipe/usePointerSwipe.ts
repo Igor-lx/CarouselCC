@@ -126,6 +126,7 @@ export function usePointerSwipe({
   hostRef: externalHostRef,
   enabled = true,
   config,
+  value,
   onPressStart,
   onDragStart,
   onDragMove,
@@ -134,6 +135,13 @@ export function usePointerSwipe({
   const settings = useMemo(() => resolveConfig(config), [config]);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+
+  // The optional drag→value binding (see PointerSwipeValueBinding). Ref-held
+  // like the settings, so an inline object never re-wires anything; the
+  // anchor is captured at drag activation and every write is anchor-relative.
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const valueAnchorRef = useRef(0);
 
   // The full pointer phase is internal and synchronous. Consumers own their
   // public dragging state through the callbacks, so pointer bookkeeping never
@@ -538,6 +546,14 @@ export function usePointerSwipe({
           const sample = createSample(event.clientX, now);
           sampleRef.current = sample;
           setPhase("dragging");
+          // Value binding: anchor at the ACTIVATION read (uiOffset is ~0
+          // here, so the first write continues the value seamlessly), then
+          // write before the callbacks so they observe the fresh value.
+          const binding = valueRef.current;
+          if (binding) {
+            valueAnchorRef.current = binding.read();
+            binding.write(valueAnchorRef.current + sample.uiOffset);
+          }
           const payload = toMovePayload(sample);
           onDragStart?.(payload);
           onDragMove?.(payload);
@@ -549,6 +565,7 @@ export function usePointerSwipe({
 
       const sample = createSample(event.clientX, now);
       sampleRef.current = sample;
+      valueRef.current?.write(valueAnchorRef.current + sample.uiOffset);
       onDragMove?.(toMovePayload(sample));
     },
     [

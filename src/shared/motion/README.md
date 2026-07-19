@@ -164,21 +164,25 @@ const ride = useCompositedRide(controller);
 useMotionPaint(controller, ({ value }) => paint(value)); // your ONE domain fn
 
 const { hostProps } = usePointerSwipe({
-  onPressStart: () => {                       // catch a ride mid-flight
-    const h = controller.captureHandoff();
-    ride.cancel(h.position);
-    controller.set(h.position);
-    origin.current = h.position;
+  // Turnkey drag: the engine anchors at read() and writes anchor + offset on
+  // every move. Cancelling the ride INSIDE read() is the mid-flight catch —
+  // the finger picks the value up exactly where the compositor painted it.
+  value: {
+    read: () => {
+      const h = controller.captureHandoff();
+      ride.cancel(h.position);
+      return h.position;
+    },
+    write: (v) => controller.set(v, { phase: "dragging" }),
   },
-  onDragMove: ({ uiOffset }) =>
-    controller.set(origin.current + uiOffset, { phase: "dragging" }),
-  onRelease: ({ uiOffset, launchVelocity }) => {
-    const from = origin.current + uiOffset;
+  onRelease: ({ launchVelocity }) => {
+    const from = controller.captureHandoff().position; // the last written value
     const to = /* your target policy */;
     const launch = resolveReleaseLaunch({
       distance: to - from, visualVelocity: launchVelocity,
       handoffVelocity: 0, intentSpeed: CRUISE,
     });
+    // (origin bookkeeping is gone: the value binding owned the drag)
     ride.start({
       element: el.current,
       segment: createProfileSegment({

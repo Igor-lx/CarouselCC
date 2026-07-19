@@ -41,6 +41,13 @@ function Strip() {
 }
 ```
 
+For a value that is 1:1 with the finger, the `value` binding removes even
+that: `value: { read: () => current(), write: (v) => apply(v) }` — the
+engine anchors at `read()` on drag activation and writes `anchor + offset`
+on every move; the callbacks remain available alongside. Consumers whose
+value lives in another unit (the carousel's pixels→slides mapping) keep the
+plain callbacks — a unit conversion is domain knowledge.
+
 No config is required — the engine ships its own tuning
 (`POINTER_SWIPE_DEFAULTS`), and a partial `config` merges over it per field.
 A component with opinions overrides only what it cares about; a component
