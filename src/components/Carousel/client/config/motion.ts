@@ -29,10 +29,19 @@ export const GO_TO_PREFLIGHT_PAGE_SPAN = 1;
 export const GO_TO_FINAL_APPROACH_PAGE_SPAN = 1;
 
 /**
- * Minimum GO_TO span, in page screens, that FLIES (teleports the invisible
- * middle) instead of riding the whole distance. Spans below it animate fully.
- * Must exceed `GO_TO_PREFLIGHT_PAGE_SPAN + GO_TO_FINAL_APPROACH_PAGE_SPAN`,
- * otherwise the skipped middle would be zero or negative.
+ * Minimum number of INTERMEDIATE pages (pages strictly between the start
+ * page and the target page — neither endpoint counts) from which a GO_TO
+ * FLIES (teleports the never-shown middle) instead of riding the whole
+ * distance.
+ *
+ * A flight additionally requires that at least one intermediate page would
+ * never be shown at all: preflight and approach each show their own pages,
+ * so the structural floor is `preflight + approach + 1` intermediates.
+ * Setting this knob below that floor breaks nothing — every jump simply
+ * rides continuously — but the knob then fires idle (Diagnostics reports
+ * it). With preflight 1 / approach 1: `3` means "1→5 flies, skipping the
+ * middle page entirely; 1→4 rides — both its intermediates are shown
+ * anyway, so there is nothing to skip".
  */
 export const GO_TO_TELEPORT_MIN_PAGE_SPAN = 3;
 

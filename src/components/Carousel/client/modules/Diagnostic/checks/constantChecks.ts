@@ -147,12 +147,22 @@ const numericRules: NumericRule[] = [
     field: "GO_TO_TELEPORT_MIN_PAGE_SPAN",
     value: GO_TO_TELEPORT_MIN_PAGE_SPAN,
     severity: "CRITICAL",
-    expected: `Expected a finite integer greater than GO_TO_PREFLIGHT_PAGE_SPAN + GO_TO_FINAL_APPROACH_PAGE_SPAN (${GO_TO_PREFLIGHT_PAGE_SPAN + GO_TO_FINAL_APPROACH_PAGE_SPAN})`,
+    expected: "Expected a positive finite integer (intermediate pages)",
     consequence:
-      "A teleport whose span does not exceed preflight + approach skips a zero or negative middle — far GO_TO motion breaks",
+      "The teleport threshold cannot be compared against a page count and far GO_TO behaviour is unpredictable",
+    predicate: isPositiveInteger,
+  },
+  {
+    layer: "Motion",
+    field: "GO_TO_TELEPORT_MIN_PAGE_SPAN",
+    value: GO_TO_TELEPORT_MIN_PAGE_SPAN,
+    severity: "LOGICAL",
+    expected: `Expected >= GO_TO_PREFLIGHT_PAGE_SPAN + GO_TO_FINAL_APPROACH_PAGE_SPAN + 1 (${GO_TO_PREFLIGHT_PAGE_SPAN + GO_TO_FINAL_APPROACH_PAGE_SPAN + 1}) — below that no intermediate page can ever be skipped`,
+    consequence:
+      "The knob fires idle: the structural gate (at least one fully skipped page) dominates and every jump rides continuously as if the threshold were the floor",
     predicate: (v) =>
-      isPositiveInteger(v) &&
-      v > GO_TO_PREFLIGHT_PAGE_SPAN + GO_TO_FINAL_APPROACH_PAGE_SPAN,
+      typeof v === "number" &&
+      v >= GO_TO_PREFLIGHT_PAGE_SPAN + GO_TO_FINAL_APPROACH_PAGE_SPAN + 1,
   },
   {
     layer: "Motion",

@@ -367,7 +367,8 @@ These are the user-facing behaviours the implementation guarantees.
 - **GO_TO motion.** Every `GO_TO` follows a speed-authored profile:
   accelerate, cruise, decelerate. Acceleration is measured inside the first
   page screen; deceleration is measured inside the final page screen. A jump
-  shorter than `GO_TO_TELEPORT_MIN_PAGE_SPAN` page screens animates its whole
+  with fewer than `GO_TO_TELEPORT_MIN_PAGE_SPAN` INTERMEDIATE pages (or with
+  no fully-skippable page at all) animates its whole
   distance; from that span on it FLIES: animates
   `GO_TO_PREFLIGHT_PAGE_SPAN` page screens, teleports the un-rendered middle,
   then animates the final approach page. See §4.4.
@@ -519,7 +520,8 @@ here only invites doc/code drift. The single source of truth is `config/`:
 - `config/defaults.ts` — public-prop defaults.
 - `config/motion.ts` — motion-profile distance shares (step / autoplay /
   snap-back / repeated-click / GO_TO) and the GO_TO teleport geometry: the
-  preflight / approach spans plus `GO_TO_TELEPORT_MIN_PAGE_SPAN`, the flight
+  preflight / approach spans plus `GO_TO_TELEPORT_MIN_PAGE_SPAN` (counting
+  intermediate pages, endpoints excluded), the flight
   threshold (must exceed their sum — diagnostics enforce it).
 - `config/interaction.ts` — hover delay, visibility threshold.
 - `config/gesture.ts` — swipe + inertial-release config, the slot-adaptive
@@ -732,7 +734,9 @@ inside per-frame subscribers.
 ### 4.4 Far GO_TO teleport
 
 A far `GO_TO` cannot animate edge-to-edge — it would mount every intermediate
-slide. A jump flies from `GO_TO_TELEPORT_MIN_PAGE_SPAN` page screens
+slide. A jump flies once it has `GO_TO_TELEPORT_MIN_PAGE_SPAN` intermediate
+pages AND at least one of them would never be shown; anything less rides
+continuously — a jump flies from that threshold
 (anything shorter rides fully); the split is laid out by one pure geometry
 resolver (`motion/timing.ts` `resolveGoToPlan`), consumed by both the reducer
 and the segment factory so the logical landing positions and the animated

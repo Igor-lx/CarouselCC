@@ -72,13 +72,21 @@ export interface GoToPlan {
 /**
  * Lay out a GO_TO of `pageSpan` page screens.
  *
- * - Short jump (`pageSpan < goToTeleportMinPageSpan`): the whole real
- *   distance is animated; acceleration and deceleration stay local to the
- *   first and last page screens.
- * - Long jump: `goToPreflightPageSpan` page screens are animated before the
- *   teleport, the invisible middle is skipped, then the final approach page is
- *   animated. `goToTeleportMinPageSpan` must exceed preflight + approach
- *   (diagnostics enforce it), so the skipped middle is always positive.
+ * Teleport semantics: `goToTeleportMinPageSpan` counts INTERMEDIATE pages —
+ * the pages strictly between the start page and the target page (neither
+ * endpoint included). A jump FLIES only when BOTH hold:
+ *
+ *  1. `intermediates >= goToTeleportMinPageSpan` — the knob's threshold;
+ *  2. at least ONE intermediate page would never be shown at all:
+ *     preflight shows `preflightPageSpan` of them and the approach shows
+ *     `finalApproachPageSpan`, so a full page is skipped only when
+ *     `intermediates > preflight + approach`. Teleporting between two pages
+ *     that are BOTH shown anyway (the old behaviour at the minimum span) is
+ *     a pointless blink — the deck just rides continuously instead.
+ *
+ * The structural gate (2) dominates: a knob set below the floor
+ * (`preflight + approach + 1`) never breaks anything — every jump simply
+ * rides — it merely fires idle, and Diagnostics reports that.
  *
  * `pageSpan` is unsigned; the caller applies travel direction.
  */
@@ -92,7 +100,12 @@ export const resolveGoToPlan = (
   const visibleTeleportDistance =
     zones.preflightDistance + zones.approachDistance;
 
-  if (pageSpan < motion.goToTeleportMinPageSpan) {
+  const intermediatePages = pageSpan - 1;
+  const shownIntermediates =
+    motion.goToPreflightPageSpan + motion.goToFinalApproachPageSpan;
+  const hasSkippablePage = intermediatePages > shownIntermediates;
+
+  if (intermediatePages < motion.goToTeleportMinPageSpan || !hasSkippablePage) {
     return {
       isTeleport: false,
       leadDistance: realDistance,

@@ -56,11 +56,18 @@ describe("resolveGoToApproachDistance", () => {
 
 describe("resolveGoToPlan", () => {
   const stepSize = 3;
-  // The flight threshold is the explicit constant, not a derived sum.
-  const teleportMinSpan = motion.goToTeleportMinPageSpan;
+  // Defaults: preflight 1, approach 1, min intermediates 3 — the structural
+  // floor (preflight + approach + 1) coincides with the knob.
+  const preflight = motion.goToPreflightPageSpan;
+  const approach = motion.goToFinalApproachPageSpan;
+  const minIntermediates = motion.goToTeleportMinPageSpan;
+  const smallestFlyingSpan = minIntermediates + 1; // intermediates = span - 1
 
-  it("animates the whole distance for a short jump (no teleport)", () => {
-    for (let pageSpan = 1; pageSpan < teleportMinSpan; pageSpan += 1) {
+  it("rides continuously while there is nothing to skip (the 1->4 case)", () => {
+    // span 3 = two intermediates; preflight shows one, approach shows the
+    // other — teleporting between two pages that are both shown anyway is a
+    // pointless blink, so the deck just rides.
+    for (let pageSpan = 1; pageSpan < smallestFlyingSpan; pageSpan += 1) {
       const plan = resolveGoToPlan(pageSpan, stepSize, motion);
       expect(plan.isTeleport).toBe(false);
       expect(plan.leadDistance).toBe(pageSpan * stepSize);
@@ -69,39 +76,62 @@ describe("resolveGoToPlan", () => {
     }
   });
 
-  it("splits a far jump into preflight + teleport + approach", () => {
-    for (let pageSpan = teleportMinSpan; pageSpan <= 20; pageSpan += 1) {
+  it("flies once a full intermediate page can be skipped (the 1->5 case)", () => {
+    for (let pageSpan = smallestFlyingSpan; pageSpan <= 20; pageSpan += 1) {
       const plan = resolveGoToPlan(pageSpan, stepSize, motion);
       const realDistance = pageSpan * stepSize;
       expect(plan.isTeleport).toBe(true);
-      expect(plan.leadDistance).toBe(motion.goToPreflightPageSpan * stepSize);
-      expect(plan.approachDistance).toBe(motion.goToFinalApproachPageSpan * stepSize);
+      expect(plan.leadDistance).toBe(preflight * stepSize);
+      expect(plan.approachDistance).toBe(approach * stepSize);
       // preflight + teleport + approach must cover the whole real distance.
       expect(plan.leadDistance + plan.teleportDistance + plan.approachDistance).toBe(
         realDistance,
       );
+      // …and the teleported width always spans at least one full skipped
+      // page plus the boundary step — never a between-neighbours blink.
+      expect(plan.teleportDistance).toBeGreaterThanOrEqual(2 * stepSize);
     }
   });
 
-  it("flies from exactly goToTeleportMinPageSpan, rides below it", () => {
-    const lastDirect = resolveGoToPlan(teleportMinSpan - 1, stepSize, motion);
-    const firstFlight = resolveGoToPlan(teleportMinSpan, stepSize, motion);
-    expect(lastDirect.isTeleport).toBe(false);
+  it("the knob counts INTERMEDIATE pages, endpoints excluded", () => {
+    const lastRide = resolveGoToPlan(smallestFlyingSpan - 1, stepSize, motion);
+    const firstFlight = resolveGoToPlan(smallestFlyingSpan, stepSize, motion);
+    expect(lastRide.isTeleport).toBe(false);
     expect(firstFlight.isTeleport).toBe(true);
-    expect(firstFlight.teleportDistance).toBeGreaterThan(0);
   });
 
-  it("obeys the constant over the derived preflight+approach sum", () => {
-    // Raise the threshold: spans that WOULD have flown under the old derived
-    // rule (span > preflight + approach) must now ride fully.
+  it("a raised knob postpones the flight further", () => {
     const raised: MotionSettings = { ...motion, goToTeleportMinPageSpan: 6 };
-    const rides = resolveGoToPlan(5, stepSize, raised);
-    expect(rides.isTeleport).toBe(false);
-    expect(rides.leadDistance).toBe(5 * stepSize);
-    const flies = resolveGoToPlan(6, stepSize, raised);
+    expect(resolveGoToPlan(6, stepSize, raised).isTeleport).toBe(false); // 5 intermediates
+    expect(resolveGoToPlan(7, stepSize, raised).isTeleport).toBe(true); // 6 intermediates
+  });
+
+  it("a knob below the structural floor never breaks — every such jump rides", () => {
+    // With min=2 (or even 1) and preflight+approach=2 no page can be skipped
+    // at intermediates=2, so the structural gate dominates: span 3 rides;
+    // span 4 (one skippable page) still flies. Diagnostics reports the idle
+    // knob separately.
+    for (const idleMin of [1, 2]) {
+      const lowered: MotionSettings = { ...motion, goToTeleportMinPageSpan: idleMin };
+      const ride = resolveGoToPlan(3, stepSize, lowered);
+      expect(ride.isTeleport).toBe(false);
+      expect(ride.leadDistance).toBe(3 * stepSize);
+      expect(resolveGoToPlan(4, stepSize, lowered).isTeleport).toBe(true);
+    }
+  });
+
+  it("wider preflight/approach push the floor with them", () => {
+    // preflight 2 + approach 1: three intermediates are all shown, so even a
+    // meets-the-knob jump with intermediates=3 must ride; intermediates=4
+    // (span 5) finally skips a page.
+    const wide: MotionSettings = {
+      ...motion,
+      goToPreflightPageSpan: 2,
+      goToTeleportMinPageSpan: 3,
+    };
+    expect(resolveGoToPlan(4, stepSize, wide).isTeleport).toBe(false);
+    const flies = resolveGoToPlan(5, stepSize, wide);
     expect(flies.isTeleport).toBe(true);
-    expect(
-      flies.leadDistance + flies.teleportDistance + flies.approachDistance,
-    ).toBe(6 * stepSize);
+    expect(flies.leadDistance).toBe(2 * stepSize);
   });
 });
