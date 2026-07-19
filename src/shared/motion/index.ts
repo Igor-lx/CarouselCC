@@ -48,3 +48,5 @@ export {
   sampleProgressStops,
 } from "./profile/progressCurve";
 export type { InFlightSpan } from "./profile/progressCurve";
+export { startPinnedAnimation } from "./compositor/pinnedAnimation";
+export type { PinnedAnimationTiming } from "./compositor/pinnedAnimation";

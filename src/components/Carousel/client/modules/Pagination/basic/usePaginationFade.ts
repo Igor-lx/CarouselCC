@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { motionNow, useIsomorphicLayoutEffect } from "../../../../../../shared";
 import {
   positionAtNow,
+  startPinnedAnimation,
   type CarouselMotionPlan,
   type InFlightSpan,
   type MotionPlanSource,
@@ -263,20 +264,16 @@ export function usePaginationFade({
               const dot = dotRefs.current[index];
               if (!dot) continue;
               suppressTransition(index);
-              let animation: Animation;
-              try {
-                animation = dot.animate(
-                  dotKeyframesBetween(blend.from, blend.to, plan.stops),
-                  { duration: plan.duration, fill: "both" },
-                );
-              } catch {
+              const animation = startPinnedAnimation(
+                dot,
+                dotKeyframesBetween(blend.from, blend.to, plan.stops),
+                { duration: plan.duration, startedAt: plan.startedAt },
+              );
+              if (!animation) {
+                // No keyframe support: back to the class flip + CSS
+                // transition — an acceptable instant-ish switch.
                 restoreTransition(index);
                 continue;
-              }
-              try {
-                animation.startTime = plan.startedAt;
-              } catch {
-                // play-pending fallback keeps the fade, merely unpinned.
               }
               animationsRef.current.set(index, animation);
               // The landing dot preferred; any animation will do if the
@@ -340,31 +337,25 @@ export function usePaginationFade({
             if (staysInvisible) continue;
 
             suppressTransition(index);
-            let animation: Animation;
-            try {
-              animation = dot.animate(
-                buildDotKeyframes(
-                  index,
-                  from,
-                  to,
-                  plan.stops,
-                  inactive,
-                  active,
-                  pageCount,
-                  isFinite,
-                ),
-                { duration: plan.duration, fill: "both" },
-              );
-            } catch {
+            const animation = startPinnedAnimation(
+              dot,
+              buildDotKeyframes(
+                index,
+                from,
+                to,
+                plan.stops,
+                inactive,
+                active,
+                pageCount,
+                isFinite,
+              ),
+              { duration: plan.duration, startedAt: plan.startedAt },
+            );
+            if (!animation) {
               // No keyframe support: hand the dot back to the class flip + CSS
               // transition, which produce an acceptable instant-ish switch.
               restoreTransition(index);
               continue;
-            }
-            try {
-              animation.startTime = plan.startedAt;
-            } catch {
-              // play-pending fallback keeps the animation, merely unpinned.
             }
             animationsRef.current.set(index, animation);
 

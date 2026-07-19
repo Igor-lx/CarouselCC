@@ -7,7 +7,7 @@ import {
 } from "../domain";
 import { useIsomorphicLayoutEffect } from "../../../../shared";
 import { isWaapiSupported } from "../../../../shared";
-import { keyframesAlongStops } from "../motion";
+import { keyframesAlongStops, startPinnedAnimation } from "../motion";
 import { isDroppedFallbackFrame, type VisualPositionSource } from "../visual-position";
 
 const RESIZE_EPSILON_PX = 0.5;
@@ -193,8 +193,7 @@ export function useTrackBinding({
         !Number.isFinite(from) ||
         !Number.isFinite(to) ||
         !(duration > 0) ||
-        stops.length < 2 ||
-        typeof track.animate !== "function"
+        stops.length < 2
       ) {
         return false;
       }
@@ -223,28 +222,14 @@ export function useTrackBinding({
       track.style.transform = fromTransform;
       lastTransformRef.current = fromTransform;
 
-      let animation: Animation;
-      try {
-        animation = track.animate(keyframes, { duration, fill: "both" });
-      } catch {
-        // Some restrictive engines expose `animate` but throw on use.
-        return false;
-      }
-
-      // Pin the animation to the segment's own clock. A fresh animation is
-      // otherwise play-pending until the browser commits it (a frame or more
-      // later under commit/raster load), which would leave the whole run
-      // phase-shifted behind the JS sampler; with an explicit `startTime` the
-      // compositor and the controller trace the same curve at the same
-      // instants, so a mid-flight handoff pin lands exactly where the track
-      // is already painted. `document.timeline` times share the
-      // `performance.now()` origin the runner stamps `startedAt` with.
-      try {
-        animation.startTime = startedAt;
-      } catch {
-        // Engines that reject an explicit startTime keep the default
-        // play-pending start — the pre-fix behaviour, still correct.
-      }
+      // The engine's delivery step owns the whole ritual: the WAAPI gate, the
+      // animate() throw fallback, and the startTime pin to the segment clock
+      // (see startPinnedAnimation for why the pin matters).
+      const animation = startPinnedAnimation(track, keyframes, {
+        duration,
+        startedAt,
+      });
+      if (!animation) return false;
 
       compositorAnimationRef.current = animation;
       animation.onfinish = () => {

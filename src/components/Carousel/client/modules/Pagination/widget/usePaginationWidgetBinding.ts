@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { motionNow, useIsomorphicLayoutEffect } from "../../../../../../shared";
 import {
   positionAtNow,
+  startPinnedAnimation,
   type CarouselMotionPlan,
   type InFlightSpan,
   type MotionPlanSource,
@@ -413,22 +414,13 @@ export function usePaginationWidgetBinding({
           continue;
         }
 
-        let animation: Animation;
-        try {
-          animation = dot.animate(keyframes, {
-            duration: plan.duration,
-            fill: "both",
-          });
-        } catch {
-          // No WAAPI keyframe support — leave the strip static; the deck
-          // still moves (its own fallback), and the step finalizes below.
-          continue;
-        }
-        try {
-          animation.startTime = plan.startedAt;
-        } catch {
-          // Engines that reject an explicit startTime run play-pending.
-        }
+        // No WAAPI keyframe support — leave the strip static; the deck
+        // still moves (its own fallback), and the step finalizes below.
+        const animation = startPinnedAnimation(dot, keyframes, {
+          duration: plan.duration,
+          startedAt: plan.startedAt,
+        });
+        if (!animation) continue;
         animations.push(animation);
       }
 
@@ -454,20 +446,12 @@ export function usePaginationWidgetBinding({
           overlay.style.opacity = "0";
           continue;
         }
-        try {
-          const animation = overlay.animate(keyframes, {
-            duration: plan.duration,
-            fill: "both",
-          });
-          try {
-            animation.startTime = plan.startedAt;
-          } catch {
-            // play-pending fallback
-          }
-          animations.push(animation);
-        } catch {
-          continue;
-        }
+        const animation = startPinnedAnimation(overlay, keyframes, {
+          duration: plan.duration,
+          startedAt: plan.startedAt,
+        });
+        if (!animation) continue;
+        animations.push(animation);
       }
 
       if (animations.length === 0) {

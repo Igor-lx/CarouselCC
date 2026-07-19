@@ -14,6 +14,7 @@ export {
   keyframesAlongStops,
   positionAtNow,
   sampleProgressStops,
+  startPinnedAnimation,
 } from "../../../../shared";
 export type { InFlightSpan } from "../../../../shared";
 export type {
