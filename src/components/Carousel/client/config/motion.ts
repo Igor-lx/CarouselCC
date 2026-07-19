@@ -62,7 +62,7 @@ export const GO_TO_DECELERATION_DISTANCE_SHARE = 0.5;
  * above. Values below 1 make a GO_TO slower than a single step, which inverts
  * the visual contract (diagnostics flag it).
  */
-export const GO_TO_SPEED_MULTIPLIER = 12;
+export const GO_TO_SPEED_MULTIPLIER = 10;
 
 /**
  * Motion-profile distance shares for the duration-authored steps. Every
@@ -78,7 +78,7 @@ export const GO_TO_SPEED_MULTIPLIER = 12;
  */
 
 /** Click step and non-inertial gesture release: soft symmetric-ish ramp. */
-  export const STEP_ACCELERATION_DISTANCE_SHARE = 0.35;
+export const STEP_ACCELERATION_DISTANCE_SHARE = 0.35;
 export const STEP_DECELERATION_DISTANCE_SHARE = 0.4;
 
 /** Autoplay step: front-loaded — moves out early, long calm settle. */
