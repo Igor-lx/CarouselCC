@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildProfile } from "../profile/profile";
 import {
+  alignSpeed,
   createProfileSegment,
   sampleProfileSegment,
 } from "../profile/profileSegment";
@@ -101,5 +102,19 @@ describe("sampleProfileSegment", () => {
     });
     expect(sampleProfileSegment(still, 0).progress).toBe(1);
     expect(sampleProfileSegment(still, 0).value).toBe(3);
+  });
+});
+
+describe("alignSpeed", () => {
+  it("keeps a velocity that helps the travel, as an unsigned speed", () => {
+    expect(alignSpeed(0.003, 5)).toBe(0.003);
+    expect(alignSpeed(-0.003, -5)).toBe(0.003);
+  });
+
+  it("drops an opposing or degenerate velocity to a standing start", () => {
+    expect(alignSpeed(-0.003, 5)).toBe(0);
+    expect(alignSpeed(0.003, -5)).toBe(0);
+    expect(alignSpeed(0.003, 0)).toBe(0);
+    expect(alignSpeed(Number.NaN, 5)).toBe(0);
   });
 });

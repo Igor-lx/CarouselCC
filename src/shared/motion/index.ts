@@ -31,6 +31,7 @@ export {
 } from "./profile/profile";
 export type { MotionProfile, MotionProfileZone } from "./profile/profile";
 export {
+  alignSpeed,
   createProfileSegment,
   sampleProfileSegment,
 } from "./profile/profileSegment";

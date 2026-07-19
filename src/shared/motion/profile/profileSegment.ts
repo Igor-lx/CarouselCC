@@ -55,6 +55,28 @@ export const sampleProfileSegment = <Strategy extends string>(
   };
 };
 
+/**
+ * The component of a signed `velocity` that points along `distance` — the
+ * bridge from a handoff (signed) to `buildProfile`'s speed inputs (unsigned):
+ * an in-flight speed is preserved only when it actually helps the new travel,
+ * otherwise the profile launches from rest. A sanctioned local copy of the
+ * gesture library's `sameDirectionSpeed` (the engines never import each
+ * other — see `motion/profile/clamp.ts` for the precedent), because a
+ * motion-only consumer (buttons, autoplay) must not drag the gesture library
+ * in for four lines.
+ */
+export const alignSpeed = (velocity: number, distance: number): number => {
+  const direction = Math.sign(distance);
+  if (
+    direction === 0 ||
+    !Number.isFinite(velocity) ||
+    Math.sign(velocity) !== direction
+  ) {
+    return 0;
+  }
+  return Math.abs(velocity);
+};
+
 export interface CreateProfileSegmentInput<Strategy extends string> {
   strategy: Strategy;
   from: number;
