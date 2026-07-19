@@ -31,6 +31,14 @@ export {
 } from "./profile/profile";
 export type { MotionProfile, MotionProfileZone } from "./profile/profile";
 export {
+  createProfileSegment,
+  sampleProfileSegment,
+} from "./profile/profileSegment";
+export type {
+  CreateProfileSegmentInput,
+  ProfileSegment,
+} from "./profile/profileSegment";
+export {
   isWaapiSupported,
   keyframesAlongStops,
   positionAtNow,

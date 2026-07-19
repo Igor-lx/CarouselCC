@@ -1,4 +1,4 @@
-import type { MotionProfile } from "../../../../shared";
+import type { ProfileSegment } from "../../../../shared";
 
 /**
  * Every carousel motion is one accel/cruise/decel profile — there is no
@@ -30,14 +30,9 @@ export type CarouselMotionIntent =
   | "gesture-release"
   | "unknown-step";
 
-export interface CarouselSegment {
-  strategy: Exclude<CarouselMotionStrategy, "idle">;
-  from: number;
-  to: number;
-  duration: number;
-  startedAt: number;
-  profile: MotionProfile;
-}
+export type CarouselSegment = ProfileSegment<
+  Exclude<CarouselMotionStrategy, "idle">
+>;
 
 export interface MotionStart {
   position: number;

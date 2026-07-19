@@ -1,5 +1,6 @@
 import {
   buildProfile,
+  createProfileSegment,
   resolveInertialRelease,
   resolvePeakSpeedForDuration,
   resolveReleaseLaunch,
@@ -107,14 +108,13 @@ const buildStepProfile = (
     decelerationDistanceShare: shares.decelerationDistanceShare,
   });
 
-  return {
+  return createProfileSegment({
     strategy: "step",
     from: start.position,
     to: state.virtualIndex,
-    duration: profile.duration,
-    startedAt,
     profile,
-  };
+    startedAt,
+  });
 };
 
 /**
@@ -145,14 +145,13 @@ const buildRepeatedProfile = (
     decelerationDistanceShare: repeated.decelerationDistanceShare,
   });
 
-  return {
+  return createProfileSegment({
     strategy: "repeated",
     from: start.position,
     to: state.virtualIndex,
-    duration: profile.duration,
-    startedAt,
     profile,
-  };
+    startedAt,
+  });
 };
 
 const buildGestureProfile = (
@@ -203,14 +202,13 @@ const buildGestureProfile = (
     profile = buildRide(flooredPeak);
   }
 
-  return {
+  return createProfileSegment({
     strategy: "gesture",
     from: start.position,
     to: state.virtualIndex,
-    duration: profile.duration,
-    startedAt,
     profile,
-  };
+    startedAt,
+  });
 };
 
 type GoToProfilePhase = "single" | "preflight" | "approach";
@@ -280,14 +278,13 @@ const buildGoToProfile = (
     decelerationDistanceShare,
   });
 
-  return {
+  return createProfileSegment({
     strategy: "jump",
     from: start.position,
     to: state.virtualIndex,
-    duration: profile.duration,
-    startedAt,
     profile,
-  };
+    startedAt,
+  });
 };
 
 const goToProfilePhase = (intent: CarouselMotionIntent): GoToProfilePhase => {
