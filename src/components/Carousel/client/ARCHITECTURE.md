@@ -526,7 +526,7 @@ here only invites doc/code drift. The single source of truth is `config/`:
 - `config/interaction.ts` — hover delay, visibility threshold.
 - `config/gesture.ts` — swipe + inertial-release config, the slot-adaptive
   normalization constants and their pure resolver (§5).
-- `config/constants.ts` — epsilons, render-window buffer.
+- `config/layout.ts` — render-window buffer; `config/fallback.ts` — legacy-fallback frame-drop cadence.
 - `modules/PaginationWidget/defaults.ts` — widget geometry + write epsilons.
 
 These values are part of the visual contract: changing them changes how the
@@ -810,7 +810,7 @@ Boundaries and guarantees:
   The single gate is `Element.animate` itself (`isWaapiSupported`, cached);
   without it the runner publishes a fallback `follow` plan and every consumer
   runs the pre-engine per-frame path — where the track and the widget also
-  drop the same Nth running frames (`FALLBACK_WRITE_FRAME_SKIP`, one shared
+  drop the same Nth running frames (`FALLBACK_DROP_EVERY_NTH_FRAME`, one shared
   constant; the rule is `visual-position/fallbackPacing.ts` evaluated on
   source-numbered frames, so the two can never desynchronize).
 - **Graceful fallback.** `startCompositorMotion` returns `false` (and the
@@ -1301,7 +1301,8 @@ src/components/Carousel/client/
 │   └── schemas.ts                 zod slide schemas (deep-import only, §11)
 ├── config/                        config resolution
 │   ├── defaults.ts                public-prop defaults
-│   ├── constants.ts               tunable runtime constants (epsilons, buffers)
+│   ├── layout.ts                  render-window buffer
+│   ├── fallback.ts                legacy-fallback frame-drop cadence
 │   ├── motion.ts                  profile distance shares (step/autoplay/snap-back/repeated/GO_TO)
 │   ├── gesture.ts                 drag config + inertial release config
 │   ├── interaction.ts             hover delay, visibility threshold

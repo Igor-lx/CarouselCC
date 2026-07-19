@@ -20,5 +20,5 @@ export const EDGE_DOT_DRIFT_FACTOR = 0.6;
 export const EDGE_DOT_RESTING_OPACITY = 0.5;
 
 // The legacy-fallback frame-skip is NOT widget-local: one shared constant
-// (`config/constants.ts` FALLBACK_WRITE_FRAME_SKIP) and one shared rule
+// (`config/fallback.ts` FALLBACK_DROP_EVERY_NTH_FRAME) and one shared rule
 // (`visual-position/fallbackPacing.ts`) pace the widget and the track together.

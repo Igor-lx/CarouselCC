@@ -1,8 +1,8 @@
 import { CAROUSEL_DEFAULTS } from "./defaults";
-import { RENDER_WINDOW_BUFFER_MULTIPLIER } from "./constants";
+import { RENDER_WINDOW_BUFFER_MULTIPLIER } from "./layout";
 // Implementation constants are colocated with their subsystems (see the
-// contract note in ./constants.ts); the runtime config still plumbs them so
-// consumers and tests keep one injection point.
+// folder contract at the top of ./index.ts); the runtime config still plumbs
+// them so consumers and tests keep one injection point.
 import { MOTION_EPSILON } from "../motion/tolerances";
 import { DRAG_RELEASE_EPSILON } from "../domain/dragRelease";
 import { GESTURE_COAST_MAX_MS } from "../gesture/coast";

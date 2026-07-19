@@ -15,7 +15,7 @@ import {
   CAROUSEL_INERTIAL_RELEASE_CONFIG,
   CAROUSEL_SWIPE_CONFIG,
 
-  FALLBACK_WRITE_FRAME_SKIP,
+  FALLBACK_DROP_EVERY_NTH_FRAME,
 
   GO_TO_ACCELERATION_DISTANCE_SHARE,
   GO_TO_DECELERATION_DISTANCE_SHARE,
@@ -48,7 +48,7 @@ import {
   REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES,
 } from "../../../config";
 // Implementation constants live with their subsystems (see the contract in
-// config/constants.ts); Diagnostics still audits them against accidental
+// config/index.ts); Diagnostics still audits them against accidental
 // edits, importing from the homes.
 import { MOTION_EPSILON } from "../../../motion/tolerances";
 import { DRAG_RELEASE_EPSILON } from "../../../domain/dragRelease";
@@ -246,8 +246,8 @@ const numericRules: NumericRule[] = [
 
   {
     layer: "Motion",
-    field: "FALLBACK_WRITE_FRAME_SKIP",
-    value: FALLBACK_WRITE_FRAME_SKIP,
+    field: "FALLBACK_DROP_EVERY_NTH_FRAME",
+    value: FALLBACK_DROP_EVERY_NTH_FRAME,
     severity: "LOGICAL",
     expected: "Expected a non-negative finite integer (values below 2 disable dropping)",
     consequence:

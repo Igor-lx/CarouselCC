@@ -15,7 +15,7 @@ import {
 } from "../../../visual-position";
 // Per-frame change-detection thresholds for the dot DOM-write path — an
 // IMPLEMENTATION detail of this binding (see the contract in
-// config/constants.ts), colocated with the write gates they feed. A new
+// config/index.ts), colocated with the write gates they feed. A new
 // projection value below the matching epsilon does not trigger a style
 // assignment (or even a transform-string allocation): the dot is already
 // visually at the previous value within sub-pixel / sub-percent precision,

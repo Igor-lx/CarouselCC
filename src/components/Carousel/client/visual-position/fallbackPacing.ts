@@ -1,4 +1,4 @@
-import { FALLBACK_WRITE_FRAME_SKIP } from "../config";
+import { FALLBACK_DROP_EVERY_NTH_FRAME } from "../config";
 import type { VisualPositionFrame } from "./types";
 
 /**
@@ -12,9 +12,9 @@ import type { VisualPositionFrame } from "./types";
  * Only `"running"` frames are ever dropped: resting frames (settle, idle
  * emits) and finger-drag frames (published with a non-running phase) always
  * paint. The first frame of a streak (index 0) always paints; every
- * `FALLBACK_WRITE_FRAME_SKIP`-th one after it is dropped.
+ * `FALLBACK_DROP_EVERY_NTH_FRAME`-th one after it is dropped.
  */
 export const isDroppedFallbackFrame = (frame: VisualPositionFrame): boolean =>
-  FALLBACK_WRITE_FRAME_SKIP > 1 &&
+  FALLBACK_DROP_EVERY_NTH_FRAME > 1 &&
   frame.phase === "running" &&
-  (frame.runningFrameIndex + 1) % FALLBACK_WRITE_FRAME_SKIP === 0;
+  (frame.runningFrameIndex + 1) % FALLBACK_DROP_EVERY_NTH_FRAME === 0;

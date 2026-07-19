@@ -1,8 +1,19 @@
+/**
+ * THE CONTRACT OF `config/`: everything in this folder is a TUNABLE — a
+ * feel, product or performance knob a developer may change freely to taste,
+ * with every value guarded by the Diagnostic layer. Each file groups the
+ * knobs of one concern (motion, gesture, interaction, layout, slides,
+ * fallback pacing). Implementation constants (tolerances, sanity clamps,
+ * calibration records, private thresholds) do NOT live here — they live WITH
+ * the code they serve, documented in place (e.g. `MOTION_EPSILON` in
+ * motion/, `DRAG_RELEASE_EPSILON` in domain/dragRelease.ts,
+ * `GESTURE_COAST_MAX_MS` in gesture/coast.ts, `SWIPE_REFERENCE_SLOT_PX` in
+ * gesture/slotAdaptiveSwipe.ts). If changing a value requires understanding
+ * the algorithm around it, it does not belong in this folder.
+ */
 export { CAROUSEL_DEFAULTS } from "./defaults";
-export {
-  RENDER_WINDOW_BUFFER_MULTIPLIER,
-  FALLBACK_WRITE_FRAME_SKIP,
-} from "./constants";
+export { RENDER_WINDOW_BUFFER_MULTIPLIER } from "./layout";
+export { FALLBACK_DROP_EVERY_NTH_FRAME } from "./fallback";
 export {
   SNAP_BACK_DURATION,
   REPEATED_CLICK_SPEED_MULTIPLIER,
