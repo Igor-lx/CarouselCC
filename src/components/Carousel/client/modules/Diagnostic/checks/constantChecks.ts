@@ -14,9 +14,9 @@ import {
   AUTOPLAY_DECELERATION_DISTANCE_SHARE,
   CAROUSEL_INERTIAL_RELEASE_CONFIG,
   CAROUSEL_SWIPE_CONFIG,
-  DRAG_RELEASE_EPSILON,
+
   FALLBACK_WRITE_FRAME_SKIP,
-  GESTURE_COAST_MAX_MS,
+
   GO_TO_ACCELERATION_DISTANCE_SHARE,
   GO_TO_DECELERATION_DISTANCE_SHARE,
   GO_TO_FINAL_APPROACH_PAGE_SPAN,
@@ -33,7 +33,7 @@ import {
   SWIPE_COMMIT_MIN_PX,
   SWIPE_COMMIT_SLOT_SHARE,
   SLIDE_REORIENT_VEIL_MAX_MS,
-  MOTION_EPSILON,
+
   REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
   REPEATED_CLICK_DECELERATION_DISTANCE_SHARE,
   REPEATED_CLICK_SPEED_MULTIPLIER,
@@ -45,7 +45,14 @@ import {
   STEP_DECELERATION_DISTANCE_SHARE,
   VISIBILITY_THRESHOLD,
   AUTOPLAY_RESETTLE_DELAY_MS,
+  REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES,
 } from "../../../config";
+// Implementation constants live with their subsystems (see the contract in
+// config/constants.ts); Diagnostics still audits them against accidental
+// edits, importing from the homes.
+import { MOTION_EPSILON } from "../../../motion/tolerances";
+import { DRAG_RELEASE_EPSILON } from "../../../domain/dragRelease";
+import { GESTURE_COAST_MAX_MS } from "../../../gesture/coast";
 import { normalizeMotionProfileShares } from "../../../../../../shared";
 // The calibration record lives with the computation it anchors, not among
 // the tuning knobs — see gesture/slotAdaptiveSwipe.ts.
@@ -313,6 +320,27 @@ const numericRules: NumericRule[] = [
     expected: "Expected a non-negative finite number of milliseconds",
     consequence: "setTimeout receives an invalid delay; hover-pause debounce becomes unreliable",
     predicate: atLeast(0),
+  },
+  {
+    layer: "Interaction",
+    field: "REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES",
+    value: REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES,
+    severity: "CRITICAL",
+    expected: "Expected a positive finite integer (pages)",
+    consequence:
+      "A repeated click resolves to a non-page landing and the reducer clamp math breaks",
+    predicate: isPositiveInteger,
+  },
+  {
+    layer: "Interaction",
+    field: "REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES",
+    value: REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES,
+    severity: "LOGICAL",
+    expected: `Expected <= RENDER_WINDOW_BUFFER_MULTIPLIER (${RENDER_WINDOW_BUFFER_MULTIPLIER}) — the render window must pre-mount everything a repeated click can reveal`,
+    consequence:
+      "A repeated click mounts new slides into the MOVING track layer — a commit+raster hitch exactly at motion start",
+    predicate: (v) =>
+      typeof v === "number" && v <= RENDER_WINDOW_BUFFER_MULTIPLIER,
   },
   {
     layer: "Interaction",

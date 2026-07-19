@@ -15,6 +15,16 @@ import { sameDirectionSpeed } from "../../../../shared";
  * (velocity opposing the target) and a calm release (aligned speed 0) launch
  * from the release point itself — there is nothing to coast.
  */
+/**
+ * Sanity clamp for the coasted ride launch (lift-off -> runner takeover).
+ * The takeover extrapolates the launch position over the measured commit gap
+ * at the release velocity; this cap bounds the extrapolated interval so a
+ * pathologically stalled commit cannot teleport the deck (the target clamp
+ * already bounds the distance). An IMPLEMENTATION guard, not a feel knob —
+ * colocated with the coast math it protects.
+ */
+export const GESTURE_COAST_MAX_MS = 250;
+
 export interface CoastedLaunchInput {
   /** The live visual position at takeover (the finger's last write). */
   livePosition: number;

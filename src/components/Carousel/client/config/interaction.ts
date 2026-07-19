@@ -19,3 +19,14 @@ export const VISIBILITY_THRESHOLD = 0.2;
  * cover the silent tail after the LAST signal — not whole flings or settles.
  */
 export const AUTOPLAY_RESETTLE_DELAY_MS = 300;
+
+/**
+ * How far ahead of the deck's CURRENT destination a rapid repeated click
+ * lands, in pages. `2` means each click during motion resolves to "one page
+ * past the page the deck is already heading to" — clicks pick each other up
+ * and the deck keeps moving continuously while the spam holds, then settles
+ * one page after the burst ends. A product-behaviour knob; must not exceed
+ * RENDER_WINDOW_BUFFER_MULTIPLIER (diagnosed), or a repeated click would
+ * mount slides into the moving track layer.
+ */
+export const REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES = 2;

@@ -4,6 +4,7 @@ import {
   normalizePageIndex,
   pageStart,
 } from "../domain";
+import { REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES } from "../config";
 import type { MotionSettings } from "../config";
 import { resolveGoToPlan } from "../motion/timing";
 import type {
@@ -12,15 +13,6 @@ import type {
   MoveCommand,
   MotionPhase,
 } from "./types";
-
-/**
- * How many pages a same-direction repeat click skips past the live visual
- * page. `2` means each rapid click resolves to "one page past the page the
- * deck is already heading to", which is the historical behaviour: clicks
- * pick each other up and the deck keeps moving continuously while the
- * spam holds, then settles one page after the burst ends.
- */
-const REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES = 2;
 
 const repeatedClickStep = (step: number): number =>
   Math.sign(step) * REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES;

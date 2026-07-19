@@ -1,10 +1,11 @@
 import { CAROUSEL_DEFAULTS } from "./defaults";
-import {
-  DRAG_RELEASE_EPSILON,
-  GESTURE_COAST_MAX_MS,
-  MOTION_EPSILON,
-  RENDER_WINDOW_BUFFER_MULTIPLIER,
-} from "./constants";
+import { RENDER_WINDOW_BUFFER_MULTIPLIER } from "./constants";
+// Implementation constants are colocated with their subsystems (see the
+// contract note in ./constants.ts); the runtime config still plumbs them so
+// consumers and tests keep one injection point.
+import { MOTION_EPSILON } from "../motion/tolerances";
+import { DRAG_RELEASE_EPSILON } from "../domain/dragRelease";
+import { GESTURE_COAST_MAX_MS } from "../gesture/coast";
 import { CAROUSEL_SWIPE_CONFIG, CAROUSEL_INERTIAL_RELEASE_CONFIG } from "./gesture";
 import {
   AUTOPLAY_ACCELERATION_DISTANCE_SHARE,

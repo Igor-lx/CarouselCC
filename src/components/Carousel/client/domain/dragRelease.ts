@@ -3,6 +3,14 @@ import { clamp, normalizePageIndex } from "./math";
 import { alignedVirtualIndex, nearestPageIndex, pageStart } from "./layout";
 import type { CarouselLayout } from "./types";
 
+/**
+ * Tolerance for "the drag released already on target" snap detection. An
+ * IMPLEMENTATION constant (float-noise absorber for the position compare
+ * below), not a feel knob — hence colocated with the release resolution it
+ * guards rather than living in config/.
+ */
+export const DRAG_RELEASE_EPSILON = 0.001;
+
 interface ResolveDragReleaseInput {
   direction: PointerSwipeDirection;
   releasePosition: number;

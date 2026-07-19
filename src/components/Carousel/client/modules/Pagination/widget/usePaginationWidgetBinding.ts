@@ -13,11 +13,18 @@ import {
   isDroppedFallbackFrame,
   type VisualPositionSource,
 } from "../../../visual-position";
-import {
-  DOT_OPACITY_EPSILON,
-  DOT_POSITION_EPSILON_PX,
-  DOT_SCALE_EPSILON,
-} from "./defaults";
+// Per-frame change-detection thresholds for the dot DOM-write path — an
+// IMPLEMENTATION detail of this binding (see the contract in
+// config/constants.ts), colocated with the write gates they feed. A new
+// projection value below the matching epsilon does not trigger a style
+// assignment (or even a transform-string allocation): the dot is already
+// visually at the previous value within sub-pixel / sub-percent precision,
+// and writing again only feeds the browser a redundant style invalidation.
+// Sized so "wobble" between two near-equal frames stays smooth while a
+// steady-state idle widget emits zero per-rAF DOM writes.
+const DOT_POSITION_EPSILON_PX = 0.25;
+const DOT_SCALE_EPSILON = 0.002;
+const DOT_OPACITY_EPSILON = 0.01;
 import {
   widgetProjectionSide,
   widgetProjectionSlotCount,
