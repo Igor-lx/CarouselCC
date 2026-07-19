@@ -13,7 +13,10 @@ facade (`index.ts`).
   the stops AND consuming them (`keyframesAlongStops`, `positionAtNow`) —
   the peak-speed-for-duration solver, the WAAPI gate;
 - `runtime/` — the EXECUTION engine (the player): the RAF controller, the
-  motion clock;
+  motion clock, the paint-subscription hook (`useMotionPaint`);
+- `compositor/` — the DELIVERY to the browser's compositor: the pinned
+  animation primitive (`startPinnedAnimation`) and the turnkey one-element
+  rider (`createCompositedRide` / `useCompositedRide`);
 - `tests/` — the library's own suite.
 
 This folder imports **only React and itself** (enforced by
@@ -129,3 +132,68 @@ a velocity from the other is the classic handoff bug this split prevents.
 | `useMotionController` | React ownership wrapper — one instance per component lifetime. |
 | `motionNow` | THE motion clock (`performance.now()` domain, SSR-safe). |
 | `MotionController`, `MotionSample`, `MotionSampleData`, `MotionHandoff`, `MotionPhase`, `MotionSegmentBase`, `MotionSegmentSampler`, `MotionStartOptions`, `MotionSetOptions`, `MotionSnapOptions`, `MotionSubscriber`, `MotionCompletionMode` | The full public type surface. |
+
+## The compositor path
+
+Three tiers, each usable on its own:
+
+- **Curve maths** — `buildProfile` → `createProfileSegment` (the canonical
+  segment; `sampleProfileSegment` is its reader), `profileProgressStops`,
+  `keyframesAlongStops`, `positionAtNow`.
+- **Delivery primitive** — `startPinnedAnimation(element, keyframes,
+  { duration, startedAt })`: the WAAPI gate, the throw fallback (`null` →
+  run the JS loop instead) and the `startTime` pin to the motion clock, in
+  one call. Consumers that fan ONE value out into MANY elements (a dot
+  strip) call this once per element around their own choreography.
+- **The rider** — `createCompositedRide(controller)` for the canonical
+  one-value → one-element shape: builds the keyframes from the segment's own
+  profile, pins origin/finish styles, runs the controller passively behind
+  the animation, and `cancel(position?)` hands the paint back to the JS loop
+  woken at the right spot. `start` returns whether the compositor took the
+  ride; the JS fallback needs nothing extra beyond a `useMotionPaint`
+  subscription.
+
+## The standard rig (with the `gesture` library)
+
+The complete recipe for "finger drags a value, release rides a curve on the
+compositor" — the two libraries connect by these calls, never by import:
+
+```tsx
+const controller = useMotionController(0);
+const ride = useCompositedRide(controller);
+useMotionPaint(controller, ({ value }) => paint(value)); // your ONE domain fn
+
+const { hostProps } = usePointerSwipe({
+  onPressStart: () => {                       // catch a ride mid-flight
+    const h = controller.captureHandoff();
+    ride.cancel(h.position);
+    controller.set(h.position);
+    origin.current = h.position;
+  },
+  onDragMove: ({ uiOffset }) =>
+    controller.set(origin.current + uiOffset, { phase: "dragging" }),
+  onRelease: ({ uiOffset, launchVelocity }) => {
+    const from = origin.current + uiOffset;
+    const to = /* your target policy */;
+    const launch = resolveReleaseLaunch({
+      distance: to - from, visualVelocity: launchVelocity,
+      handoffVelocity: 0, intentSpeed: CRUISE,
+    });
+    ride.start({
+      element: el.current,
+      segment: createProfileSegment({
+        strategy: "ride", from, to,
+        profile: buildProfile({
+          from, to, startSpeed: launch.startSpeed,
+          peakSpeed: launch.cruiseSpeed, endSpeed: 0,
+          accelerationDistanceShare: 0.3, decelerationDistanceShare: 0.4,
+        }),
+      }),
+      toKeyframe: (x) => ({ transform: `translateX(${x}px)` }),
+    });
+  },
+});
+```
+
+Buttons are the same rig minus the gesture half: `captureHandoff` →
+`alignSpeed` → `buildProfile` → `createProfileSegment` → `ride.start`.

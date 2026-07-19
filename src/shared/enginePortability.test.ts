@@ -8,13 +8,17 @@ import { describe, expect, it } from "vitest";
  * the FOLDER — so their source may import only React and files inside their
  * own folder. Anything else (another shared util, a carousel module, an npm
  * helper) would break the copied folder silently. Tests are exempt for
- * `vitest` only; the sanctioned escape for tiny helpers is a LOCAL copy
- * (see `motion/profile/clamp.ts`).
+ * `vitest` and the react-dom renderer only; the sanctioned escape for tiny
+ * helpers is a LOCAL copy (see `motion/profile/clamp.ts`).
  */
 
 const ENGINE_ROOTS = ["gesture", "motion"] as const;
 const ALLOWED_BARE = new Set(["react"]);
-const ALLOWED_TEST_BARE = new Set(["react", "vitest"]);
+// Tests additionally get the renderer: the LIBRARY may import only react,
+// but its use* hooks cannot be exercised without one, and any project the
+// folder is copied into is a React project — react-dom is there by
+// definition. The source allowlist stays react-only.
+const ALLOWED_TEST_BARE = new Set(["react", "vitest", "react-dom/client"]);
 
 const walk = (dir: string): string[] =>
   readdirSync(dir).flatMap((name) => {

@@ -50,4 +50,12 @@ export {
 } from "./profile/progressCurve";
 export type { InFlightSpan } from "./profile/progressCurve";
 export { startPinnedAnimation } from "./compositor/pinnedAnimation";
+export {
+  createCompositedRide,
+  useCompositedRide,
+} from "./compositor/compositedRide";
+export type {
+  CompositedRide,
+  CompositedRideStart,
+} from "./compositor/compositedRide";
 export type { PinnedAnimationTiming } from "./compositor/pinnedAnimation";
