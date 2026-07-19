@@ -5,25 +5,25 @@
   "default": "family/tall/720",
   "variants": [
     {
-      "subdir": "family/wide/480",
+      "subdir": "family/tall/480",
       "width": 480
     },
     {
-      "subdir": "family/wide/720",
+      "subdir": "family/tall/720",
       "width": 720
     }
   ],
   "sources": [
     {
-      "media": "(orientation: portrait)",
+      "media": "(orientation: landscape) and (max-height: 520px)",
       "type": "image/webp",
       "variants": [
         {
-          "subdir": "family/tall/480",
+          "subdir": "family/wide/480",
           "width": 480
         },
         {
-          "subdir": "family/tall/720",
+          "subdir": "family/wide/720",
           "width": 720
         }
       ]

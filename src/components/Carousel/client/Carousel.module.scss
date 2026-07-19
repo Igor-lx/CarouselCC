@@ -12,18 +12,22 @@
     // not in the stylesheet.
     --viewport-radius: var(--slide-radius);
 
-    // The slide box aspect ratio. The box FOLLOWS THE VIEWPORT orientation
-    // (landscape 16:9, portrait 9:16 via the media query below) — always,
-    // module or not. The image `object-fit: cover`s into it:
+    // The slide box aspect ratio. TALL (9:16) is the DEFAULT art direction —
+    // desktops, laptops, tablets and portrait phones all show the vertical
+    // crop; the box flips to 16:9 ONLY in compact landscape (a handheld held
+    // sideways — the media query below), where a tall box physically cannot
+    // fit the short viewport. Always, module or not. The image
+    // `object-fit: cover`s into it:
     //  - WITH <ResponsiveImages />: the browser also swaps to the art-directed
-    //    crop matching the orientation, so box aspect === asset aspect and
-    //    nothing is cropped;
-    //  - WITHOUT it: the ONE designated asset covers the box, filling the
-    //    screen in its own orientation and cropping to the centre in the
-    //    other (plain `cover` semantics — the deliberate single-set trade-off).
+    //    crop matching the same media condition, so box aspect === asset
+    //    aspect and nothing is cropped;
+    //  - WITHOUT it: the ONE designated asset (the tall default) covers the
+    //    box — a perfect fit everywhere except compact landscape, where it
+    //    centre-crops (plain `cover` semantics — the single-set trade-off).
     // The carousel's height is DERIVED from slot width × this ratio — no fixed
-    // component height, so the deck fits any window.
-    --slide-aspect: 16 / 9;
+    // component height; on big landscape screens the HOST bounds the deck
+    // width so a tall slide fits the viewport height (see the demo App.module.scss).
+    --slide-aspect: 9 / 16;
 
     // Optional FIXED slide height. `auto` (default) => the height derives from
     // slot width × --slide-aspect (the fluid default above). Set a length
@@ -58,13 +62,17 @@
   // tried and rejected: the OS still gives tactile feedback for the long-press,
   // and feedback with no menu reads as breakage.
 
-  // Portrait viewports flip the box to 9:16 — regardless of the module. With
-  // the module the browser also picks the 9:16 crop (perfect fit); without it
-  // the single asset covers the flipped box (full in its own orientation,
-  // centre-cropped in the other). The box tracks the SCREEN, not the module.
-  @media (orientation: portrait) {
+  // Compact landscape (handheld held sideways) flips the box to 16:9 —
+  // regardless of the module: a 9:16 box cannot fit a short viewport. With
+  // the module the browser also picks the 16:9 crop (perfect fit); without
+  // it the single tall asset covers the flipped box (centre-cropped). The
+  // box tracks the SCREEN, not the module. The condition is the ONE
+  // art-direction flip — it MUST stay literally identical to
+  // `SLIDE_WIDE_MEDIA_CONDITION` (config/slides.ts) and to every generated
+  // `<source media>`; `orientationMediaSync.test.ts` pins all copies.
+  @media (orientation: landscape) and (max-height: 520px) {
     .outerContainer {
-      --slide-aspect: 9 / 16;
+      --slide-aspect: 16 / 9;
     }
   }
 

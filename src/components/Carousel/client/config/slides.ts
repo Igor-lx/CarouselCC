@@ -7,15 +7,24 @@
  * `MAX_ATTEMPTS` failures.
  */
 /**
- * THE orientation condition of the slide-geometry contract. The same string
- * lives in three places that must stay in lockstep (guarded by
- * `orientationMediaSync.test.ts`):
+ * THE art-direction flip of the slide-geometry contract: viewports matching
+ * this condition show the WIDE (16:9) crop; everything else — desktops,
+ * laptops, tablets, portrait phones — shows the TALL (9:16) default. Only a
+ * compact landscape viewport (a handheld held sideways) is physically too
+ * short for a tall slide, so that is the one place the wide crop applies.
+ * The value deliberately matches the shared `COMPACT_LANDSCAPE_QUERY`
+ * ergonomics condition so the crop and the host layout flip together.
+ *
+ * The same string lives in three places that must stay in lockstep (guarded
+ * by `orientationMediaSync.test.ts`):
  *  - `Carousel.module.scss` — flips `--slide-aspect` (box geometry);
  *  - the generated `<source media>` of every art-directed slide (asset);
- *  - this constant — the JS mirror driving the orientation-swap veil, so the
- *    veil reacts to EXACTLY the flip that swaps box and asset.
+ *  - this constant — the JS mirror driving the reorientation veil and the
+ *    warm-candidate choice, so both react to EXACTLY the flip that swaps
+ *    box and asset.
  */
-export const SLIDE_PORTRAIT_MEDIA_CONDITION = "(orientation: portrait)";
+export const SLIDE_WIDE_MEDIA_CONDITION =
+  "(orientation: landscape) and (max-height: 520px)";
 
 /**
  * Orientation-swap veil timing (one layer, three knobs — diagnostics audit

@@ -1,15 +1,15 @@
 [
   {
     "id": "951baf57-cd40-4cb8-9275-f1cec85c2ba5",
-    "content": "/CarouselCC/carousel/nature/wide/480/carousel1.webp",
+    "content": "/CarouselCC/carousel/nature/tall/480/carousel1.webp",
     "alt": "",
     "image": {
-      "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel1.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel1.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel1.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel1.webp 1600w",
+      "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel1.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel1.webp 720w",
       "defaultSrc": "/CarouselCC/carousel/nature/tall/720/carousel1.webp",
       "sources": [
         {
-          "media": "(orientation: portrait)",
-          "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel1.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel1.webp 720w",
+          "media": "(orientation: landscape) and (max-height: 520px)",
+          "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel1.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel1.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel1.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel1.webp 1600w",
           "type": "image/webp"
         }
       ]
@@ -17,15 +17,15 @@
   },
   {
     "id": "3647f549-7521-4ec3-83be-6ac3a4883492",
-    "content": "/CarouselCC/carousel/nature/wide/480/carousel2.webp",
+    "content": "/CarouselCC/carousel/nature/tall/480/carousel2.webp",
     "alt": "",
     "image": {
-      "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel2.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel2.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel2.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel2.webp 1600w",
+      "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel2.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel2.webp 720w",
       "defaultSrc": "/CarouselCC/carousel/nature/tall/720/carousel2.webp",
       "sources": [
         {
-          "media": "(orientation: portrait)",
-          "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel2.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel2.webp 720w",
+          "media": "(orientation: landscape) and (max-height: 520px)",
+          "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel2.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel2.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel2.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel2.webp 1600w",
           "type": "image/webp"
         }
       ]
@@ -33,15 +33,15 @@
   },
   {
     "id": "ec1f934e-f5db-441e-8054-f7d004200892",
-    "content": "/CarouselCC/carousel/nature/wide/480/carousel3.webp",
+    "content": "/CarouselCC/carousel/nature/tall/480/carousel3.webp",
     "alt": "",
     "image": {
-      "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel3.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel3.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel3.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel3.webp 1600w",
+      "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel3.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel3.webp 720w",
       "defaultSrc": "/CarouselCC/carousel/nature/tall/720/carousel3.webp",
       "sources": [
         {
-          "media": "(orientation: portrait)",
-          "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel3.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel3.webp 720w",
+          "media": "(orientation: landscape) and (max-height: 520px)",
+          "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel3.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel3.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel3.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel3.webp 1600w",
           "type": "image/webp"
         }
       ]
@@ -49,15 +49,15 @@
   },
   {
     "id": "e5d16be7-ba63-4c9a-9db4-1aeeb893aef8",
-    "content": "/CarouselCC/carousel/nature/wide/480/carousel4.webp",
+    "content": "/CarouselCC/carousel/nature/tall/480/carousel4.webp",
     "alt": "",
     "image": {
-      "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel4.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel4.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel4.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel4.webp 1600w",
+      "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel4.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel4.webp 720w",
       "defaultSrc": "/CarouselCC/carousel/nature/tall/720/carousel4.webp",
       "sources": [
         {
-          "media": "(orientation: portrait)",
-          "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel4.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel4.webp 720w",
+          "media": "(orientation: landscape) and (max-height: 520px)",
+          "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel4.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel4.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel4.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel4.webp 1600w",
           "type": "image/webp"
         }
       ]
@@ -65,15 +65,15 @@
   },
   {
     "id": "e0801a49-37f1-4a63-ae21-3934e7a0f3b1",
-    "content": "/CarouselCC/carousel/nature/wide/480/carousel5.webp",
+    "content": "/CarouselCC/carousel/nature/tall/480/carousel5.webp",
     "alt": "",
     "image": {
-      "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel5.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel5.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel5.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel5.webp 1600w",
+      "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel5.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel5.webp 720w",
       "defaultSrc": "/CarouselCC/carousel/nature/tall/720/carousel5.webp",
       "sources": [
         {
-          "media": "(orientation: portrait)",
-          "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel5.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel5.webp 720w",
+          "media": "(orientation: landscape) and (max-height: 520px)",
+          "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel5.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel5.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel5.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel5.webp 1600w",
           "type": "image/webp"
         }
       ]
@@ -81,15 +81,15 @@
   },
   {
     "id": "7f79b392-f01d-4663-be15-28e698759b77",
-    "content": "/CarouselCC/carousel/nature/wide/480/carousel6.webp",
+    "content": "/CarouselCC/carousel/nature/tall/480/carousel6.webp",
     "alt": "",
     "image": {
-      "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel6.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel6.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel6.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel6.webp 1600w",
+      "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel6.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel6.webp 720w",
       "defaultSrc": "/CarouselCC/carousel/nature/tall/720/carousel6.webp",
       "sources": [
         {
-          "media": "(orientation: portrait)",
-          "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel6.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel6.webp 720w",
+          "media": "(orientation: landscape) and (max-height: 520px)",
+          "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel6.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel6.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel6.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel6.webp 1600w",
           "type": "image/webp"
         }
       ]
@@ -97,15 +97,15 @@
   },
   {
     "id": "8cb857ea-9a9b-4382-b1be-61479167c57f",
-    "content": "/CarouselCC/carousel/nature/wide/480/carousel7.webp",
+    "content": "/CarouselCC/carousel/nature/tall/480/carousel7.webp",
     "alt": "",
     "image": {
-      "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel7.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel7.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel7.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel7.webp 1600w",
+      "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel7.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel7.webp 720w",
       "defaultSrc": "/CarouselCC/carousel/nature/tall/720/carousel7.webp",
       "sources": [
         {
-          "media": "(orientation: portrait)",
-          "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel7.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel7.webp 720w",
+          "media": "(orientation: landscape) and (max-height: 520px)",
+          "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel7.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel7.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel7.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel7.webp 1600w",
           "type": "image/webp"
         }
       ]
@@ -113,15 +113,15 @@
   },
   {
     "id": "45fa71de-7cd2-4e08-9449-a71555ceda52",
-    "content": "/CarouselCC/carousel/nature/wide/480/carousel8.webp",
+    "content": "/CarouselCC/carousel/nature/tall/480/carousel8.webp",
     "alt": "",
     "image": {
-      "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel8.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel8.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel8.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel8.webp 1600w",
+      "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel8.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel8.webp 720w",
       "defaultSrc": "/CarouselCC/carousel/nature/tall/720/carousel8.webp",
       "sources": [
         {
-          "media": "(orientation: portrait)",
-          "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel8.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel8.webp 720w",
+          "media": "(orientation: landscape) and (max-height: 520px)",
+          "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel8.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel8.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel8.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel8.webp 1600w",
           "type": "image/webp"
         }
       ]
@@ -129,15 +129,15 @@
   },
   {
     "id": "1873a9b3-ed89-4000-99b4-5dd12e14da5a",
-    "content": "/CarouselCC/carousel/nature/wide/480/carousel9.webp",
+    "content": "/CarouselCC/carousel/nature/tall/480/carousel9.webp",
     "alt": "",
     "image": {
-      "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel9.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel9.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel9.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel9.webp 1600w",
+      "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel9.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel9.webp 720w",
       "defaultSrc": "/CarouselCC/carousel/nature/tall/720/carousel9.webp",
       "sources": [
         {
-          "media": "(orientation: portrait)",
-          "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel9.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel9.webp 720w",
+          "media": "(orientation: landscape) and (max-height: 520px)",
+          "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel9.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel9.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel9.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel9.webp 1600w",
           "type": "image/webp"
         }
       ]
@@ -145,15 +145,15 @@
   },
   {
     "id": "21770250-0f57-4f86-ab32-e34867d57aac",
-    "content": "/CarouselCC/carousel/nature/wide/480/carousel10.webp",
+    "content": "/CarouselCC/carousel/nature/tall/480/carousel10.webp",
     "alt": "",
     "image": {
-      "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel10.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel10.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel10.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel10.webp 1600w",
+      "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel10.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel10.webp 720w",
       "defaultSrc": "/CarouselCC/carousel/nature/tall/720/carousel10.webp",
       "sources": [
         {
-          "media": "(orientation: portrait)",
-          "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel10.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel10.webp 720w",
+          "media": "(orientation: landscape) and (max-height: 520px)",
+          "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel10.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel10.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel10.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel10.webp 1600w",
           "type": "image/webp"
         }
       ]
@@ -161,15 +161,15 @@
   },
   {
     "id": "0724b6c1-12bd-4ee6-a9d4-8846814a278b",
-    "content": "/CarouselCC/carousel/nature/wide/480/carousel11.webp",
+    "content": "/CarouselCC/carousel/nature/tall/480/carousel11.webp",
     "alt": "",
     "image": {
-      "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel11.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel11.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel11.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel11.webp 1600w",
+      "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel11.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel11.webp 720w",
       "defaultSrc": "/CarouselCC/carousel/nature/tall/720/carousel11.webp",
       "sources": [
         {
-          "media": "(orientation: portrait)",
-          "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel11.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel11.webp 720w",
+          "media": "(orientation: landscape) and (max-height: 520px)",
+          "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel11.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel11.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel11.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel11.webp 1600w",
           "type": "image/webp"
         }
       ]
@@ -177,15 +177,15 @@
   },
   {
     "id": "1d895362-740b-4f29-91f7-5b6451a7df4c",
-    "content": "/CarouselCC/carousel/nature/wide/480/carousel12.webp",
+    "content": "/CarouselCC/carousel/nature/tall/480/carousel12.webp",
     "alt": "",
     "image": {
-      "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel12.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel12.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel12.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel12.webp 1600w",
+      "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel12.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel12.webp 720w",
       "defaultSrc": "/CarouselCC/carousel/nature/tall/720/carousel12.webp",
       "sources": [
         {
-          "media": "(orientation: portrait)",
-          "srcSet": "/CarouselCC/carousel/nature/tall/480/carousel12.webp 480w, /CarouselCC/carousel/nature/tall/720/carousel12.webp 720w",
+          "media": "(orientation: landscape) and (max-height: 520px)",
+          "srcSet": "/CarouselCC/carousel/nature/wide/480/carousel12.webp 480w, /CarouselCC/carousel/nature/wide/720/carousel12.webp 720w, /CarouselCC/carousel/nature/wide/1080/carousel12.webp 1080w, /CarouselCC/carousel/nature/wide/1600/carousel12.webp 1600w",
           "type": "image/webp"
         }
       ]

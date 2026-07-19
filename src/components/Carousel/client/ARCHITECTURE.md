@@ -223,23 +223,24 @@ For each logical slide you need, starting from a single high-resolution source:
      "urlBase": "/CarouselCC/carousel/",
      "output": "public/carousel-slides.json",
      "variants": [
-       { "subdir": "nature/wide/480", "width": 480 },
-       { "subdir": "nature/wide/720", "width": 720 },
-       { "subdir": "nature/wide/1080", "width": 1080 },
-       { "subdir": "nature/wide/1600", "width": 1600 }
+       { "subdir": "nature/tall/480", "width": 480 },
+       { "subdir": "nature/tall/720", "width": 720 }
      ],
      "sources": [
-       { "media": "(orientation: portrait)", "type": "image/webp",
-         "variants": [ { "subdir": "nature/tall/480", "width": 480 }, { "subdir": "nature/tall/720", "width": 720 } ] }
+       { "media": "(orientation: landscape) and (max-height: 520px)", "type": "image/webp",
+         "variants": [ { "subdir": "nature/wide/480", "width": 480 }, { "subdir": "nature/wide/720", "width": 720 },
+                       { "subdir": "nature/wide/1080", "width": 1080 }, { "subdir": "nature/wide/1600", "width": 1600 } ] }
      ]
    }
 
-   The slide box's `--slide-aspect` (SCSS) FOLLOWS THE VIEWPORT orientation
-   — landscape `16 / 9`, portrait `9 / 16` via an `(orientation: portrait)`
-   override — always, module or not. The box tracks the screen; the image
-   `object-fit: cover`s into it. WITH the module the browser also swaps to
-   the crop matching that orientation, so box aspect === asset aspect and
-   nothing is cropped. The carousel derives its height from slot width ×
+   The slide box's `--slide-aspect` (SCSS) FOLLOWS THE SCREEN — TALL
+   (`9 / 16`) is the default everywhere (desktop, laptop, tablet, portrait
+   phone); only COMPACT LANDSCAPE (a handheld held sideways, the
+   `(orientation: landscape) and (max-height: 520px)` override) flips it to
+   `16 / 9`, because a tall box cannot fit a short viewport — always, module
+   or not. The image `object-fit: cover`s into the box. WITH the module the
+   browser also swaps to the crop matching the same condition, so box aspect
+   === asset aspect and nothing is cropped. The carousel derives its height from slot width ×
    aspect instead of a fixed height, so it fits any window. To PIN the
    height instead, set `--slide-height` to a length (default `auto` keeps
    the fluid ratio): an explicit height makes the browser ignore
@@ -252,9 +253,9 @@ For each logical slide you need, starting from a single high-resolution source:
    Without the `<ResponsiveImages />` module (`data-responsive-images`
    false) the deck runs ONE native set (`resolveRenderedImageSrc`) and none
    of the machinery below runs — but the box still flips with the viewport,
-   so the single asset fills the screen in its OWN orientation and is
-   centre-cropped by `cover` in the other (the deliberate single-set
-   trade-off). Which single asset: the publisher's designated
+   so the single asset (typically the tall default) fits perfectly wherever
+   the box shares its aspect and is centre-cropped by `cover` in compact
+   landscape (the deliberate single-set trade-off). Which single asset: the publisher's designated
    `image.defaultSrc` when the data declares one (a multi-set deck has a
    human who chose the canonical stand-alone asset — the generator's
    `default` field records it); otherwise the widest candidate across all
@@ -266,7 +267,7 @@ For each logical slide you need, starting from a single high-resolution source:
    painting the old crop until the new `<source>` resource decodes — under
    `cover` that window shows a zoomed centre of the previous orientation's
    photo. `useOrientationSwapVeil` (slides/) masks exactly that window: it
-   watches the same media condition (`SLIDE_PORTRAIT_MEDIA_CONDITION`, the
+   watches the same media condition (`SLIDE_WIDE_MEDIA_CONDITION`, the
    third leg of the contract — `orientationMediaSync.test.ts` keeps SCSS,
    generated sources and the constant in lockstep), fades the bitmap out via
    `data-reorienting` and unveils when `img.decode()` settles. Fade-out and

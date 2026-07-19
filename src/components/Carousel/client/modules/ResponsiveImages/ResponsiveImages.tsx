@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef } from "react";
 
 import { useMediaQuery } from "../../../../../shared";
-import { SLIDE_PORTRAIT_MEDIA_CONDITION } from "../../config";
+import { SLIDE_WIDE_MEDIA_CONDITION } from "../../config";
 import { useCarouselMotion, useCarouselStable } from "../../context";
 import type { CarouselSlotComponent } from "../../slots";
 import { useResponsiveImagesDiagnostic } from "../Diagnostic/useResponsiveImagesDiagnostic";
@@ -86,7 +86,7 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
   const { status, intent } = useCarouselMotion();
   // The art-direction axis: which crop the rendered <picture> is choosing
   // right now. A rotation flips it, and the warm re-runs for the new crop.
-  const isPortrait = useMediaQuery(SLIDE_PORTRAIT_MEDIA_CONDITION);
+  const isWideViewport = useMediaQuery(SLIDE_WIDE_MEDIA_CONDITION);
 
   useResponsiveImagesDiagnostic({ preloadPagesNr, isPreloadOn, isPredecodeOn });
 
@@ -113,12 +113,12 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
       const start = page * layout.visibleSlidesCount;
       for (const slide of slides.slice(start, start + layout.visibleSlidesCount)) {
         // The crop the deck is ACTUALLY rendering for this viewport — never
-        // the default set blindly (that would fetch the landscape asset while
-        // a portrait deck shows the portrait crop).
+        // the default set blindly (that would fetch the tall asset while a
+        // compact-landscape deck shows the wide crop).
         const { srcSet, sizes } = resolveRenderedSrcSet(
           slide,
-          isPortrait,
-          SLIDE_PORTRAIT_MEDIA_CONDITION,
+          isWideViewport,
+          SLIDE_WIDE_MEDIA_CONDITION,
         );
         targets.push({
           // The chosen set is part of the identity: a rotation picks another
@@ -216,7 +216,7 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
   }, [
     imageSizes,
     intent.targetPageIndex,
-    isPortrait,
+    isWideViewport,
     isPredecodeOn,
     isPreloadOn,
     layout.isDataSaverEnabled,

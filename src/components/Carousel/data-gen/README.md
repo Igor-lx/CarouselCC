@@ -47,11 +47,11 @@ A JSON array of slides:
 [
   {
     "id": "…",                          // stable; preserved across regenerations
-    "content": "<base>/nature/wide/480/carousel1.webp", // identity + <img> fallback
+    "content": "<base>/nature/tall/480/carousel1.webp", // identity + <img> fallback
     "alt": "",                          // scaffolded empty; fill by hand
     "image": {
       "srcSet": "…480w, …720w",
-      "defaultSrc": "<base>/nature/wide/1600/carousel1.webp", // only if `default` is set
+      "defaultSrc": "<base>/nature/tall/720/carousel1.webp",  // only if `default` is set
       "sources": [ { "media": "…", "srcSet": "…", "type": "image/webp" } ]
     }
   }
@@ -70,10 +70,10 @@ same slug across folders is the same logical slide.
 
 ```
 <assetsDir>/
-  nature/wide/480/carousel1.webp …   (default: wide 16:9 cut, more widths welcome)
-  nature/wide/720/carousel1.webp …
-  nature/tall/480/carousel1.webp …   (art-directed 9:16 crop of the SAME photos)
+  nature/tall/480/carousel1.webp …   (default: tall 9:16 cut — big screens and portrait)
   nature/tall/720/carousel1.webp …
+  nature/wide/480/carousel1.webp …   (art-directed 16:9 crop of the SAME photos —
+  nature/wide/720/carousel1.webp …    compact landscape only; more widths welcome)
 ```
 
 ## Run it
@@ -89,25 +89,32 @@ tsx src/components/Carousel/data-gen/cli.ts carousel-data.config.json
   "assetsDir": "public/carousel",
   "urlBase": "/CarouselCC/carousel/",
   "output": "public/carousel-slides.json",
-  "default": "nature/wide/1600",
+  "default": "nature/tall/720",
   "variants": [
-    { "subdir": "nature/wide/480", "width": 480 },
-    { "subdir": "nature/wide/720", "width": 720 },
-    { "subdir": "nature/wide/1080", "width": 1080 },
-    { "subdir": "nature/wide/1600", "width": 1600 }
+    { "subdir": "nature/tall/480", "width": 480 },
+    { "subdir": "nature/tall/720", "width": 720 }
   ],
   "sources": [
     {
-      "media": "(orientation: portrait)",
+      "media": "(orientation: landscape) and (max-height: 520px)",
       "type": "image/webp",
       "variants": [
-        { "subdir": "nature/tall/480", "width": 480 },
-        { "subdir": "nature/tall/720", "width": 720 }
+        { "subdir": "nature/wide/480", "width": 480 },
+        { "subdir": "nature/wide/720", "width": 720 },
+        { "subdir": "nature/wide/1080", "width": 1080 },
+        { "subdir": "nature/wide/1600", "width": 1600 }
       ]
     }
   ]
 }
 ```
+
+The example mirrors the live art direction: TALL (9:16) is the default set —
+desktops, laptops, tablets and portrait phones all render it — and the WIDE
+(16:9) crop is the art-directed exception for compact landscape (a handheld
+held sideways), behind the same media condition the carousel's CSS box flip
+uses (`SLIDE_WIDE_MEDIA_CONDITION`; `orientationMediaSync.test.ts` pins every
+copy of that string, including the ones in these configs).
 
 - `assetsDir` — disk root of the variant subfolders (relative to cwd or absolute).
 - `urlBase` — URL prefix baked into the document (the app origin / base, or a CDN
@@ -134,12 +141,14 @@ tsx src/components/Carousel/data-gen/cli.ts carousel-data.config.json
 renders when the `<ResponsiveImages />` module is NOT mounted (it becomes
 `image.defaultSrc` in the document). **With the module mounted it plays no
 role at all**: the browser then picks the crop through the art-directed
-`<source media>` queries, and a landscape viewport (any desktop) matches
-the wide crop by design — pointing `default` at a tall crop will not and
-must not change what a desktop shows in responsive mode. To SEE the
-`default` asset, unmount `<ResponsiveImages />` and reload. (Runtime rule:
-`resolveRenderedImageSrc` — responsive mode returns the canonical URL,
-single-set mode returns `defaultSrc` → widest candidate → content.)
+`<source media>` queries. Under the live art direction both paths agree on
+big screens — the tall crop is the default `variants` set AND the `default`
+asset — so a desktop shows the vertical picture with or without the module;
+only compact landscape diverges (module: wide crop via `<source media>`;
+no module: the tall default centre-cropped by `object-fit: cover`).
+(Runtime rule: `resolveRenderedImageSrc` — responsive mode returns the
+canonical URL, single-set mode returns `defaultSrc` → widest candidate →
+content.)
 
 Re-running merges against the existing `output`: a slide is matched by its slug,
 so its `id` and hand-written `alt` are preserved, new assets get a fresh id, and

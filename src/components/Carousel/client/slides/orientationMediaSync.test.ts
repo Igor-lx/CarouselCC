@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { SLIDE_PORTRAIT_MEDIA_CONDITION } from "../config";
+import { SLIDE_WIDE_MEDIA_CONDITION } from "../config";
 
 /**
  * SSOT guard for the slide-orientation contract. One media condition flips
@@ -18,27 +18,29 @@ const read = (relativeToRepoRoot: string) =>
 
 describe("slide orientation media condition SSOT", () => {
   it("the TS constant is the canonical condition", () => {
-    expect(SLIDE_PORTRAIT_MEDIA_CONDITION).toBe("(orientation: portrait)");
+    expect(SLIDE_WIDE_MEDIA_CONDITION).toBe(
+      "(orientation: landscape) and (max-height: 520px)",
+    );
   });
 
   it("the SCSS aspect flip uses the same condition", () => {
     const scss = read("src/components/Carousel/client/Carousel.module.scss");
-    expect(scss).toContain(`@media ${SLIDE_PORTRAIT_MEDIA_CONDITION}`);
+    expect(scss).toContain(`@media ${SLIDE_WIDE_MEDIA_CONDITION}`);
   });
 
-  it("every generated portrait <source> uses the same condition", () => {
+  it("every generated wide <source> uses the same condition", () => {
     for (const config of ["carousel-data.config1.json", "carousel-data.config2.json"]) {
       const parsed = JSON.parse(read(config)) as {
         sources?: Array<{ media?: string }>;
       } & Record<string, unknown>;
       const text = JSON.stringify(parsed);
-      // Each config declares at least one portrait-crop source, and no source
+      // Each config declares at least one wide-crop source, and no source
       // spells the orientation condition differently.
-      expect(text).toContain(SLIDE_PORTRAIT_MEDIA_CONDITION);
+      expect(text).toContain(SLIDE_WIDE_MEDIA_CONDITION);
       const mediaValues = [...text.matchAll(/"media":"([^"]+)"/g)].map((m) => m[1]);
       for (const media of mediaValues) {
         if (media.includes("orientation")) {
-          expect(media).toBe(SLIDE_PORTRAIT_MEDIA_CONDITION);
+          expect(media).toBe(SLIDE_WIDE_MEDIA_CONDITION);
         }
       }
     }

@@ -5,34 +5,34 @@
   "default": "nature/tall/720",
   "variants": [
     {
-      "subdir": "nature/wide/480",
+      "subdir": "nature/tall/480",
       "width": 480
     },
     {
-      "subdir": "nature/wide/720",
+      "subdir": "nature/tall/720",
       "width": 720
-    },
-    {
-      "subdir": "nature/wide/1080",
-      "width": 1080
-    },
-    {
-      "subdir": "nature/wide/1600",
-      "width": 1600
     }
   ],
   "sources": [
     {
-      "media": "(orientation: portrait)",
+      "media": "(orientation: landscape) and (max-height: 520px)",
       "type": "image/webp",
       "variants": [
         {
-          "subdir": "nature/tall/480",
+          "subdir": "nature/wide/480",
           "width": 480
         },
         {
-          "subdir": "nature/tall/720",
+          "subdir": "nature/wide/720",
           "width": 720
+        },
+        {
+          "subdir": "nature/wide/1080",
+          "width": 1080
+        },
+        {
+          "subdir": "nature/wide/1600",
+          "width": 1600
         }
       ]
     }
