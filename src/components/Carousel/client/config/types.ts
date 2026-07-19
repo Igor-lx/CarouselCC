@@ -29,6 +29,8 @@ export interface MotionSettings {
   snapBackProfile: MotionProfileSharesSettings;
   /** @see GO_TO_PREFLIGHT_PAGE_SPAN */
   goToPreflightPageSpan: number;
+  /** @see GO_TO_TELEPORT_ENABLED */
+  goToTeleportEnabled: boolean;
   /** @see GO_TO_TELEPORT_MIN_PAGE_SPAN */
   goToTeleportMinPageSpan: number;
   /** @see GO_TO_FINAL_APPROACH_PAGE_SPAN */

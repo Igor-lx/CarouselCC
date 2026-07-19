@@ -371,7 +371,11 @@ These are the user-facing behaviours the implementation guarantees.
   no fully-skippable page at all) animates its whole
   distance; from that span on it FLIES: animates
   `GO_TO_PREFLIGHT_PAGE_SPAN` page screens, teleports the un-rendered middle,
-  then animates the final approach page. See §4.4.
+  then animates the final approach page. With the teleport enabled
+  (`GO_TO_TELEPORT_ENABLED`) a ride is additionally TIME-CAPPED to the
+  flight envelope — no jump is ever slower than a farther one; with it
+  disabled every jump rides uncapped at the one shared cruise speed.
+  See §4.4.
 - **Click during motion (opposite direction).** Re-targets without
   restarting from the logical origin: the new segment continues from the
   last emitted visual sample, not from where the previous segment was
@@ -663,7 +667,10 @@ halves with no cruise zone. Two authoring modes feed the same builder:
   - `"jump"` — **every GO_TO**, at `GO_TO_SPEED_MULTIPLIER × normalStepSpeed`. A
     short jump uses one segment with local first-screen acceleration and local
     final-screen deceleration; a far jump uses a preflight segment, a position
-    teleport, and a fixed one-page approach (§4.4).
+    teleport, and a fixed one-page approach (§4.4). Teleport ON: a ride that
+    would outlast a flight is re-solved to the flight-envelope duration
+    (`resolveGoToFlightDuration`) — the one duration-authored exception in
+    this bullet, sharing the step solver.
   - `"repeated"` — **repeated-click fast advance**, one segment directly to the
     next page boundary, peak speed `REPEATED_CLICK_SPEED_MULTIPLIER ×
     normalMoveSpeed`.
@@ -764,6 +771,14 @@ of the invisible middle is cut out. Acceleration and deceleration are local
 page-screen budgets, so `GO_TO_DECELERATION_DISTANCE_SHARE = 1` means "slow
 down over the whole final page screen", not "slow down over the whole jump".
 This is the only intentional visual teleport.
+
+Time consistency (teleport ON): a flight always animates the same distance
+(preflight + approach), so all flights share one duration — and that duration
+is also the CEILING for continuous rides. A ride longer than the flight
+envelope cruises proportionally faster and lands in exactly the flight time,
+so durations grow monotonically with span and plateau at the envelope.
+`GO_TO_TELEPORT_ENABLED = false` removes both the flights and the ceiling:
+consistent SPEED instead of consistent time, duration grows with distance.
 
 ### 4.5 Compositor motion (WAAPI) and the motion plan
 

@@ -13,6 +13,24 @@ export const REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE = 0.3;
 export const REPEATED_CLICK_DECELERATION_DISTANCE_SHARE = 0.35;
 
 /**
+ * Master switch of the far-GO_TO teleport.
+ *
+ * `true`  — jumps whose span passes the gate (see
+ *           GO_TO_TELEPORT_MIN_PAGE_SPAN) fly: preflight, instant cut,
+ *           final approach. Jumps that ride but would take LONGER than a
+ *           flight are time-capped to the flight envelope (they cruise
+ *           slightly faster), so ride and flight durations meet seamlessly.
+ * `false` — no jump ever flies and no time cap applies: every GO_TO rides
+ *           the full distance at the one shared cruise speed
+ *           (GO_TO_SPEED_MULTIPLIER), so duration grows with distance.
+ *           The three span knobs below are inert in this mode.
+ *
+ * Before this switch the only way to suppress flying was a knob ratio that
+ * never passes the gate; this makes the intent explicit.
+ */
+export const GO_TO_TELEPORT_ENABLED = true;
+
+/**
  * Number of page screens animated before a far-GO_TO teleport. After the
  * teleport the carousel shows only the final approach page. GO_TO spans that
  * fit within preflight + final approach animate directly without teleport.
@@ -70,6 +88,11 @@ export const GO_TO_DECELERATION_DISTANCE_SHARE = 0.35;
  * here is the engine's own feel decision, exactly like the accel/decel shares
  * above. Values below 1 make a GO_TO slower than a single step, which inverts
  * the visual contract (diagnostics flag it).
+ *
+ * With the teleport ENABLED this cruise is also bounded in TIME: a ride that
+ * would outlast a flight (preflight + approach at this cruise) is compressed
+ * to exactly the flight duration and cruises faster — so no jump is ever
+ * slower than a farther one. Teleport disabled = no ceiling, pure speed law.
  */
 export const GO_TO_SPEED_MULTIPLIER = 10;
 

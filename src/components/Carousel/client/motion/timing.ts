@@ -88,6 +88,10 @@ export interface GoToPlan {
  * (`preflight + approach + 1`) never breaks anything — every jump simply
  * rides — it merely fires idle, and Diagnostics reports that.
  *
+ * `goToTeleportEnabled: false` short-circuits everything: no jump ever
+ * flies (and no ride is ever time-capped — see the flight envelope below),
+ * every GO_TO rides the full distance at the shared cruise speed.
+ *
  * `pageSpan` is unsigned; the caller applies travel direction.
  */
 export const resolveGoToPlan = (
@@ -105,7 +109,11 @@ export const resolveGoToPlan = (
     motion.goToPreflightPageSpan + motion.goToFinalApproachPageSpan;
   const hasSkippablePage = intermediatePages > shownIntermediates;
 
-  if (intermediatePages < motion.goToTeleportMinPageSpan || !hasSkippablePage) {
+  if (
+    !motion.goToTeleportEnabled ||
+    intermediatePages < motion.goToTeleportMinPageSpan ||
+    !hasSkippablePage
+  ) {
     return {
       isTeleport: false,
       leadDistance: realDistance,
@@ -152,3 +160,52 @@ export const resolveGoToApproachDuration = (
   const decelShare = Math.min(1, zones.decelerationDistance / approach);
   return (approach * (1 + decelShare)) / peakSpeed;
 };
+
+/**
+ * Duration of the pre-teleport preflight segment: enter at `startSpeed`,
+ * accelerate to cruise over the local acceleration budget, cruise the rest.
+ * Zone times: acceleration `2·a·P/(s+p)` (average speed `(s+p)/2`) plus
+ * cruise `(1-a)·P/p`. The mirror of `resolveGoToApproachDuration`.
+ */
+export const resolveGoToPreflightDuration = (
+  stepSize: number,
+  motion: MotionSettings,
+  peakSpeed: number,
+  startSpeed = 0,
+): number => {
+  const zones = resolveGoToProfileZones(stepSize, motion);
+  const preflight = zones.preflightDistance;
+  if (!(preflight > 0) || !(peakSpeed > 0)) return 0;
+  const accelShare = Math.min(1, zones.accelerationDistance / preflight);
+  const entrySpeed = Math.max(0, startSpeed);
+  const accelDistance = accelShare * preflight;
+  return (
+    (2 * accelDistance) / (entrySpeed + peakSpeed) +
+    ((1 - accelShare) * preflight) / peakSpeed
+  );
+};
+
+/**
+ * TOTAL animated time of a far-GO_TO flight: preflight + approach (the
+ * teleport cut itself is instant). This is also the TIME CEILING of every
+ * continuous GO_TO ride while the teleport is enabled: a ride that would
+ * take longer than a flight is compressed to exactly this duration (it
+ * cruises faster than the shared jump speed), so ride and flight durations
+ * meet seamlessly at the gate — no jump is ever slower than a farther one.
+ * Derived entirely from existing knobs (preflight span, approach span,
+ * cruise speed, local ramp budgets) — valid for ANY knob ratio; degenerate
+ * tunings (zero animated flight distance) yield `0`, which consumers treat
+ * as "no ceiling".
+ *
+ * With the teleport DISABLED the ceiling is deliberately not applied:
+ * every ride keeps the one shared cruise speed and duration grows with
+ * distance (consistent SPEED, not consistent time).
+ */
+export const resolveGoToFlightDuration = (
+  stepSize: number,
+  motion: MotionSettings,
+  peakSpeed: number,
+  startSpeed = 0,
+): number =>
+  resolveGoToPreflightDuration(stepSize, motion, peakSpeed, startSpeed) +
+  resolveGoToApproachDuration(stepSize, motion, peakSpeed);

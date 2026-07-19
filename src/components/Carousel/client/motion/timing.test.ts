@@ -4,6 +4,9 @@ import { buildCarouselConfig } from "../config/buildConfig";
 import type { MotionSettings } from "../config";
 import {
   resolveGoToApproachDistance,
+  resolveGoToApproachDuration,
+  resolveGoToFlightDuration,
+  resolveGoToPreflightDuration,
   resolveGoToPlan,
   resolveGoToProfileZones,
   resolveJumpPeakSpeed,
@@ -133,5 +136,53 @@ describe("resolveGoToPlan", () => {
     const flies = resolveGoToPlan(5, stepSize, wide);
     expect(flies.isTeleport).toBe(true);
     expect(flies.leadDistance).toBe(2 * stepSize);
+  });
+});
+
+describe("goToTeleportEnabled master switch", () => {
+  const stepSize = 3;
+  it("false short-circuits the plan: even the farthest span rides", () => {
+    const off: MotionSettings = { ...motion, goToTeleportEnabled: false };
+    const plan = resolveGoToPlan(50, stepSize, off);
+    expect(plan.isTeleport).toBe(false);
+    expect(plan.leadDistance).toBe(50 * stepSize);
+    expect(plan.teleportDistance).toBe(0);
+  });
+
+  it("true keeps the gate semantics intact", () => {
+    const on: MotionSettings = { ...motion, goToTeleportEnabled: true };
+    expect(resolveGoToPlan(50, stepSize, on).isTeleport).toBe(true);
+  });
+});
+
+describe("resolveGoToFlightDuration (the ride time ceiling)", () => {
+  const stepSize = 3;
+  const peak = resolveJumpPeakSpeed(stepSize, 1000, motion.goToSpeedMultiplier);
+
+  it("is exactly preflight + approach", () => {
+    expect(resolveGoToFlightDuration(stepSize, motion, peak)).toBeCloseTo(
+      resolveGoToPreflightDuration(stepSize, motion, peak) +
+        resolveGoToApproachDuration(stepSize, motion, peak),
+      9,
+    );
+  });
+
+  it("a running start shortens only the preflight ramp", () => {
+    const standing = resolveGoToFlightDuration(stepSize, motion, peak, 0);
+    const rolling = resolveGoToFlightDuration(stepSize, motion, peak, peak / 2);
+    expect(rolling).toBeLessThan(standing);
+    expect(
+      resolveGoToApproachDuration(stepSize, motion, peak),
+    ).toBeCloseTo(standing - resolveGoToPreflightDuration(stepSize, motion, peak), 9);
+  });
+
+  it("degenerate tunings yield 0 — consumers read that as 'no ceiling'", () => {
+    expect(resolveGoToFlightDuration(stepSize, motion, 0)).toBe(0);
+    const zeroSpans: MotionSettings = {
+      ...motion,
+      goToPreflightPageSpan: 0,
+      goToFinalApproachPageSpan: 0,
+    };
+    expect(resolveGoToFlightDuration(stepSize, zeroSpans, peak)).toBe(0);
   });
 });

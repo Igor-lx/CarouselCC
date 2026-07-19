@@ -16,6 +16,7 @@ import type { CarouselState } from "../state";
 import { durationByVirtualSpan, resolveStepDuration } from "./duration";
 import { sameDirectionSpeed, signedVelocity } from "./speed";
 import {
+  resolveGoToFlightDuration,
   resolveGoToProfileZones,
   resolveJumpPeakSpeed,
   resolveSpeed,
@@ -268,7 +269,7 @@ const buildGoToProfile = (
     }
   }
 
-  const profile = buildProfile({
+  let profile = buildProfile({
     from: start.position,
     to: state.virtualIndex,
     startSpeed,
@@ -277,6 +278,43 @@ const buildGoToProfile = (
     accelerationDistanceShare,
     decelerationDistanceShare,
   });
+
+  // Flight-envelope time ceiling (teleport ON only): a continuous ride must
+  // never take LONGER than a flight would — otherwise the longest ride (just
+  // below the teleport gate) sits slower than a farther jump. Rides at or
+  // under the envelope keep the shared cruise untouched; longer ones are
+  // duration-authored to exactly the flight time (same solver as the steps),
+  // so ride and flight durations meet seamlessly at the gate for ANY
+  // preflight/approach/gate knob ratio. A degenerate envelope (0 — nothing
+  // animated in a flight) means "no ceiling".
+  if (phase === "single" && motion.goToTeleportEnabled) {
+    const flightDuration = resolveGoToFlightDuration(
+      stepSize,
+      motion,
+      peakSpeed,
+      startSpeed,
+    );
+    if (flightDuration > 0 && profile.duration > flightDuration) {
+      const cappedPeak = resolvePeakSpeedForDuration({
+        distance,
+        duration: flightDuration,
+        startSpeed,
+        accelerationDistanceShare,
+        decelerationDistanceShare,
+      });
+      if (cappedPeak > peakSpeed) {
+        profile = buildProfile({
+          from: start.position,
+          to: state.virtualIndex,
+          startSpeed,
+          peakSpeed: cappedPeak,
+          endSpeed,
+          accelerationDistanceShare,
+          decelerationDistanceShare,
+        });
+      }
+    }
+  }
 
   return createProfileSegment({
     strategy: "jump",

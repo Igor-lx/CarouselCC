@@ -7,6 +7,11 @@ import { buildInitialState } from "../state/initial";
 import { carouselReducer } from "../state/reducer";
 import type { CarouselCommand, CarouselState } from "../state/types";
 import { buildCarouselSegment } from "./segmentFactory";
+import {
+  resolveGoToApproachDuration,
+  resolveGoToFlightDuration,
+  resolveJumpPeakSpeed,
+} from "./timing";
 import { sampleCarouselSegment } from "./sampler";
 
 /**
@@ -233,5 +238,120 @@ describe("a micro-hold before lift-off must not launch the ride from a standstil
     });
 
     expect(Math.abs(sampleCarouselSegment(segment, 1).velocity)).toBeLessThan(0.001);
+  });
+});
+
+/**
+ * Flight-envelope time ceiling of a GO_TO ride (teleport ON).
+ *
+ * MECHANISM tests with PINNED GO_TO knobs (the live values are feel
+ * tunables): the contract is that with the teleport enabled no continuous
+ * ride ever takes LONGER than a flight, so ride and flight durations meet
+ * seamlessly at the gate — for ANY preflight/approach/gate ratio. With the
+ * teleport disabled the ceiling must NOT apply: one shared cruise speed,
+ * duration grows with distance.
+ */
+describe("GO_TO flight-envelope time ceiling", () => {
+  const PINNED_GO_TO = {
+    goToTeleportEnabled: true,
+    goToPreflightPageSpan: 1,
+    goToFinalApproachPageSpan: 1,
+    goToTeleportMinPageSpan: 3,
+    goToAccelerationDistanceShare: 0.35,
+    goToDecelerationDistanceShare: 0.35,
+    goToSpeedMultiplier: 10,
+  };
+
+  const makeGoToConfig = (overrides: Partial<typeof PINNED_GO_TO> = {}) => {
+    const built = buildCarouselConfig({ durationStep: 1000 });
+    return {
+      ...built,
+      motion: { ...built.motion, ...PINNED_GO_TO, ...overrides },
+    };
+  };
+
+  /** Issue a GO_TO from page 0 and build its first (ride or preflight) segment. */
+  const jumpFrom0 = (cfg: ReturnType<typeof makeGoToConfig>, targetPageIndex: number) => {
+    const layout = makeLayout(30, 3); // pageCount 10, stepSize 3
+    const state = carouselReducer(buildInitialState(layout), {
+      type: "GO_TO",
+      targetPageIndex,
+      moveReason: "click",
+      fromVirtualIndex: 0,
+      context: { layout, config: cfg, isInstantMode: false },
+    });
+    const { segment } = buildCarouselSegment({
+      state,
+      config: cfg,
+      isInstantMode: false,
+      start: { position: 0, velocity: 0, strategy: "idle" },
+      startedAt: 0,
+    });
+    return { state, segment };
+  };
+
+  const flightEnvelope = (cfg: ReturnType<typeof makeGoToConfig>) =>
+    resolveGoToFlightDuration(
+      3,
+      cfg.motion,
+      resolveJumpPeakSpeed(3, cfg.stepDuration, cfg.motion.goToSpeedMultiplier),
+    );
+
+  it("the widest still-riding jump is time-capped to exactly the flight duration", () => {
+    const cfg = makeGoToConfig();
+    const { state, segment } = jumpFrom0(cfg, 3); // span 3: rides (2 intermediates, both shown)
+    expect(state.teleportVirtualIndex).toBeNull();
+    expect(segment.duration).toBeCloseTo(flightEnvelope(cfg), 4);
+  });
+
+  it("rides at or under the envelope keep the shared cruise untouched", () => {
+    const enabled = makeGoToConfig();
+    const disabled = makeGoToConfig({ goToTeleportEnabled: false });
+    for (const target of [1, 2]) {
+      const withCeiling = jumpFrom0(enabled, target).segment.duration;
+      const freeRide = jumpFrom0(disabled, target).segment.duration;
+      expect(withCeiling).toBeCloseTo(freeRide, 6);
+    }
+  });
+
+  it("durations are monotonic and the ride/flight seam matches", () => {
+    const cfg = makeGoToConfig();
+    const d1 = jumpFrom0(cfg, 1).segment.duration;
+    const d2 = jumpFrom0(cfg, 2).segment.duration;
+    const d3 = jumpFrom0(cfg, 3).segment.duration; // capped ride
+    // span 4+ flies: preflight segment + precomputable approach = full flight
+    const { state: far, segment: preflight } = jumpFrom0(cfg, 4);
+    expect(far.teleportVirtualIndex).not.toBeNull();
+    const peak = resolveJumpPeakSpeed(3, cfg.stepDuration, cfg.motion.goToSpeedMultiplier);
+    const flightTotal =
+      preflight.duration + resolveGoToApproachDuration(3, cfg.motion, peak);
+    expect(d1).toBeLessThanOrEqual(d2 + 1e-9);
+    expect(d2).toBeLessThanOrEqual(d3 + 1e-9);
+    expect(d3).toBeCloseTo(flightTotal, 4);
+  });
+
+  it("disabled teleport: far jumps ride the full distance with NO ceiling", () => {
+    const cfg = makeGoToConfig({ goToTeleportEnabled: false });
+    const { state, segment } = jumpFrom0(cfg, 8); // span 8 would fly when enabled
+    expect(state.teleportVirtualIndex).toBeNull();
+    expect(segment.duration).toBeGreaterThan(flightEnvelope(cfg) * 2);
+    // consistent SPEED, not consistent time: farther rides take longer
+    expect(segment.duration).toBeGreaterThan(jumpFrom0(cfg, 3).segment.duration);
+  });
+
+  it("holds for a different preflight/approach/gate ratio (tuning-agnostic)", () => {
+    const cfg = makeGoToConfig({
+      goToPreflightPageSpan: 2,
+      goToFinalApproachPageSpan: 1,
+      goToTeleportMinPageSpan: 6,
+    });
+    // spans 4..6 all ride (intermediates 3..5 < gate 6) — every one capped
+    const d4 = jumpFrom0(cfg, 4).segment.duration;
+    const d6 = jumpFrom0(cfg, 6).segment.duration;
+    expect(jumpFrom0(cfg, 6).state.teleportVirtualIndex).toBeNull();
+    expect(d4).toBeCloseTo(flightEnvelope(cfg), 4);
+    expect(d6).toBeCloseTo(flightEnvelope(cfg), 4);
+    // span 7 (6 intermediates >= gate, > 3 shown) flies
+    expect(jumpFrom0(cfg, 7).state.teleportVirtualIndex).not.toBeNull();
   });
 });

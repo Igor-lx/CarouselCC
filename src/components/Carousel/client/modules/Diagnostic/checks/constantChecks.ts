@@ -22,6 +22,7 @@ import {
   GO_TO_FINAL_APPROACH_PAGE_SPAN,
   GO_TO_PREFLIGHT_PAGE_SPAN,
   GO_TO_SPEED_MULTIPLIER,
+  GO_TO_TELEPORT_ENABLED,
   GO_TO_TELEPORT_MIN_PAGE_SPAN,
   HOVER_PAUSE_DELAY,
   IMAGE_RETRY_BASE_DELAY_MS,
@@ -725,6 +726,65 @@ const collectRetryDelayRelation = (): CarouselDiagnosticWarning | null => {
 };
 
 /**
+ * The teleport switch is the only boolean knob — a dedicated check, since
+ * the numeric rules cannot audit it. Anything but a literal boolean means
+ * the gate comparison in resolveGoToPlan silently coerces.
+ */
+const collectTeleportEnabledType = (): CarouselDiagnosticWarning | null => {
+  if (typeof GO_TO_TELEPORT_ENABLED === "boolean") return null;
+  return {
+    severity: "CRITICAL",
+    layer: "Motion",
+    field: "GO_TO_TELEPORT_ENABLED",
+    actual: GO_TO_TELEPORT_ENABLED,
+    expected: "Expected a literal boolean",
+    consequence:
+      "The teleport gate coerces a non-boolean and far GO_TO behaviour becomes accidental",
+  };
+};
+
+/**
+ * Implementation threshold of the CHECK below (not a tuning knob): how much
+ * faster than the shared GO_TO cruise the widest still-riding jump may go
+ * before Diagnostics calls the transition zone uncomfortable. 2x is where a
+ * time-capped ride starts reading as a blur next to a flight.
+ */
+const TRANSITION_ZONE_CRUISE_WARN_FACTOR = 2;
+
+/**
+ * With the teleport enabled, rides longer than the flight envelope are
+ * time-capped to it (see resolveGoToFlightDuration) and cruise FASTER than
+ * the shared jump speed. The widest such ride is the one just below the
+ * teleport gate; raising GO_TO_TELEPORT_MIN_PAGE_SPAN far above its floor
+ * widens that zone until its cruise visibly outruns the nominal jump speed.
+ * Distance-proportional estimate in page units (zero start speed, local
+ * ramp budgets included) — exact enough for a warning.
+ */
+const collectTeleportTransitionZoneRelation =
+  (): CarouselDiagnosticWarning | null => {
+    if (GO_TO_TELEPORT_ENABLED !== true) return null;
+    const shownPages =
+      GO_TO_PREFLIGHT_PAGE_SPAN + GO_TO_FINAL_APPROACH_PAGE_SPAN;
+    const rampPages =
+      GO_TO_ACCELERATION_DISTANCE_SHARE + GO_TO_DECELERATION_DISTANCE_SHARE;
+    if (!(shownPages + rampPages > 0)) return null;
+    const widestRidePages =
+      Math.max(GO_TO_TELEPORT_MIN_PAGE_SPAN - 1, shownPages) + 1;
+    const compressionFactor =
+      (widestRidePages + rampPages) / (shownPages + rampPages);
+    if (compressionFactor <= TRANSITION_ZONE_CRUISE_WARN_FACTOR) return null;
+    return {
+      severity: "LOGICAL",
+      layer: "Motion",
+      field: "GO_TO_TELEPORT_MIN_PAGE_SPAN",
+      actual: GO_TO_TELEPORT_MIN_PAGE_SPAN,
+      expected: `Expected the widest still-riding jump to need at most ${TRANSITION_ZONE_CRUISE_WARN_FACTOR}x the shared GO_TO cruise (got ~${compressionFactor.toFixed(2)}x)`,
+      consequence:
+        "Rides just below the teleport gate are time-capped to the flight envelope and cruise much faster than the nominal jump speed — the transition zone reads as a blur",
+    };
+  };
+
+/**
  * Audit every hand-written carousel constant used at runtime. The constants
  * are imported by value so the checks always see what the runtime sees.
  */
@@ -783,5 +843,9 @@ collectProfileShareRelation(
   out.push(...collectSwipeCommitRelations());
   const rideFloorRelation = collectRideFloorRelation();
   if (rideFloorRelation) out.push(rideFloorRelation);
+  const teleportEnabledType = collectTeleportEnabledType();
+  if (teleportEnabledType) out.push(teleportEnabledType);
+  const teleportTransitionZone = collectTeleportTransitionZoneRelation();
+  if (teleportTransitionZone) out.push(teleportTransitionZone);
   return out;
 };
