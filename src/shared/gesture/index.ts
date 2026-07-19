@@ -22,6 +22,18 @@ export type {
   PointerSwipeValueBinding,
 } from "./swipe/types";
 export { resolveInertialRelease } from "./inertia/inertialRelease";
+export {
+  MOMENTUM_DEFAULTS,
+  projectMomentum,
+  RELEASE_KINETICS_DEFAULTS,
+  resolveReleaseKinetics,
+} from "./inertia/releaseKinetics";
+export type {
+  MomentumConfig,
+  ReleaseKinetics,
+  ReleaseKineticsConfig,
+  ReleaseKineticsInput,
+} from "./inertia/releaseKinetics";
 export { resolveReleaseLaunch } from "./inertia/releaseLaunch";
 export { sameDirectionSpeed } from "./inertia/speed";
 export type {

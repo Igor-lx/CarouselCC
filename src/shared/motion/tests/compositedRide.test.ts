@@ -160,3 +160,63 @@ describe("createCompositedRide", () => {
     expect(ride.isComposited()).toBe(true);
   });
 });
+
+describe("the high-level rider surface", () => {
+  it("flyTo builds the ride from the live handoff — one call, no assembly", () => {
+    const anim = fakeAnimation();
+    animateMock.mockReturnValue(anim);
+    const controller = createMotionController(50);
+    const element = document.createElement("div");
+    const ride = createCompositedRide(controller, {
+      element: { current: element },
+      toKeyframe,
+    });
+
+    const composited = ride.flyTo({ to: 250, cruiseSpeed: 0.5 });
+
+    expect(composited).toBe(true);
+    // Origin defaulted from the handoff (the resting value, 50)…
+    expect(element.style.transform).toBe("translateX(50px)");
+    // …and the animation is pinned to the handoff's clock.
+    expect(typeof anim.startTime).toBe("number");
+  });
+
+  it("rider defaults free start() from repeating element/toKeyframe", () => {
+    const anim = fakeAnimation();
+    animateMock.mockReturnValue(anim);
+    const controller = createMotionController(0);
+    const element = document.createElement("div");
+    const ride = createCompositedRide(controller, {
+      element: { current: element },
+      toKeyframe,
+    });
+
+    const composited = ride.start({ segment: segmentTo(0, 100) });
+    expect(composited).toBe(true);
+    expect(element.style.transform).toBe("translateX(0px)");
+  });
+
+  it("dragBinding: read catches the flying ride at its position, write feeds the finger", () => {
+    const anim = fakeAnimation();
+    animateMock.mockReturnValue(anim);
+    const raf = vi.fn(() => 1);
+    vi.stubGlobal("requestAnimationFrame", raf);
+
+    const controller = createMotionController(0);
+    const element = document.createElement("div");
+    const ride = createCompositedRide(controller, {
+      element: { current: element },
+      toKeyframe,
+    });
+    ride.flyTo({ to: 100, cruiseSpeed: 0.5 });
+
+    const binding = ride.dragBinding();
+    const caught = binding.read();
+    expect(anim.cancel).toHaveBeenCalled(); // the ride died pinned
+    expect(ride.isComposited()).toBe(false);
+
+    binding.write(caught + 12);
+    expect(ride.position()).toBeCloseTo(caught + 12, 10);
+    vi.unstubAllGlobals();
+  });
+});

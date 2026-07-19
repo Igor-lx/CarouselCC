@@ -51,11 +51,16 @@ export {
 export type { InFlightSpan } from "./profile/progressCurve";
 export { startPinnedAnimation } from "./compositor/pinnedAnimation";
 export {
+  applyKeyframe,
   createCompositedRide,
+  DEFAULT_RIDE_SHARES,
   useCompositedRide,
 } from "./compositor/compositedRide";
 export type {
   CompositedRide,
+  CompositedRideDefaults,
+  CompositedRideFlight,
   CompositedRideStart,
+  RideDragBinding,
 } from "./compositor/compositedRide";
 export type { PinnedAnimationTiming } from "./compositor/pinnedAnimation";

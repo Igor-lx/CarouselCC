@@ -156,48 +156,47 @@ Three tiers, each usable on its own:
 ## The standard rig (with the `gesture` library)
 
 The complete recipe for "finger drags a value, release rides a curve on the
-compositor" — the two libraries connect by these calls, never by import:
+compositor". The libraries connect by ONE structural seam —
+`ride.dragBinding()` dropped into the gesture hook's `value` prop — never by
+import:
 
 ```tsx
 const controller = useMotionController(0);
-const ride = useCompositedRide(controller);
-useMotionPaint(controller, ({ value }) => paint(value)); // your ONE domain fn
+const circle = useRef<HTMLDivElement | null>(null);
+// element + toKeyframe given ONCE: every ride uses them, and the hook wires
+// the paint automatically — no useMotionPaint of your own.
+const ride = useCompositedRide(controller, {
+  element: circle,
+  toKeyframe: (x) => ({ transform: `translateX(${x}px)` }),
+});
 
 const { hostProps } = usePointerSwipe({
-  // Turnkey drag: the engine anchors at read() and writes anchor + offset on
-  // every move. Cancelling the ride INSIDE read() is the mid-flight catch —
-  // the finger picks the value up exactly where the compositor painted it.
-  value: {
-    read: () => {
-      const h = controller.captureHandoff();
-      ride.cancel(h.position);
-      return h.position;
-    },
-    write: (v) => controller.set(v),
-  },
-  onRelease: ({ launchVelocity }) => {
-    const from = controller.captureHandoff().position; // the last written value
-    const to = /* your target policy */;
-    const launch = resolveReleaseLaunch({
-      distance: to - from, visualVelocity: launchVelocity,
-      handoffVelocity: 0, intentSpeed: CRUISE,
-    });
-    // (origin bookkeeping is gone: the value binding owned the drag)
-    ride.start({
-      element: el.current,
-      segment: createProfileSegment({
-        strategy: "ride", from, to,
-        profile: buildProfile({
-          from, to, startSpeed: launch.startSpeed,
-          peakSpeed: launch.cruiseSpeed, endSpeed: 0,
-          accelerationDistanceShare: 0.3, decelerationDistanceShare: 0.4,
-        }),
+  value: ride.dragBinding(), // drag + mid-flight catch, wired
+  onRelease: ({ launchVelocity, pointerReleaseVelocity }) => {
+    const drift = projectMomentum(launchVelocity);   // default landing policy
+    if (drift === null) return;                      // too slow: rest
+    ride.flyTo({
+      to: ride.position() + drift,
+      ...resolveReleaseKinetics({                    // flick boost + continuity
+        distance: drift,
+        launchVelocity,
+        pointerReleaseVelocity,
+        baseSpeed: CRUISE,
       }),
-      toKeyframe: (x) => ({ transform: `translateX(${x}px)` }),
     });
   },
 });
+
+return (
+  <div {...hostProps}>
+    <div ref={circle} className="circle" />
+    <button onClick={() => ride.flyTo({ to: ride.position() + 200, cruiseSpeed: CRUISE })}>
+      →
+    </button>
+  </div>
+);
 ```
 
-Buttons are the same rig minus the gesture half: `captureHandoff` →
-`alignSpeed` → `buildProfile` → `createProfileSegment` → `ride.start`.
+Buttons are one `ride.flyTo` call; a snap policy replaces `projectMomentum`
+with your own target. For zero seams at all — one hook, everything fused —
+take the `kinetic` blank instead of the two engines.

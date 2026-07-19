@@ -10,8 +10,11 @@ done. Everything a consumer may need is exported from this folder's facade
 
 - `swipe/` — gesture REGISTRATION: the hook, host props, recognition
   (`internals/` inside is private machinery);
-- `inertia/` — the KINETIC MEANING of a release: intent speed
-  (`resolveInertialRelease`), continuity launch (`resolveReleaseLaunch`);
+- `inertia/` — the KINETIC MEANING of a release: the one-call fusion
+  (`resolveReleaseKinetics` — flick judgment + continuity launch) and the
+  default landing policy (`projectMomentum`); the underlying primitives
+  (`resolveInertialRelease`, `resolveReleaseLaunch`) stay exported for
+  bespoke pipelines;
 - `tests/` — the library's own suite.
 
 This folder imports **only React and itself** (enforced by
