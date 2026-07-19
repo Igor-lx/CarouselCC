@@ -8,22 +8,25 @@
  */
 /**
  * THE art-direction flip of the slide-geometry contract: viewports matching
- * this condition show the WIDE (16:9) crop; everything else — desktops,
- * laptops, tablets, portrait phones — shows the TALL (9:16) default. Only a
- * compact landscape viewport (a handheld held sideways) is physically too
- * short for a tall slide, so that is the one place the wide crop applies.
- * The value deliberately matches the shared `COMPACT_LANDSCAPE_QUERY`
- * ergonomics condition so the crop and the host layout flip together.
- *
- * The same string lives in three places that must stay in lockstep (guarded
- * by `orientationMediaSync.test.ts`):
+ * this condition render the art-directed `<source>` crop family; everything
+ * else renders the default variant set. WHICH crop family sits on which
+ * side, and the condition itself, are host/data tuning — the carousel is a
+ * universal component and bakes in no art direction of its own. The
+ * MECHANISM is the contract: one condition, and the same string living in
+ * three places that must stay in lockstep (guarded by
+ * `orientationMediaSync.test.ts`):
  *  - `Carousel.module.scss` — flips `--slide-aspect` (box geometry);
  *  - the generated `<source media>` of every art-directed slide (asset);
  *  - this constant — the JS mirror driving the reorientation veil and the
  *    warm-candidate choice, so both react to EXACTLY the flip that swaps
  *    box and asset.
+ *
+ * CURRENT tuning (the demo dataset's particular case, not a component
+ * rule): tall 9:16 variants are the default set, wide 16:9 sits behind this
+ * compact-landscape condition; the value matches the shared
+ * `COMPACT_LANDSCAPE_QUERY` so the crop and the host layout flip together.
  */
-export const SLIDE_WIDE_MEDIA_CONDITION =
+export const SLIDE_ART_DIRECTION_MEDIA_CONDITION =
   "(orientation: landscape) and (max-height: 520px)";
 
 /**

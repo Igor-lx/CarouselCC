@@ -200,12 +200,13 @@ Contract guarantees:
 
 For each logical slide you need, starting from a single high-resolution source:
 
-1. **Produce the variant files.** Two axes — resolution and (optionally)
-   orientation crop:
-   - a wide 16:9 cut (`wide/`): a resolution ladder (the demo cuts up to
-     480/720/1080/1600w);
-   - a tall 9:16 crop of the SAME photos (`tall/`) for portrait viewports —
-     art direction changes the crop, never the picture.
+1. **Produce the variant files.** Two axes — resolution and (optionally) an
+   art-directed crop. Which crop family is the default and which sits behind
+   the media condition is entirely the dataset's choice (the component bakes
+   in no art direction). The demo's case:
+   - a tall 9:16 cut (`tall/`, 480/720w) as the default set;
+   - a wide 16:9 crop of the SAME photos (`wide/`, up to 1600w) for compact
+     landscape — art direction changes the crop, never the picture.
 
    The demo serves them from `public/carousel/<collection>/<crop>/<width>/carouselN.webp`
    (so they have stable URLs, not bundler-hashed ones). In production they'd
@@ -233,12 +234,14 @@ For each logical slide you need, starting from a single high-resolution source:
      ]
    }
 
-   The slide box's `--slide-aspect` (SCSS) FOLLOWS THE SCREEN — TALL
-   (`9 / 16`) is the default everywhere (desktop, laptop, tablet, portrait
-   phone); only COMPACT LANDSCAPE (a handheld held sideways, the
-   `(orientation: landscape) and (max-height: 520px)` override) flips it to
-   `16 / 9`, because a tall box cannot fit a short viewport — always, module
-   or not. The image `object-fit: cover`s into the box. WITH the module the
+   The slide box's `--slide-aspect` (SCSS) is a TUNING PAIR with the data's
+   crop families — the default value matches the default variant set, the
+   media override matches the art-directed `<source>` crops; the component
+   itself bakes in NO art direction (any legitimate pair works). Current
+   demo tuning: `9 / 16` default, flipped to `16 / 9` under
+   `(orientation: landscape) and (max-height: 520px)` (compact landscape,
+   where a tall box cannot fit) — always, module or not. The image
+   `object-fit: cover`s into the box. WITH the module the
    browser also swaps to the crop matching the same condition, so box aspect
    === asset aspect and nothing is cropped. The carousel derives its height from slot width ×
    aspect instead of a fixed height, so it fits any window. To PIN the
@@ -253,9 +256,9 @@ For each logical slide you need, starting from a single high-resolution source:
    Without the `<ResponsiveImages />` module (`data-responsive-images`
    false) the deck runs ONE native set (`resolveRenderedImageSrc`) and none
    of the machinery below runs — but the box still flips with the viewport,
-   so the single asset (typically the tall default) fits perfectly wherever
-   the box shares its aspect and is centre-cropped by `cover` in compact
-   landscape (the deliberate single-set trade-off). Which single asset: the publisher's designated
+   so the single asset fits perfectly wherever the box shares its aspect and
+   is centre-cropped by `cover` where the override flips the box (the
+   deliberate single-set trade-off). Which single asset: the publisher's designated
    `image.defaultSrc` when the data declares one (a multi-set deck has a
    human who chose the canonical stand-alone asset — the generator's
    `default` field records it); otherwise the widest candidate across all
@@ -267,7 +270,7 @@ For each logical slide you need, starting from a single high-resolution source:
    painting the old crop until the new `<source>` resource decodes — under
    `cover` that window shows a zoomed centre of the previous orientation's
    photo. `useOrientationSwapVeil` (slides/) masks exactly that window: it
-   watches the same media condition (`SLIDE_WIDE_MEDIA_CONDITION`, the
+   watches the same media condition (`SLIDE_ART_DIRECTION_MEDIA_CONDITION`, the
    third leg of the contract — `orientationMediaSync.test.ts` keeps SCSS,
    generated sources and the constant in lockstep), fades the bitmap out via
    `data-reorienting` and unveils when `img.decode()` settles. Fade-out and

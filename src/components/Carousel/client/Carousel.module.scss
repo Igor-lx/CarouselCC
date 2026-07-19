@@ -12,21 +12,22 @@
     // not in the stylesheet.
     --viewport-radius: var(--slide-radius);
 
-    // The slide box aspect ratio. TALL (9:16) is the DEFAULT art direction —
-    // desktops, laptops, tablets and portrait phones all show the vertical
-    // crop; the box flips to 16:9 ONLY in compact landscape (a handheld held
-    // sideways — the media query below), where a tall box physically cannot
-    // fit the short viewport. Always, module or not. The image
-    // `object-fit: cover`s into it:
-    //  - WITH <ResponsiveImages />: the browser also swaps to the art-directed
-    //    crop matching the same media condition, so box aspect === asset
-    //    aspect and nothing is cropped;
-    //  - WITHOUT it: the ONE designated asset (the tall default) covers the
-    //    box — a perfect fit everywhere except compact landscape, where it
-    //    centre-crops (plain `cover` semantics — the single-set trade-off).
-    // The carousel's height is DERIVED from slot width × this ratio — no fixed
-    // component height; on big landscape screens the HOST bounds the deck
-    // width so a tall slide fits the viewport height (see the demo App.module.scss).
+    // The slide box aspect ratio — a TUNING PAIR with the data's crop
+    // families, not a component opinion: this default value matches the
+    // default variant set, and the media override below matches the
+    // art-directed `<source>` crops. Whatever pair the host's dataset uses
+    // is legitimate; the current 9/16-default is simply the demo dataset's
+    // case (its default variants are tall cuts). The image
+    // `object-fit: cover`s into the box:
+    //  - WITH <ResponsiveImages />: the browser swaps to the crop matching
+    //    the same media condition, so box aspect === asset aspect and
+    //    nothing is cropped;
+    //  - WITHOUT it: the ONE designated asset covers the box — a perfect
+    //    fit while box and asset share an aspect, centre-cropped where the
+    //    override flips the box (plain `cover` — the single-set trade-off).
+    // The carousel's height is DERIVED from slot width × this ratio — no
+    // fixed component height; the HOST decides how many slots share its
+    // width so a slide fits the screen (see the demo's VISIBLE_BY_BREAKPOINT).
     --slide-aspect: 9 / 16;
 
     // Optional FIXED slide height. `auto` (default) => the height derives from
@@ -62,14 +63,15 @@
   // tried and rejected: the OS still gives tactile feedback for the long-press,
   // and feedback with no menu reads as breakage.
 
-  // Compact landscape (handheld held sideways) flips the box to 16:9 —
-  // regardless of the module: a 9:16 box cannot fit a short viewport. With
-  // the module the browser also picks the 16:9 crop (perfect fit); without
-  // it the single tall asset covers the flipped box (centre-cropped). The
-  // box tracks the SCREEN, not the module. The condition is the ONE
-  // art-direction flip — it MUST stay literally identical to
-  // `SLIDE_WIDE_MEDIA_CONDITION` (config/slides.ts) and to every generated
-  // `<source media>`; `orientationMediaSync.test.ts` pins all copies.
+  // The art-direction override: under this condition the box takes the
+  // aspect of the art-directed `<source>` crops — regardless of the module
+  // (the box tracks the SCREEN; without the module the single asset simply
+  // centre-crops into the flipped box). The CONDITION is the contract: it
+  // MUST stay literally identical to `SLIDE_ART_DIRECTION_MEDIA_CONDITION`
+  // (config/slides.ts) and to every generated `<source media>` —
+  // `orientationMediaSync.test.ts` pins all copies. The VALUES (16/9 wide
+  // cuts behind a compact-landscape condition) are the demo dataset's
+  // tuning, not a component rule.
   @media (orientation: landscape) and (max-height: 520px) {
     .outerContainer {
       --slide-aspect: 16 / 9;

@@ -11,11 +11,12 @@ import type { CarouselSlideMediaView } from "../../context";
  * choose for the current viewport, which is the only set worth warming. A
  * detached `Image` understands `srcset`/`sizes` (resolution switching) but NOT
  * `<source media>` (art direction), so the media choice has to be made here:
- * the wide `<source>` when the viewport is compact landscape, the tall
+ * the art-directed `<source>` when the viewport matches its condition, the
  * default set otherwise. (One art-direction axis exists by contract —
  * `orientationMediaSync.test.ts` pins every generated source to the same
- * `SLIDE_WIDE_MEDIA_CONDITION`.) Warming `slide.srcSet` blindly would
- * fetch the TALL set while a compact-landscape deck renders the wide crop:
+ * `SLIDE_ART_DIRECTION_MEDIA_CONDITION`; which crop family sits on which
+ * side is the dataset's business.) Warming `slide.srcSet` blindly would
+ * fetch the default set while the deck renders the art-directed crop:
  * bytes spent on an asset that never appears, and the needed crop left cold.
  *
  * There is deliberately no parallel-orientation ("rotation") warm. The set of
@@ -32,11 +33,11 @@ export interface RenderedSrcSet {
 
 export const resolveRenderedSrcSet = (
   slide: CarouselSlideMediaView,
-  isWideViewport: boolean,
-  wideMediaCondition: string,
+  isArtDirectedViewport: boolean,
+  artDirectionMediaCondition: string,
 ): RenderedSrcSet => {
-  const artDirected = isWideViewport
-    ? slide.sources?.find((source) => source.media === wideMediaCondition)
+  const artDirected = isArtDirectedViewport
+    ? slide.sources?.find((source) => source.media === artDirectionMediaCondition)
     : undefined;
   return artDirected
     ? { srcSet: artDirected.srcSet, sizes: artDirected.sizes }

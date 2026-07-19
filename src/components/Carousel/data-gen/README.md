@@ -70,10 +70,10 @@ same slug across folders is the same logical slide.
 
 ```
 <assetsDir>/
-  nature/tall/480/carousel1.webp …   (default: tall 9:16 cut — big screens and portrait)
+  nature/tall/480/carousel1.webp …   (the demo’s default set — tall 9:16 cut)
   nature/tall/720/carousel1.webp …
-  nature/wide/480/carousel1.webp …   (art-directed 16:9 crop of the SAME photos —
-  nature/wide/720/carousel1.webp …    compact landscape only; more widths welcome)
+  nature/wide/480/carousel1.webp …   (the demo’s art-directed 16:9 crop of the SAME
+  nature/wide/720/carousel1.webp …    photos, behind its media condition)
 ```
 
 ## Run it
@@ -109,12 +109,14 @@ tsx src/components/Carousel/data-gen/cli.ts carousel-data.config.json
 }
 ```
 
-The example mirrors the live art direction: TALL (9:16) is the default set —
-desktops, laptops, tablets and portrait phones all render it — and the WIDE
-(16:9) crop is the art-directed exception for compact landscape (a handheld
-held sideways), behind the same media condition the carousel's CSS box flip
-uses (`SLIDE_WIDE_MEDIA_CONDITION`; `orientationMediaSync.test.ts` pins every
-copy of that string, including the ones in these configs).
+The generator is crop-agnostic: which variant family is the default set and
+which sits behind a `<source media>` condition is purely this config's
+choice (the carousel component bakes in no art direction). The example
+mirrors the DEMO's current tuning — tall 9:16 as the default set, wide 16:9
+behind a compact-landscape condition — using the same media string as the
+carousel's CSS box flip (`SLIDE_ART_DIRECTION_MEDIA_CONDITION`;
+`orientationMediaSync.test.ts` pins every copy, including the ones in these
+configs).
 
 - `assetsDir` — disk root of the variant subfolders (relative to cwd or absolute).
 - `urlBase` — URL prefix baked into the document (the app origin / base, or a CDN
@@ -141,11 +143,13 @@ copy of that string, including the ones in these configs).
 renders when the `<ResponsiveImages />` module is NOT mounted (it becomes
 `image.defaultSrc` in the document). **With the module mounted it plays no
 role at all**: the browser then picks the crop through the art-directed
-`<source media>` queries. Under the live art direction both paths agree on
-big screens — the tall crop is the default `variants` set AND the `default`
-asset — so a desktop shows the vertical picture with or without the module;
-only compact landscape diverges (module: wide crop via `<source media>`;
-no module: the tall default centre-cropped by `object-fit: cover`).
+`<source media>` queries. Under the demo's CURRENT tuning both paths agree
+on big screens — the tall crop is the default `variants` set AND the
+`default` asset — so a desktop shows the vertical picture with or without
+the module; only compact landscape diverges (module: wide crop via
+`<source media>`; no module: the default asset centre-cropped by
+`object-fit: cover`). With a different config the split lands wherever its
+media condition puts it.
 (Runtime rule: `resolveRenderedImageSrc` — responsive mode returns the
 canonical URL, single-set mode returns `defaultSrc` → widest candidate →
 content.)

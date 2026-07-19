@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { useMediaQuery } from "../../../../shared";
 import {
-  SLIDE_WIDE_MEDIA_CONDITION,
+  SLIDE_ART_DIRECTION_MEDIA_CONDITION,
   SLIDE_REORIENT_VEIL_MAX_MS,
 } from "../config";
 
@@ -42,13 +42,13 @@ export function useOrientationSwapVeil({
   imgRef,
   isBitmapShown,
 }: UseOrientationSwapVeilInput): boolean {
-  const isWideViewport = useMediaQuery(SLIDE_WIDE_MEDIA_CONDITION);
+  const isArtDirectedViewport = useMediaQuery(SLIDE_ART_DIRECTION_MEDIA_CONDITION);
   const [isVeiled, setIsVeiled] = useState(false);
-  const previousOrientationRef = useRef(isWideViewport);
+  const previousOrientationRef = useRef(isArtDirectedViewport);
 
   useEffect(() => {
-    if (previousOrientationRef.current === isWideViewport) return;
-    previousOrientationRef.current = isWideViewport;
+    if (previousOrientationRef.current === isArtDirectedViewport) return;
+    previousOrientationRef.current = isArtDirectedViewport;
 
     const img = imgRef.current;
     if (!isBitmapShown || !img) return;
@@ -83,7 +83,7 @@ export function useOrientationSwapVeil({
       cancelAnimationFrame(frame);
       window.clearTimeout(failOpen);
     };
-  }, [imgRef, isBitmapShown, isWideViewport]);
+  }, [imgRef, isBitmapShown, isArtDirectedViewport]);
 
   return isVeiled;
 }
