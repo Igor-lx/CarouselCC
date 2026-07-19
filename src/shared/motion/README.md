@@ -20,7 +20,7 @@ facade (`index.ts`).
 - `tests/` — the library's own suite.
 
 This folder imports **only React and itself** (enforced by
-`shared/enginePortability.test.ts`), so it can be COPIED into another
+its own `tests/portability.test.ts`, which travels with every copy), so it can be COPIED into another
 project as-is — even its `clamp` is a sanctioned local copy.
 
 ## Scope (deliberate)

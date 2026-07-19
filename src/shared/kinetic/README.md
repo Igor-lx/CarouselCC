@@ -16,7 +16,7 @@ ready-to-deploy member of the library collection.
 ## Self-sufficient by DUPLICATION
 
 This folder imports **only React and itself** (enforced by
-`shared/enginePortability.test.ts`) — copy the one folder into any React
+its own `tests/portability.test.ts`, which travels with every copy) — copy the one folder into any React
 project and it works. It achieves that by carrying its own **forks** of the
 gesture and motion engines (`./gesture`, `./motion`), deliberately
 duplicated rather than imported: every blank in the collection is a

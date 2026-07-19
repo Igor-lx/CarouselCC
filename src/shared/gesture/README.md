@@ -15,7 +15,7 @@ done. Everything a consumer may need is exported from this folder's facade
 - `tests/` — the library's own suite.
 
 This folder imports **only React and itself** (enforced by
-`shared/enginePortability.test.ts`), so it can be COPIED into another
+its own `tests/portability.test.ts`, which travels with every copy), so it can be COPIED into another
 project as-is. The standard rig below references the `motion` library by
 name, never by import — want the full ride physics, copy both folders.
 
