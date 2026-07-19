@@ -5,6 +5,7 @@ export * from "./hooks/media";
 export * from "./hooks/environment";
 
 export * from "./motion";
+export * from "./kinetic";
 export * from "./gesture";
 
 export { manageFocusShift } from "./focus/manageFocusShift";

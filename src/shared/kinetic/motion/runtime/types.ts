@@ -1,0 +1,123 @@
+export type MotionPhase = "idle" | "running" | "settled";
+
+export interface MotionSample<Strategy extends string = string> {
+  progress: number;
+  value: number;
+  velocity: number;
+  target: number;
+  strategy: Strategy;
+  timestamp: number;
+  phase: MotionPhase;
+}
+
+export interface MotionSampleData<Strategy extends string = string> {
+  progress: number;
+  value: number;
+  velocity: number;
+  target: number;
+  strategy: Strategy;
+}
+
+/**
+ * An atomic motion-continuation point: the coherent `(position, velocity)` of
+ * the controller as of one `timestamp`. Returned by `captureHandoff` so a
+ * caller starting a new segment cannot accidentally mix a position from one
+ * moment with a velocity from another — there is exactly one method and one
+ * answer. Distinct from `MotionSample` (the full visual frame for UI).
+ */
+export interface MotionHandoff<Strategy extends string = string> {
+  position: number;
+  velocity: number;
+  strategy: Strategy;
+  timestamp: number;
+}
+
+export interface MotionSegmentBase<Strategy extends string = string> {
+  strategy: Strategy;
+  from: number;
+  to: number;
+  duration: number;
+  startedAt: number;
+}
+
+export type MotionSegmentSampler<
+  Segment extends MotionSegmentBase<Strategy>,
+  Strategy extends string = string,
+> = (segment: Segment, timestamp: number) => MotionSampleData<Strategy>;
+
+export type MotionCompletionMode = "immediate" | "next-frame";
+
+export interface MotionStartOptions<
+  Segment extends MotionSegmentBase<Strategy>,
+  Strategy extends string = string,
+> {
+  segment: Segment;
+  sampler: MotionSegmentSampler<Segment, Strategy>;
+  onComplete?: (sample: MotionSample<Strategy>) => void;
+  completion?: MotionCompletionMode;
+  /**
+   * Set when this segment's paint is owned elsewhere — a compositor animation
+   * running the same curve — so no subscriber needs the per-frame stream.
+   *
+   * The controller then runs the segment without a frame loop: it sleeps and
+   * wakes once, at the end, to settle. It stays the position SSOT throughout —
+   * on-demand reads (`captureHandoff`, `sampleAt`) sample the live curve, so
+   * an interruption mid-segment is as precise as it is under a frame loop.
+   *
+   * Ticking a segment nobody reads is not free: a frame callback registered
+   * every frame drags the main thread through a full paint lifecycle behind a
+   * ride that needs none of it.
+   */
+  isPassive?: boolean;
+}
+
+export interface MotionSetOptions<Strategy extends string = string> {
+  velocity?: number;
+  target?: number;
+  strategy?: Strategy;
+  progress?: number;
+  phase?: MotionPhase;
+}
+
+export interface MotionSnapOptions<Strategy extends string = string>
+  extends MotionSetOptions<Strategy> {
+  onComplete?: (sample: MotionSample<Strategy>) => void;
+  completion?: MotionCompletionMode;
+}
+
+export type MotionSubscriber<Strategy extends string = string> = (
+  sample: MotionSample<Strategy>,
+) => void;
+
+export interface MotionController<Strategy extends string = string> {
+  /**
+   * The atomic motion-continuation point as of `timestamp` — a coherent
+   * `(position, velocity)` from the active curve (or the resting sample when
+   * idle). The single API for handing motion off to a new segment; it cannot
+   * be mixed with `getSnapshot`. Does not emit, cancel, or notify subscribers.
+   */
+  captureHandoff: (timestamp?: number) => MotionHandoff<Strategy>;
+  /** The last *emitted* visual frame — for UI reads, not motion handoff. */
+  getSnapshot: () => MotionSample<Strategy>;
+  isActive: () => boolean;
+  subscribe: (
+    listener: MotionSubscriber<Strategy>,
+    options?: { emitCurrent?: boolean },
+  ) => () => void;
+  start: <Segment extends MotionSegmentBase<Strategy>>(
+    options: MotionStartOptions<Segment, Strategy>,
+  ) => void;
+  set: (value: number, options?: MotionSetOptions<Strategy>) => void;
+  snap: (value: number, options?: MotionSnapOptions<Strategy>) => void;
+  /**
+   * Resume the frame loop for a passive segment whose external paint owner
+   * disappeared mid-flight (its compositor animation was cancelled — a
+   * geometry re-base, a rotation). The controller takes the paint back and
+   * emits the segment's remaining frames itself; without this the strip
+   * freezes where the animation died and teleports at the settle. A no-op
+   * when idle or already ticking.
+   */
+  wake: () => void;
+  cancel: () => void;
+  destroy: () => void;
+}

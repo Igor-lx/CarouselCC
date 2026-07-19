@@ -173,7 +173,7 @@ const { hostProps } = usePointerSwipe({
       ride.cancel(h.position);
       return h.position;
     },
-    write: (v) => controller.set(v, { phase: "dragging" }),
+    write: (v) => controller.set(v),
   },
   onRelease: ({ launchVelocity }) => {
     const from = controller.captureHandoff().position; // the last written value

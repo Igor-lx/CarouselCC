@@ -3,16 +3,17 @@ import { dirname, join, resolve, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * COPY-PORTABILITY contract of the engine libraries. `shared/gesture` and
- * `shared/motion` are designed to be lifted into another project by copying
- * the FOLDER — so their source may import only React and files inside their
- * own folder. Anything else (another shared util, a carousel module, an npm
+ * COPY-PORTABILITY contract of the engine libraries. `shared/gesture`,
+ * `shared/motion` and `shared/kinetic` are designed to be lifted into
+ * another project by copying the FOLDER — so their source may import only
+ * React and files inside their own folder. `kinetic` meets the contract by
+ * DUPLICATION: it carries its own forks of the other two engines inside. Anything else (another shared util, a carousel module, an npm
  * helper) would break the copied folder silently. Tests are exempt for
  * `vitest` and the react-dom renderer only; the sanctioned escape for tiny
  * helpers is a LOCAL copy (see `motion/profile/clamp.ts`).
  */
 
-const ENGINE_ROOTS = ["gesture", "motion"] as const;
+const ENGINE_ROOTS = ["gesture", "motion", "kinetic"] as const;
 const ALLOWED_BARE = new Set(["react"]);
 // Tests additionally get the renderer: the LIBRARY may import only react,
 // but its use* hooks cannot be exercised without one, and any project the
