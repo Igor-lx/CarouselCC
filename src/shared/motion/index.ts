@@ -8,6 +8,7 @@
  */
 export { createMotionController } from "./runtime/createMotionController";
 export { useMotionController } from "./runtime/useMotionController";
+export { useMotionPaint } from "./runtime/useMotionPaint";
 export { motionNow } from "./runtime/clock";
 export type {
   MotionController,
