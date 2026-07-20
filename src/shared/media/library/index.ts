@@ -1,10 +1,19 @@
 /**
  * The MEDIA LIBRARY — individual, standalone media-condition hooks. Each is
- * usable on its own (grab exactly the one you need); they all sit on the ONE
- * shared store in `useMediaQuery` (a single MediaQueryList listener per
- * distinct query, app-wide). A general toolkit for any consumer — NOT shaped
- * by any particular component's needs. The `../useMedia` facade mirrors
- * these (by duplication — see its internal/).
+ * usable on its own (grab exactly the one you need); within THIS folder they
+ * all sit on the one `useMediaQuery` store — a single MediaQueryList listener
+ * per distinct query, shared by every consumer of this copy.
+ *
+ * Dedup is per STORE COPY, not app-wide: each self-sufficient folder forks
+ * its own `useMediaQuery` (copy-portability), so a query subscribed BOTH here
+ * and via the `../useMedia` facade holds one listener in each copy. That is
+ * rare (an app usually picks the library OR the facade for a given concern)
+ * and harmless (two correct listeners, negligible overhead) — the accepted
+ * price of every folder being liftable on its own.
+ *
+ * A general toolkit for any consumer — NOT shaped by any particular
+ * component. The `../useMedia` facade mirrors these (by duplication — see
+ * its internal/).
  */
 export { useMediaQuery } from "./useMediaQuery";
 export {
