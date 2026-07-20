@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import { useKineticValue } from "../useKineticValue";
-import type { KineticValue } from "../types";
+import type { KineticValue } from "../internal/types";
 
 /**
  * The blank's promise: JSX + one keyframe function IS the whole deployment.

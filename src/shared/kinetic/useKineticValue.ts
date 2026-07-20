@@ -1,6 +1,6 @@
 import { useCallback, useRef } from "react";
 
-import { resolveReleaseLaunch, usePointerSwipe } from "./gesture";
+import { resolveReleaseLaunch, usePointerSwipe } from "./internal/gesture";
 import {
   alignSpeed,
   applyKeyframe,
@@ -10,9 +10,9 @@ import {
   useMotionController,
   useMotionPaint,
   type MotionSample,
-} from "./motion";
-import { KINETIC_DEFAULTS } from "./defaults";
-import type { KineticConfig, UseKineticValueInput, KineticValue } from "./types";
+} from "./internal/motion";
+import { KINETIC_DEFAULTS } from "./internal/defaults";
+import type { KineticConfig, UseKineticValueInput, KineticValue } from "./internal/types";
 
 /**
  * THE blank: one draggable, flyable value painted through one element, fused
