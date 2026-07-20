@@ -4,9 +4,9 @@ export { useViewportVisibility } from "./hooks/useViewportVisibility";
 export * from "./hooks/media";
 export * from "./hooks/environment";
 
-export * from "./motion";
-export * from "./kinetic";
-export * from "./gesture";
+export * from "./engines/motion";
+export * from "./engines/kinetic";
+export * from "./engines/gesture";
 
 export { manageFocusShift } from "./focus/manageFocusShift";
 export { resolveSlots } from "./slots/resolveSlots";
