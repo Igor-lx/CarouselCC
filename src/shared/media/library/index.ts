@@ -3,8 +3,8 @@
  * usable on its own (grab exactly the one you need); they all sit on the ONE
  * shared store in `useMediaQuery` (a single MediaQueryList listener per
  * distinct query, app-wide). A general toolkit for any consumer — NOT shaped
- * by any particular component's needs. The `../viewport` facade composes
- * these into a single call.
+ * by any particular component's needs. The `../useMedia` facade mirrors
+ * these (by duplication — see its internal/).
  */
 export { useMediaQuery } from "./useMediaQuery";
 export { useBreakpoint } from "./useBreakpoint";

@@ -953,7 +953,7 @@ none.
 
 ## 5. Gesture model
 
-The shared gesture ENGINE (`shared/gesture/`, its own README documents the
+The shared gesture ENGINE (`shared/engines/gesture/`, its own README documents the
 full standalone contract) provides `usePointerSwipe` — a generic horizontal
 pointer-swipe primitive (touch-only, built-in defaults with per-field config
 merge, EMA-smoothed velocity with progressive distance resistance, intent
@@ -1363,8 +1363,8 @@ src/components/Carousel/client/
 │   ├── reducer.ts                 single switch over Commands
 │   └── useCarouselState.ts        binds the reducer to React
 ├── motion/                        carousel SEMANTICS on top of the shared motion library
-│   │                              (curves + runtime live in shared/motion — see its README;
-│   │                              release physics in shared/gesture/inertia)
+│   │                              (curves + runtime live in shared/engines/motion — see its README;
+│   │                              release physics in shared/engines/gesture/inertia)
 │   ├── types.ts                   CarouselSegment (one profile shape), MotionIntent, MotionStart
 │   ├── planChannel.ts             engine → paint-consumer motion-plan observable
 │   ├── speed.ts                   sameDirectionSpeed, signedVelocity

@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 
-import { useDataSaver } from "../library/useDataSaver";
-import { useIsReducedMotion } from "../library/useIsReducedMotion";
-import { useIsTouchDevice } from "../library/useIsTouchDevice";
+import { useDataSaver } from "./internal/useDataSaver";
+import { useIsReducedMotion } from "./internal/useIsReducedMotion";
+import { useIsTouchDevice } from "./internal/useIsTouchDevice";
 
 /**
  * The set of user-environment signals a UI may react to. Each is a single

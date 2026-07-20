@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 
-import { useMediaQuery } from "../library/useMediaQuery";
-import { resolveActiveBreakpoint } from "../library/resolveActiveBreakpoint";
+import { useMediaQuery } from "./internal/useMediaQuery";
+import { resolveActiveBreakpoint } from "./internal/resolveActiveBreakpoint";
 import {
   PORTRAIT_ORIENTATION_QUERY,
   type ViewportOrientation,
-} from "../library/useOrientation";
+} from "./internal/useOrientation";
 import {
   canonicalMediaQueries,
   type MediaAxes,

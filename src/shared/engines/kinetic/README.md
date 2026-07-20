@@ -10,16 +10,16 @@ ready-to-deploy member of the library collection.
 | task | folder |
 | --- | --- |
 | a value follows the finger + rides curves, simple landing policy | **this one** |
-| motion only — autoplay, progress, meters; no finger anywhere | `shared/motion` |
-| full control — carousel-grade state machines, custom unit mapping | `shared/gesture` + `shared/motion` |
+| motion only — autoplay, progress, meters; no finger anywhere | `shared/engines/motion` |
+| full control — carousel-grade state machines, custom unit mapping | `shared/engines/gesture` + `shared/engines/motion` |
 
 ## Self-sufficient by DUPLICATION
 
 This folder imports **only React and itself** (enforced by
 its own `tests/portability.test.ts`, which travels with every copy) — copy the one folder into any React
 project and it works. It achieves that by carrying its own **forks** of the
-gesture and motion engines (`./gesture`, `./motion`), deliberately
-duplicated rather than imported: every blank in the collection is a
+gesture and motion engines (`./internal/gesture`, `./internal/motion`),
+deliberately duplicated rather than imported: every blank in the collection is a
 standalone заготовка you pick by task, not a node in a dependency graph.
 The forks may drift from the standalone originals as the blank evolves —
 that is the design, not an accident.
@@ -27,7 +27,7 @@ that is the design, not an accident.
 ## Quick start — the whole app
 
 ```tsx
-import { useKineticValue } from "shared/kinetic";
+import { useKineticValue } from "shared/engines/kinetic";
 
 function Circle() {
   const kinetic = useKineticValue({

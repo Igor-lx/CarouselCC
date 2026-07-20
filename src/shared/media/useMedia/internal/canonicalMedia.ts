@@ -2,11 +2,11 @@ import {
   breakpointMinWidthQuery,
   sortedBreakpointEntries,
   type BreakpointTable,
-} from "../../library/resolveActiveBreakpoint";
+} from "./resolveActiveBreakpoint";
 import {
   LANDSCAPE_ORIENTATION_QUERY,
   PORTRAIT_ORIENTATION_QUERY,
-} from "../../library/useOrientation";
+} from "./useOrientation";
 
 /**
  * The set of viewport axes a consumer cares about: named width tiers plus
