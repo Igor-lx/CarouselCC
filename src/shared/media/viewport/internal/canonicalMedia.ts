@@ -2,7 +2,7 @@ import {
   breakpointMinWidthQuery,
   sortedBreakpointEntries,
   type BreakpointTable,
-} from "../../library/useActiveBreakpoint";
+} from "../../library/resolveActiveBreakpoint";
 import {
   LANDSCAPE_ORIENTATION_QUERY,
   PORTRAIT_ORIENTATION_QUERY,

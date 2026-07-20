@@ -8,14 +8,14 @@
  */
 export { useMediaQuery } from "./useMediaQuery";
 export { useBreakpoint } from "./useBreakpoint";
-export type { Breakpoint } from "./useBreakpoint";
+export type { BreakpointState } from "./useBreakpoint";
 export {
-  useActiveBreakpoint,
   resolveActiveBreakpoint,
   sortedBreakpointEntries,
   breakpointMinWidthQuery,
-} from "./useActiveBreakpoint";
-export type { BreakpointTable } from "./useActiveBreakpoint";
+  STANDARD_BREAKPOINTS,
+} from "./resolveActiveBreakpoint";
+export type { BreakpointTable } from "./resolveActiveBreakpoint";
 export {
   useOrientation,
   PORTRAIT_ORIENTATION_QUERY,
