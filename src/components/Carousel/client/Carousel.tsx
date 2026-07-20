@@ -113,9 +113,21 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // responsive machinery (see resolveRenderedImageSrc).
   const isResponsiveImagesOn = Boolean(slots["responsive-images"]);
 
-  // Live viewport axes (breakpoint tier / orientation / compact landscape) —
-  // stamped on the root below; the SCSS slide geometry keys on them.
+  // Live viewport axes (breakpoint tier / orientation / flags) — stamped on
+  // the root below; the SCSS slide geometry keys on them.
   const slideViewport = useSlideViewport();
+
+  // Each ACTIVE flag becomes a `data-<flag>` attribute on the root (stable
+  // between viewport changes — the facade memoises on its signature).
+  const viewportFlagAttributes = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(slideViewport.flags)
+          .filter(([, on]) => on)
+          .map(([name]) => [`data-${name}`, "true"]),
+      ),
+    [slideViewport.flags],
+  );
 
   // --- resolved runtime config (no diagnostic dependency) ------------------
   const config = useCarouselConfig({
@@ -439,12 +451,11 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
             data-reduced-motion={isInstantMode}
             // The viewport axes (config/viewport.ts), stamped as the styling
             // contract: the component SCSS shapes slide geometry by these
-            // attributes and carries no media queries of its own.
+            // attributes and carries no media queries of its own. Each active
+            // flag adds a `data-<flag>` attribute (see viewportFlagAttributes).
             data-breakpoint={slideViewport.breakpoint}
             data-orientation={slideViewport.orientation}
-            data-compact-landscape={
-              slideViewport.isCompactLandscape ? "true" : undefined
-            }
+            {...viewportFlagAttributes}
           >
             <div
               tabIndex={-1}

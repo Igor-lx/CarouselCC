@@ -12,7 +12,7 @@ export type ViewportOrientation = "portrait" | "landscape";
 /**
  * The viewport orientation as a NAME. Pure aspect of the viewport (is the
  * height greater than the width) — nothing about device class or size;
- * contrast `useCompactLandscape`, which is landscape AND a short viewport
+ * contrast `useShortLandscape`, which adds an independent max-HEIGHT ceiling
  * (a handheld held sideways). A desktop monitor is `landscape` here but
  * never compact-landscape.
  */

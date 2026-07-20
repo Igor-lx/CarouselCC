@@ -68,17 +68,17 @@
   // Per-viewport slide geometry — keyed on the ROOT'S OWN data attributes,
   // never on media queries: the component stylesheet contains no conditions
   // and no numbers. The root stamps `data-breakpoint` (custom tier names
-  // from config/viewport.ts), `data-orientation` and
-  // `data-compact-landscape` from the one shared viewport sensor, so the
-  // box, the art-directed asset, the warm and the veil all flip on the same
-  // thresholds by construction. Style any state or combination:
+  // from config/viewport.ts), `data-orientation` and one `data-<flag>` per
+  // active flag (e.g. `data-short-landscape`) from the one viewport facade,
+  // so the box, the art-directed asset, the warm and the veil all flip on
+  // the same thresholds by construction. Style any state or combination:
   //   &[data-breakpoint="desktop"] { ... }
   //   &[data-breakpoint="tablet"][data-orientation="landscape"] { ... }
   // Diagnostics cross-checks every state name used here against the config
-  // table (a typo means a silently dead block). Values below are the DEMO
+  // axes (a typo means a silently dead block). Values below are the DEMO
   // dataset's tuning (tall 9:16 photos; wide 16:9 only where a tall box
   // cannot fit) — restyle freely for your data.
-  .outerContainer[data-compact-landscape="true"] {
+  .outerContainer[data-short-landscape="true"] {
     --slide-aspect: 16 / 9;
   }
 

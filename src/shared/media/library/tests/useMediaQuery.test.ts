@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getMediaQueryStore } from "./useMediaQuery";
+import { getMediaQueryStore } from "../useMediaQuery";
 
 /**
  * Lifecycle regression tests for the shared media-query store. Each case

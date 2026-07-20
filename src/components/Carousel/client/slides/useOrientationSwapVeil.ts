@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { SLIDE_REORIENT_VEIL_MAX_MS } from "../config";
-import { useCanonicalMediaMatches } from "../viewport/useSlideViewport";
+import { useSlideViewport } from "../viewport/useSlideViewport";
 
 /**
  * Orientation-swap choreography for an art-directed slide image.
@@ -44,7 +44,7 @@ export function useOrientationSwapVeil({
   // does NOT change the rendered crop is absorbed by construction: decode()
   // on the already-painted resource resolves immediately and the veil never
   // becomes visible.
-  const { signature } = useCanonicalMediaMatches();
+  const { signature } = useSlideViewport();
   const [isVeiled, setIsVeiled] = useState(false);
   const previousSignatureRef = useRef(signature);
 

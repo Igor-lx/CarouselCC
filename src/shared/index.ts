@@ -1,7 +1,7 @@
 export { useIsomorphicLayoutEffect } from "./hooks/useIsomorphicLayoutEffect";
 export { useViewportVisibility } from "./hooks/useViewportVisibility";
 
-export * from "./hooks/media";
+export * from "./media";
 export * from "./hooks/environment";
 
 export * from "./engines/motion";

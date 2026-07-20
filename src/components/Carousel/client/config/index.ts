@@ -56,9 +56,14 @@ export {
 } from "./slides";
 export {
   SLIDE_VIEWPORT_BREAKPOINTS,
+  SLIDE_VIEWPORT_FLAGS,
+  SLIDE_VIEWPORT_AXES,
   SLIDE_CANONICAL_SOURCE_MEDIA,
 } from "./viewport";
-export type { SlideViewportBreakpoint } from "./viewport";
+export type {
+  SlideViewportBreakpoint,
+  SlideViewportFlag,
+} from "./viewport";
 export { buildCarouselConfig } from "./buildConfig";
 export { useCarouselConfig } from "./useCarouselConfig";
 export type {

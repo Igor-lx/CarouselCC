@@ -1,6 +1,7 @@
 import {
   SLIDE_CANONICAL_SOURCE_MEDIA,
   SLIDE_VIEWPORT_BREAKPOINTS,
+  SLIDE_VIEWPORT_FLAGS,
 } from "../../../config";
 import type { CarouselSlideMediaView } from "../../../context";
 import type { CarouselDiagnosticWarning } from "../types";
@@ -28,6 +29,7 @@ const canonical = new Set<string>(SLIDE_CANONICAL_SOURCE_MEDIA);
 const breakpointNames = new Set<string>(
   Object.keys(SLIDE_VIEWPORT_BREAKPOINTS),
 );
+const flagNames = new Set<string>(Object.keys(SLIDE_VIEWPORT_FLAGS));
 const ORIENTATION_NAMES = new Set(["portrait", "landscape"]);
 
 export const collectViewportAxisWarnings =
@@ -163,6 +165,7 @@ export const collectViewportCssWarnings = (): CarouselDiagnosticWarning[] => {
   if (typeof document === "undefined") return [];
   const out: CarouselDiagnosticWarning[] = [];
   const referencedBreakpoints = new Set<string>();
+  const referencedFlags = new Set<string>();
 
   for (const sheet of document.styleSheets) {
     let rules: CSSRuleList;
@@ -172,6 +175,13 @@ export const collectViewportCssWarnings = (): CarouselDiagnosticWarning[] => {
       continue; // cross-origin sheet — unreadable by design, skip
     }
     walkRules(rules, (selector) => {
+      // Flags surface as `data-<flag>` attributes (the flag name IS the
+      // attribute), so unlike data-breakpoint/orientation there is no fixed
+      // anchor to typo-detect against — a typo'd `data-<flag>` is instead
+      // caught indirectly by the "declared but unreferenced" note below.
+      for (const flag of flagNames) {
+        if (selector.includes(`[data-${flag}=`)) referencedFlags.add(flag);
+      }
       for (const name of collectSelectorStateNames(selector, "data-breakpoint")) {
         referencedBreakpoints.add(name);
         if (!breakpointNames.has(name)) {
@@ -212,6 +222,22 @@ export const collectViewportCssWarnings = (): CarouselDiagnosticWarning[] => {
         expected: "Referenced from at least one stylesheet (or deliberately unstyled)",
         consequence:
           "The tier resolves and stamps but styles nothing — intended fallback-to-base, or a forgotten block?",
+      });
+    }
+  }
+
+  for (const flag of flagNames) {
+    if (!referencedFlags.has(flag)) {
+      out.push({
+        severity: "LOGICAL",
+        layer: "Viewport",
+        field: "SLIDE_VIEWPORT_FLAGS",
+        actual: flag,
+        expected: `A stylesheet rule keyed on [data-${flag}] (or deliberately unstyled)`,
+        consequence:
+          "The flag resolves and stamps data-" +
+          flag +
+          " but styles nothing — a forgotten or mistyped selector, or intended?",
       });
     }
   }

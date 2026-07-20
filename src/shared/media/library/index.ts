@@ -1,9 +1,10 @@
 /**
- * Viewport / layout media conditions — everything that answers "does this
- * CSS media query match right now", built on the ONE shared store in
- * `useMediaQuery` (a single MediaQueryList listener per distinct query,
- * app-wide). Named wrappers live here when the condition has a stable
- * layout meaning of its own.
+ * The MEDIA LIBRARY — individual, standalone media-condition hooks. Each is
+ * usable on its own (grab exactly the one you need); they all sit on the ONE
+ * shared store in `useMediaQuery` (a single MediaQueryList listener per
+ * distinct query, app-wide). A general toolkit for any consumer — NOT shaped
+ * by any particular component's needs. The `../viewport` facade composes
+ * these into a single call.
  */
 export { useMediaQuery } from "./useMediaQuery";
 export { useBreakpoint } from "./useBreakpoint";
@@ -22,6 +23,6 @@ export {
 } from "./useOrientation";
 export type { ViewportOrientation } from "./useOrientation";
 export {
-  useCompactLandscape,
-  COMPACT_LANDSCAPE_QUERY,
-} from "./useCompactLandscape";
+  useShortLandscape,
+  SHORT_LANDSCAPE_QUERY,
+} from "./useShortLandscape";

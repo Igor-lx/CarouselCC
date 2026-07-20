@@ -100,7 +100,7 @@ const getServerSnapshot = () => false;
 
 /**
  * Reports whether a CSS media query currently matches. The generic module
- * store behind `useIsReducedMotion`, `useBreakpoint`, `useCompactLandscape` —
+ * store behind `useIsReducedMotion`, `useBreakpoint`, `useShortLandscape` —
  * and the single way to subscribe to any other query without hand-rolling
  * another store. Backed by `useSyncExternalStore` (SSR/hydration handled via
  * the `false` server snapshot).

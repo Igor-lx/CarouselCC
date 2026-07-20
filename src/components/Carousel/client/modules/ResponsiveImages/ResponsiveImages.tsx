@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef } from "react";
 
-import { useCanonicalMediaMatches } from "../../viewport/useSlideViewport";
+import { useSlideViewport } from "../../viewport/useSlideViewport";
 import { useCarouselMotion, useCarouselStable } from "../../context";
 import type { CarouselSlotComponent } from "../../slots";
 import { useResponsiveImagesDiagnostic } from "../Diagnostic/useResponsiveImagesDiagnostic";
@@ -87,7 +87,7 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
   // matches right now. Any flip changes `signature`, and the warm re-runs
   // for the newly-selected crops.
   const { matches: matchesMedia, signature: mediaSignature } =
-    useCanonicalMediaMatches();
+    useSlideViewport();
 
   useResponsiveImagesDiagnostic({ preloadPagesNr, isPreloadOn, isPredecodeOn });
 

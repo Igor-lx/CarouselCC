@@ -1,13 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
 import appStyles from "./App.module.scss";
+import { useUserEnvironment, useViewport } from "../shared";
 import {
-  useActiveBreakpoint,
-  useCompactLandscape,
-  useUserEnvironment,
-} from "../shared";
-import {
-  SLIDE_VIEWPORT_BREAKPOINTS,
+  SLIDE_VIEWPORT_AXES,
   type SlideViewportBreakpoint,
 } from "../components/Carousel/client/config";
 import Carousel, {
@@ -74,7 +70,12 @@ export default function App() {
   // the environment itself). The hook returns a memoised, stable object.
   const userEnvironment = useUserEnvironment();
   const isTouch = userEnvironment.touch;
-  const isCompactLandscape = useCompactLandscape();
+
+  // One viewport read over the carousel's own axes: the same facade the
+  // component uses, so the visible-slide count below flips on exactly the
+  // thresholds that drive slide geometry and asset choice.
+  const viewport = useViewport(SLIDE_VIEWPORT_AXES);
+  const isShortLandscape = viewport.flags["short-landscape"];
 
   const [isAutoplay, setIsAutoplay] = useState(false);
   const [isInteractive, setIsInteractive] = useState(false);
@@ -86,15 +87,13 @@ export default function App() {
   const [status, setStatus] = useState<CarouselStatusSnapshot | null>(null);
 
   const device =
-    VISIBLE_BY_VIEWPORT[
-      useActiveBreakpoint(SLIDE_VIEWPORT_BREAKPOINTS) as SlideViewportBreakpoint
-    ];
+    VISIBLE_BY_VIEWPORT[viewport.breakpoint as SlideViewportBreakpoint];
 
   // Layout-only: how many slides share the viewport. Orientation can change
   // this, but it never changes slide identity (one responsive set), so rotation
   // re-flows the layout without resetting the viewing position.
   const visibleSlidesNr =
-    isTouch && isCompactLandscape ? COMPACT_LANDSCAPE_VISIBLE_SLIDES : device;
+    isTouch && isShortLandscape ? COMPACT_LANDSCAPE_VISIBLE_SLIDES : device;
 
   // Content document, fetched at load from the static file the generator
   // produced (one stable responsive set; the browser selects the asset). The
