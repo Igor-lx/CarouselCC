@@ -2,40 +2,60 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { SLIDE_ART_DIRECTION_MEDIA_CONDITION } from "../config";
+import {
+  SLIDE_CANONICAL_SOURCE_MEDIA,
+  SLIDE_VIEWPORT_BREAKPOINTS,
+} from "../config";
+import {
+  breakpointMinWidthQuery,
+  sortedBreakpointEntries,
+} from "../../../../shared";
 
 /**
- * SSOT guard for the art-direction flip. One media condition flips three
- * things at once — the DEMO HOST's slide box aspect (App.module.scss: the
- * component itself ships no geometry media queries, the host tunes the CSS
- * variables), the art-directed `<source>` crop (generated data), and the
- * reorientation veil (the TS constant). If any copy drifts, the box, the
- * asset and the veil react to DIFFERENT flips and the swap silently breaks.
- * Same pattern as `themeBootSync.test.ts`: read the real files, assert the
- * same string. Which crop family sits on which side of the condition is the
- * dataset's tuning — this guard pins only the CONDITION.
+ * SSOT guard for the viewport-axes contract (config/viewport.ts). The axes
+ * table is the single source: canonical media strings derive from its
+ * NUMBERS, art-directed slide data must use ONLY those strings, and the
+ * component stylesheet must carry no media conditions at all (geometry keys
+ * on the root's data attributes instead). Which crop family sits behind
+ * which condition is the dataset's tuning — this guard pins only the
+ * CONDITIONS. Diagnostics repeats the data audit at runtime for arbitrary
+ * hosts; this test covers the repo's own generator configs in CI.
  */
 
 const read = (relativeToRepoRoot: string) =>
   readFileSync(resolve(__dirname, "../../../../..", relativeToRepoRoot), "utf8");
 
-describe("slide orientation media condition SSOT", () => {
-  it("the TS constant is the canonical condition", () => {
-    expect(SLIDE_ART_DIRECTION_MEDIA_CONDITION).toBe(
-      "(orientation: landscape) and (max-height: 520px)",
+describe("viewport axes SSOT", () => {
+  it("canonical strings derive from the breakpoint table numbers", () => {
+    for (const [, px] of sortedBreakpointEntries(SLIDE_VIEWPORT_BREAKPOINTS)) {
+      if (px > 0) {
+        expect(SLIDE_CANONICAL_SOURCE_MEDIA).toContain(
+          breakpointMinWidthQuery(px),
+        );
+      }
+    }
+    // The fallback tier must NOT produce a source condition: a 0-width
+    // min-width always matches and would shadow the default set.
+    expect(SLIDE_CANONICAL_SOURCE_MEDIA).not.toContain(
+      breakpointMinWidthQuery(0),
     );
   });
 
-  it("the demo host's aspect override uses the same condition", () => {
-    const hostScss = read("src/app/App.module.scss");
-    expect(hostScss).toContain(`@media ${SLIDE_ART_DIRECTION_MEDIA_CONDITION}`);
+  it("every <source media> in the generator configs is canonical", () => {
+    for (const config of ["carousel-data.config1.json", "carousel-data.config2.json"]) {
+      const text = JSON.stringify(JSON.parse(read(config)));
+      const mediaValues = [...text.matchAll(/"media":"([^"]+)"/g)].map(
+        (m) => m[1],
+      );
+      expect(mediaValues.length).toBeGreaterThan(0);
+      for (const media of mediaValues) {
+        expect(SLIDE_CANONICAL_SOURCE_MEDIA).toContain(media);
+      }
+    }
   });
 
-  it("the component ships no geometry media queries of its own", () => {
+  it("the component stylesheet carries no media queries for slide geometry", () => {
     const scss = read("src/components/Carousel/client/Carousel.module.scss");
-    // Every @media block in the component stylesheet must be about layout
-    // ergonomics, never about --slide-aspect / --slide-height: per-viewport
-    // slide shaping is host tuning by design.
     for (const block of scss.split("@media").slice(1)) {
       const body = block.slice(0, block.indexOf("}"));
       expect(body).not.toContain("--slide-aspect");
@@ -43,21 +63,9 @@ describe("slide orientation media condition SSOT", () => {
     }
   });
 
-  it("every generated wide <source> uses the same condition", () => {
-    for (const config of ["carousel-data.config1.json", "carousel-data.config2.json"]) {
-      const parsed = JSON.parse(read(config)) as {
-        sources?: Array<{ media?: string }>;
-      } & Record<string, unknown>;
-      const text = JSON.stringify(parsed);
-      // Each config declares at least one wide-crop source, and no source
-      // spells the orientation condition differently.
-      expect(text).toContain(SLIDE_ART_DIRECTION_MEDIA_CONDITION);
-      const mediaValues = [...text.matchAll(/"media":"([^"]+)"/g)].map((m) => m[1]);
-      for (const media of mediaValues) {
-        if (media.includes("orientation")) {
-          expect(media).toBe(SLIDE_ART_DIRECTION_MEDIA_CONDITION);
-        }
-      }
-    }
+  it("the demo App carries no slide-geometry styling (self-sufficiency)", () => {
+    const hostScss = read("src/app/App.module.scss");
+    expect(hostScss).not.toContain("--slide-aspect");
+    expect(hostScss).not.toContain("--slide-height");
   });
 });

@@ -1,13 +1,16 @@
-import { memo, useEffect, useMemo } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 
-import { useCarouselDiagnosticContext } from "../../context";
+import { useCarouselDiagnosticContext, useCarouselStable } from "../../context";
 import type { CarouselSlotComponent } from "../../slots";
 import {
   collectConstantWarnings,
   collectLayoutWarnings,
   collectPropWarnings,
+  collectSlideSourceMediaWarnings,
   collectSlotWarnings,
   collectStateWarnings,
+  collectViewportAxisWarnings,
+  collectViewportCssWarnings,
 } from "./checks";
 import type { CarouselDiagnosticWarning } from "./types";
 import { useGroupedWarnings } from "./useGroupedWarnings";
@@ -17,21 +20,37 @@ const BANNER =
 
 const DiagnosticBase = memo(function CarouselDiagnostic() {
   const { state, props, layout, slots } = useCarouselDiagnosticContext();
+  const { slides } = useCarouselStable();
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     console.info(BANNER);
   }, []);
 
+  // Stylesheet-dependent audit runs AFTER mount: the scan needs the module
+  // styles attached to the document, which render time cannot guarantee.
+  const [cssWarnings, setCssWarnings] = useState<CarouselDiagnosticWarning[]>(
+    [],
+  );
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      setCssWarnings(collectViewportCssWarnings());
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
   const warnings = useMemo<CarouselDiagnosticWarning[]>(
     () => [
       ...collectPropWarnings(props),
       ...collectConstantWarnings(),
+      ...collectViewportAxisWarnings(),
+      ...collectSlideSourceMediaWarnings(slides),
       ...collectLayoutWarnings(layout),
       ...collectSlotWarnings(slots),
       ...collectStateWarnings(state),
+      ...cssWarnings,
     ],
-    [layout, props, slots, state],
+    [cssWarnings, layout, props, slides, slots, state],
   );
 
   useGroupedWarnings(warnings);

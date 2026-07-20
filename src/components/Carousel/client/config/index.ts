@@ -50,11 +50,15 @@ export {
   IMAGE_RETRY_BASE_DELAY_MS,
   IMAGE_RETRY_MAX_DELAY_MS,
   IMAGE_RETRY_MAX_ATTEMPTS,
-  SLIDE_ART_DIRECTION_MEDIA_CONDITION,
   SLIDE_REORIENT_FADE_IN_MS,
   SLIDE_REORIENT_FADE_OUT_MS,
   SLIDE_REORIENT_VEIL_MAX_MS,
 } from "./slides";
+export {
+  SLIDE_VIEWPORT_BREAKPOINTS,
+  SLIDE_CANONICAL_SOURCE_MEDIA,
+} from "./viewport";
+export type { SlideViewportBreakpoint } from "./viewport";
 export { buildCarouselConfig } from "./buildConfig";
 export { useCarouselConfig } from "./useCarouselConfig";
 export type {

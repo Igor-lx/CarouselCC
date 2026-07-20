@@ -1,4 +1,4 @@
-import { useMediaQuery } from "./useMediaQuery";
+import { useActiveBreakpoint } from "./useActiveBreakpoint";
 
 const BREAKPOINTS = {
   DESKTOP: 1024,
@@ -9,19 +9,16 @@ const BREAKPOINTS = {
 export type Breakpoint = keyof typeof BREAKPOINTS;
 
 /**
- * Resolves a value for the active width breakpoint. Built on the shared
- * `useMediaQuery` store — one `min-width` listener per tier, shared across
- * every consumer (SSR resolves to MOBILE via the `false` snapshots).
+ * Resolves a value for the active width breakpoint of the app-generic tier
+ * set (DESKTOP/TABLET/MOBILE). A thin naming layer over
+ * `useActiveBreakpoint` — same numeric resolution, same shared listeners
+ * (SSR resolves to MOBILE via the `false` snapshots). Consumers that need
+ * CUSTOM tier names/thresholds use `useActiveBreakpoint` with their own
+ * table instead.
  */
 export function useBreakpoint<T>(
   values: Partial<Record<Breakpoint, T>> & { DEFAULT: T }
 ): T {
-  const isDesktop = useMediaQuery(`(min-width: ${BREAKPOINTS.DESKTOP}px)`);
-  const isTablet = useMediaQuery(`(min-width: ${BREAKPOINTS.TABLET}px)`);
-  const active: Breakpoint = isDesktop
-    ? "DESKTOP"
-    : isTablet
-    ? "TABLET"
-    : "MOBILE";
+  const active = useActiveBreakpoint(BREAKPOINTS) as Breakpoint;
   return values[active] ?? values.DEFAULT;
 }

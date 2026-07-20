@@ -111,12 +111,15 @@ tsx src/components/Carousel/data-gen/cli.ts carousel-data.config.json
 
 The generator is crop-agnostic: which variant family is the default set and
 which sits behind a `<source media>` condition is purely this config's
-choice (the carousel component bakes in no art direction). The example
-mirrors the DEMO's current tuning — tall 9:16 as the default set, wide 16:9
-behind a compact-landscape condition — using the same media string as the
-carousel's CSS box flip (`SLIDE_ART_DIRECTION_MEDIA_CONDITION`;
-`orientationMediaSync.test.ts` pins every copy, including the ones in these
-configs).
+choice (the carousel component bakes in no art direction). The one rule:
+every `media` string must be one of the carousel's CANONICAL axis strings
+(`SLIDE_CANONICAL_SOURCE_MEDIA`, generated from the breakpoint table in
+`config/viewport.ts` plus the orientation and compact-landscape
+conditions) — that is what guarantees the asset choice flips together with
+the slide box, the warm and the veil. `orientationMediaSync.test.ts` checks
+these configs in CI; Diagnostics re-checks whatever data a host feeds at
+runtime. The example mirrors the DEMO's current tuning — tall 9:16 as the
+default set, wide 16:9 behind the compact-landscape condition.
 
 - `assetsDir` — disk root of the variant subfolders (relative to cwd or absolute).
 - `urlBase` — URL prefix baked into the document (the app origin / base, or a CDN

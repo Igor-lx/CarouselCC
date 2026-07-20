@@ -13,9 +13,9 @@ import type { CarouselSlideMediaView } from "../../context";
  * `<source media>` (art direction), so the media choice has to be made here:
  * the art-directed `<source>` when the viewport matches its condition, the
  * default set otherwise. (One art-direction axis exists by contract —
- * `orientationMediaSync.test.ts` pins every generated source to the same
- * `SLIDE_ART_DIRECTION_MEDIA_CONDITION`; which crop family sits on which
- * side is the dataset's business.) Warming `slide.srcSet` blindly would
+ * `orientationMediaSync.test.ts` pins generated sources to the canonical
+ * axis strings; which crop family sits on which side is the dataset's
+ * business.) Warming `slide.srcSet` blindly would
  * fetch the default set while the deck renders the art-directed crop:
  * bytes spent on an asset that never appears, and the needed crop left cold.
  *
@@ -33,12 +33,13 @@ export interface RenderedSrcSet {
 
 export const resolveRenderedSrcSet = (
   slide: CarouselSlideMediaView,
-  isArtDirectedViewport: boolean,
-  artDirectionMediaCondition: string,
+  matchesMedia: (media: string) => boolean,
 ): RenderedSrcSet => {
-  const artDirected = isArtDirectedViewport
-    ? slide.sources?.find((source) => source.media === artDirectionMediaCondition)
-    : undefined;
+  // FIRST matching source in document order — exactly the browser's own
+  // <picture> selection rule, so the warm can never disagree with render.
+  const artDirected = slide.sources?.find(
+    (source) => source.media !== undefined && matchesMedia(source.media),
+  );
   return artDirected
     ? { srcSet: artDirected.srcSet, sizes: artDirected.sizes }
     : { srcSet: slide.srcSet, sizes: slide.sizes };

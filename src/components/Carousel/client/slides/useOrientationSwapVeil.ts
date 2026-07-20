@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
-import { useMediaQuery } from "../../../../shared";
-import {
-  SLIDE_ART_DIRECTION_MEDIA_CONDITION,
-  SLIDE_REORIENT_VEIL_MAX_MS,
-} from "../config";
+import { SLIDE_REORIENT_VEIL_MAX_MS } from "../config";
+import { useCanonicalMediaMatches } from "../viewport/useSlideViewport";
 
 /**
  * Orientation-swap choreography for an art-directed slide image.
@@ -42,13 +39,18 @@ export function useOrientationSwapVeil({
   imgRef,
   isBitmapShown,
 }: UseOrientationSwapVeilInput): boolean {
-  const isArtDirectedViewport = useMediaQuery(SLIDE_ART_DIRECTION_MEDIA_CONDITION);
+  // One dependency for "the art-direction verdicts changed": any flip that
+  // can re-select a <source media> crop changes this signature. A flip that
+  // does NOT change the rendered crop is absorbed by construction: decode()
+  // on the already-painted resource resolves immediately and the veil never
+  // becomes visible.
+  const { signature } = useCanonicalMediaMatches();
   const [isVeiled, setIsVeiled] = useState(false);
-  const previousOrientationRef = useRef(isArtDirectedViewport);
+  const previousSignatureRef = useRef(signature);
 
   useEffect(() => {
-    if (previousOrientationRef.current === isArtDirectedViewport) return;
-    previousOrientationRef.current = isArtDirectedViewport;
+    if (previousSignatureRef.current === signature) return;
+    previousSignatureRef.current = signature;
 
     const img = imgRef.current;
     if (!isBitmapShown || !img) return;
@@ -83,7 +85,7 @@ export function useOrientationSwapVeil({
       cancelAnimationFrame(frame);
       window.clearTimeout(failOpen);
     };
-  }, [imgRef, isBitmapShown, isArtDirectedViewport]);
+  }, [imgRef, isBitmapShown, signature]);
 
   return isVeiled;
 }

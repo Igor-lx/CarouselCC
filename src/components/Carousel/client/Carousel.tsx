@@ -32,6 +32,7 @@ import {
 import { useCarouselNavigation } from "./navigation";
 import { useVisualPosition } from "./visual-position";
 import { useModuleRenderPolicy } from "./render-policy/useModuleRenderPolicy";
+import { useSlideViewport } from "./viewport/useSlideViewport";
 import {
   SlideItem,
   useCarouselSlideDeck,
@@ -111,6 +112,10 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // slot: no module — one native set everywhere, largest candidate, zero
   // responsive machinery (see resolveRenderedImageSrc).
   const isResponsiveImagesOn = Boolean(slots["responsive-images"]);
+
+  // Live viewport axes (breakpoint tier / orientation / compact landscape) —
+  // stamped on the root below; the SCSS slide geometry keys on them.
+  const slideViewport = useSlideViewport();
 
   // --- resolved runtime config (no diagnostic dependency) ------------------
   const config = useCarouselConfig({
@@ -432,6 +437,14 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
             data-carousel-root=""
             data-touch={isTouch}
             data-reduced-motion={isInstantMode}
+            // The viewport axes (config/viewport.ts), stamped as the styling
+            // contract: the component SCSS shapes slide geometry by these
+            // attributes and carries no media queries of its own.
+            data-breakpoint={slideViewport.breakpoint}
+            data-orientation={slideViewport.orientation}
+            data-compact-landscape={
+              slideViewport.isCompactLandscape ? "true" : undefined
+            }
           >
             <div
               tabIndex={-1}

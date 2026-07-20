@@ -9,6 +9,19 @@ export { useMediaQuery } from "./useMediaQuery";
 export { useBreakpoint } from "./useBreakpoint";
 export type { Breakpoint } from "./useBreakpoint";
 export {
+  useActiveBreakpoint,
+  resolveActiveBreakpoint,
+  sortedBreakpointEntries,
+  breakpointMinWidthQuery,
+} from "./useActiveBreakpoint";
+export type { BreakpointTable } from "./useActiveBreakpoint";
+export {
+  useOrientation,
+  PORTRAIT_ORIENTATION_QUERY,
+  LANDSCAPE_ORIENTATION_QUERY,
+} from "./useOrientation";
+export type { ViewportOrientation } from "./useOrientation";
+export {
   useCompactLandscape,
   COMPACT_LANDSCAPE_QUERY,
 } from "./useCompactLandscape";

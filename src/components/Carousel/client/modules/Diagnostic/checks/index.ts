@@ -13,3 +13,8 @@ export {
   collectResponsiveImagesWarnings,
   type ResponsiveImagesDiagnosticInput,
 } from "./responsiveImagesChecks";
+export {
+  collectViewportAxisWarnings,
+  collectSlideSourceMediaWarnings,
+  collectViewportCssWarnings,
+} from "./viewportChecks";

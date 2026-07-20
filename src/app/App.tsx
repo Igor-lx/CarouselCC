@@ -2,10 +2,14 @@ import { useEffect, useRef, useState } from "react";
 
 import appStyles from "./App.module.scss";
 import {
-  useBreakpoint,
+  useActiveBreakpoint,
   useCompactLandscape,
   useUserEnvironment,
 } from "../shared";
+import {
+  SLIDE_VIEWPORT_BREAKPOINTS,
+  type SlideViewportBreakpoint,
+} from "../components/Carousel/client/config";
 import Carousel, {
   type CarouselHandle,
   type CarouselStatusSnapshot,
@@ -40,12 +44,16 @@ const SLIDES_SET: 1 | 2 = (() => {
   return DEFAULT_SLIDES_SET;
 })();
 
-const VISIBLE_BY_BREAKPOINT = {
-  DESKTOP: 2,
-  TABLET: 2,
-  MOBILE: 1,
-  DEFAULT: 3,
-} as const;
+// Visible-slide counts keyed by the CAROUSEL'S OWN viewport tiers
+// (SLIDE_VIEWPORT_BREAKPOINTS — names and thresholds live in the component's
+// config and travel with it). Mapping tier -> count here means the slide
+// COUNT flips on exactly the same thresholds as the slide GEOMETRY and the
+// art-directed asset choice. The counts themselves are host tuning.
+const VISIBLE_BY_VIEWPORT: Record<SlideViewportBreakpoint, number> = {
+  desktop: 3,
+  tablet: 2,
+  mobile: 1,
+};
 
 const COMPACT_LANDSCAPE_VISIBLE_SLIDES = 2;
 
@@ -77,7 +85,10 @@ export default function App() {
   const carouselRef = useRef<CarouselHandle>(null);
   const [status, setStatus] = useState<CarouselStatusSnapshot | null>(null);
 
-  const device = useBreakpoint(VISIBLE_BY_BREAKPOINT);
+  const device =
+    VISIBLE_BY_VIEWPORT[
+      useActiveBreakpoint(SLIDE_VIEWPORT_BREAKPOINTS) as SlideViewportBreakpoint
+    ];
 
   // Layout-only: how many slides share the viewport. Orientation can change
   // this, but it never changes slide identity (one responsive set), so rotation

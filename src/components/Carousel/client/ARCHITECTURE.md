@@ -234,20 +234,26 @@ For each logical slide you need, starting from a single high-resolution source:
      ]
    }
 
-   The slide box is PLAIN HOST CSS. The component exposes cascading
-   variables (`--slide-aspect`, `--slide-height`, `--slide-image-fit`) with
-   neutral defaults and carries NO geometry media queries of its own — a
-   host wrapper overrides them freely, including under its own media
-   conditions, exactly like styling any element. `--slide-aspect` is just
-   "height as a function of the computed slot width" (a box needs a height
-   before image bytes arrive), NOT a declaration of the assets' aspect; the
-   image fits into whatever box results via `--slide-image-fit`
-   (object-fit semantics). Demo tuning (App.module.scss): `9 / 16`
-   everywhere, `16 / 9` under
-   `(orientation: landscape) and (max-height: 520px)` — the same condition
-   its generated art-directed sources use, so box and asset swap together. WITH the module the
-   browser also swaps to the crop matching the same condition, so box aspect
-   === asset aspect and nothing is cropped. The carousel derives its height from slot width ×
+   The slide box is plain component CSS, tuned per VIEWPORT STATE. The axes
+   (custom breakpoint names + numbers, orientation, compact landscape) are
+   ONE table in `config/viewport.ts`; the root resolves them through the
+   shared `useMediaQuery` store and stamps `data-breakpoint` /
+   `data-orientation` / `data-compact-landscape` on itself, and the
+   stylesheet keys the cascading variables (`--slide-aspect`,
+   `--slide-height`, `--slide-image-fit`) on those attributes — it contains
+   NO media queries and NO numbers. Resolution is purely numeric (largest
+   matching threshold wins), so tier naming and declaration order can never
+   shadow a wider tier. `--slide-aspect` is just "height as a function of
+   the computed slot width" (a box needs a height before image bytes
+   arrive), NOT a declaration of the assets' aspect; the image fits into
+   whatever box results via `--slide-image-fit` (object-fit semantics).
+   Everything travels WITH the component — a bare new host gets the full
+   behavior with zero CSS of its own; overriding the variables stays
+   possible but never required. Demo tuning: `9 / 16` base, `16 / 9` under
+   `data-compact-landscape`. WITH the module the browser also swaps to the
+   crop whose `<source media>` uses the same canonical condition strings
+   (generated from the same table numbers), so box aspect === asset aspect
+   and nothing is cropped. The carousel derives its height from slot width ×
    aspect instead of a fixed height, so it fits any window. To PIN the
    height instead, set `--slide-height` to a length (default `auto` keeps
    the fluid ratio): an explicit height makes the browser ignore
@@ -274,10 +280,13 @@ For each logical slide you need, starting from a single high-resolution source:
    painting the old crop until the new `<source>` resource decodes — under
    `cover` that window shows a zoomed centre of the previous orientation's
    photo. `useOrientationSwapVeil` (slides/) masks exactly that window: it
-   watches the same media condition (`SLIDE_ART_DIRECTION_MEDIA_CONDITION`, the
-   third leg of the contract — `orientationMediaSync.test.ts` keeps SCSS,
-   generated sources and the constant in lockstep), fades the bitmap out via
-   `data-reorienting` and unveils when `img.decode()` settles. Fade-out and
+   watches the SIGNATURE of the canonical media verdicts
+   (`useCanonicalMediaMatches` — any flip that can re-select a `<source>`
+   changes it; `orientationMediaSync.test.ts` keeps the generated sources
+   canonical, Diagnostics audits live data at runtime), fades the bitmap out
+   via `data-reorienting` and unveils when `img.decode()` settles. A flip
+   that does not change the rendered crop is absorbed: `decode()` on the
+   already-painted resource resolves immediately and the veil never shows. Fade-out and
    fade-in have SEPARATE durations (`SLIDE_REORIENT_FADE_OUT_MS` /
    `SLIDE_REORIENT_FADE_IN_MS`, injected by the root as CSS vars — values
    bound to a JS invariant live in config, not the stylesheet) — not extra

@@ -1,7 +1,6 @@
 import { memo, useEffect, useRef } from "react";
 
-import { useMediaQuery } from "../../../../../shared";
-import { SLIDE_ART_DIRECTION_MEDIA_CONDITION } from "../../config";
+import { useCanonicalMediaMatches } from "../../viewport/useSlideViewport";
 import { useCarouselMotion, useCarouselStable } from "../../context";
 import type { CarouselSlotComponent } from "../../slots";
 import { useResponsiveImagesDiagnostic } from "../Diagnostic/useResponsiveImagesDiagnostic";
@@ -84,9 +83,11 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
 }: ResponsiveImagesProps) {
   const { layout, slides, imageSizes } = useCarouselStable();
   const { status, intent } = useCarouselMotion();
-  // The art-direction axis: which crop the rendered <picture> is choosing
-  // right now. A rotation flips it, and the warm re-runs for the new crop.
-  const isArtDirectedViewport = useMediaQuery(SLIDE_ART_DIRECTION_MEDIA_CONDITION);
+  // The art-direction verdicts: which <source media> conditions the viewport
+  // matches right now. Any flip changes `signature`, and the warm re-runs
+  // for the newly-selected crops.
+  const { matches: matchesMedia, signature: mediaSignature } =
+    useCanonicalMediaMatches();
 
   useResponsiveImagesDiagnostic({ preloadPagesNr, isPreloadOn, isPredecodeOn });
 
@@ -115,11 +116,7 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
         // The crop the deck is ACTUALLY rendering for this viewport — never
         // the default set blindly (that would fetch the default family while
         // the deck shows the art-directed crop).
-        const { srcSet, sizes } = resolveRenderedSrcSet(
-          slide,
-          isArtDirectedViewport,
-          SLIDE_ART_DIRECTION_MEDIA_CONDITION,
-        );
+        const { srcSet, sizes } = resolveRenderedSrcSet(slide, matchesMedia);
         targets.push({
           // The chosen set is part of the identity: a rotation picks another
           // crop for the same slide, and that crop must warm on its own.
@@ -216,7 +213,8 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
   }, [
     imageSizes,
     intent.targetPageIndex,
-    isArtDirectedViewport,
+    matchesMedia,
+    mediaSignature,
     isPredecodeOn,
     isPreloadOn,
     layout.isDataSaverEnabled,
