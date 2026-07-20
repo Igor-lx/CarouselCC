@@ -7,15 +7,14 @@
  * these (by duplication — see its internal/).
  */
 export { useMediaQuery } from "./useMediaQuery";
-export { useBreakpoint } from "./useBreakpoint";
-export type { BreakpointState } from "./useBreakpoint";
 export {
+  useBreakpoint,
   resolveActiveBreakpoint,
   sortedBreakpointEntries,
   breakpointMinWidthQuery,
   STANDARD_BREAKPOINTS,
-} from "./resolveActiveBreakpoint";
-export type { BreakpointTable } from "./resolveActiveBreakpoint";
+} from "./useBreakpoint";
+export type { BreakpointState, BreakpointTable } from "./useBreakpoint";
 export {
   useOrientation,
   PORTRAIT_ORIENTATION_QUERY,

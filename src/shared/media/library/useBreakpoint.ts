@@ -1,12 +1,53 @@
 import { useMemo } from "react";
 
 import { useMediaQuery } from "./useMediaQuery";
-import {
-  breakpointMinWidthQuery,
-  resolveActiveBreakpoint,
-  sortedBreakpointEntries,
-  type BreakpointTable,
-} from "./resolveActiveBreakpoint";
+
+/**
+ * A width-tier table: tier names mapped to their `min-width` thresholds in
+ * px. Names carry no meaning to the resolver — resolution is purely numeric
+ * ("the largest threshold the viewport currently clears wins"), so
+ * declaration order and naming can never shadow a wider tier with a narrower
+ * one. A `0` entry is the natural fallback (matches everything).
+ */
+export type BreakpointTable = Readonly<Record<string, number>>;
+
+/** A sensible default tier set for the common case; callers with their own
+ * thresholds pass their own table instead. */
+export const STANDARD_BREAKPOINTS: BreakpointTable = {
+  desktop: 1024,
+  tablet: 768,
+  mobile: 0,
+};
+
+/** The canonical CSS form of one tier threshold — the SAME string data
+ * (`<source media>`) and diagnostics must use, so every leg of a breakpoint
+ * contract derives from the one number in the table. */
+export const breakpointMinWidthQuery = (px: number): string =>
+  `(min-width: ${px}px)`;
+
+/** Tiers in resolution order (largest threshold first). Pure and exported so
+ * non-React consumers (a facade, diagnostics, tests) share the exact
+ * resolution semantics of the hook. */
+export const sortedBreakpointEntries = (
+  table: BreakpointTable,
+): Array<[string, number]> =>
+  Object.entries(table).sort((a, b) => b[1] - a[1]);
+
+/**
+ * Pure resolution core: the first tier (in descending-threshold order) whose
+ * query matches; if none does, the narrowest tier is the fallback. `matches`
+ * abstracts the media evaluation so the hook and non-React consumers share
+ * one implementation. Lives WITH the hook — it is the hook's own kernel, not
+ * a second "breakpoint" module.
+ */
+export const resolveActiveBreakpoint = (
+  table: BreakpointTable,
+  matches: (query: string) => boolean,
+): string => {
+  const entries = sortedBreakpointEntries(table);
+  const hit = entries.find(([, px]) => matches(breakpointMinWidthQuery(px)));
+  return (hit ?? entries[entries.length - 1])?.[0] ?? "";
+};
 
 export interface BreakpointState {
   /** The active tier NAME of the table. */
@@ -35,18 +76,17 @@ export function useBreakpoint(table: BreakpointTable): BreakpointState {
     // eslint-disable-next-line react-hooks/rules-of-hooks -- static table contract (documented above)
     useMediaQuery(breakpointMinWidthQuery(px)),
   );
-  // A verdict-map built from the live subscriptions, so `resolveActiveBreakpoint`
-  // reuses the exact numeric resolution instead of re-deriving it.
-  const signature = matched.map((m) => (m ? "1" : "0")).join("");
-  return useMemo(() => {
-    const verdict = new Map(
-      entries.map(([, px], i) => [breakpointMinWidthQuery(px), matched[i]!]),
-    );
-    const name = resolveActiveBreakpoint(table, (q) => verdict.get(q) ?? false);
-    return {
-      name,
-      pick: (values) => values[name] ?? values.DEFAULT,
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- verdicts encoded in signature; table is a static constant
-  }, [signature]);
+  // The active tier NAME — the single primitive the result depends on. Cheap
+  // to derive every render; the shared `resolveActiveBreakpoint` keeps the
+  // "largest matching threshold wins" rule in one place.
+  const verdict = new Map(
+    entries.map(([, px], i) => [breakpointMinWidthQuery(px), matched[i]!]),
+  );
+  const name = resolveActiveBreakpoint(table, (q) => verdict.get(q) ?? false);
+  // Memoised on that name alone, so the object identity is stable while the
+  // tier is unchanged — no exhaustive-deps override needed.
+  return useMemo<BreakpointState>(
+    () => ({ name, pick: (values) => values[name] ?? values.DEFAULT }),
+    [name],
+  );
 }

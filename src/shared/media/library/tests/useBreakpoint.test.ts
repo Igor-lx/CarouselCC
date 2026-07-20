@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   breakpointMinWidthQuery,
   resolveActiveBreakpoint,
-} from "../resolveActiveBreakpoint";
+} from "../useBreakpoint";
 
 /** A viewport of the given width, as a min-width matcher. */
 const viewport = (width: number) => (query: string) => {
