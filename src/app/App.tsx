@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import appStyles from "./App.module.scss";
-import { useUserEnvironment, useViewport } from "../shared";
+import { useUserEnvironment, useMedia } from "../shared";
 import {
   SLIDE_VIEWPORT_AXES,
   type SlideViewportBreakpoint,
@@ -74,7 +74,7 @@ export default function App() {
   // One viewport read over the carousel's own axes: the same facade the
   // component uses, so the visible-slide count below flips on exactly the
   // thresholds that drive slide geometry and asset choice.
-  const viewport = useViewport(SLIDE_VIEWPORT_AXES);
+  const viewport = useMedia(SLIDE_VIEWPORT_AXES);
   const isShortLandscape = viewport.flags["short-landscape"];
 
   const [isAutoplay, setIsAutoplay] = useState(false);

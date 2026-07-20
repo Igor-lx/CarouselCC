@@ -13,7 +13,7 @@ import {
  * arbitrary named boolean flags (any media condition — height, aspect-ratio,
  * hover, …). Orientation is always available and needs no declaration.
  */
-export interface ViewportAxes {
+export interface MediaAxes {
   breakpoints: BreakpointTable;
   /** name -> media condition string. The name becomes the flag key. */
   flags?: Readonly<Record<string, string>>;
@@ -27,7 +27,7 @@ export interface ViewportAxes {
  * art-directed `<source media>` may use — one derivation, so box, asset,
  * warm and veil can never key off a condition the facade does not track.
  */
-export const viewportCanonicalMedia = (axes: ViewportAxes): string[] => [
+export const canonicalMediaQueries = (axes: MediaAxes): string[] => [
   ...sortedBreakpointEntries(axes.breakpoints)
     .filter(([, px]) => px > 0)
     .map(([, px]) => breakpointMinWidthQuery(px)),

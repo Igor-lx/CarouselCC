@@ -1,11 +1,11 @@
-import { viewportCanonicalMedia, type ViewportAxes } from "../../../../shared";
+import { canonicalMediaQueries, type MediaAxes } from "../../../../shared";
 
 /**
  * THE viewport axes of the carousel — the single place where its breakpoint
  * NAMES/NUMBERS and its flag conditions are defined. Everything else derives
  * from here:
  *
- *  - the root resolves these axes (one `useViewport` call) and stamps the
+ *  - the root resolves these axes (one `useMedia` call) and stamps the
  *    result as data attributes (`data-breakpoint`, `data-orientation`, and
  *    `data-<flag>` for each flag); the component SCSS styles slide geometry
  *    by those attributes — the stylesheet holds NO media queries and NO
@@ -45,8 +45,8 @@ export const SLIDE_VIEWPORT_FLAGS = {
 
 export type SlideViewportFlag = keyof typeof SLIDE_VIEWPORT_FLAGS;
 
-/** The axes as one object — the config passed to `useViewport`. */
-export const SLIDE_VIEWPORT_AXES: ViewportAxes = {
+/** The axes as one object — the config passed to `useMedia`. */
+export const SLIDE_VIEWPORT_AXES: MediaAxes = {
   breakpoints: SLIDE_VIEWPORT_BREAKPOINTS,
   flags: SLIDE_VIEWPORT_FLAGS,
 };
@@ -60,4 +60,4 @@ export const SLIDE_VIEWPORT_AXES: ViewportAxes = {
  * box).
  */
 export const SLIDE_CANONICAL_SOURCE_MEDIA: readonly string[] =
-  viewportCanonicalMedia(SLIDE_VIEWPORT_AXES);
+  canonicalMediaQueries(SLIDE_VIEWPORT_AXES);

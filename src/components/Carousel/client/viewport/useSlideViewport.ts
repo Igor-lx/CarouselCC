@@ -1,4 +1,4 @@
-import { useViewport, type Viewport } from "../../../../shared";
+import { useMedia, type MediaState } from "../../../../shared";
 import { SLIDE_VIEWPORT_AXES } from "../config/viewport";
 
 /**
@@ -12,4 +12,4 @@ import { SLIDE_VIEWPORT_AXES } from "../config/viewport";
  * Backed by the shared `useMediaQuery` store, so calling it in several
  * consumers costs one browser listener per distinct condition, not per call.
  */
-export const useSlideViewport = (): Viewport => useViewport(SLIDE_VIEWPORT_AXES);
+export const useSlideViewport = (): MediaState => useMedia(SLIDE_VIEWPORT_AXES);

@@ -7,11 +7,11 @@ import {
   type ViewportOrientation,
 } from "../library/useOrientation";
 import {
-  viewportCanonicalMedia,
-  type ViewportAxes,
+  canonicalMediaQueries,
+  type MediaAxes,
 } from "./internal/canonicalMedia";
 
-export interface Viewport {
+export interface MediaState {
   /** Active width-tier NAME (from the axes' breakpoint table). */
   breakpoint: string;
   orientation: ViewportOrientation;
@@ -27,18 +27,20 @@ export interface Viewport {
 }
 
 /**
- * THE viewport facade — one call answers "what viewport state are we in" for
- * a caller-supplied set of axes (width tiers + orientation + arbitrary flag
- * conditions). Combines the single-axis primitives over the ONE shared
+ * THE media facade — one call resolves a whole set of media axes (width
+ * tiers + orientation + arbitrary flag conditions) for a caller-supplied
+ * config. Combines the single-axis library primitives over the ONE shared
  * `useMediaQuery` store (a single browser listener per distinct condition,
- * no matter how many consumers or how many times this is called).
+ * no matter how many consumers or how many times this is called). Distinct
+ * from the base `useMediaQuery` primitive: that evaluates ONE query to a
+ * bool; this resolves a NAMED set of axes to a structured state.
  *
  * `axes` MUST be a static module constant: one hook is subscribed per
  * tracked condition, so the set's size and order may not change between
  * renders.
  */
-export function useViewport(axes: ViewportAxes): Viewport {
-  const queries = viewportCanonicalMedia(axes);
+export function useMedia(axes: MediaAxes): MediaState {
+  const queries = canonicalMediaQueries(axes);
   const bits = queries.map((query) =>
     // eslint-disable-next-line react-hooks/rules-of-hooks -- static axes contract (documented above)
     useMediaQuery(query),
