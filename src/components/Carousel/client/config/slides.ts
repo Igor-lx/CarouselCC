@@ -15,7 +15,8 @@
  * MECHANISM is the contract: one condition, and the same string living in
  * three places that must stay in lockstep (guarded by
  * `orientationMediaSync.test.ts`):
- *  - `Carousel.module.scss` — flips `--slide-aspect` (box geometry);
+ *  - the HOST's slide-geometry CSS (the component ships no geometry media
+ *    queries; the demo overrides `--slide-aspect` in App.module.scss);
  *  - the generated `<source media>` of every art-directed slide (asset);
  *  - this constant — the JS mirror driving the reorientation veil and the
  *    warm-candidate choice, so both react to EXACTLY the flip that swaps

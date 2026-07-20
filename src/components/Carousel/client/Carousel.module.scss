@@ -12,33 +12,35 @@
     // not in the stylesheet.
     --viewport-radius: var(--slide-radius);
 
-    // The slide box aspect ratio — a TUNING PAIR with the data's crop
-    // families, not a component opinion: this default value matches the
-    // default variant set, and the media override below matches the
-    // art-directed `<source>` crops. Whatever pair the host's dataset uses
-    // is legitimate; the current 9/16-default is simply the demo dataset's
-    // case (its default variants are tall cuts). The image
-    // `object-fit: cover`s into the box:
-    //  - WITH <ResponsiveImages />: the browser swaps to the crop matching
-    //    the same media condition, so box aspect === asset aspect and
-    //    nothing is cropped;
-    //  - WITHOUT it: the ONE designated asset covers the box — a perfect
-    //    fit while box and asset share an aspect, centre-cropped where the
-    //    override flips the box (plain `cover` — the single-set trade-off).
-    // The carousel's height is DERIVED from slot width × this ratio — no
-    // fixed component height; the HOST decides how many slots share its
-    // width so a slide fits the screen (see the demo's VISIBLE_BY_BREAKPOINT).
-    --slide-aspect: 9 / 16;
-
-    // Optional FIXED slide height. `auto` (default) => the height derives from
-    // slot width × --slide-aspect (the fluid default above). Set a length
-    // (e.g. `150px`) to pin the height instead: an explicit height makes the
-    // browser ignore `aspect-ratio`, so the box becomes `slot-width ×
-    // <length>`. The slide AND the invisible height sizer both consume this
-    // one variable, so the slide, the track and the clip stay in sync — a
-    // host overriding only one would desync them. Width stays fluid and the
-    // motion math is width-based, so a fixed height never affects scrolling.
+    // ------------------- SLIDE GEOMETRY — pure CSS tuning -------------------
+    // Plain CSS, no contracts with the assets. Slide WIDTH is always computed
+    // (viewport width, slot count and --slides-gap); everything else is yours
+    // to style, from the HOST's stylesheet if you like — these are ordinary
+    // cascading custom properties, so a host wrapper can override any of
+    // them, including under its own media queries (the demo does exactly
+    // that in App.module.scss). The component ships only neutral defaults.
+    //
+    // --slide-aspect  Height as a function of the computed width — nothing
+    //                 more. It is NOT "the aspect of your images" and does
+    //                 not need to match them: it shapes the slide BOX, and
+    //                 the image then fits into that box per --slide-image-fit
+    //                 (standard object-fit semantics, crops or letterboxes
+    //                 like anywhere else in CSS). A box needs SOME height
+    //                 before any image bytes arrive (slides are absolutely
+    //                 positioned; the track takes its height from the sizer
+    //                 below) — this ratio is that height rule, purely layout.
+    // --slide-height  Set a length to PIN the height instead (the browser
+    //                 then ignores aspect-ratio: box = slot-width × length).
+    //                 `auto` keeps the fluid ratio. The slide AND the
+    //                 invisible height sizer both consume this one variable,
+    //                 so slides, track and clip stay in sync by construction.
+    //                 Width stays fluid and the motion math is width-based,
+    //                 so a fixed height never affects scrolling.
+    // --slide-image-fit  How the image fills the box (object-fit). `cover`
+    //                 crops, `contain` letterboxes — a taste knob, not logic.
+    --slide-aspect: 16 / 9;
     --slide-height: auto;
+    --slide-image-fit: cover;
 
     position: relative;
     display: flex;
@@ -63,20 +65,14 @@
   // tried and rejected: the OS still gives tactile feedback for the long-press,
   // and feedback with no menu reads as breakage.
 
-  // The art-direction override: under this condition the box takes the
-  // aspect of the art-directed `<source>` crops — regardless of the module
-  // (the box tracks the SCREEN; without the module the single asset simply
-  // centre-crops into the flipped box). The CONDITION is the contract: it
-  // MUST stay literally identical to `SLIDE_ART_DIRECTION_MEDIA_CONDITION`
-  // (config/slides.ts) and to every generated `<source media>` —
-  // `orientationMediaSync.test.ts` pins all copies. The VALUES (16/9 wide
-  // cuts behind a compact-landscape condition) are the demo dataset's
-  // tuning, not a component rule.
-  @media (orientation: landscape) and (max-height: 520px) {
-    .outerContainer {
-      --slide-aspect: 16 / 9;
-    }
-  }
+  // NOTE: the component deliberately carries NO media queries for the slide
+  // geometry. Per-viewport shaping (e.g. a different box for a handheld held
+  // sideways) is HOST styling: override the variables above under your own
+  // media conditions (see the demo's App.module.scss). If the host also
+  // mounts <ResponsiveImages /> with art-directed sets, aligning its CSS
+  // conditions with the data's `<source media>` makes box and asset swap on
+  // the same flip — the demo keeps them identical to
+  // `SLIDE_ART_DIRECTION_MEDIA_CONDITION` (orientationMediaSync.test.ts).
 
   .innerContainer {
     position: relative;
@@ -191,7 +187,7 @@
       display: block;
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: var(--slide-image-fit, cover);
       // Orientation-swap veil (data-reorienting, set by useOrientationSwapVeil):
       // masks the window where the box already flipped its aspect but the old
       // crop is still painted. Cached swaps clear before the fade is visible.

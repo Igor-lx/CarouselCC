@@ -80,6 +80,21 @@
   justify-content: center;
   width: 100%;
   min-width: 0;
+
+  // -------------- DEMO slide-geometry tuning (host CSS, not the component) --
+  // The carousel exposes plain cascading variables (--slide-aspect,
+  // --slide-height, --slide-image-fit — see Carousel.module.scss) and ships
+  // no media opinions of its own. THIS dataset is tall 9:16 photos, so the
+  // demo shapes the box 9/16 everywhere and 16/9 only in compact landscape
+  // (a handheld held sideways, where a tall box cannot fit). The media
+  // condition is kept literally identical to the generated `<source media>`
+  // and SLIDE_ART_DIRECTION_MEDIA_CONDITION, so the box and the art-directed
+  // asset swap on the same flip (orientationMediaSync.test.ts pins it).
+  --slide-aspect: 9 / 16;
+
+  @media (orientation: landscape) and (max-height: 520px) {
+    --slide-aspect: 16 / 9;
+  }
 }
 
 @media (width <= 1023px) {

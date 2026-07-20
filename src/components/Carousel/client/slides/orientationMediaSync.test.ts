@@ -5,12 +5,15 @@ import { describe, expect, it } from "vitest";
 import { SLIDE_ART_DIRECTION_MEDIA_CONDITION } from "../config";
 
 /**
- * SSOT guard for the slide-orientation contract. One media condition flips
- * three things at once — the slide box aspect (SCSS), the art-directed
- * `<source>` crop (generated data), and the orientation-swap veil (the TS
- * constant). If any copy drifts, the box, the asset and the veil react to
- * DIFFERENT flips and the geometry contract silently breaks. Same pattern as
- * `themeBootSync.test.ts`: read the real files, assert the same string.
+ * SSOT guard for the art-direction flip. One media condition flips three
+ * things at once — the DEMO HOST's slide box aspect (App.module.scss: the
+ * component itself ships no geometry media queries, the host tunes the CSS
+ * variables), the art-directed `<source>` crop (generated data), and the
+ * reorientation veil (the TS constant). If any copy drifts, the box, the
+ * asset and the veil react to DIFFERENT flips and the swap silently breaks.
+ * Same pattern as `themeBootSync.test.ts`: read the real files, assert the
+ * same string. Which crop family sits on which side of the condition is the
+ * dataset's tuning — this guard pins only the CONDITION.
  */
 
 const read = (relativeToRepoRoot: string) =>
@@ -23,9 +26,21 @@ describe("slide orientation media condition SSOT", () => {
     );
   });
 
-  it("the SCSS aspect flip uses the same condition", () => {
+  it("the demo host's aspect override uses the same condition", () => {
+    const hostScss = read("src/app/App.module.scss");
+    expect(hostScss).toContain(`@media ${SLIDE_ART_DIRECTION_MEDIA_CONDITION}`);
+  });
+
+  it("the component ships no geometry media queries of its own", () => {
     const scss = read("src/components/Carousel/client/Carousel.module.scss");
-    expect(scss).toContain(`@media ${SLIDE_ART_DIRECTION_MEDIA_CONDITION}`);
+    // Every @media block in the component stylesheet must be about layout
+    // ergonomics, never about --slide-aspect / --slide-height: per-viewport
+    // slide shaping is host tuning by design.
+    for (const block of scss.split("@media").slice(1)) {
+      const body = block.slice(0, block.indexOf("}"));
+      expect(body).not.toContain("--slide-aspect");
+      expect(body).not.toContain("--slide-height");
+    }
   });
 
   it("every generated wide <source> uses the same condition", () => {

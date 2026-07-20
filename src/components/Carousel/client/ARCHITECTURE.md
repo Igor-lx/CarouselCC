@@ -234,14 +234,18 @@ For each logical slide you need, starting from a single high-resolution source:
      ]
    }
 
-   The slide box's `--slide-aspect` (SCSS) is a TUNING PAIR with the data's
-   crop families — the default value matches the default variant set, the
-   media override matches the art-directed `<source>` crops; the component
-   itself bakes in NO art direction (any legitimate pair works). Current
-   demo tuning: `9 / 16` default, flipped to `16 / 9` under
-   `(orientation: landscape) and (max-height: 520px)` (compact landscape,
-   where a tall box cannot fit) — always, module or not. The image
-   `object-fit: cover`s into the box. WITH the module the
+   The slide box is PLAIN HOST CSS. The component exposes cascading
+   variables (`--slide-aspect`, `--slide-height`, `--slide-image-fit`) with
+   neutral defaults and carries NO geometry media queries of its own — a
+   host wrapper overrides them freely, including under its own media
+   conditions, exactly like styling any element. `--slide-aspect` is just
+   "height as a function of the computed slot width" (a box needs a height
+   before image bytes arrive), NOT a declaration of the assets' aspect; the
+   image fits into whatever box results via `--slide-image-fit`
+   (object-fit semantics). Demo tuning (App.module.scss): `9 / 16`
+   everywhere, `16 / 9` under
+   `(orientation: landscape) and (max-height: 520px)` — the same condition
+   its generated art-directed sources use, so box and asset swap together. WITH the module the
    browser also swaps to the crop matching the same condition, so box aspect
    === asset aspect and nothing is cropped. The carousel derives its height from slot width ×
    aspect instead of a fixed height, so it fits any window. To PIN the
