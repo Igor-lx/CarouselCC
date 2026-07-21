@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import appStyles from "./App.module.scss";
 import { useUserEnvironment, useMedia } from "../shared";
@@ -86,6 +86,39 @@ export default function App() {
   const carouselRef = useRef<CarouselHandle>(null);
   const [status, setStatus] = useState<CarouselStatusSnapshot | null>(null);
 
+  // Stable identity on purpose: <Carousel> is memoised, and an inline arrow
+  // here would hand it a fresh prop on every App render — breaking the memo
+  // and reconciling the whole deck. The status fires twice per ride (motion
+  // start and settle), i.e. exactly in the frames where that must not happen.
+  const handleStatusChange = useCallback(
+    (snapshot: CarouselStatusSnapshot) => setStatus(snapshot),
+    [],
+  );
+
+  // Memoised for the same reason as the callback above: inline JSX children
+  // are fresh elements on every render, which alone defeats <Carousel>'s memo.
+  // An ARRAY, not a fragment — the carousel resolves its slots with
+  // `Children.forEach`, which flattens arrays but would see a fragment as one
+  // opaque child and find no slots at all.
+  const carouselModules = useMemo(
+    () => [
+      isTouch ? (
+        <PaginationWidget key="pagination" />
+      ) : (
+        <Pagination key="pagination" />
+      ),
+      <Controls key="controls" />,
+      <ResponsiveImages
+        key="responsive-images"
+        isPreloadOn={true}
+        isPredecodeOn={true}
+        preloadPagesNr={2}
+      />,
+      <Diagnostic key="diagnostic" />,
+    ],
+    [isTouch],
+  );
+
   const device =
     VISIBLE_BY_VIEWPORT[viewport.breakpoint as SlideViewportBreakpoint];
 
@@ -167,16 +200,9 @@ export default function App() {
               isFullPagesOn
               userEnvironment={userEnvironment}
               onSlideClick={openSlide}
-              onCarouselStatusChange={(snapshot) => setStatus(snapshot)}
+              onCarouselStatusChange={handleStatusChange}
             >
-              {isTouch ? <PaginationWidget /> : <Pagination />}
-              <Controls />
-              <ResponsiveImages
-                isPreloadOn={true}
-                isPredecodeOn={true}
-                preloadPagesNr={2}
-              />
-              <Diagnostic />
+              {carouselModules}
             </Carousel>
           )}
         </div>
