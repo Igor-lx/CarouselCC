@@ -4,6 +4,15 @@ This is **not** an import graph to build against — it is a **shelf of
 copy-ready blanks**. You take what you need into a real project: one single
 hook, a whole library, one facade, several at once, in any combination.
 
+> **Read this before judging anything here.** By rights this folder lives
+> OUTSIDE a project: you copy blanks out of it and wire them up with the
+> importing project's own paths. In THIS repo it does double duty — it is
+> also the live source the demo carousel runs on, purely for convenience of
+> the test bench. That dual role is why two rules that look contradictory
+> coexist here: duplication between blanks (the SHELF rule) alongside
+> single-source imports (the APPLICATION rule). In a real project only the
+> second applies, because you copy each blank exactly once.
+
 Two consequences shape everything here:
 
 1. **A blank carries its own copies.** Each folder duplicates the hooks it
@@ -59,14 +68,25 @@ keeps its own registry, so the same media query would be watched by two
 independent listeners and the "one listener per query" guarantee would only
 hold per copy. Hence: pure logic duplicated freely, stores shared and single.
 
-## On portability tests
+## Single-source guards (instead of portability tests)
 
 The `engines/` blanks import nothing but React and themselves, so each keeps
-a `tests/portability.test.ts` guard. The `clientState/` blanks deliberately
-import one file from `shared/`, and in a target project that file may live
-anywhere, so a "react + self only" guard would always fail there and was
-dropped. The invariant worth guarding instead is *"exactly one copy of each
-store"* — visible directly from the layout above.
+a `tests/portability.test.ts`. The other blanks deliberately point at one
+project-level file, and in a target project that file may live anywhere — a
+"react + self only" assertion could never hold there, so those guards were
+dropped in favour of guards for the invariant that actually matters:
+
+- `clientState/shared/tests/singleStore.test.ts` — exactly ONE
+  `useMediaQuery.ts` exists in the project. A second copy would split the
+  listener registry.
+- `viewportObservation/tests/singleSource.test.ts` — if the project already
+  provides `useIsomorphicLayoutEffect`, this blank must import THAT one and
+  leave its own copy dormant. The failure message says exactly that, so a
+  developer who copies the folder into a project that already has the helper
+  is told to repoint the import rather than run two copies.
+
+Both guards travel with their folder and re-evaluate in whatever project
+they land in.
 
 ## Rules of the collection
 

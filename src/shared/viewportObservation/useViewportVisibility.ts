@@ -1,5 +1,5 @@
 import { useRef, useState, type RefObject } from "react";
-import { useIsomorphicLayoutEffect } from "./useIsomorphicLayoutEffect";
+import { useIsomorphicLayoutEffect } from "../hooks/useIsomorphicLayoutEffect";
 
 interface UseViewportVisibilityProps {
   elementRef: RefObject<Element | null>;
