@@ -34,6 +34,7 @@ export function useKineticValue({
   initialValue = 0,
   enabled = true,
   config,
+  surfaceRef,
   resolveTarget,
   onSettle,
 }: UseKineticValueInput): KineticValue {
@@ -119,6 +120,7 @@ export function useKineticValue({
 
   const { hostProps } = usePointerSwipe({
     enabled,
+    surfaceRef,
     config: config?.swipe,
     // The finger owns the value 1:1: catch a flying value inside read()
     // (cancel pins the element at the live position and the drag picks it

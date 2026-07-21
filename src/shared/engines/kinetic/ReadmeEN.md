@@ -45,6 +45,26 @@ useKineticValue({
 });
 ```
 
+## Chrome inside the host
+
+The host owns the finger, so a control placed inside it — the `→` button
+above — BRAKES a flying value when pressed and held (a resting finger is a
+"catch the strip" gesture). Declare what is actually draggable and everything
+else under the host becomes chrome: no ownership, no brake, no drag, click
+still fires.
+
+```tsx
+const circleRef = useRef<HTMLElement | null>(null);
+const kinetic = useKineticValue({ keyframe, surfaceRef: circleRef });
+
+<div {...kinetic.hostProps}>
+  <div ref={(n) => { kinetic.ref(n); circleRef.current = n; }} className="circle" />
+  <button onClick={…}>→</button>   {/* chrome: leaves the ride alone */}
+</div>
+```
+
+Omit `surfaceRef` and the whole host stays the surface — the default.
+
 ## Scope (deliberate)
 
 - **One value, one moving element**, and the value is **1:1 with the finger**

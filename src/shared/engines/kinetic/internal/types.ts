@@ -42,6 +42,15 @@ export interface UseKineticValueInput {
    * where released (e.g. snap grids: `Math.round(from / step) * step`).
    */
   resolveTarget?: (release: KineticRelease) => number | null;
+  /**
+   * Optional: the draggable SURFACE inside the host. By default the whole
+   * host owns the finger, so a control placed inside it (the -> button in
+   * the quick start) BRAKES a flying value when pressed and held. Point this
+   * at the subtree that should actually be draggable and everything else
+   * under the host becomes chrome: no ownership, no brake, no drag, and its
+   * click still fires.
+   */
+  surfaceRef?: { readonly current: HTMLElement | null };
   /** Fires when any ride (glide, flyTo, snap) settles. */
   onSettle?: (value: number) => void;
 }
