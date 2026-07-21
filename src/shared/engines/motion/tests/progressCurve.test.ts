@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildProfile, sampleMotionProfile } from "../profile/profile";
 import {
+  resolveProgressStopIntervals,
   profileProgressStops,
   resolvePeakSpeedForDuration,
   sampleProgressStops,
@@ -161,5 +162,50 @@ describe("keyframesAlongStops", () => {
   it("supports a reversed span and a single-stop degenerate curve", () => {
     expect(keyframesAlongStops(5, 3, [0, 1], (p) => p)).toEqual([5, 3]);
     expect(keyframesAlongStops(1, 1, [0, 1], (p) => p)).toEqual([1, 1]);
+  });
+});
+
+/**
+ * Serialization DENSITY. The compositor interpolates linearly between stops,
+ * so velocity is piecewise-constant and steps at each one. What the eye reads
+ * is how LONG a step lasts — so the density is pinned to the frame, not to a
+ * fixed sample count that silently coarsens as rides get slower.
+ */
+describe("progress-stop density scales with duration", () => {
+  const segmentMs = (duration: number) =>
+    duration / resolveProgressStopIntervals(duration);
+
+  it("never lets a linear segment outlast one frame", () => {
+    for (const duration of [300, 800, 1300, 2000, 3000, 4000]) {
+      expect(segmentMs(duration)).toBeLessThanOrEqual(16.7);
+    }
+  });
+
+  it("keeps a floor for very short rides (no degenerate curves)", () => {
+    expect(resolveProgressStopIntervals(50)).toBe(32);
+    expect(resolveProgressStopIntervals(0)).toBe(32);
+    expect(resolveProgressStopIntervals(-1)).toBe(32);
+  });
+
+  it("stays bounded for pathologically long rides", () => {
+    expect(resolveProgressStopIntervals(60_000)).toBe(256);
+  });
+
+  it("a slow ride is serialized far more densely than the old fixed 32", () => {
+    // The regression this guards: 2000 ms at 32 intervals meant 62 ms — four
+    // frames of constant velocity — per segment.
+    expect(resolveProgressStopIntervals(2000)).toBeGreaterThan(32);
+    expect(profileProgressStops(stepProfile(), 3).length).toBeGreaterThan(33);
+  });
+
+  it("velocity steps between consecutive segments stay small", () => {
+    const profile = stepProfile();
+    const stops = profileProgressStops(profile, 3);
+    const speeds = stops.slice(1).map((stop, i) => stop - stops[i]!);
+    const peak = Math.max(...speeds);
+    const jumps = speeds
+      .slice(1)
+      .map((speed, i) => Math.abs(speed - speeds[i]!) / peak);
+    expect(Math.max(...jumps)).toBeLessThan(0.05);
   });
 });

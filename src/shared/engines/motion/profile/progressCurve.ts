@@ -25,12 +25,41 @@ import {
  */
 
 /**
- * Uniform time-samples per serialized curve. 32 intervals keep the
- * piecewise-linear approximation error of a smoothstep-shaped profile well
- * under 0.2% of the travelled distance — sub-pixel for any realistic track.
- * Implementation granularity, not a feel knob.
+ * Serialization density of a curve, in TIME — not a fixed sample count.
+ *
+ * The browser interpolates LINEARLY between keyframes, so a serialized curve
+ * is a polyline: position error is tiny (~h²·|f''|/8, sub-pixel at any sane
+ * density), but VELOCITY is piecewise-CONSTANT and steps at every stop. What
+ * the eye reads is that step, and its visibility depends on how long a
+ * segment lasts, not on how many there are.
+ *
+ * A fixed count therefore degrades exactly where it must not: at 32 intervals
+ * a 300 ms flick spends 9 ms per segment (invisible, sub-frame) while a
+ * 2000 ms button ride spends 62 ms — four whole frames of constant velocity,
+ * then a jump. Slow, smooth rides are precisely where a human tracks the
+ * motion and reads the steps as stuttering.
+ *
+ * So the density is pinned to the frame instead: one stop per ~16 ms of ride,
+ * clamped. Every linear segment then lasts at most one frame, the compositor
+ * samples it at most once, and no step can survive into a second frame at any
+ * duration. A 2 s ride costs ~125 stops — numbers in a keyframe list, free
+ * for the compositor.
  */
-const PROGRESS_STOP_INTERVALS = 32;
+const TARGET_MS_PER_PROGRESS_STOP = 16;
+const MIN_PROGRESS_STOP_INTERVALS = 32;
+const MAX_PROGRESS_STOP_INTERVALS = 256;
+
+/** Stop count for a ride of `duration` ms (see the density note above). */
+export const resolveProgressStopIntervals = (duration: number): number => {
+  if (!(duration > 0)) return MIN_PROGRESS_STOP_INTERVALS;
+  return Math.min(
+    MAX_PROGRESS_STOP_INTERVALS,
+    Math.max(
+      MIN_PROGRESS_STOP_INTERVALS,
+      Math.ceil(duration / TARGET_MS_PER_PROGRESS_STOP),
+    ),
+  );
+};
 
 /**
  * Uniform distance-progress samples of a profile: index `i` is the progress
@@ -41,7 +70,7 @@ const PROGRESS_STOP_INTERVALS = 32;
 export const profileProgressStops = (
   profile: MotionProfile,
   distance: number,
-  intervals: number = PROGRESS_STOP_INTERVALS,
+  intervals: number = resolveProgressStopIntervals(profile.duration),
 ): number[] => {
   const absDistance = Math.abs(distance);
   if (!(profile.duration > 0) || !(absDistance > 0) || !(intervals >= 1)) {
