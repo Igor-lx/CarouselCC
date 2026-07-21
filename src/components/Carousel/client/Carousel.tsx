@@ -311,6 +311,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // --- gesture --------------------------------------------------------------
   const { hostProps: dragHostProps } = useCarouselGesture({
     viewportRef,
+    trackRef,
     layout,
     isSwipeOn,
     inFlightTargetPageIndex: status.isIdle ? null : state.targetPageIndex,

@@ -166,6 +166,21 @@ export interface PointerSwipeProps {
    * second ref onto the DOM node.
    */
   hostRef?: PointerSwipeHostRef;
+  /**
+   * OPTIONAL: the draggable SURFACE inside the host. When given (and
+   * mounted), only presses landing INSIDE this subtree are the engine's
+   * business — everything else under the host is CHROME (arrows, overlays,
+   * toolbars) and is handed straight back: no pointer capture, no ownership,
+   * no brake, no drag, no phase change, and its click is never swallowed by
+   * the post-swipe cooldown. A press on chrome leaves a running ride exactly
+   * as it was, just like a press on an element outside the host.
+   *
+   * Declaring the surface POSITIVELY is what makes chrome safe by
+   * construction: a control added inside the host later is excluded
+   * automatically, with nothing to remember to mark. Omit it (or leave the
+   * ref empty) and the whole host is the surface — the default, unchanged.
+   */
+  surfaceRef?: { readonly current: HTMLElement | null };
   enabled?: boolean;
   config?: PointerSwipeConfig;
   /** Optional turnkey drag→value binding — see {@link PointerSwipeValueBinding}. */

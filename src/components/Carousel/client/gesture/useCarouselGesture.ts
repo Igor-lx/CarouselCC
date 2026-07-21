@@ -21,6 +21,15 @@ import {
 
 interface UseCarouselGestureInput {
   viewportRef: RefObject<HTMLDivElement | null>;
+  /**
+   * The TRACK — the carousel's draggable surface. Declaring it positively is
+   * what keeps chrome layered inside the viewport (the Controls arrows, any
+   * future overlay) from touching a running ride: a press outside the track
+   * is not the gesture engine's business at all, exactly like a press outside
+   * the component. Pressing a SLIDE still brakes the deck — slides live
+   * inside the track.
+   */
+  trackRef: RefObject<HTMLDivElement | null>;
   layout: CarouselLayout;
   /**
    * Public gesture switch (`isSwipeOn` prop). When `false` the pointer-swipe
@@ -368,6 +377,7 @@ export function useCarouselGesture({
   const { hostProps } = usePointerSwipe({
     enabled: layout.canSlide && isSwipeOn,
     hostRef: viewportRef,
+    surfaceRef: trackRef,
     config: swipeConfig,
     onPressStart: (payload) => startDragFromCurrentPosition(payload.pressClientX),
     onDragStart: handleDragStart,

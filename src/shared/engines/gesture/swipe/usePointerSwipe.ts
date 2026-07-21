@@ -124,6 +124,7 @@ const eventTime = (event: { timeStamp: number }): number =>
 
 export function usePointerSwipe({
   hostRef: externalHostRef,
+  surfaceRef,
   enabled = true,
   config,
   value,
@@ -474,6 +475,18 @@ export function usePointerSwipe({
       const target = event.currentTarget as HTMLElement;
       const interactive = getInteractiveTarget(event.target, target);
 
+      // Not the engine's surface → not the engine's press. Chrome layered
+      // over the deck inside the host (arrows, overlays) must leave a running
+      // ride untouched, exactly like an element outside the host: no capture,
+      // no ownership, no phase change. Its click is marked allowed so the
+      // post-swipe cooldown cannot swallow it either.
+      const surface = surfaceRef?.current ?? null;
+      if (surface && event.target instanceof Node && !surface.contains(event.target)) {
+        allowedClickTargetRef.current =
+          interactive ?? (event.target instanceof Element ? event.target : null);
+        return;
+      }
+
       if (interactive && now < lockUntilRef.current) {
         allowedClickTargetRef.current = interactive;
         return;
@@ -510,7 +523,7 @@ export function usePointerSwipe({
       ensureCapture(target, event.pointerId);
       scheduleCatch(target, event.pointerId);
     },
-    [enabled, ensureCapture, scheduleCatch, setPhase],
+    [enabled, ensureCapture, scheduleCatch, setPhase, surfaceRef],
   );
 
   const handlePointerMove = useCallback(
