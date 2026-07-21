@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 
 import styles from "../Carousel.module.scss";
 import { mergeStyleMaps } from "../../../../shared";
@@ -67,13 +67,42 @@ export const useCarouselPresentation = ({
     [visibleSlidesCount],
   );
 
-  const slideStyles = useMemo(
-    () =>
-      virtualSlides.map((slide) =>
-        buildSlideCssVars(slide.virtualIndex, layoutOrigin),
-      ),
-    [layoutOrigin, virtualSlides],
-  );
+  // Per-lane style objects are CACHED by virtual index, not just memoised as
+  // an array. `virtualSlides` is rebuilt whenever `isMoving` flips (the
+  // visibility flags depend on it), i.e. at the start AND the end of every
+  // ride — but a slide's lane depends only on its own virtualIndex and the
+  // layout origin, neither of which moved. Rebuilding the style objects there
+  // would hand every mounted SlideItem a fresh `style` prop and break its
+  // memo, re-rendering the whole deck twice per ride, in exactly the two
+  // frames where the animation starts and settles. Reusing the object keeps
+  // the prop `===`, so only slides whose OWN flags changed re-render.
+  const laneCacheRef = useRef({
+    origin: Number.NaN,
+    byIndex: new Map<number, CarouselSlideCssVars>(),
+  });
+
+  const slideStyles = useMemo(() => {
+    const cache = laneCacheRef.current;
+    if (cache.origin !== layoutOrigin) {
+      // A recenter re-bases every lane: drop the whole cache.
+      cache.origin = layoutOrigin;
+      cache.byIndex.clear();
+    } else {
+      // Keep the map bounded by the render window.
+      const live = new Set(virtualSlides.map((slide) => slide.virtualIndex));
+      for (const index of cache.byIndex.keys()) {
+        if (!live.has(index)) cache.byIndex.delete(index);
+      }
+    }
+
+    return virtualSlides.map((slide) => {
+      const cached = cache.byIndex.get(slide.virtualIndex);
+      if (cached) return cached;
+      const style = buildSlideCssVars(slide.virtualIndex, layoutOrigin);
+      cache.byIndex.set(slide.virtualIndex, style);
+      return style;
+    });
+  }, [layoutOrigin, virtualSlides]);
 
   const flagAttributes = useMemo(() => buildFlagAttributes(flags), [flags]);
 
