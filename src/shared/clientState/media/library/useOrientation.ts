@@ -1,4 +1,4 @@
-import { useMediaQuery } from "./useMediaQuery";
+import { useMediaQuery } from "../../shared/useMediaQuery";
 
 /** The canonical portrait condition — the one string every leg of an
  * orientation contract (CSS-facing data, diagnostics) should reuse. */

@@ -1,4 +1,4 @@
-import { useMediaQuery } from "./useMediaQuery";
+import { useMediaQuery } from "../../shared/useMediaQuery";
 
 /**
  * A SHORT landscape viewport — landscape AND limited in HEIGHT. The

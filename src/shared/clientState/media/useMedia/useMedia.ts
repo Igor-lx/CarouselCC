@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { useMediaQuery } from "./internal/useMediaQuery";
+import { useMediaQuery } from "../../shared/useMediaQuery";
 import { resolveActiveBreakpoint } from "./internal/resolveActiveBreakpoint";
 import {
   PORTRAIT_ORIENTATION_QUERY,

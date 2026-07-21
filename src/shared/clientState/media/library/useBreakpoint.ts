@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { useMediaQuery } from "./useMediaQuery";
+import { useMediaQuery } from "../../shared/useMediaQuery";
 
 /**
  * A width-tier table: tier names mapped to their `min-width` thresholds in

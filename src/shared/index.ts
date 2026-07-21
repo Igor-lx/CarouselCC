@@ -1,7 +1,6 @@
 export { useIsomorphicLayoutEffect } from "./hooks/useIsomorphicLayoutEffect";
 
-export * from "./media";
-export * from "./environment";
+export * from "./clientState";
 export * from "./viewportObservation";
 
 export * from "./engines/motion";
