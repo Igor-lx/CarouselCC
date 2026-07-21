@@ -28,6 +28,7 @@ import { useCarouselPresentation } from "./presentation";
 import { useSlideViewport } from "./viewport/useSlideViewport";
 import {
   SlideItem,
+  useActiveBandGate,
   useCarouselSlideDeck,
   useImageResourceStore,
   useSlideRenderModel,
@@ -212,6 +213,17 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     renderWindowBufferMultiplier: config.layout.renderWindowBufferMultiplier,
   });
 
+  // Bandwidth gate: the buffered slides of the render window hold their image
+  // sources until the visible band has reported back, so the slide the user is
+  // looking at does not share the pipe with four it has not asked for yet
+  // (see `useActiveBandGate`).
+  const isOffBandFetchOn = useActiveBandGate({
+    virtualSlides,
+    isContentImg,
+    isResponsiveImagesOn,
+    imageResourceStore,
+  });
+
   // --- track DOM bridge -----------------------------------------------------
   const {
     readCurrentPosition,
@@ -326,7 +338,8 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
       isReducedMotion: isInstantMode,
       isDataSaverEnabled,
       slides: slideMediaViews,
-      imageSizes,
+      trackRef,
+      isOffBandFetchOn,
       visualPosition: isInstantMode ? null : visualPosition,
       motionPlan: isInstantMode ? null : planChannel.source,
       isAtStart,
@@ -425,6 +438,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
                     isInteractiveOn={isSlideInteractiveOn}
                     isActive={slide.isActive}
                     isActual={slide.isActual}
+                    isOffBandFetchOn={isOffBandFetchOn}
                     isDataSaverEnabled={isDataSaverEnabled}
                     imageResourceStore={imageResourceStore}
                     imageSizes={imageSizes}

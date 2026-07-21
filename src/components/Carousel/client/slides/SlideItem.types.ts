@@ -16,6 +16,12 @@ export interface SlideItemProps extends SlideAriaProps {
   isInteractiveOn: boolean;
   isActive: boolean;
   isActual: boolean;
+  /**
+   * Bandwidth gate (see `useActiveBandGate`): `false` means the visible band
+   * is still fetching, so an OFF-band slide withholds its image sources and
+   * does not compete for the pipe. In-band slides ignore it.
+   */
+  isOffBandFetchOn: boolean;
   /** The carousel's image-resource store, or `null` when image content is off. */
   imageResourceStore: ImageResourceStore | null;
   /**

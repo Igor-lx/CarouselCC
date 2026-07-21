@@ -166,11 +166,7 @@ export default function App() {
             >
               {isTouch ? <PaginationWidget /> : <Pagination />}
               <Controls />
-              <ResponsiveImages
-                isPreloadOn={true}
-                isPredecodeOn={true}
-                preloadPagesNr={2}
-              />
+              <ResponsiveImages isPredecodeOn={true} />
               <Diagnostic />
             </Carousel>
           )}

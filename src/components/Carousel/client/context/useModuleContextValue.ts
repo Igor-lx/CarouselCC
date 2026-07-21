@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type RefObject } from "react";
 
 import type { MotionPlanSource } from "../motion";
 import type { CarouselNavigation } from "../navigation";
@@ -21,7 +21,8 @@ interface UseModuleContextValueInput {
   isReducedMotion: boolean;
   isDataSaverEnabled: boolean;
   slides: readonly CarouselSlideMediaView[];
-  imageSizes: string;
+  trackRef: RefObject<HTMLDivElement | null>;
+  isOffBandFetchOn: boolean;
   visualPosition: VisualPositionSource | null;
   motionPlan: MotionPlanSource | null;
   isAtStart: boolean;
@@ -37,7 +38,8 @@ export function useModuleContextValue({
   isReducedMotion,
   isDataSaverEnabled,
   slides,
-  imageSizes,
+  trackRef,
+  isOffBandFetchOn,
   visualPosition,
   motionPlan,
   isAtStart,
@@ -115,16 +117,18 @@ export function useModuleContextValue({
       visualPosition,
       motionPlan,
       slides,
-      imageSizes,
+      trackRef,
+      isOffBandFetchOn,
       isPaginationInteractiveOn,
     }),
     [
-      imageSizes,
+      isOffBandFetchOn,
       isPaginationInteractiveOn,
       layoutView,
       motionPlan,
       navigationView,
       slides,
+      trackRef,
       visualPosition,
     ],
   );

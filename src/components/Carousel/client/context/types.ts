@@ -1,3 +1,4 @@
+import type { RefObject } from "react";
 import type { MotionPlanSource } from "../motion";
 import type { SlideImageSource } from "../public-api/types";
 import type { CarouselNavigation } from "../navigation";
@@ -86,8 +87,22 @@ export interface CarouselStableContextValue {
   motionPlan: MotionPlanSource | null;
   /** Deck-order media descriptors (empty when image content is off). */
   slides: readonly CarouselSlideMediaView[];
-  /** The carousel-derived default `sizes` hint (see useResponsiveImageSizes). */
-  imageSizes: string;
+  /**
+   * The track element. Handed to modules that must read what the deck has
+   * ACTUALLY rendered rather than re-derive it — `<ResponsiveImages>` takes
+   * the buffered `<img>`s' `currentSrc` from here, which is the browser's own
+   * candidate choice and cannot disagree with the markup the way a parallel
+   * computation can. A ref object is referentially stable, so exposing it
+   * costs no re-render.
+   */
+  trackRef: RefObject<HTMLDivElement | null>;
+  /**
+   * Bandwidth gate (see `useActiveBandGate`): `true` once the visible band has
+   * reported back and the buffered slides are allowed to fetch. Modules read
+   * it as "the buffer exists now" — before it flips, the buffer's `<img>`s are
+   * not mounted at all.
+   */
+  isOffBandFetchOn: boolean;
   /**
    * Whether the <Pagination> dots accept clicks (the `isPaginationInteractiveOn`
    * public prop). A slot child cannot be handed props by the carousel, so this

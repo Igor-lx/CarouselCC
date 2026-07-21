@@ -30,6 +30,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
     isInteractiveOn,
     isActive,
     isActual,
+    isOffBandFetchOn,
     isDataSaverEnabled,
     imageResourceStore,
     imageSizes,
@@ -50,6 +51,9 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
 
   const isImageSlide = imageSource !== null;
   const hasImageError = isImageSlide && status === "error";
+
+  // The visible band always fetches; the buffer waits for the gate.
+  const isFetchOn = isActual || isOffBandFetchOn;
 
   // Orientation-swap veil: masks the stale-crop repaint window on rotation
   // (see useOrientationSwapVeil). Applies only while a bitmap is on screen.
@@ -140,7 +144,12 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
       {imageSource !== null ? (
         hasImageError ? (
           slideData.alt || errAltPlaceholder
-        ) : sources.length > 0 ? (
+        ) : !isFetchOn ? // Bandwidth gate: the buffer waits out the visible band (see
+        // `useActiveBandGate`). The sources are withheld by NOT MOUNTING the
+        // element — a mounted `<img>` with no `src` inside a `<picture>` would
+        // still resolve a candidate from the `<source>`s and fetch it, and a
+        // src-less `<img>` renders its `alt` text as visible content.
+        null : sources.length > 0 ? (
           <picture key={generation}>
             {sources.map((source) => (
               <source
