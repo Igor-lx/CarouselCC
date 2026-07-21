@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { memo, useMemo } from "react";
+import { memo, useMemo, type CSSProperties } from "react";
 
 import { mergeStyleMaps } from "../../../../../../shared";
 import { useCarouselMotion, useCarouselStable } from "../../../context";
@@ -10,7 +10,33 @@ import { projectDot } from "./math/projection";
 import { usePaginationWidgetBinding } from "./usePaginationWidgetBinding";
 import { PaginationWidgetDot } from "./PaginationWidgetDot";
 import { PAGINATION_WIDGET_DEFAULTS } from "./defaults";
+
 import styles from "./PaginationWidget.module.scss";
+
+/**
+ * The widget's JS→CSS custom-property contract — one dot's published
+ * variables, DECLARED rather than cast inline (`CSSProperties` cannot express
+ * custom properties). Same rule as the root's presentation module: JS hands
+ * the stylesheet DATA, the rules stay in the stylesheet.
+ */
+interface PaginationDotCssVars extends CSSProperties {
+  /** How strongly this dot reads as the active one — drives its colour and
+   * scale accents in CSS. */
+  "--dot-active-strength": number;
+}
+
+interface ProjectedDotStyleInput {
+  opacity: number;
+  x: number;
+  scale: number;
+  activeStrength: number;
+}
+
+const buildDotStyle = (dot: ProjectedDotStyleInput): PaginationDotCssVars => ({
+  opacity: dot.opacity,
+  transform: `translate3d(${dot.x}px, 0, 0) scale(${dot.scale})`,
+  "--dot-active-strength": dot.activeStrength,
+});
 import type {
   PaginationWidgetContainerCSSVars,
   PaginationWidgetProps,
@@ -103,13 +129,7 @@ const PaginationWidgetBase = memo(function PaginationWidget({
             <div
               key={dot.id}
               className={clsx(classNames.dot_PW, dot.isActive && classNames.dotActive_PW)}
-              style={{
-                opacity: dot.opacity,
-                transform: `translate3d(${dot.x}px, 0, 0) scale(${dot.scale})`,
-                ...({
-                  "--dot-active-strength": dot.activeStrength,
-                } as React.CSSProperties),
-              }}
+              style={buildDotStyle(dot)}
             />
           ))}
       {isMotionBound

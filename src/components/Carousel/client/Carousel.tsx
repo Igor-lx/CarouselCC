@@ -1,13 +1,8 @@
 import { memo, useImperativeHandle, useMemo, useRef } from "react";
 
 import styles from "./Carousel.module.scss";
-import { mergeStyleMaps, resolveSlots } from "../../../shared";
-import {
-  CAROUSEL_DEFAULTS,
-  SLIDE_REORIENT_FADE_IN_MS,
-  SLIDE_REORIENT_FADE_OUT_MS,
-  useCarouselConfig,
-} from "./config";
+import { resolveSlots } from "../../../shared";
+import { CAROUSEL_DEFAULTS, useCarouselConfig } from "./config";
 import {
   CarouselDiagnosticContext,
   CarouselMotionContext,
@@ -15,11 +10,7 @@ import {
   useDiagnosticContextValue,
   useModuleContextValue,
 } from "./context";
-import {
-  carouselBoundaryState,
-  deckCarriesImageSets,
-  slideLane,
-} from "./domain";
+import { carouselBoundaryState, deckCarriesImageSets } from "./domain";
 import { useCarouselAutoplay } from "./autoplay/useCarouselAutoplay";
 import { useFocusRecovery } from "./focus/useFocusRecovery";
 import { useCarouselGesture } from "./gesture";
@@ -32,6 +23,7 @@ import {
 import { useCarouselNavigation } from "./navigation";
 import { useVisualPosition } from "./visual-position";
 import { useModuleRenderPolicy } from "./render-policy/useModuleRenderPolicy";
+import { useCarouselPresentation } from "./presentation";
 import { useSlideViewport } from "./viewport/useSlideViewport";
 import {
   SlideItem,
@@ -42,29 +34,7 @@ import {
 import { CAROUSEL_SLOTS } from "./slots";
 import { useCarouselState } from "./state";
 import { useCarouselStatusReporter } from "./host-report/useCarouselStatusReporter";
-import { SLIDE_CLASS_KEYS } from "./public-api/types";
-import type { CarouselProps, SlideClassMap } from "./public-api/types";
-
-/**
- * The root's CSS custom properties — the ONLY styling JS hands the stylesheet
- * at this level, and it hands DATA, never rules (the rules live in
- * `Carousel.module.scss`, so a host can restyle through `className`):
- *  - the veil fade timings are bound to a JS invariant (the fail-open cap), so
- *    their SSOT is `config/slides.ts`;
- *  - `--visible-slides` is the live `visibleSlidesNr`, which the slide/sizer
- *    width rule needs and CSS cannot know on its own.
- */
-interface CarouselRootCSSVars extends React.CSSProperties {
-  "--slide-reorient-fade-out": string;
-  "--slide-reorient-fade-in": string;
-  "--visible-slides": number;
-}
-
-/** Per-slide datum: which lane the slide sits in (see `slideLane`). The only
- * style that cannot be shared across slides — each sits in a different lane. */
-interface CarouselSlideCSSVars extends React.CSSProperties {
-  "--slide-lane": number;
-}
+import type { CarouselProps } from "./public-api/types";
 
 const Carousel = memo(function Carousel(props: CarouselProps) {
   const {
@@ -117,17 +87,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // the root below; the SCSS slide geometry keys on them.
   const slideViewport = useSlideViewport();
 
-  // Each ACTIVE flag becomes a `data-<flag>` attribute on the root (stable
-  // between viewport changes — the facade memoises on its signature).
-  const viewportFlagAttributes = useMemo(
-    () =>
-      Object.fromEntries(
-        Object.entries(slideViewport.flags)
-          .filter(([, on]) => on)
-          .map(([name]) => [`data-${name}`, "true"]),
-      ),
-    [slideViewport.flags],
-  );
 
   // --- resolved runtime config (no diagnostic dependency) ------------------
   const config = useCarouselConfig({
@@ -401,41 +360,20 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     deckCarriesImageSets: useMemoDeckCarriesImageSets,
   });
 
-  // --- style mapping --------------------------------------------------------
-  const classNames = useMemo(
-    () => (className ? mergeStyleMaps(styles, className) : styles),
-    [className]
-  );
-
-  const slideClassMap = useMemo<SlideClassMap>(() => {
-    const map = {} as SlideClassMap;
-    SLIDE_CLASS_KEYS.forEach((key) => {
-      map[key] = classNames[key] ?? "";
-    });
-    return map;
-  }, [classNames]);
-
-  const rootStyle = useMemo<CarouselRootCSSVars>(
-    () => ({
-      "--slide-reorient-fade-out": `${SLIDE_REORIENT_FADE_OUT_MS}ms`,
-      "--slide-reorient-fade-in": `${SLIDE_REORIENT_FADE_IN_MS}ms`,
-      "--visible-slides": layout.visibleSlidesCount,
-    }),
-    [layout.visibleSlidesCount]
-  );
-
-  // One style object per slide, positionally aligned with `virtualSlides`.
-  // The lane is the ONE datum that cannot be shared (each slide sits in a
-  // different one), so it is the only style the view builds per element —
-  // memoised here rather than in JSX so the objects keep a stable identity
-  // and `SlideItem`'s memo is not defeated by a fresh literal every render.
-  const slideStyles = useMemo<CarouselSlideCSSVars[]>(
-    () =>
-      virtualSlides.map((slide) => ({
-        "--slide-lane": slideLane(slide.virtualIndex, layoutOrigin),
-      })),
-    [layoutOrigin, virtualSlides]
-  );
+  // --- presentation payload (classes, CSS vars, state attributes) ----------
+  const {
+    classNames,
+    slideClassMap,
+    rootStyle,
+    slideStyles,
+    flagAttributes,
+  } = useCarouselPresentation({
+    className,
+    visibleSlidesCount: layout.visibleSlidesCount,
+    virtualSlides,
+    layoutOrigin,
+    flags: slideViewport.flags,
+  });
 
   return (
     <CarouselStableContext.Provider value={stableContextValue}>
@@ -453,10 +391,10 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
             // The viewport axes (config/viewport.ts), stamped as the styling
             // contract: the component SCSS shapes slide geometry by these
             // attributes and carries no media queries of its own. Each active
-            // flag adds a `data-<flag>` attribute (see viewportFlagAttributes).
+            // flag adds a `data-<flag>` attribute (see presentation/domPayload).
             data-breakpoint={slideViewport.breakpoint}
             data-orientation={slideViewport.orientation}
-            {...viewportFlagAttributes}
+            {...flagAttributes}
           >
             <div
               tabIndex={-1}

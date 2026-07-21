@@ -11,16 +11,21 @@ import { describe, expect, it } from "vitest";
  * falls back and every slide would stack in lane 0), so read the real files
  * and assert both halves still speak the same names — same pattern as
  * `orientationMediaSync.test.ts`.
+ *
+ * The JS half lives in `presentation/cssVars.ts` — the one module that owns
+ * "which custom properties this component publishes, in what units". The
+ * view is checked separately for the inverse: it must ship no rules at all.
  */
 const read = (relative: string) =>
   readFileSync(resolve(__dirname, relative), "utf8");
 
 const scss = read("../Carousel.module.scss");
+const cssVars = read("../presentation/cssVars.ts");
 const carousel = read("../Carousel.tsx");
 
 describe("layout CSS custom properties SSOT", () => {
   it("JS publishes --visible-slides on the root", () => {
-    expect(carousel).toContain('"--visible-slides"');
+    expect(cssVars).toContain('"--visible-slides"');
   });
 
   it("the SCSS width rule consumes --visible-slides (rule lives in the stylesheet)", () => {
@@ -29,7 +34,7 @@ describe("layout CSS custom properties SSOT", () => {
   });
 
   it("JS publishes --slide-lane per slide", () => {
-    expect(carousel).toContain('"--slide-lane"');
+    expect(cssVars).toContain('"--slide-lane"');
   });
 
   it("the SCSS transform rule consumes --slide-lane (rule lives in the stylesheet)", () => {
@@ -37,8 +42,16 @@ describe("layout CSS custom properties SSOT", () => {
     expect(scss).toMatch(/transform:\s*translateX\(\s*calc\(var\(--slide-lane/);
   });
 
-  it("JS ships NO layout rules inline — no calc()/translateX() strings in the view", () => {
-    expect(carousel).not.toContain("translateX(");
-    expect(carousel).not.toContain("calc(");
+  it("JS ships NO layout rules — no calc()/translateX() strings in the view or the vars module", () => {
+    for (const source of [carousel, cssVars]) {
+      expect(source).not.toContain("translateX(");
+      expect(source).not.toContain("calc(");
+    }
+  });
+
+  it("the composition root no longer declares custom properties itself", () => {
+    // The root composes; the presentation module owns the JS->CSS contract.
+    expect(carousel).not.toContain('"--slide-lane"');
+    expect(carousel).not.toContain('"--visible-slides"');
   });
 });
