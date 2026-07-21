@@ -8,5 +8,9 @@ export {
   pauseDecayedVelocity,
   safeResistance,
 } from "./math";
-export { DRAG_IGNORE_ATTRIBUTE, getInteractiveTarget } from "./interactiveTarget";
+export {
+  DRAG_IGNORE_ATTRIBUTE,
+  getInteractiveTarget,
+  getDragIgnoreTarget,
+} from "./interactiveTarget";
 export { resolveSwipeDirection } from "./resolveSwipeDirection";

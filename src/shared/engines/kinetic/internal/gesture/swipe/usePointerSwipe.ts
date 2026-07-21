@@ -13,6 +13,7 @@ import {
   decayedVelocity,
   dominantMagnitude,
   frameAdjustedAlpha,
+  getDragIgnoreTarget,
   getInteractiveTarget,
   pauseDecayedVelocity,
   resolveSwipeDirection,
@@ -124,6 +125,7 @@ const eventTime = (event: { timeStamp: number }): number =>
 
 export function usePointerSwipe({
   hostRef: externalHostRef,
+  surfaceRef,
   enabled = true,
   config,
   value,
@@ -474,6 +476,26 @@ export function usePointerSwipe({
       const target = event.currentTarget as HTMLElement;
       const interactive = getInteractiveTarget(event.target, target);
 
+      // Not the engine's surface → not the engine's press. Two ways an
+      // element declares that, both handed straight back with no capture, no
+      // ownership, no drag and no phase change — and with the click marked
+      // allowed so the post-swipe cooldown cannot swallow it either:
+      //  1. it lies outside the declared `surfaceRef` subtree (a whole chrome
+      //     layer — arrows, overlays — excluded by construction);
+      //  2. it carries `data-drag-ignore="true"` (a point exception INSIDE the
+      //     surface, e.g. a button on a card).
+      const surface = surfaceRef?.current ?? null;
+      const offSurface =
+        surface && event.target instanceof Node && !surface.contains(event.target);
+      const dragIgnored = getDragIgnoreTarget(event.target, target);
+      if (offSurface || dragIgnored) {
+        allowedClickTargetRef.current =
+          dragIgnored ??
+          interactive ??
+          (event.target instanceof Element ? event.target : null);
+        return;
+      }
+
       if (interactive && now < lockUntilRef.current) {
         allowedClickTargetRef.current = interactive;
         return;
@@ -510,7 +532,7 @@ export function usePointerSwipe({
       ensureCapture(target, event.pointerId);
       scheduleCatch(target, event.pointerId);
     },
-    [enabled, ensureCapture, scheduleCatch, setPhase],
+    [enabled, ensureCapture, scheduleCatch, setPhase, surfaceRef],
   );
 
   const handlePointerMove = useCallback(
