@@ -39,3 +39,24 @@ export const getInteractiveTarget = (
   if (!interactive || !boundary.contains(interactive)) return null;
   return interactive;
 };
+
+/**
+ * The explicit opt-out, on its own: an element (or ancestor) marked
+ * `data-drag-ignore="true"` is NOT part of the draggable surface. Unlike
+ * plain interactivity — a `<button>` may well BE the surface, e.g. an
+ * interactive slide — this marker is a deliberate statement by the host, so
+ * the engine takes no ownership and starts no drag from it.
+ *
+ * Use it for point exceptions INSIDE the surface (a like button on a card).
+ * For a whole chrome layer, declare the surface positively instead
+ * (`surfaceRef`) — that cannot be forgotten on the next element added.
+ */
+export const getDragIgnoreTarget = (
+  target: EventTarget | null,
+  boundary: HTMLElement,
+): Element | null => {
+  if (!(target instanceof Element)) return null;
+  const ignored = target.closest(`[${DRAG_IGNORE_ATTRIBUTE}='true']`);
+  if (!ignored || !boundary.contains(ignored)) return null;
+  return ignored;
+};

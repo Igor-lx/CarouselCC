@@ -154,3 +154,63 @@ describe("declared surface", () => {
     expect(seen.releases).toBe(1);
   });
 });
+
+/**
+ * The point-exception marker: `data-drag-ignore="true"` states that an
+ * element is not part of the draggable surface even though it sits inside
+ * it — for the odd control on a card. Its click keeps working.
+ */
+function IgnoreRig() {
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const { hostProps } = usePointerSwipe({
+    surfaceRef: trackRef,
+    onPressStart: () => {
+      seen.presses += 1;
+    },
+    onDragStart: () => {
+      seen.dragStarts += 1;
+    },
+    onRelease: () => {
+      seen.releases += 1;
+    },
+  });
+
+  return (
+    <div {...hostProps}>
+      <div ref={trackRef} data-testid="track2">
+        <button data-testid="like" data-drag-ignore="true">
+          like
+        </button>
+      </div>
+    </div>
+  );
+}
+
+describe("data-drag-ignore inside the surface", () => {
+  beforeEach(() => {
+    act(() => root.render(<IgnoreRig />));
+  });
+
+  it("takes no ownership on a held press", () => {
+    press(el("like"), { x: 10, y: 10, t: 0 });
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(seen.presses).toBe(0);
+  });
+
+  it("starts no drag", () => {
+    press(el("like"), { x: 10, y: 10, t: 0 });
+    move(el("like"), { x: 200, y: 10, t: 16 });
+    move(el("like"), { x: 300, y: 10, t: 32 });
+    expect(seen.dragStarts).toBe(0);
+  });
+
+  it("the rest of the surface is unaffected", () => {
+    press(el("track2"), { x: 10, y: 10, t: 0 });
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(seen.presses).toBe(1);
+  });
+});

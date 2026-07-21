@@ -13,6 +13,7 @@ import {
   decayedVelocity,
   dominantMagnitude,
   frameAdjustedAlpha,
+  getDragIgnoreTarget,
   getInteractiveTarget,
   pauseDecayedVelocity,
   resolveSwipeDirection,
@@ -475,15 +476,23 @@ export function usePointerSwipe({
       const target = event.currentTarget as HTMLElement;
       const interactive = getInteractiveTarget(event.target, target);
 
-      // Not the engine's surface → not the engine's press. Chrome layered
-      // over the deck inside the host (arrows, overlays) must leave a running
-      // ride untouched, exactly like an element outside the host: no capture,
-      // no ownership, no phase change. Its click is marked allowed so the
-      // post-swipe cooldown cannot swallow it either.
+      // Not the engine's surface → not the engine's press. Two ways an
+      // element declares that, both handed straight back with no capture, no
+      // ownership, no drag and no phase change — and with the click marked
+      // allowed so the post-swipe cooldown cannot swallow it either:
+      //  1. it lies outside the declared `surfaceRef` subtree (a whole chrome
+      //     layer — arrows, overlays — excluded by construction);
+      //  2. it carries `data-drag-ignore="true"` (a point exception INSIDE the
+      //     surface, e.g. a button on a card).
       const surface = surfaceRef?.current ?? null;
-      if (surface && event.target instanceof Node && !surface.contains(event.target)) {
+      const offSurface =
+        surface && event.target instanceof Node && !surface.contains(event.target);
+      const dragIgnored = getDragIgnoreTarget(event.target, target);
+      if (offSurface || dragIgnored) {
         allowedClickTargetRef.current =
-          interactive ?? (event.target instanceof Element ? event.target : null);
+          dragIgnored ??
+          interactive ??
+          (event.target instanceof Element ? event.target : null);
         return;
       }
 

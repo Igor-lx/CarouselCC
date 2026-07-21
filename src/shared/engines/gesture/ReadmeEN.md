@@ -21,6 +21,12 @@ Self-contained: imports only React and itself (guarded by
 - **Touch pointers only** (mouse/pen ignored — those are clicks and scroll).
 - **Horizontal only** — a press turning vertical is handed back to native
   scroll; a horizontal one is captured until release.
+- **The host is not automatically the surface.** Pass `surfaceRef` to declare
+  which subtree is draggable; presses outside it (chrome layered over the deck)
+  are handed straight back — no ownership, no brake, no drag, and their click is
+  never swallowed. Omit it and the whole host is the surface. For a point
+  exception INSIDE the surface, mark the element `data-drag-ignore="true"`
+  (`DRAG_IGNORE_ATTRIBUTE`).
 - **The engine OWNS its host element** — the `ref` in `hostProps` carries the
   listeners, the required styles and the native suppressors as one bundle;
   there is no wiring left to get wrong.
@@ -50,7 +56,7 @@ required (`POINTER_SWIPE_DEFAULTS`); a partial `config` merges per field.
 | `POINTER_SWIPE_DEFAULTS` | Built-in tuning (a partial `config` overrides it). |
 | `resolveReleaseKinetics`, `projectMomentum` | One-call release meaning + landing policy. |
 | `resolveInertialRelease`, `resolveReleaseLaunch`, `sameDirectionSpeed` | Low-level release primitives. |
-| `DRAG_IGNORE_ATTRIBUTE` | Mark an element to opt out of drag-starting. |
+| `DRAG_IGNORE_ATTRIBUTE` | Mark an element as not-surface: no ownership, no drag (its click still works). |
 
 ## Pairing with `motion`
 
