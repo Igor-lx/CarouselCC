@@ -50,6 +50,7 @@ export {
   keyframesAlongStops,
   positionAtNow,
   profileProgressStops,
+  resampleStops,
   resolvePeakSpeedForDuration,
   sampleProgressStops,
 } from "./profile/progressCurve";

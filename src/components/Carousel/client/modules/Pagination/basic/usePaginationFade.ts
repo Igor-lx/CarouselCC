@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef } from "react";
 
-import { motionNow, useIsomorphicLayoutEffect } from "../../../../../../shared";
+import {
+  motionNow,
+  resampleStops,
+  useIsomorphicLayoutEffect,
+} from "../../../../../../shared";
 import {
   positionAtNow,
   startPinnedAnimation,
@@ -46,6 +50,8 @@ const FALLBACK_ACTIVE: DotVisualState = { opacity: 0.8, scale: 1.4 };
 /** Below this the dot shows nothing for the whole step — pin it instead of
  * paying for an animation that paints no difference (the widget's rule). */
 const INVISIBLE_STRENGTH = 0.001;
+
+const DOT_CURVE_INTERVALS = 32;
 
 const readVar = (styles: CSSStyleDeclaration, name: string, fallback: number) => {
   const parsed = Number.parseFloat(styles.getPropertyValue(name));
@@ -121,6 +127,18 @@ export function usePaginationFade({
   /** Where the carousel LOOKS to be, in pages — fractional while a step runs. */
   const offsetRef = useRef(targetPageIndex);
   const stepRef = useRef<ActiveFade | null>(null);
+
+  // The dot look is CSS-owned and does NOT change between rides, but reading
+  // it forces a style recalculation — and the read used to sit inside the
+  // click handler, i.e. in the one frame that must stay cheap (measured: a
+  // getComputedStyle + three getPropertyValue per ride). Cached instead, and
+  // refreshed only while the deck rests, where the cost is invisible.
+  const dotStatesRef = useRef<{ inactive: DotVisualState; active: DotVisualState } | null>(null);
+
+  const refreshDotStates = useCallback(() => {
+    const anyDot = dotRefs.current.find((dot) => dot) ?? null;
+    if (anyDot) dotStatesRef.current = readDotStates(anyDot);
+  }, []);
   const targetRef = useRef(targetPageIndex);
   targetRef.current = targetPageIndex;
 
@@ -195,8 +213,10 @@ export function usePaginationFade({
         pageCount > 0 ? ((landedOn % pageCount) + pageCount) % pageCount : landedOn;
       stepRef.current = null;
       cancelAllFades();
+      // Idle: re-read the CSS-owned look so a theme/breakpoint change lands.
+      refreshDotStates();
     },
-    [cancelAllFades, pageCount],
+    [cancelAllFades, pageCount, refreshDotStates],
   );
 
   const applyPlan = useCallback(
@@ -212,7 +232,13 @@ export function usePaginationFade({
             settle(targetRef.current);
             return;
           }
-          const { inactive, active } = readDotStates(anyDot);
+          // A dot travels a few pixels: it reads no velocity step at any
+          // density, so it rides a COARSER re-sample of the same curve —
+          // one keyframe per stop, per dot, on every ride is what the full
+          // track density would otherwise cost here.
+          const dotStops = resampleStops(plan.stops, DOT_CURVE_INTERVALS);
+          if (!dotStatesRef.current) refreshDotStates();
+          const { inactive, active } = dotStatesRef.current ?? readDotStates(anyDot);
 
           // GO_TO: the deck TELEPORTS its middle, so the dots must not tour
           // it. Each involved dot cross-fades straight to its final look —
@@ -266,7 +292,7 @@ export function usePaginationFade({
               suppressTransition(index);
               const animation = startPinnedAnimation(
                 dot,
-                dotKeyframesBetween(blend.from, blend.to, plan.stops),
+                dotKeyframesBetween(blend.from, blend.to, dotStops),
                 { duration: plan.duration, startedAt: plan.startedAt },
               );
               if (!animation) {
@@ -343,7 +369,7 @@ export function usePaginationFade({
                 index,
                 from,
                 to,
-                plan.stops,
+                dotStops,
                 inactive,
                 active,
                 pageCount,

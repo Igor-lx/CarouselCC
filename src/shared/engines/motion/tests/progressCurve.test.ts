@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildProfile, sampleMotionProfile } from "../profile/profile";
 import {
   resolveProgressStopIntervals,
+  resampleStops,
   profileProgressStops,
   resolvePeakSpeedForDuration,
   sampleProgressStops,
@@ -207,5 +208,36 @@ describe("progress-stop density scales with duration", () => {
       .slice(1)
       .map((speed, i) => Math.abs(speed - speeds[i]!) / peak);
     expect(Math.max(...jumps)).toBeLessThan(0.05);
+  });
+});
+
+describe("resampleStops — a coarser grid on the same curve", () => {
+  it("returns the requested interval count, exact at both ends", () => {
+    const dense = profileProgressStops(stepProfile(), 3);
+    const coarse = resampleStops(dense, 32);
+    expect(coarse).toHaveLength(33);
+    expect(coarse[0]).toBe(0);
+    expect(coarse[coarse.length - 1]).toBe(1);
+  });
+
+  it("stays on the same curve (matches the dense read at the same instants)", () => {
+    const dense = profileProgressStops(stepProfile(), 3);
+    const coarse = resampleStops(dense, 32);
+    for (let i = 0; i <= 32; i += 1) {
+      const t = i / 32;
+      expect(coarse[i]!).toBeCloseTo(sampleProgressStops(dense, t), 6);
+    }
+  });
+
+  it("never upsamples — an already-coarse array is returned as is", () => {
+    const short = [0, 0.5, 1];
+    expect(resampleStops(short, 32)).toEqual(short);
+  });
+
+  it("stays monotonic", () => {
+    const coarse = resampleStops(profileProgressStops(stepProfile(), 3), 16);
+    for (let i = 1; i < coarse.length; i += 1) {
+      expect(coarse[i]!).toBeGreaterThanOrEqual(coarse[i - 1]!);
+    }
   });
 });

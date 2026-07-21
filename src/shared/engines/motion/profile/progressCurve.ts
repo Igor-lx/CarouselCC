@@ -111,6 +111,33 @@ export const sampleProgressStops = (
 };
 
 /**
+ * Re-sample a stops array to a COARSER uniform grid, on the same curve.
+ *
+ * Serialization density is chosen for the widest-travelling consumer (the
+ * one where a velocity step is visible at all — see the density note above).
+ * A consumer whose element travels a few pixels — a pagination dot — reads
+ * no step at any density, yet pays the full price: one keyframe per stop,
+ * per element, built on every ride. Handing it a coarser grid of the SAME
+ * curve keeps every consumer on one temporal shape while cutting that cost.
+ *
+ * Uniform in time and exact at both ends, so a re-sampled curve stays
+ * synchronized with the full-density one it came from.
+ */
+export const resampleStops = (
+  stops: readonly number[],
+  intervals: number,
+): number[] => {
+  if (!(intervals >= 1) || stops.length <= intervals + 1) return [...stops];
+  const out: number[] = new Array(intervals + 1);
+  for (let i = 0; i <= intervals; i += 1) {
+    out[i] = sampleProgressStops(stops, i / intervals);
+  }
+  out[0] = stops[0] ?? 0;
+  out[intervals] = stops[stops.length - 1] ?? 1;
+  return out;
+};
+
+/**
  * Peak speed that makes an accel/cruise/decel profile cover `distance` in
  * exactly `duration` (duration-authored motions: click step, autoplay step,
  * snap-back, non-inertial gesture release).
