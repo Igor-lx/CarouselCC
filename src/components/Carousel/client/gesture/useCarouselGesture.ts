@@ -69,6 +69,7 @@ export interface CarouselGestureResult {
 
 export function useCarouselGesture({
   viewportRef,
+  trackRef,
   layout,
   isSwipeOn,
   inFlightTargetPageIndex,
