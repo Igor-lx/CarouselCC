@@ -39,18 +39,43 @@ const DiagnosticBase = memo(function CarouselDiagnostic() {
     return () => cancelAnimationFrame(frame);
   }, []);
 
+  // Split by what each group actually depends on. The carousel state changes
+  // on every dispatch — twice per ride, in the frames where the animation
+  // starts and settles — and the constant/axis audits do not depend on it at
+  // all: recomputing ~60 numeric rules and a `matchMedia` call per canonical
+  // condition there was pure work in the worst possible frame.
+  const constantWarnings = useMemo(
+    () => [...collectConstantWarnings(), ...collectViewportAxisWarnings()],
+    [],
+  );
+  const propWarnings = useMemo(() => collectPropWarnings(props), [props]);
+  const dataWarnings = useMemo(
+    () => collectSlideSourceMediaWarnings(slides),
+    [slides],
+  );
+  const layoutWarnings = useMemo(() => collectLayoutWarnings(layout), [layout]);
+  const slotWarnings = useMemo(() => collectSlotWarnings(slots), [slots]);
+  const stateWarnings = useMemo(() => collectStateWarnings(state), [state]);
+
   const warnings = useMemo<CarouselDiagnosticWarning[]>(
     () => [
-      ...collectPropWarnings(props),
-      ...collectConstantWarnings(),
-      ...collectViewportAxisWarnings(),
-      ...collectSlideSourceMediaWarnings(slides),
-      ...collectLayoutWarnings(layout),
-      ...collectSlotWarnings(slots),
-      ...collectStateWarnings(state),
+      ...propWarnings,
+      ...constantWarnings,
+      ...dataWarnings,
+      ...layoutWarnings,
+      ...slotWarnings,
+      ...stateWarnings,
       ...cssWarnings,
     ],
-    [cssWarnings, layout, props, slides, slots, state],
+    [
+      constantWarnings,
+      cssWarnings,
+      dataWarnings,
+      layoutWarnings,
+      propWarnings,
+      slotWarnings,
+      stateWarnings,
+    ],
   );
 
   useGroupedWarnings(warnings);
