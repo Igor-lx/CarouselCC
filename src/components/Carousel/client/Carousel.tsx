@@ -22,6 +22,7 @@ import {
 } from "./motion";
 import { useCarouselNavigation } from "./navigation";
 import { useVisualPosition } from "./visual-position";
+import { areCarouselPropsEqual } from "./areCarouselPropsEqual";
 import { useModuleRenderPolicy } from "./render-policy/useModuleRenderPolicy";
 import { useCarouselPresentation } from "./presentation";
 import { useSlideViewport } from "./viewport/useSlideViewport";
@@ -442,6 +443,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
       </CarouselMotionContext.Provider>
     </CarouselStableContext.Provider>
   );
-});
+}, areCarouselPropsEqual);
 
 export default Carousel;
