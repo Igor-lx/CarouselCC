@@ -108,6 +108,30 @@ describe("useActiveBandGate", () => {
     expect(observed).toBe(true);
   });
 
+  it("does not re-subscribe when the band's URLs are unchanged", () => {
+    // `virtualSlides` is a fresh array on every dispatch — twice per ride —
+    // but the band's URLs change at most once. A gate keyed on array identity
+    // tore down and rebuilt N store subscriptions in the click frame.
+    let subscriptions = 0;
+    const real = store;
+    const counting: ImageResourceStore = {
+      ...real,
+      subscribe: (url, listener) => {
+        subscriptions += 1;
+        return real.subscribe(url, listener);
+      },
+    };
+    store = counting;
+
+    render([slide("a.webp", true), slide("b.webp", false)]);
+    const afterFirst = subscriptions;
+    // A new array, same content — exactly what a dispatch produces.
+    render([slide("a.webp", true), slide("b.webp", false)]);
+    expect(subscriptions).toBe(afterFirst);
+
+    store = real;
+  });
+
   it("is open when the band carries no images at all", () => {
     render([]);
     expect(observed).toBe(true);

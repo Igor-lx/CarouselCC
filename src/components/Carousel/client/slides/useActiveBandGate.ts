@@ -54,18 +54,36 @@ export function useActiveBandGate({
   // The band's rendered URLs, by the same rule the slides themselves use
   // (`resolveRenderedImageSrc`) — the gate must watch exactly the elements
   // that will report back, not a parallel guess at them.
+  //
+  // Identity is stabilised on CONTENT. `virtualSlides` is a fresh array on
+  // every dispatch (its visibility flags move), so a memo keyed on it alone
+  // handed the effect below a new list twice per ride — and the effect's job
+  // is to unsubscribe from N URLs and resubscribe to N URLs. The band's URLs
+  // change once per ride at most; the subscription churn (and the extra React
+  // pass its `setIsOpen` provoked, measured at the worst possible moment: the
+  // click frame) was pure waste.
+  const bandUrlsRef = useRef<string[]>([]);
   const bandUrls = useMemo(() => {
-    if (!isContentImg || imageResourceStore === null) return [];
-    const urls: string[] = [];
-    for (const slide of virtualSlides) {
-      if (!slide.isActual || !slide.slideData) continue;
-      const url = resolveRenderedImageSrc(
-        slide.slideData,
-        isResponsiveImagesOn,
-      );
-      if (url !== null && !urls.includes(url)) urls.push(url);
+    const next: string[] = [];
+    if (isContentImg && imageResourceStore !== null) {
+      for (const slide of virtualSlides) {
+        if (!slide.isActual || !slide.slideData) continue;
+        const url = resolveRenderedImageSrc(
+          slide.slideData,
+          isResponsiveImagesOn,
+        );
+        if (url !== null && !next.includes(url)) next.push(url);
+      }
     }
-    return urls;
+    const previous = bandUrlsRef.current;
+    if (
+      previous.length === next.length &&
+      previous.every((url, index) => url === next[index])
+    ) {
+      return previous;
+    }
+    bandUrlsRef.current = next;
+    return next;
   }, [imageResourceStore, isContentImg, isResponsiveImagesOn, virtualSlides]);
 
   // URLs that have reported an outcome at least once. A ref, not state: the
