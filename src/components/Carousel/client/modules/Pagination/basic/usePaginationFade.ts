@@ -348,8 +348,17 @@ export function usePaginationFade({
 
             // A dot the offset never comes within a step of paints nothing all
             // the way through — leave it to its class styles.
+            //
+            // Scanned on the COARSE grid the dot actually rides, not on the
+            // plan's full density. Both grids sample the same curve, and the
+            // question asked here — "does this dot ever come within one step
+            // of the offset" — is about the offset's path, which a 32-interval
+            // sample describes as faithfully as a 157-interval one. The full
+            // grid meant ~157 evaluations per candidate dot in the click frame,
+            // which is one of the only two frames the carousel spends
+            // main-thread time in.
             const staysInvisible =
-              plan.stops.every(
+              dotStops.every(
                 (p) =>
                   dotActiveStrength(
                     offsetDistance(

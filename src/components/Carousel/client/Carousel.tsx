@@ -402,6 +402,10 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
             data-carousel-root=""
             data-touch={isTouch}
             data-reduced-motion={isInstantMode}
+            // Rides suppress the slide-outline transition (see the stylesheet):
+            // a moving strip hands :hover from slide to slide under a resting
+            // cursor, and outline-color is not compositable.
+            data-moving={!status.isIdle}
             // The viewport axes (config/viewport.ts), stamped as the styling
             // contract: the component SCSS shapes slide geometry by these
             // attributes and carries no media queries of its own. Each active

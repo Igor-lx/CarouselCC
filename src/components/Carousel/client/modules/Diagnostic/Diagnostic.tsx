@@ -15,6 +15,14 @@ import {
 import type { CarouselDiagnosticWarning } from "./types";
 import { useGroupedWarnings } from "./useGroupedWarnings";
 
+/** Build-time constant: the whole diagnostic layer is a development tool.
+ * Substituted by the bundler, so every branch guarded by it — and every
+ * `collect*` import behind that branch — leaves the production bundle. */
+const IS_DEV = import.meta.env.DEV;
+
+/** One frozen empty result, shared by every gated-off collection. */
+const EMPTY: CarouselDiagnosticWarning[] = [];
+
 const BANNER =
   "[Carousel Diagnostic] enabled. Observe-only: diagnostics reports runtime values and explicit runtime normalizations.";
 
@@ -23,7 +31,7 @@ const DiagnosticBase = memo(function CarouselDiagnostic() {
   const { slides } = useCarouselStable();
 
   useEffect(() => {
-    if (!import.meta.env.DEV) return;
+    if (!IS_DEV) return;
     console.info(BANNER);
   }, []);
 
@@ -33,6 +41,7 @@ const DiagnosticBase = memo(function CarouselDiagnostic() {
     [],
   );
   useEffect(() => {
+    if (!IS_DEV) return;
     const frame = requestAnimationFrame(() => {
       setCssWarnings(collectViewportCssWarnings());
     });
@@ -44,18 +53,42 @@ const DiagnosticBase = memo(function CarouselDiagnostic() {
   // starts and settles — and the constant/axis audits do not depend on it at
   // all: recomputing ~60 numeric rules and a `matchMedia` call per canonical
   // condition there was pure work in the worst possible frame.
+  //
+  // Every collection is additionally gated on IS_DEV. Reporting was already
+  // dev-only (`useGroupedWarnings`), but the collecting was not: a production
+  // build still re-validated the whole state on every dispatch and threw the
+  // result away. Measured on the two frames that matter — the click frame and
+  // the settle window are the ONLY frames the carousel spends main-thread time
+  // in, so anything discarded there is the cheapest possible win. `IS_DEV` is
+  // substituted at build time, so the branches (and with them every `collect*`
+  // import) drop out of the production bundle entirely.
   const constantWarnings = useMemo(
-    () => [...collectConstantWarnings(), ...collectViewportAxisWarnings()],
+    () =>
+      IS_DEV
+        ? [...collectConstantWarnings(), ...collectViewportAxisWarnings()]
+        : EMPTY,
     [],
   );
-  const propWarnings = useMemo(() => collectPropWarnings(props), [props]);
+  const propWarnings = useMemo(
+    () => (IS_DEV ? collectPropWarnings(props) : EMPTY),
+    [props],
+  );
   const dataWarnings = useMemo(
-    () => collectSlideSourceMediaWarnings(slides),
+    () => (IS_DEV ? collectSlideSourceMediaWarnings(slides) : EMPTY),
     [slides],
   );
-  const layoutWarnings = useMemo(() => collectLayoutWarnings(layout), [layout]);
-  const slotWarnings = useMemo(() => collectSlotWarnings(slots), [slots]);
-  const stateWarnings = useMemo(() => collectStateWarnings(state), [state]);
+  const layoutWarnings = useMemo(
+    () => (IS_DEV ? collectLayoutWarnings(layout) : EMPTY),
+    [layout],
+  );
+  const slotWarnings = useMemo(
+    () => (IS_DEV ? collectSlotWarnings(slots) : EMPTY),
+    [slots],
+  );
+  const stateWarnings = useMemo(
+    () => (IS_DEV ? collectStateWarnings(state) : EMPTY),
+    [state],
+  );
 
   const warnings = useMemo<CarouselDiagnosticWarning[]>(
     () => [

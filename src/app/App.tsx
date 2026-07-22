@@ -158,7 +158,7 @@ export default function App() {
               isSlideInteractiveOn={isInteractive}
               isPaginationInteractiveOn={!isTouch}
               durationAutoplay={3000}
-              durationStep={2000}
+              durationStep={2500}
               intervalAutoplay={2500}
               isFullPagesOn
               userEnvironment={userEnvironment}

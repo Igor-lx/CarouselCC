@@ -245,6 +245,23 @@
     }
   }
 
+  // While the deck RIDES, the slide outline stops transitioning.
+  //
+  // The pointer does not have to move for `:hover` to move: the strip travels
+  // under a resting cursor, so every slide boundary that sweeps past it hands
+  // hover from one slide to the next. `outline-color` is not a compositable
+  // property, so each handover starts a 600 ms MAIN-THREAD transition — two of
+  // them, on the slide being left and the slide being entered — in the middle
+  // of a ride whose whole design is that the main thread stays idle. At three
+  // visible slides a single page step crosses the cursor three times.
+  //
+  // Suppressed for the ride only: the hover still moves (a style recalc of a
+  // handful of elements), it simply lands instantly instead of animating. At
+  // rest the fade is exactly as authored — which is where it is ever looked at.
+  .outerContainer[data-moving="true"] .slide {
+    transition: none;
+  }
+
   .slideError {
     display: flex;
     align-items: center;
