@@ -4,6 +4,24 @@ import type { CarouselState } from "../state";
 import type { UserEnvironment } from "../public-api/types";
 import type { CarouselDiagnosticContextValue } from "./types";
 
+/**
+ * The diagnostic layer is a development tool, and since the render policy
+ * stopped attaching it in production nothing consumes this context there.
+ * Building the value anyway meant a fresh object and a re-identified provider
+ * on EVERY dispatch — twice per ride, in the two frames the carousel spends
+ * main-thread time in. In production the hook now yields one frozen value,
+ * so the provider never re-identifies and the sub-views cost nothing.
+ */
+const IS_DEV = import.meta.env.DEV;
+
+/** The production stand-in: shape-complete, referentially fixed, never read. */
+const SILENT_VALUE = Object.freeze({
+  state: null,
+  props: null,
+  layout: null,
+  slots: null,
+}) as unknown as CarouselDiagnosticContextValue;
+
 interface UseDiagnosticContextValueInput {
   /** Full effective state — carries its own layout, so the structural
    * validator inside `<Diagnostic />` can never receive a state/layout pair
@@ -123,12 +141,15 @@ export function useDiagnosticContextValue({
   );
 
   return useMemo(
-    () => ({
-      state,
-      props: propsView,
-      layout: layoutView,
-      slots: slotsView,
-    }),
+    () =>
+      IS_DEV
+        ? {
+            state,
+            props: propsView,
+            layout: layoutView,
+            slots: slotsView,
+          }
+        : SILENT_VALUE,
     [layoutView, propsView, slotsView, state],
   );
 }

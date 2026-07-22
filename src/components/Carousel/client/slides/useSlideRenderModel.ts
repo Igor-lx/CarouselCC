@@ -96,13 +96,28 @@ export function useSlideRenderModel({
     return origin;
   }, [renderWindow]);
 
+  // One VirtualSlide object per virtual index, reused while nothing about it
+  // changed. `virtualSlides` is rebuilt on EVERY dispatch — twice per ride,
+  // because the visibility flags depend on `isMoving` — yet the only fields
+  // that ever move are the two flags, and only for the two or three slides at
+  // the band's edges. Without the cache each dispatch minted N slide objects,
+  // N `ariaProps` objects and N `aria-label` strings, and handed every memoised
+  // SlideItem a fresh `ariaProps` to shallow-compare. This is the same device
+  // the lane styles already use (`laneCacheRef` in presentation), for the same
+  // reason and in the same two frames.
+  const slideCacheRef = useRef(new Map<number, VirtualSlide>());
+
   const virtualSlides = useMemo<VirtualSlide[]>(() => {
     const totalSlides = records.length;
     if (totalSlides === 0) return [];
 
+    const cache = slideCacheRef.current;
+    const live = new Set<number>();
+
     const length = Math.max(0, renderWindow.end - renderWindow.start + 1);
-    return Array.from({ length }, (_, offset) => {
+    const slides = Array.from({ length }, (_, offset) => {
       const virtualIndex = renderWindow.start + offset;
+      live.add(virtualIndex);
       const record = records[loopedSlideIndex(virtualIndex, totalSlides)]!;
       const usesCloneKey =
         layout.canSlide &&
@@ -117,19 +132,45 @@ export function useSlideRenderModel({
         isMoving,
       );
 
-      const ariaProps = buildSlideAriaProps(record.layoutIndex, isActual, totalSlides);
+      const slideKey = usesCloneKey
+        ? `clone:${record.slideKey}:${virtualIndex}`
+        : record.slideKey;
 
-      return {
+      // Nothing about this slide moved — hand back the very same object, so
+      // its `ariaProps` stays referentially identical and SlideItem's memo
+      // holds without re-comparing a fresh one.
+      const cached = cache.get(virtualIndex);
+      if (
+        cached &&
+        cached.isActive === isActive &&
+        cached.isActual === isActual &&
+        cached.slideKey === slideKey &&
+        cached.slideData === record.slideData
+      ) {
+        return cached;
+      }
+
+      const next: VirtualSlide = {
         slideData: record.slideData,
-        slideKey: usesCloneKey
-          ? `clone:${record.slideKey}:${virtualIndex}`
-          : record.slideKey,
+        slideKey,
         virtualIndex,
         isActive,
         isActual,
-        ariaProps,
+        // `isActual` is the only input the aria payload has beyond the record,
+        // so it is rebuilt exactly when the identity check above already failed.
+        ariaProps: buildSlideAriaProps(record.layoutIndex, isActual, totalSlides),
       };
+      cache.set(virtualIndex, next);
+      return next;
     });
+
+    // Bounded memory: an index that left the render window will be rebuilt if
+    // it ever comes back, and its lane/record may differ by then anyway.
+    for (const virtualIndex of cache.keys()) {
+      if (!live.has(virtualIndex)) cache.delete(virtualIndex);
+    }
+
+    return slides;
   }, [current, isMoving, layout, previous, records, renderWindow]);
 
   return {

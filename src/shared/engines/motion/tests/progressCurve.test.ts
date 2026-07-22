@@ -168,34 +168,41 @@ describe("keyframesAlongStops", () => {
 
 /**
  * Serialization DENSITY. The compositor interpolates linearly between stops,
- * so velocity is piecewise-constant and steps at each one. What the eye reads
- * is how LONG a step lasts — so the density is pinned to the frame, not to a
- * fixed sample count that silently coarsens as rides get slower.
+ * so velocity is piecewise-constant and jumps at each one. What the eye reads
+ * is the SIZE of that jump relative to the speed it is tracking — a quantity
+ * that is dimensionless in time. So the density is derived from the profile's
+ * own shape, and the answer is a stop COUNT that does not move with the
+ * duration, and does not encode a display refresh rate.
  */
-describe("progress-stop density scales with duration", () => {
-  const segmentMs = (duration: number) =>
-    duration / resolveProgressStopIntervals(duration);
-
-  it("never lets a linear segment outlast one frame", () => {
-    for (const duration of [300, 800, 1300, 2000, 3000, 4000]) {
-      expect(segmentMs(duration)).toBeLessThanOrEqual(16.7);
-    }
+describe("progress-stop density follows the profile's shape", () => {
+  it("is the same count whatever the ride lasts", () => {
+    const counts = [300, 800, 1300, 2000, 3000, 4000].map((duration) =>
+      resolveProgressStopIntervals(stepProfile({ a: 0.35, d: 0.4 }, 0, duration)),
+    );
+    // Identical up to the ceil() rounding of one interval — the criterion is
+    // dimensionless in time, so duration must not move the answer.
+    expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1);
   });
 
-  it("keeps a floor for very short rides (no degenerate curves)", () => {
-    expect(resolveProgressStopIntervals(50)).toBe(32);
-    expect(resolveProgressStopIntervals(0)).toBe(32);
-    expect(resolveProgressStopIntervals(-1)).toBe(32);
+  it("rises when the launch gets sharper — the only thing that changed", () => {
+    const soft = resolveProgressStopIntervals(stepProfile({ a: 0.45, d: 0.4 }));
+    const sharp = resolveProgressStopIntervals(stepProfile({ a: 0.1, d: 0.4 }));
+    expect(sharp).toBeGreaterThan(soft);
   });
 
-  it("stays bounded for pathologically long rides", () => {
-    expect(resolveProgressStopIntervals(60_000)).toBe(256);
+  it("keeps a floor for degenerate profiles", () => {
+    expect(
+      resolveProgressStopIntervals({ duration: 0, endSpeed: 0, zones: [] }),
+    ).toBe(32);
+    expect(
+      resolveProgressStopIntervals({ duration: 500, endSpeed: 0, zones: [] }),
+    ).toBe(32);
   });
 
-  it("a slow ride is serialized far more densely than the old fixed 32", () => {
-    // The regression this guards: 2000 ms at 32 intervals meant 62 ms — four
-    // frames of constant velocity — per segment.
-    expect(resolveProgressStopIntervals(2000)).toBeGreaterThan(32);
+  it("is denser than the old fixed 32 for a real button ride", () => {
+    // The regression this guards: at 32 intervals a 2 s ride's relative
+    // velocity jump reached ~15%, above the ~10% smooth-pursuit vision reads.
+    expect(resolveProgressStopIntervals(stepProfile())).toBeGreaterThan(32);
     expect(profileProgressStops(stepProfile(), 3).length).toBeGreaterThan(33);
   });
 

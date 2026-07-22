@@ -25,39 +25,69 @@ import {
  */
 
 /**
- * Serialization density of a curve, in TIME — not a fixed sample count.
+ * Serialization density of a curve, derived from the CURVE ITSELF.
  *
  * The browser interpolates LINEARLY between keyframes, so a serialized curve
  * is a polyline: position error is tiny (~h²·|f''|/8, sub-pixel at any sane
- * density), but VELOCITY is piecewise-CONSTANT and steps at every stop. What
- * the eye reads is that step, and its visibility depends on how long a
- * segment lasts, not on how many there are.
+ * density), but VELOCITY is piecewise-CONSTANT and jumps at every stop. What
+ * the eye reads is that jump — and what makes it visible is its SIZE relative
+ * to the speed being tracked, not how long the segment lasted.
  *
- * A fixed count therefore degrades exactly where it must not: at 32 intervals
- * a 300 ms flick spends 9 ms per segment (invisible, sub-frame) while a
- * 2000 ms button ride spends 62 ms — four whole frames of constant velocity,
- * then a jump. Slow, smooth rides are precisely where a human tracks the
- * motion and reads the steps as stuttering.
+ * That distinction decides the whole rule, because the relative jump is
+ * dimensionless in time. A zone's steepest acceleration is `1.5·Δv/T` (the
+ * smoothstep speed law peaks at 1.5× its mean slope, at the zone's midpoint),
+ * so over a segment of length `h` the speed moves by `1.5·Δv·h/T`. Divide by
+ * the peak speed and both the profile's timescale and the display's cancel
+ * out: the answer is a stop COUNT, and it is the same count for a 300 ms
+ * flick and a 3 s ride, on a 60 Hz panel and a 120 Hz one.
  *
- * So the density is pinned to the frame instead: one stop per ~16 ms of ride,
- * clamped. Every linear segment then lasts at most one frame, the compositor
- * samples it at most once, and no step can survive into a second frame at any
- * duration. A 2 s ride costs ~125 stops — numbers in a keyframe list, free
- * for the compositor.
+ * Two rules this replaces, both wrong in the same way — they fixed the wrong
+ * quantity:
+ *  - a fixed COUNT (32) let a long ride's relative jump reach ~15%, above the
+ *    ~10% at which smooth-pursuit vision reads a velocity change, so slow
+ *    button rides stepped;
+ *  - a fixed INTERVAL (one stop per 16 ms) silently encoded a 60 Hz display.
+ *    Re-derived honestly from the refresh rate it would have doubled the
+ *    keyframe count on a 120 Hz panel — and the keyframes are built in the
+ *    frame the ride STARTS, one of only two frames the carousel spends
+ *    main-thread time in — to shrink a 3% jump to 1.5%, which no eye reads.
+ *
+ * Deriving the count from the profile also keeps it honest under tuning: make
+ * the launch sharper (a smaller acceleration share) and the density rises on
+ * its own, because that is what actually changed.
  */
-const TARGET_MS_PER_PROGRESS_STOP = 16;
+const MAX_RELATIVE_VELOCITY_STEP = 0.05;
 const MIN_PROGRESS_STOP_INTERVALS = 32;
 const MAX_PROGRESS_STOP_INTERVALS = 256;
 
-/** Stop count for a ride of `duration` ms (see the density note above). */
-export const resolveProgressStopIntervals = (duration: number): number => {
-  if (!(duration > 0)) return MIN_PROGRESS_STOP_INTERVALS;
-  return Math.min(
+/** Stop count for one profile (see the density note above). */
+export const resolveProgressStopIntervals = (profile: MotionProfile): number => {
+  if (!(profile.duration > 0) || profile.zones.length === 0) {
+    return MIN_PROGRESS_STOP_INTERVALS;
+  }
+
+  let peakSpeed = 0;
+  let peakAcceleration = 0;
+  for (const zone of profile.zones) {
+    peakSpeed = Math.max(peakSpeed, zone.startSpeed, zone.endSpeed);
+    if (!(zone.duration > 0)) continue;
+    peakAcceleration = Math.max(
+      peakAcceleration,
+      (1.5 * Math.abs(zone.endSpeed - zone.startSpeed)) / zone.duration,
+    );
+  }
+
+  // A profile with no speed change anywhere (pure cruise) has no velocity
+  // step to hide; the floor is all it needs.
+  if (!(peakSpeed > 0) || !(peakAcceleration > 0)) {
+    return MIN_PROGRESS_STOP_INTERVALS;
+  }
+
+  const interval = (MAX_RELATIVE_VELOCITY_STEP * peakSpeed) / peakAcceleration;
+  return clamp(
+    Math.ceil(profile.duration / interval),
+    MIN_PROGRESS_STOP_INTERVALS,
     MAX_PROGRESS_STOP_INTERVALS,
-    Math.max(
-      MIN_PROGRESS_STOP_INTERVALS,
-      Math.ceil(duration / TARGET_MS_PER_PROGRESS_STOP),
-    ),
   );
 };
 
@@ -70,7 +100,7 @@ export const resolveProgressStopIntervals = (duration: number): number => {
 export const profileProgressStops = (
   profile: MotionProfile,
   distance: number,
-  intervals: number = resolveProgressStopIntervals(profile.duration),
+  intervals: number = resolveProgressStopIntervals(profile),
 ): number[] => {
   const absDistance = Math.abs(distance);
   if (!(profile.duration > 0) || !(absDistance > 0) || !(intervals >= 1)) {
