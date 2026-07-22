@@ -1,5 +1,18 @@
 import { useMemo, type ReactNode } from "react";
 
+/**
+ * The diagnostic layer is a DEVELOPMENT tool end to end: it renders nothing,
+ * mutates nothing, and its only output is `console.warn`, which was already
+ * dev-only. Gating its ATTACHMENT here makes that true of its cost as well —
+ * in production the slot never mounts, never consumes the diagnostic context,
+ * and never re-renders on a dispatch. Measured: the two frames the carousel
+ * spends main-thread time in (the click frame and the settle window) are
+ * dominated by the React render of this subtree, so a component that produces
+ * nothing must not be in it. A host may leave `<Diagnostic />` in its JSX
+ * permanently — it simply costs nothing shipped.
+ */
+const IS_DEV = import.meta.env.DEV;
+
 interface UseModuleRenderPolicyInput {
   controlsSlot: ReactNode;
   paginationSlot: ReactNode;
@@ -45,6 +58,8 @@ export function useModuleRenderPolicy({
   const hasControlsSlot = Boolean(controlsSlot);
   const hasPaginationSlot = Boolean(paginationSlot);
   const hasDiagnosticSlot = Boolean(diagnosticSlot);
+  // Attachment as the RUNTIME sees it: dev-only (see IS_DEV above).
+  const isDiagnosticAttached = hasDiagnosticSlot && IS_DEV;
   const hasResponsiveImagesSlot = Boolean(responsiveImagesSlot);
 
   // Controls and pagination follow one symmetric rule: a module renders only
@@ -61,7 +76,7 @@ export function useModuleRenderPolicy({
       hasPaginationSlot,
       hasDiagnosticSlot,
       hasResponsiveImagesSlot,
-      isDiagnosticActive: hasDiagnosticSlot,
+      isDiagnosticActive: isDiagnosticAttached,
       slots: {
         controls: isControlsOn && canSlide && hasControlsSlot ? controlsSlot : null,
         pagination:
@@ -69,7 +84,7 @@ export function useModuleRenderPolicy({
         // Headless like Diagnostic: renders whenever attached — its PRESENCE
         // is the switch that turns the responsive-image stack on.
         responsiveImages: hasResponsiveImagesSlot ? responsiveImagesSlot : null,
-        diagnostic: hasDiagnosticSlot ? diagnosticSlot : null,
+        diagnostic: isDiagnosticAttached ? diagnosticSlot : null,
       },
     }),
     [
@@ -78,6 +93,7 @@ export function useModuleRenderPolicy({
       diagnosticSlot,
       hasControlsSlot,
       hasDiagnosticSlot,
+      isDiagnosticAttached,
       hasPaginationSlot,
       hasResponsiveImagesSlot,
       isControlsOn,
