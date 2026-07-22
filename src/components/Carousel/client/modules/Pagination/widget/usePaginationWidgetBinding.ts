@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef } from "react";
 
-import { motionNow, useIsomorphicLayoutEffect } from "../../../../../../shared";
+import {
+  motionNow,
+  resampleStops,
+  useIsomorphicLayoutEffect,
+} from "../../../../../../shared";
 import {
   positionAtNow,
   startPinnedAnimation,
@@ -76,6 +80,28 @@ const ACTIVE_DOT_COUNT = 4;
  * every dot's projection is unique and Blink cannot share one ComputedStyle
  * across them (see WIDGET-PERF-INVESTIGATION.md). */
 const INVISIBLE_OPACITY = 0.001;
+
+/**
+ * Serialization density of the plan curve FOR THE STRIP, in intervals.
+ *
+ * The plan arrives at the density the TRACK needs — one stop per ~16 ms of
+ * ride, so a page step carries ~157 of them. That density exists because the
+ * track travels a whole viewport and a velocity step there is visible. A
+ * widget dot travels at most one strip width, a couple of dozen pixels: at 32
+ * intervals its largest per-segment move is a fraction of a pixel, far below
+ * anything an eye can read as stepping.
+ *
+ * The difference is not cosmetic. Every dot builds ONE KEYFRAME PER STOP,
+ * every overlay too, and a trajectory has to be built in full BEFORE the
+ * invisibility test below can decide to throw it away — so the full density
+ * meant `(dots + overlays) × 157` keyframe objects and transform strings in
+ * the click frame, the majority discarded. That frame is one of only two the
+ * carousel spends main-thread time in, and this path is the MOBILE one.
+ *
+ * Both grids are uniform samples of the same curve and exact at both ends, so
+ * the strip stays synchronized with the track it rides beside.
+ */
+const STRIP_CURVE_INTERVALS = 32;
 
 const emptyDotState = (): PaginationWidgetDotState => ({
   id: 0,
@@ -390,6 +416,10 @@ export function usePaginationWidgetBinding({
       invalidateWriteCaches();
 
       const animations: Animation[] = [];
+      // The strip rides a coarser sample of the SAME curve than the track
+      // (see STRIP_CURVE_INTERVALS) — resampled once here, shared by every dot
+      // and overlay below.
+      const stripStops = resampleStops(plan.stops, STRIP_CURVE_INTERVALS);
       const lowId =
         Math.floor(Math.min(from, target)) - side - DOT_COVERAGE_MARGIN / 2;
 
@@ -404,7 +434,7 @@ export function usePaginationWidgetBinding({
           from,
           target,
           geometry,
-          plan.stops,
+          stripStops,
         );
 
         // A dot that stays INVISIBLE for the whole step never needs an
@@ -445,7 +475,7 @@ export function usePaginationWidgetBinding({
           from,
           target,
           geometry,
-          plan.stops,
+          stripStops,
         );
         // Same rule as the dots: an overlay whose active strength never lifts
         // off zero across the step paints nothing — pin it, do not animate it.
