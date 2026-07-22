@@ -78,6 +78,10 @@ export default function App() {
 
   const [isAutoplay, setIsAutoplay] = useState(false);
   const [isInteractive, setIsInteractive] = useState(false);
+  // Which pagination module is mounted. Defaults to the product rule (dots on
+  // a pointer device, the strip widget on touch) and is overridable from the
+  // control bar so both can be compared on one device without a redeploy.
+  const [isWidgetPagination, setIsWidgetPagination] = useState(isTouch);
 
   // Imperative control from another part of the page.
   const carouselRef = useRef<CarouselHandle>(null);
@@ -140,6 +144,12 @@ export default function App() {
           >
             {isInteractive ? "INT" : "NO"}
           </button>
+          <button
+            className={appStyles.button}
+            onClick={() => setIsWidgetPagination((prev) => !prev)}
+          >
+            {isWidgetPagination ? "▭" : "•••"}
+          </button>
         </div>
 
         <div className={appStyles.component}>
@@ -164,7 +174,7 @@ export default function App() {
               userEnvironment={userEnvironment}
               onSlideClick={openSlide}
             >
-              {isTouch ? <PaginationWidget /> : <Pagination />}
+              {isWidgetPagination ? <PaginationWidget /> : <Pagination />}
               <Controls />
               <ResponsiveImages isPredecodeOn={true} />
               <Diagnostic />
