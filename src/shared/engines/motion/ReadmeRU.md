@@ -43,7 +43,7 @@ controller.start({ segment, sampler, onComplete });
 | --- | --- |
 | `useMotionController` / `createMotionController` | Рантайм, с React / без. |
 | `motionNow` | ЧАСЫ движения (`performance.now()`, SSR-безопасно). |
-| `buildProfile`, `createMotionProfile`, `normalizeMotionProfileShares` | Кривые разгон/круиз/торможение. |
+| `buildProfile`, `createMotionProfile` | Кривые разгон/круиз/торможение. |
 | `profileProgressStops`, `resolvePeakSpeedForDuration`, `isWaapiSupported` | Транспорт WAAPI-кейфреймов. |
 | `startPinnedAnimation`, `useCompositedRide` | Доставка в композитор + one-element-райдер. |
 | `useMotionPaint` | Хук подписки отрисовки (путь JS-фолбэка). |

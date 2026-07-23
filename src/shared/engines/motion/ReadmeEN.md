@@ -42,7 +42,7 @@ controller.start({ segment, sampler, onComplete });
 | --- | --- |
 | `useMotionController` / `createMotionController` | The runtime, with / without React. |
 | `motionNow` | THE motion clock (`performance.now()`, SSR-safe). |
-| `buildProfile`, `createMotionProfile`, `normalizeMotionProfileShares` | Accel/cruise/decel curves. |
+| `buildProfile`, `createMotionProfile` | Accel/cruise/decel curves. |
 | `profileProgressStops`, `resolvePeakSpeedForDuration`, `isWaapiSupported` | WAAPI keyframe transport. |
 | `startPinnedAnimation`, `useCompositedRide` | Compositor delivery + one-element rider. |
 | `useMotionPaint` | Paint-subscription hook (JS-fallback path). |

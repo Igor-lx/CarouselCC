@@ -51,7 +51,6 @@ import {
 import { MOTION_EPSILON } from "../../../motion/tolerances";
 import { DRAG_RELEASE_EPSILON } from "../../../domain/dragRelease";
 import { GESTURE_COAST_MAX_MS } from "../../../gesture/coast";
-import { normalizeMotionProfileShares } from "../../../../../../shared";
 // The calibration record lives with the computation it anchors, not among
 // the tuning knobs — see gesture/slotAdaptiveSwipe.ts.
 import { SWIPE_REFERENCE_SLOT_PX } from "../../../gesture/slotAdaptiveSwipe";
@@ -582,22 +581,20 @@ const numericRules: NumericRule[] = [
 ];
 
 /**
- * Overallocated accel+decel shares (> 1) are normalized by the runtime
- * profile builder to equal halves with no cruise zone; report each pair that
- * triggers the normalization, with the shape runtime will actually use.
+ * Overallocated accel+decel shares (> 1) are NO LONGER rescued by the runtime:
+ * the engine trusts the raw shares (see profile.ts), so the cruise budget goes
+ * negative, its zone is dropped, and the ramps over-fill the travel. Detection
+ * is pure arithmetic on the carousel's own constants — the check owns it, with
+ * no dependency on the engine. Report every pair that over-allocates.
  */
 const collectProfileShareRelation = (
   field: string,
   accelerationDistanceShare: number,
   decelerationDistanceShare: number,
-  consequence: string,
   expected = "Expected accelerationShare + decelerationShare <= 1 for an explicit cruise zone",
 ): CarouselDiagnosticWarning | null => {
-  const normalized = normalizeMotionProfileShares(
-    accelerationDistanceShare,
-    decelerationDistanceShare,
-  );
-  if (!normalized.wasNormalized) return null;
+  const sum = accelerationDistanceShare + decelerationDistanceShare;
+  if (!(Number.isFinite(sum) && sum > 1)) return null;
   return {
     severity: "LOGICAL",
     layer: "Motion",
@@ -605,15 +602,11 @@ const collectProfileShareRelation = (
     actual: {
       accelerationDistanceShare,
       decelerationDistanceShare,
-      sum: accelerationDistanceShare + decelerationDistanceShare,
-    },
-    normalizedTo: {
-      accelerationDistanceShare: normalized.accelerationShare,
-      decelerationDistanceShare: normalized.decelerationShare,
-      cruiseDistanceShare: normalized.cruiseShare,
+      sum,
     },
     expected,
-    consequence,
+    consequence:
+      "The engine uses these shares as-is: with no cruise budget the ramps over-fill the distance, so the ride finishes its travel before its nominal duration and holds at the destination for the remainder (and the duration<->peak solve degenerates)",
   };
 };
 
@@ -779,38 +772,32 @@ export const collectConstantWarnings = (): CarouselDiagnosticWarning[] => {
       "REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE + REPEATED_CLICK_DECELERATION_DISTANCE_SHARE",
       REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
       REPEATED_CLICK_DECELERATION_DISTANCE_SHARE,
-      "Motion profile runtime normalizes overallocated shares to 50% acceleration and 50% deceleration",
     ),
     collectProfileShareRelation(
       "GO_TO_ACCELERATION_DISTANCE_SHARE + GO_TO_DECELERATION_DISTANCE_SHARE",
       GO_TO_ACCELERATION_DISTANCE_SHARE,
       GO_TO_DECELERATION_DISTANCE_SHARE,
-      "A one-page direct GO_TO runtime profile normalizes overallocated local zones to 50% acceleration and 50% deceleration",
       "Expected accelerationShare + decelerationShare <= 1 for a one-page direct GO_TO",
     ),
     collectProfileShareRelation(
       "STEP_ACCELERATION_DISTANCE_SHARE + STEP_DECELERATION_DISTANCE_SHARE",
       STEP_ACCELERATION_DISTANCE_SHARE,
       STEP_DECELERATION_DISTANCE_SHARE,
-      "Click-step runtime profile normalizes overallocated shares to 50% acceleration and 50% deceleration",
     ),
     collectProfileShareRelation(
       "AUTOPLAY_ACCELERATION_DISTANCE_SHARE + AUTOPLAY_DECELERATION_DISTANCE_SHARE",
       AUTOPLAY_ACCELERATION_DISTANCE_SHARE,
       AUTOPLAY_DECELERATION_DISTANCE_SHARE,
-      "Autoplay-step runtime profile normalizes overallocated shares to 50% acceleration and 50% deceleration",
     ),
-collectProfileShareRelation(
+    collectProfileShareRelation(
       "CAROUSEL_INERTIAL_RELEASE_CONFIG.accelerationDistanceShare + decelerationDistanceShare",
       CAROUSEL_INERTIAL_RELEASE_CONFIG.accelerationDistanceShare,
       CAROUSEL_INERTIAL_RELEASE_CONFIG.decelerationDistanceShare,
-      "Gesture-release runtime profile normalizes overallocated shares to 50% acceleration and 50% deceleration",
     ),
     collectProfileShareRelation(
       "SNAP_BACK_ACCELERATION_DISTANCE_SHARE + SNAP_BACK_DECELERATION_DISTANCE_SHARE",
       SNAP_BACK_ACCELERATION_DISTANCE_SHARE,
       SNAP_BACK_DECELERATION_DISTANCE_SHARE,
-      "Snap-back runtime profile normalizes overallocated shares to 50% acceleration and 50% deceleration",
     ),
   ];
   for (const relation of profileRelations) {

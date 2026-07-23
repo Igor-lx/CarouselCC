@@ -30,7 +30,6 @@ export interface MotionProfileInput {
  * for an invalid input.
  */
 const MIN_PROFILE_SPEED = 1e-6;
-const OVERALLOCATED_PROFILE_SHARE = 0.5;
 const smoothstep = (progress: number) => progress * progress * (3 - 2 * progress);
 
 const smoothstepIntegral = (progress: number) =>
@@ -38,36 +37,6 @@ const smoothstepIntegral = (progress: number) =>
 
 const lerp = (from: number, to: number, progress: number) =>
   from + (to - from) * progress;
-
-export interface MotionProfileShares {
-  accelerationShare: number;
-  decelerationShare: number;
-  cruiseShare: number;
-  wasNormalized: boolean;
-}
-
-export const normalizeMotionProfileShares = (
-  accelerationDistanceShare: number,
-  decelerationDistanceShare: number,
-): MotionProfileShares => {
-  const sum = accelerationDistanceShare + decelerationDistanceShare;
-
-  if (Number.isFinite(sum) && sum > 1) {
-    return {
-      accelerationShare: OVERALLOCATED_PROFILE_SHARE,
-      decelerationShare: OVERALLOCATED_PROFILE_SHARE,
-      cruiseShare: 0,
-      wasNormalized: true,
-    };
-  }
-
-  return {
-    accelerationShare: accelerationDistanceShare,
-    decelerationShare: decelerationDistanceShare,
-    cruiseShare: 1 - sum,
-    wasNormalized: false,
-  };
-};
 
 const zoneDuration = (distance: number, startSpeed: number, endSpeed: number) => {
   if (!(distance > 0)) return 0;
@@ -110,11 +79,14 @@ export const createMotionProfile = ({
   decelerationDistanceShare,
 }: MotionProfileInput): MotionProfile => {
   const absDistance = Math.abs(distance);
-  const { accelerationShare, decelerationShare, cruiseShare } =
-    normalizeMotionProfileShares(
-      accelerationDistanceShare,
-      decelerationDistanceShare,
-    );
+  // The engine trusts its inputs: over-allocated shares (accel + decel > 1)
+  // are NOT reshaped here. The cruise share simply goes negative and its zone
+  // is skipped (`pushZone` drops share <= 0), so the ramps consume the whole
+  // travel. Callers own share validity; the carousel surfaces over-allocation
+  // through its Diagnostic layer, not by a silent runtime rescue.
+  const accelerationShare = accelerationDistanceShare;
+  const decelerationShare = decelerationDistanceShare;
+  const cruiseShare = 1 - accelerationShare - decelerationShare;
 
   const resolvedPeak = Math.max(peakSpeed, startSpeed, endSpeed);
 

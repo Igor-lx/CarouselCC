@@ -79,9 +79,10 @@ All props are optional except `slidesData`. Defaults below are substituted only
 for `undefined` props. Other values pass through unchanged — invalid input
 (NaN, negative durations, mismatched slot counts) is surfaced by the
 `Diagnostic` slot but never repaired at config resolution time, so the failure
-mode is visible. Motion-profile share over-allocation is the one explicit
-runtime exception: profile math normalizes acceleration/deceleration zones to
-equal halves with no cruise zone, and Diagnostic reports that normalized shape.
+mode is visible. This extends all the way down: motion-profile share
+over-allocation (accel + decel > 1) is no longer rescued anywhere — the engine
+trusts the raw shares (the cruise budget goes negative and its zone is
+dropped), and Diagnostic reports the over-allocation without repairing it.
 
 #### Slides
 
@@ -567,7 +568,7 @@ Every responsibility has exactly one owner. The orchestrator
 | --- | --- | --- |
 | Public props | `Carousel.tsx` | Frozen contract, declared in `public-api/types.ts`. |
 | User environment | host application | Injected via the `userEnvironment` prop. The carousel never detects `prefers-reduced-motion` / touch / data-saver itself; the host reads them (recommended: `useUserEnvironment` in `shared`) and passes a stable object in. |
-| Resolved runtime config | `useCarouselConfig` | One memo. Substitutes defaults only for `undefined` props; never normalises explicit values. Motion-profile share normalization happens later inside the profile builder, not in config. |
+| Resolved runtime config | `useCarouselConfig` | One memo. Substitutes defaults only for `undefined` props; never normalises explicit values. Nothing downstream normalises them either — the profile builder trusts the authored acceleration/deceleration shares as-is. |
 | Slide records | `useCarouselSlideDeck` | Builds slide records, optionally extends to fill perfect pages. |
 | Layout facts | `useCarouselSlideDeck` | `length`, `visibleSlidesCount`, `pageCount`, `virtualLength`, `canSlide`, `isFinite`, `dataKey`. |
 | Logical state | `useCarouselState` | Reducer-backed. Owns `targetPageIndex`, `fromVirtualIndex`, `virtualIndex`, optional `teleportVirtualIndex`, `isTeleportApproach`, `motionPhase`, `gesture`, `isRepeatedClickAdvance`, `moveReason`. |
@@ -669,9 +670,11 @@ phase }`.
 `CarouselSegment` (`motion/types.ts`) has exactly ONE shape: a smoothstep-driven
 acceleration / cruise / deceleration **profile**. There are no easing curves —
 every motion is authored through the same constants model (distance shares for
-ramp-up and ramp-down; the remainder is cruise). If acceleration and
-deceleration shares sum above `1`, runtime normalizes the profile to equal
-halves with no cruise zone. Two authoring modes feed the same builder:
+ramp-up and ramp-down; the remainder is cruise). The engine trusts these
+shares as authored: if acceleration and deceleration sum above `1` the cruise
+share goes negative and its zone is simply dropped, so the ramps over-fill the
+travel — over-allocation is a misconfiguration the Diagnostic slot reports, not
+one the runtime silently reshapes. Two authoring modes feed the same builder:
 
 - **Duration-authored** (strategy `"step"`): click step, autoplay step,
   snap-back, and a non-inertial gesture release. The step kind picks its shares
@@ -1298,14 +1301,13 @@ Output format (one line per warning, built by `formatter.ts`):
 
 ```
 [Carousel Diagnostic][SEVERITY] <Layer> -> <field> has value <actual>. \
-[Runtime normalizes it to <normalizedTo>.] <Expected …>. <Consequence>. \
+<Expected …>. <Consequence>. \
 Diagnostics is observe-only and does not apply runtime changes.
 ```
 
-`SEVERITY` is `CRITICAL` or `LOGICAL`. The `normalizedTo` clause appears only
-when runtime applies an explicit normalization (the overallocated
-acceleration/deceleration profile share). Warnings are deduplicated by
-signature across renders.
+`SEVERITY` is `CRITICAL` or `LOGICAL`. Diagnostic only ever describes a value
+and its consequence — it never claims a runtime repair, because the runtime
+performs none. Warnings are deduplicated by signature across renders.
 
 ---
 
@@ -1513,9 +1515,9 @@ dependencies, the architecture has held.
 - **Diagnostic is strictly observe-only.** The runtime values the
   carousel uses do not depend on whether the Diagnostic slot is attached.
   Diagnostic never normalises, validates, repairs, or substitutes any
-  value; it reads and warns. When runtime profile math intentionally
-  normalizes overallocated acceleration/deceleration shares, Diagnostic
-  reports the normalized shape without participating in the decision. The
+  value; it reads and warns. There is no runtime normalization anywhere for it
+  to mirror — over-allocated acceleration/deceleration shares are reported as a
+  plain misconfiguration (the engine trusts the raw shares). The
   trade-off is that the carousel will visibly misbehave when fed invalid
   inputs (NaN propagation, impossible geometry, malformed transforms) —
   which is the intended signal that the input must be fixed.
@@ -1563,10 +1565,10 @@ dependencies, the architecture has held.
 - **Runtime safety.** Layout reconciliation tolerates page-count changes
   and resets on `dataKey` changes. Numeric inputs are *not* generally
   coerced or repaired — invalid input is intentionally allowed to propagate so
-  the failure mode is visible. The only runtime normalization is the
-  profile-level rule for overallocated acceleration/deceleration shares. The
-  diagnostic layer surfaces violations separately, without ever feeding back
-  into runtime.
+  the failure mode is visible. There is no runtime normalization at all: even
+  overallocated acceleration/deceleration shares are trusted as authored (the
+  engine drops the negative cruise zone). The diagnostic layer surfaces
+  violations separately, without ever feeding back into runtime.
 - **Performance.** Every engine-planned motion — click, autoplay, snap-back,
   gesture release, repeated click, every GO_TO slice — runs on the compositor
   thread via WAAPI with the profile stop-encoded into keyframes (§4.5): the

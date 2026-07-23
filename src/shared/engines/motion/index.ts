@@ -27,7 +27,6 @@ export type {
 export {
   buildProfile,
   createMotionProfile,
-  normalizeMotionProfileShares,
   sampleMotionProfile,
 } from "./profile/profile";
 export type { MotionProfile, MotionProfileZone } from "./profile/profile";

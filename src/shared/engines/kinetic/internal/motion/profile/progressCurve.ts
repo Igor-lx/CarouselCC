@@ -1,9 +1,5 @@
 import { clamp } from "./clamp";
-import {
-  normalizeMotionProfileShares,
-  sampleMotionProfile,
-  type MotionProfile,
-} from "./profile";
+import { sampleMotionProfile, type MotionProfile } from "./profile";
 
 /**
  * Progress-curve sampling — the bridge that lets ANY accel/cruise/decel
@@ -198,11 +194,12 @@ export const resolvePeakSpeedForDuration = ({
   const absDistance = Math.abs(distance);
   if (!(absDistance > 0) || !(duration > 0)) return 0;
 
-  const { accelerationShare, decelerationShare, cruiseShare } =
-    normalizeMotionProfileShares(
-      accelerationDistanceShare,
-      decelerationDistanceShare,
-    );
+  // Raw shares, trusted as-is (the engine no longer reshapes over-allocation);
+  // an over-allocated pair yields a negative cruise share, mirroring the
+  // profile builder.
+  const accelerationShare = accelerationDistanceShare;
+  const decelerationShare = decelerationDistanceShare;
+  const cruiseShare = 1 - accelerationShare - decelerationShare;
   const s0 = Math.max(0, startSpeed);
 
   const tailDistance = (cruiseShare + 2 * decelerationShare) * absDistance;

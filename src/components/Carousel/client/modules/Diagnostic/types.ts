@@ -10,15 +10,15 @@ export type DiagnosticSeverity = "CRITICAL" | "LOGICAL";
  * wrong and what will happen at runtime.
  *
  * Diagnostics is observe/report only. Emitting a warning never changes the
- * runtime value the carousel uses; when runtime has an explicit normalization
- * rule, `normalizedTo` reports the value runtime will use.
+ * runtime value the carousel uses: the carousel trusts its inputs and the
+ * engines trust theirs, so there is no runtime normalization to mirror — a
+ * warning describes what the value is and what it will cause, nothing more.
  */
 export interface CarouselDiagnosticWarning {
   severity: DiagnosticSeverity;
   layer: string;
   field: string;
   actual: unknown;
-  normalizedTo?: unknown;
   expected: string;
   consequence: string;
 }

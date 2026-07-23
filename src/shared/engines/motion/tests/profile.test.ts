@@ -3,38 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildProfile,
   createMotionProfile,
-  normalizeMotionProfileShares,
   sampleMotionProfile,
 } from "../profile/profile";
-
-describe("normalizeMotionProfileShares", () => {
-  it("keeps in-budget shares and derives the cruise remainder", () => {
-    const shares = normalizeMotionProfileShares(0.3, 0.3);
-    expect(shares.wasNormalized).toBe(false);
-    expect(shares.accelerationShare).toBe(0.3);
-    expect(shares.decelerationShare).toBe(0.3);
-    expect(shares.cruiseShare).toBeCloseTo(0.4);
-  });
-
-  it("treats a sum of exactly 1 as in-budget with no cruise", () => {
-    const shares = normalizeMotionProfileShares(0.5, 0.5);
-    expect(shares.wasNormalized).toBe(false);
-    expect(shares.cruiseShare).toBeCloseTo(0);
-  });
-
-  it("normalizes an overallocated sum to 0.5 / 0.5 with no cruise", () => {
-    const shares = normalizeMotionProfileShares(0.7, 0.7);
-    expect(shares.wasNormalized).toBe(true);
-    expect(shares.accelerationShare).toBe(0.5);
-    expect(shares.decelerationShare).toBe(0.5);
-    expect(shares.cruiseShare).toBe(0);
-  });
-
-  it("does not normalize when the sum is non-finite", () => {
-    const shares = normalizeMotionProfileShares(Number.NaN, 0.3);
-    expect(shares.wasNormalized).toBe(false);
-  });
-});
 
 describe("createMotionProfile", () => {
   it("produces a positive duration and ordered zones for a normal accel/cruise/decel", () => {

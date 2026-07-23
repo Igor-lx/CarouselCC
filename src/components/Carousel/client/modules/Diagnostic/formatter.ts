@@ -38,9 +38,6 @@ export const formatWarning = (warning: CarouselDiagnosticWarning): string =>
   [
     `[${BANNER}][${warning.severity}] ${warning.layer} -> ${warning.field}`,
     `has value ${formatActual(warning.actual)}.`,
-    typeof warning.normalizedTo === "undefined"
-      ? ""
-      : `Runtime normalizes it to ${formatActual(warning.normalizedTo)}.`,
     finishSentence(warning.expected),
     finishSentence(warning.consequence),
     TRAILER,
@@ -53,7 +50,6 @@ export const warningSignature = (warning: CarouselDiagnosticWarning): string =>
     warning.layer,
     warning.field,
     formatActual(warning.actual),
-    formatActual(warning.normalizedTo),
     warning.expected,
     warning.consequence,
   ].join("|");

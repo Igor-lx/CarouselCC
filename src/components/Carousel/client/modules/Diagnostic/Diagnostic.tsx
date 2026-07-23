@@ -24,7 +24,7 @@ const IS_DEV = import.meta.env.DEV;
 const EMPTY: CarouselDiagnosticWarning[] = [];
 
 const BANNER =
-  "[Carousel Diagnostic] enabled. Observe-only: diagnostics reports runtime values and explicit runtime normalizations.";
+  "[Carousel Diagnostic] enabled. Observe-only: diagnostics reports runtime values and never repairs them.";
 
 const DiagnosticBase = memo(function CarouselDiagnostic() {
   const { state, props, layout, slots } = useCarouselDiagnosticContext();
