@@ -367,6 +367,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     extendedLength: perfectPageLayoutInfo.extendedLength,
     didExtendLayout: perfectPageLayoutInfo.didExtendLayout,
     hasPerfectPageLayout: perfectPageLayoutInfo.hasPerfectPageLayout,
+    requestedVisibleSlidesCount: config.visibleSlidesCount,
     visibleSlidesCount: layout.visibleSlidesCount,
     canSlide: layout.canSlide,
     isControlsOn,

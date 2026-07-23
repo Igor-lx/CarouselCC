@@ -145,6 +145,11 @@ export interface CarouselDiagnosticContextValue {
   };
   layout: {
     rawLength: number;
+    /** The count the caller asked for (resolved config, pre-clamp). When it
+     * exceeds the deck length the runtime coerces it down — a correct
+     * adaptation the Diagnostic layer surfaces via `collectLayoutWarnings`. */
+    requestedVisibleSlidesCount: number;
+    /** The EFFECTIVE count actually used: `min(requested, rawLength)`. */
     visibleSlidesCount: number;
     extendedLength: number;
     didExtendLayout: boolean;

@@ -40,6 +40,9 @@ interface UseDiagnosticContextValueInput {
   extendedLength: number;
   didExtendLayout: boolean;
   hasPerfectPageLayout: boolean;
+  /** Resolved config count (pre-clamp) — what the caller asked for. */
+  requestedVisibleSlidesCount: number;
+  /** Effective count actually used: `min(requested, rawLength)`. */
   visibleSlidesCount: number;
   canSlide: boolean;
   // Slot wiring facts.
@@ -71,6 +74,7 @@ export function useDiagnosticContextValue({
   extendedLength,
   didExtendLayout,
   hasPerfectPageLayout,
+  requestedVisibleSlidesCount,
   visibleSlidesCount,
   canSlide,
   isControlsOn,
@@ -103,6 +107,7 @@ export function useDiagnosticContextValue({
   const layoutView = useMemo(
     () => ({
       rawLength,
+      requestedVisibleSlidesCount,
       extendedLength,
       didExtendLayout,
       hasPerfectPageLayout,
@@ -115,6 +120,7 @@ export function useDiagnosticContextValue({
       extendedLength,
       hasPerfectPageLayout,
       rawLength,
+      requestedVisibleSlidesCount,
       visibleSlidesCount,
     ],
   );

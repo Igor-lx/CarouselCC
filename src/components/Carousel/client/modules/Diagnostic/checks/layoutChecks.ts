@@ -88,6 +88,21 @@ export const collectLayoutWarnings = (
 ): CarouselDiagnosticWarning[] => {
   const out: CarouselDiagnosticWarning[] = [];
 
+  // The visible band cannot exceed the deck: `buildCarouselLayout` coerces a
+  // too-large `visibleSlidesNr` down to the deck length. That coercion is a
+  // correct, load-bearing runtime adaptation (not a repair) — but a silent
+  // one, so surface it: requested N, deck M, used M.
+  if (layout.requestedVisibleSlidesCount > layout.rawLength) {
+    out.push({
+      severity: "LOGICAL",
+      layer: LAYOUT_LAYER,
+      field: "visibleSlidesNr",
+      actual: layout.requestedVisibleSlidesCount,
+      expected: `Expected visibleSlidesNr (${layout.requestedVisibleSlidesCount}) not to exceed the deck length (${layout.rawLength})`,
+      consequence: `Runtime coerces the visible band to the deck length: requested ${layout.requestedVisibleSlidesCount}, deck ${layout.rawLength}, used ${layout.visibleSlidesCount}`,
+    });
+  }
+
   if (!layout.hasPerfectPageLayout) {
     if (layout.didExtendLayout) {
       out.push({
