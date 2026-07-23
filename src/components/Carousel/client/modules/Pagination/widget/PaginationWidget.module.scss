@@ -81,27 +81,35 @@
 
 // Mobile tier — keyed on the root's tier attribute (config/viewport.ts), so
 // the strip and the slide box flip on one shared threshold, never two typed
-// numbers that could drift apart.
-[data-breakpoint="mobile"] .container_PW {
-  --widget-padding-inline: 20px;
-  --widget-padding-block: 10px;
-
+// numbers that could drift apart. Order-INDEPENDENT: the flag state is
+// excluded (its own block below), and the widget-private 380px sub-threshold
+// is split by width, so at most one padding rule matches a given viewport.
+// max-width holds for the whole mobile tier.
+[data-breakpoint="mobile"]:not([data-short-landscape="true"]) .container_PW {
   max-width: calc(100vw - 24px);
 }
 
-[data-short-landscape="true"] .container_PW {
-  --widget-padding-inline: 14px;
-  --widget-padding-block: 7px;
+@media (width > 380px) {
+  [data-breakpoint="mobile"]:not([data-short-landscape="true"]) .container_PW {
+    --widget-padding-inline: 20px;
+    --widget-padding-block: 10px;
+  }
 }
 
 // A widget-PRIVATE threshold: below this the strip padding tightens once more.
 // It has no counterpart in the shared axes (it drives neither art direction
-// nor slide geometry), so it stays a raw query rather than becoming a config
-// axis. Scoped to the mobile tier so its specificity matches the attribute
-// rule above and source order still lets it win.
+// nor slide geometry), so it stays a raw query — split from the > 380px rule
+// by width so the two are mutually exclusive and order stays irrelevant.
 @media (width <= 380px) {
-  [data-breakpoint="mobile"] .container_PW {
+  [data-breakpoint="mobile"]:not([data-short-landscape="true"]) .container_PW {
     --widget-padding-inline: 12px;
     --widget-padding-block: 8px;
   }
+}
+
+// Short-landscape: its own state, mutually exclusive with the mobile rules
+// above via their :not(), so declaration order does not matter here either.
+[data-short-landscape="true"] .container_PW {
+  --widget-padding-inline: 14px;
+  --widget-padding-block: 7px;
 }

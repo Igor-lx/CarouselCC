@@ -282,33 +282,44 @@
     font-size: 30px;
   }
 
-  // Below desktop (tablet + mobile tiers): tighter gaps and radii.
-  .outerContainer[data-breakpoint="tablet"],
-  .outerContainer[data-breakpoint="mobile"] {
-    --slides-gap: 28px;
-    --slide-radius: 10px;
-    --pagination-gap: 14px;
+  // Per-tier geometry, order-INDEPENDENT by construction — the CSS twin of the
+  // useMedia contract, where the tier is SELECTED (largest matching threshold),
+  // never "the first rule that happens to match". `data-breakpoint` is a single
+  // value, so the tiers are mutually exclusive already; each states its FINAL
+  // geometry directly (no grouped rule that a later one overrides). The one
+  // state that can co-occur with a tier is the `short-landscape` flag, so the
+  // plain-tier rules exclude it — a viewport is EITHER a short-landscape one OR
+  // a plain tier, never both at once. Reorder any of these blocks freely: the
+  // matching one still wins, because at most one ever matches a given viewport.
+  // (`desktop` needs no block — it is the base `.outerContainer` values above.)
+  .outerContainer:not([data-short-landscape="true"]) {
+    &[data-breakpoint="tablet"] {
+      --slides-gap: 28px;
+      --slide-radius: 10px;
+      --pagination-gap: 14px;
+    }
+
+    &[data-breakpoint="mobile"] {
+      --slides-gap: 14px;
+      --pagination-gap: 12px;
+      --slide-radius: 8px;
+
+      // Portrait phones: one tall 9:16 card — cap its width so it keeps a
+      // phone-like proportion instead of stretching across a wide-but-portrait
+      // viewport. (Portrait ⇒ not landscape ⇒ not short-landscape, so this is
+      // already exclusive with the flag block below.)
+      &[data-orientation="portrait"] .innerContainer {
+        width: min(100%, 360px);
+      }
+    }
   }
 
-  // Mobile: tighter still (wins over the tablet+mobile rule above by order).
-  .outerContainer[data-breakpoint="mobile"] {
-    --slides-gap: 14px;
-    --pagination-gap: 12px;
-    --slide-radius: 8px;
-  }
-
-  // Portrait phones: one tall 9:16 card — cap its width so the card keeps a
-  // phone-like proportion instead of stretching across a wide-but-portrait
-  // viewport.
-  .outerContainer[data-breakpoint="mobile"][data-orientation="portrait"]
-    .innerContainer {
-    width: min(100%, 360px);
-  }
-
-  // Compact landscape (low-height handhelds): two 16:9 slides side by side;
-  // cap the strip so the derived height stays within the short viewport.
-  // Last of the geometry rules, so its gaps win over the mobile tier's when a
-  // short-landscape phone matches both.
+  // The short-landscape flag is its OWN state — a low-height handheld held
+  // sideways: two 16:9 slides side by side. It replaces the tier styling (the
+  // same precedence the host gives the flag in JS), and its `:not()` twin
+  // above keeps the two mutually exclusive, so no rule here depends on order.
+  // Higher specificity than the base `.outerContainer`, so it also wins over
+  // the desktop base when a wide-but-short viewport matches.
   .outerContainer[data-short-landscape="true"] {
     --slides-gap: 26px;
     --pagination-gap: 6px;

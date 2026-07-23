@@ -90,31 +90,35 @@
     transition: none;
   }
 
-  // Scale the tokens per breakpoint — keyed on the ROOT'S tier attribute, so
-  // they flip on exactly the carousel's own thresholds (config/viewport.ts),
-  // never on numbers typed here. (The old `@media (width <= 1024px)` was off
-  // by one against the tier boundary: at exactly 1024px the carousel is
-  // desktop while the buttons still shrank. Keyed on the tier that cannot
-  // happen.)
-  // Below desktop (tablet + mobile tiers): a tall pill, easier to hit by thumb.
-  [data-breakpoint="tablet"] .navZone,
-  [data-breakpoint="mobile"] .navZone {
-    --nav-button-w: 48px;
-    --nav-button-h: 96px;
-    --nav-button-radius: 10px;
-    --nav-edge-inset: 8px;
+  // Scale the tokens per tier — keyed on the ROOT'S tier attribute, so they
+  // flip on exactly the carousel's own thresholds (config/viewport.ts), never
+  // on numbers typed here, and order-INDEPENDENTLY: the tiers are a single
+  // attribute value (mutually exclusive) and the plain-tier rules exclude the
+  // short-landscape flag, so at most one block matches a given viewport — the
+  // useMedia contract in CSS. (The old `@media (width <= 1024px)` was also off
+  // by one against the tier boundary: at exactly 1024px the carousel is desktop
+  // while the buttons still shrank. Keyed on the tier that cannot happen.)
+  :not([data-short-landscape="true"]) {
+    // Below desktop (tablet + mobile): a tall pill, easier to hit by thumb.
+    &[data-breakpoint="tablet"] .navZone {
+      --nav-button-w: 48px;
+      --nav-button-h: 96px;
+      --nav-button-radius: 10px;
+      --nav-edge-inset: 8px;
+    }
+
+    // Mobile: smaller pill, tighter to the edge.
+    &[data-breakpoint="mobile"] .navZone {
+      --nav-button-w: 40px;
+      --nav-button-h: 80px;
+      --nav-button-radius: 8px;
+      --nav-edge-inset: 6px;
+    }
   }
 
-  // Mobile: smaller pill, tighter to the edge.
-  [data-breakpoint="mobile"] .navZone {
-    --nav-button-w: 40px;
-    --nav-button-h: 80px;
-    --nav-button-radius: 8px;
-    --nav-edge-inset: 6px;
-  }
-
-  // Compact landscape (low-height handhelds): shorter pill that never
-  // exceeds the viewport edge-to-edge.
+  // Compact landscape (low-height handhelds): its own state, mutually
+  // exclusive with the plain tiers above — shorter pill that never exceeds
+  // the viewport edge-to-edge.
   [data-short-landscape="true"] .navZone {
     --nav-button-w: 36px;
     --nav-button-h: 56px;
