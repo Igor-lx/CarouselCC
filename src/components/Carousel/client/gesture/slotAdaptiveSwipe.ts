@@ -1,9 +1,5 @@
 import type { PointerSwipeConfig } from "../../../../shared";
-import {
-  SWIPE_COMMIT_MAX_PX,
-  SWIPE_COMMIT_MIN_PX,
-  SWIPE_COMMIT_SLOT_SHARE,
-} from "../config";
+import type { CarouselSwipeConfig } from "../config";
 
 /**
  * NOT a tuning knob — a calibration RECORD for `resolveSlotAdaptiveSwipeConfig`
@@ -27,13 +23,13 @@ const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
 /**
- * Translate the carousel's content-relative swipe semantics into the
- * engine's absolute px config for the given measured slot. Pure; `null`
- * slot (pre-measure / SSR) returns the base config untouched.
+ * Translate the carousel's content-relative swipe tuning
+ * (`CarouselSwipeConfig`) into the engine's absolute px config
+ * (`Required<PointerSwipeConfig>`) for the given measured slot. Pure.
  *
- * The knobs it translates (`SWIPE_COMMIT_SLOT_SHARE` and the ergonomic
- * clamps) are tuning constants and stay in `config/gesture.ts`; this module
- * owns only the computation and its calibration record.
+ * The knobs it translates live in `CAROUSEL_SWIPE_CONFIG.commit`
+ * (`config/gesture.ts`); this module owns only the computation and its
+ * calibration record.
  *
  * `swipeThresholdRatio: 0` deliberately disables the engine's host-relative
  * threshold: the commit distance is delivered fully resolved via
@@ -41,28 +37,40 @@ const clamp = (value: number, min: number, max: number) =>
  * the engine stays generic and the slot semantics stay carousel-owned.
  */
 export const resolveSlotAdaptiveSwipeConfig = (
-  base: Required<PointerSwipeConfig>,
+  base: CarouselSwipeConfig,
   slotPx: number | null,
 ): Required<PointerSwipeConfig> => {
-  if (slotPx === null || !(slotPx > 0)) return base;
+  // Split the two families the type encodes: `commit` is the carousel-unit
+  // group this resolver OWNS the translation of; `engine` is everything the
+  // engine consumes directly (some fields still rescaled below).
+  const { commit, ...engine } = base;
+
+  // Before the first measurement (SSR / first render): no slot to scale to, so
+  // pass the engine fields through and deliver the commit distance at its
+  // ergonomic floor. A real gesture always outlives the first measurement, so
+  // this governs no committed swipe — it only keeps the shape valid.
+  if (slotPx === null || !(slotPx > 0)) {
+    return { ...engine, swipeThresholdRatio: 0, minSwipeDistance: commit.minPx };
+  }
+
   const slotScale = slotPx / SWIPE_REFERENCE_SLOT_PX;
   return {
-    ...base,
+    ...engine,
     swipeThresholdRatio: 0,
     minSwipeDistance: clamp(
-      slotPx * SWIPE_COMMIT_SLOT_SHARE,
-      SWIPE_COMMIT_MIN_PX,
-      SWIPE_COMMIT_MAX_PX,
+      slotPx * commit.slotShare,
+      commit.minPx,
+      commit.maxPx,
     ),
     resistanceCurvature:
-      base.resistanceCurvature * (SWIPE_REFERENCE_SLOT_PX / slotPx),
+      engine.resistanceCurvature * (SWIPE_REFERENCE_SLOT_PX / slotPx),
     // Flick qualification is CONTENT-relative: "fast/far enough to be a
     // flick" is a judgement about motion relative to one slide, so the
     // px-domain thresholds scale WITH the slot (unlike the curvature,
     // which scales inversely — it is a per-px quantity). Without this a
     // fixed px/ms threshold is proportionally hair-triggered on any slot
     // larger than the calibration one and numb on smaller ones.
-    quickFlickVelocity: base.quickFlickVelocity * slotScale,
-    quickFlickMinOffset: base.quickFlickMinOffset * slotScale,
+    quickFlickVelocity: engine.quickFlickVelocity * slotScale,
+    quickFlickMinOffset: engine.quickFlickMinOffset * slotScale,
   };
 };

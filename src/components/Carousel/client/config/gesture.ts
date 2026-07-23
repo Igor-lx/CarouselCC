@@ -29,10 +29,50 @@ export interface CarouselInertialReleaseConfig extends InertialReleaseConfig {
 }
 
 /**
+ * How far the finger must travel to COMMIT a swipe (advance a page) rather
+ * than snap back — expressed in the carousel's OWN units, a fraction of one
+ * slide. The engine works in absolute px of the whole host element (which is
+ * `visibleSlidesNr` slides wide), so a fixed host-relative threshold would
+ * drift with the slide count — ~11% of a slide at 1 visible, ~32% at 3. These
+ * knobs stay slot-relative; the slot-adaptive resolver
+ * (`gesture/slotAdaptiveSwipe.ts`) translates them into the engine's
+ * `minSwipeDistance` for the measured slot, and always disables the engine's
+ * own host-relative path (`swipeThresholdRatio -> 0`) so the two never fight.
+ */
+export interface SwipeCommitConfig {
+  /** Raw finger travel that commits a slow (non-flick) swipe, as a fraction
+   * of the SLOT width. Calibrated to the proven single-slide phone feel;
+   * raise it to enlarge the snap-back zone (a short drag returns instead of
+   * flipping). */
+  slotShare: number;
+  /** Ergonomic FLOOR on the resolved commit distance (px): a finger's
+   * comfortable travel does not scale with the screen, so a tiny slot must
+   * not become a hair-trigger. */
+  minPx: number;
+  /** Ergonomic CEILING (px): a huge slot must not demand a half-metre swipe. */
+  maxPx: number;
+}
+
+/**
+ * The carousel's whole swipe-tuning surface — everything the author sets. The
+ * type IS the architecture: it is the engine's config MINUS the two fields the
+ * carousel never sets by hand (`minSwipeDistance`, `swipeThresholdRatio`),
+ * PLUS the `commit` group the carousel expresses in its own units. The
+ * slot-adaptive resolver turns this into the full engine
+ * `Required<PointerSwipeConfig>` for the measured slot — passing most fields
+ * through, rescaling a few to the slot, and COMPUTING `minSwipeDistance` from
+ * `commit` (see gesture/slotAdaptiveSwipe.ts).
+ */
+export type CarouselSwipeConfig = Omit<
+  Required<PointerSwipeConfig>,
+  "minSwipeDistance" | "swipeThresholdRatio"
+> & { commit: SwipeCommitConfig };
+
+/**
  * Drag/swipe tuning specific to the carousel. These values control the *feel*
  * of touch dragging and are part of the visual contract.
  */
-export const CAROUSEL_SWIPE_CONFIG: Required<PointerSwipeConfig> = {
+export const CAROUSEL_SWIPE_CONFIG: CarouselSwipeConfig = {
   cooldownMs: 150,
   intentThreshold: 8,
   resistance: 0.33,
@@ -58,8 +98,6 @@ export const CAROUSEL_SWIPE_CONFIG: Required<PointerSwipeConfig> = {
   flickVelocityAlpha: 0.45,
   flickPauseGraceMs: 120,
   flickVelocityHalfLifeMs: 250,
-  minSwipeDistance: 20,
-  swipeThresholdRatio: 0.23,
   // The catch window: a press must rest this long before it BRAKES a moving
   // strip (catch-and-hold). Inside the window a vertical intent hands the
   // gesture to the browser with the ride untouched — this is what keeps a
@@ -72,32 +110,16 @@ export const CAROUSEL_SWIPE_CONFIG: Required<PointerSwipeConfig> = {
   // (~500ms), or the context menu would open before the catch (relation
   // check enforces it).
   catchDelayMs: 250,
+  // The swipe-commit threshold, in the carousel's own units (see
+  // SwipeCommitConfig). The resolver turns this into the engine's
+  // minSwipeDistance for the measured slot; the engine's own
+  // swipeThresholdRatio is always forced to 0.
+  commit: {
+    slotShare: 0.11,
+    minPx: 20,
+    maxPx: 120,
+  },
 };
-
-/**
- * Slot-adaptive swipe normalization KNOBS. The engine works in absolute px
- * of the HOST element, but the user's eye works in slots — "how far did the
- * content move relative to one slide". A fixed host-relative threshold
- * therefore drifts with `visibleSlidesNr`: at 1 visible slide it commits at
- * ~11% of a slide, at 3 it demands ~32%. These constants let the carousel
- * adapter translate content semantics into the engine's absolute units,
- * reactively to the measured slot. The computation itself (and its
- * calibration record) lives with the gesture logic:
- * `gesture/slotAdaptiveSwipe.ts`.
- *
- * - `SWIPE_COMMIT_SLOT_SHARE` — raw finger travel, as a fraction of the slot
- *   width, that commits a slow (non-flick) swipe. Calibrated to match the
- *   proven single-slide phone feel.
- * - `SWIPE_COMMIT_MIN_PX` / `SWIPE_COMMIT_MAX_PX` — ergonomic clamps: a
- *   finger's comfortable travel does not scale with the screen, so extreme
- *   slots must not produce a hair-trigger or a half-metre swipe.
- *
- * Diagnostics audit the values and their pairing (clamps ordered; the share
- * at the reference slot must land inside the clamps).
- */
-export const SWIPE_COMMIT_SLOT_SHARE = 0.11;
-export const SWIPE_COMMIT_MIN_PX = 20;
-export const SWIPE_COMMIT_MAX_PX = 120;
 
 /**
  * Inertial release tuning. `inertiaBoost` makes a fast swipe land faster than

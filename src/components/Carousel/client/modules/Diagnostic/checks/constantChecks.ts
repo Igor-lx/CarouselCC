@@ -30,9 +30,6 @@ import {
   IMAGE_RETRY_MAX_DELAY_MS,
   SLIDE_REORIENT_FADE_IN_MS,
   SLIDE_REORIENT_FADE_OUT_MS,
-  SWIPE_COMMIT_MAX_PX,
-  SWIPE_COMMIT_MIN_PX,
-  SWIPE_COMMIT_SLOT_SHARE,
   SLIDE_REORIENT_VEIL_MAX_MS,
 
   REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
@@ -487,30 +484,12 @@ const numericRules: NumericRule[] = [
     consequence: "Quick-flick offset gate is invalid and gesture intent becomes inconsistent",
     predicate: atLeast(0),
   },
+  // Swipe-commit knobs (CAROUSEL_SWIPE_CONFIG.commit) — the carousel-unit
+  // group the slot resolver turns into the engine's minSwipeDistance.
   {
     layer: "Gesture",
-    field: "CAROUSEL_SWIPE_CONFIG.minSwipeDistance",
-    value: CAROUSEL_SWIPE_CONFIG.minSwipeDistance,
-    severity: "LOGICAL",
-    expected: "Expected a non-negative finite number of pixels",
-    consequence: "Minimum swipe distance is invalid; releases either snap back or always commit",
-    predicate: atLeast(0),
-  },
-  {
-    layer: "Gesture",
-    field: "CAROUSEL_SWIPE_CONFIG.swipeThresholdRatio",
-    value: CAROUSEL_SWIPE_CONFIG.swipeThresholdRatio,
-    severity: "LOGICAL",
-    expected: "Expected a finite number in the range (0, 1]",
-    consequence: "Distance-based commit threshold becomes impossible to reach or fires instantly",
-    predicate: inRangeExclusiveLower(0, 1),
-  },
-
-  // Release config
-  {
-    layer: "Gesture",
-    field: "SWIPE_COMMIT_SLOT_SHARE",
-    value: SWIPE_COMMIT_SLOT_SHARE,
+    field: "CAROUSEL_SWIPE_CONFIG.commit.slotShare",
+    value: CAROUSEL_SWIPE_CONFIG.commit.slotShare,
     severity: "LOGICAL",
     expected: "Expected a finite number in the range (0, 1]",
     consequence: "Slot-relative commit share outside (0,1] makes the swipe threshold degenerate",
@@ -518,8 +497,8 @@ const numericRules: NumericRule[] = [
   },
   {
     layer: "Gesture",
-    field: "SWIPE_COMMIT_MIN_PX",
-    value: SWIPE_COMMIT_MIN_PX,
+    field: "CAROUSEL_SWIPE_CONFIG.commit.minPx",
+    value: CAROUSEL_SWIPE_CONFIG.commit.minPx,
     severity: "LOGICAL",
     expected: "Expected a positive finite number of px",
     consequence: "Ergonomic floor for the commit distance becomes incoherent",
@@ -527,8 +506,8 @@ const numericRules: NumericRule[] = [
   },
   {
     layer: "Gesture",
-    field: "SWIPE_COMMIT_MAX_PX",
-    value: SWIPE_COMMIT_MAX_PX,
+    field: "CAROUSEL_SWIPE_CONFIG.commit.maxPx",
+    value: CAROUSEL_SWIPE_CONFIG.commit.maxPx,
     severity: "LOGICAL",
     expected: "Expected a positive finite number of px",
     consequence: "Ergonomic ceiling for the commit distance becomes incoherent",
@@ -680,26 +659,27 @@ const collectRideFloorRelation = (): CarouselDiagnosticWarning | null => {
 
 const collectSwipeCommitRelations = (): CarouselDiagnosticWarning[] => {
   const out: CarouselDiagnosticWarning[] = [];
-  if (SWIPE_COMMIT_MIN_PX > SWIPE_COMMIT_MAX_PX) {
+  const { slotShare, minPx, maxPx } = CAROUSEL_SWIPE_CONFIG.commit;
+  if (minPx > maxPx) {
     out.push({
       severity: "LOGICAL",
       layer: "Gesture",
-      field: "SWIPE_COMMIT_MIN_PX <= SWIPE_COMMIT_MAX_PX",
-      actual: { minPx: SWIPE_COMMIT_MIN_PX, maxPx: SWIPE_COMMIT_MAX_PX },
+      field: "CAROUSEL_SWIPE_CONFIG.commit.minPx <= .maxPx",
+      actual: { minPx, maxPx },
       expected: "Expected the ergonomic floor not to exceed the ceiling",
       consequence: "The commit-distance clamp collapses to the ceiling for every slot",
     });
   }
-  const atReference = SWIPE_COMMIT_SLOT_SHARE * SWIPE_REFERENCE_SLOT_PX;
-  if (atReference < SWIPE_COMMIT_MIN_PX || atReference > SWIPE_COMMIT_MAX_PX) {
+  const atReference = slotShare * SWIPE_REFERENCE_SLOT_PX;
+  if (atReference < minPx || atReference > maxPx) {
     out.push({
       severity: "LOGICAL",
       layer: "Gesture",
-      field: "SWIPE_COMMIT_SLOT_SHARE * SWIPE_REFERENCE_SLOT_PX within [SWIPE_COMMIT_MIN_PX, SWIPE_COMMIT_MAX_PX]",
+      field: "CAROUSEL_SWIPE_CONFIG.commit.slotShare * SWIPE_REFERENCE_SLOT_PX within [minPx, maxPx]",
       actual: {
         commitAtReferencePx: atReference,
-        minPx: SWIPE_COMMIT_MIN_PX,
-        maxPx: SWIPE_COMMIT_MAX_PX,
+        minPx,
+        maxPx,
       },
       expected:
         "Expected the commit distance at the calibration slot to land inside the ergonomic clamps",

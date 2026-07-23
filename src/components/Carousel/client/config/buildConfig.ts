@@ -86,7 +86,10 @@ export const buildCarouselConfig = ({
   layout: {
     renderWindowBufferMultiplier: RENDER_WINDOW_BUFFER_MULTIPLIER,
   },
-  swipeConfig: { ...CAROUSEL_SWIPE_CONFIG },
+  swipeConfig: {
+    ...CAROUSEL_SWIPE_CONFIG,
+    commit: { ...CAROUSEL_SWIPE_CONFIG.commit },
+  },
   releaseConfig: { ...CAROUSEL_INERTIAL_RELEASE_CONFIG },
   dragReleaseEpsilon: DRAG_RELEASE_EPSILON,
   gestureCoastMaxMs: GESTURE_COAST_MAX_MS,

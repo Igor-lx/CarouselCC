@@ -1,5 +1,4 @@
-import type { PointerSwipeConfig } from "../../../../shared";
-import type { CarouselInertialReleaseConfig } from "./gesture";
+import type { CarouselInertialReleaseConfig, CarouselSwipeConfig } from "./gesture";
 
 export interface PropDerivedSettings {
   visibleSlidesCount: number;
@@ -66,7 +65,7 @@ export interface CarouselRuntimeConfig extends PropDerivedSettings {
   repeatedClick: RepeatedClickSettings;
   interaction: InteractionSettings;
   layout: LayoutSettings;
-  swipeConfig: Required<PointerSwipeConfig>;
+  swipeConfig: CarouselSwipeConfig;
   releaseConfig: CarouselInertialReleaseConfig;
   dragReleaseEpsilon: number;
   /** @see GESTURE_COAST_MAX_MS */

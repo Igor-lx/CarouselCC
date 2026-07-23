@@ -114,8 +114,8 @@ export const STEP_ACCELERATION_DISTANCE_SHARE = 0.35;
 export const STEP_DECELERATION_DISTANCE_SHARE = 0.4;
 
 /** Autoplay step: front-loaded — moves out early, long calm settle. */
-export const AUTOPLAY_ACCELERATION_DISTANCE_SHARE = 0.1;
-export const AUTOPLAY_DECELERATION_DISTANCE_SHARE = 0.6;
+export const AUTOPLAY_ACCELERATION_DISTANCE_SHARE = 0.4;
+export const AUTOPLAY_DECELERATION_DISTANCE_SHARE = 0.5;
 
 /** Snap-back after a no-intent drag release: near-immediate ease-out tail. */
 export const SNAP_BACK_ACCELERATION_DISTANCE_SHARE = 0.08;

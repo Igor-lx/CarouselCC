@@ -975,13 +975,16 @@ engine thinks in absolute px of its host, but the user's eye thinks in slots
 ("how far did the content move relative to one slide"), and a host-relative
 threshold drifts with `visibleSlidesNr` (11% of a slide at 1 visible vs 32%
 at 3). `resolveSlotAdaptiveSwipeConfig` (gesture/slotAdaptiveSwipe.ts, pure,
-unit tested; the tuning KNOBS it translates stay in config/gesture.ts)
-translates content semantics into engine units against the MEASURED
-slot (`useMeasuredSlotSize`): the commit distance becomes
-`clamp(SWIPE_COMMIT_MIN_PX, slot × SWIPE_COMMIT_SLOT_SHARE,
-SWIPE_COMMIT_MAX_PX)` delivered via `minSwipeDistance` (with
-`swipeThresholdRatio: 0` — the engine's own host-relative path is retired
-for the carousel), the rubber curvature is rescaled by
+unit tested; the tuning KNOBS it translates live in
+`CAROUSEL_SWIPE_CONFIG.commit`, config/gesture.ts) translates content
+semantics into engine units against the MEASURED slot
+(`useMeasuredSlotSize`): the commit distance becomes
+`clamp(commit.minPx, slot × commit.slotShare, commit.maxPx)` delivered via
+the engine's `minSwipeDistance` (with `swipeThresholdRatio: 0` — the
+engine's own host-relative path is retired for the carousel; the base
+`CAROUSEL_SWIPE_CONFIG` is the engine config MINUS those two computed fields,
+PLUS the `commit` group, so a field the resolver owns cannot be mis-set by
+hand), the rubber curvature is rescaled by
 `SWIPE_REFERENCE_SLOT_PX / slot` so resistance reaches the same relative
 stiffness at the same relative pull on any slot, and the flick
 qualification (`quickFlickVelocity`, `quickFlickMinOffset`) is rescaled by

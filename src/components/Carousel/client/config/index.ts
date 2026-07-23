@@ -42,9 +42,6 @@ export {
 export {
   CAROUSEL_SWIPE_CONFIG,
   CAROUSEL_INERTIAL_RELEASE_CONFIG,
-  SWIPE_COMMIT_SLOT_SHARE,
-  SWIPE_COMMIT_MIN_PX,
-  SWIPE_COMMIT_MAX_PX,
 } from "./gesture";
 export {
   IMAGE_RETRY_BASE_DELAY_MS,
@@ -77,4 +74,8 @@ export type {
   InteractionSettings,
   LayoutSettings,
 } from "./types";
-export type { CarouselInertialReleaseConfig } from "./gesture";
+export type {
+  CarouselInertialReleaseConfig,
+  CarouselSwipeConfig,
+  SwipeCommitConfig,
+} from "./gesture";
