@@ -5,9 +5,15 @@ import { sameDirectionSpeed } from "./speed";
  * the ride starts at the velocity the eye SAW at lift-off and accelerates to
  * the intent speed — content never jumps above its visible speed.
  *
- * - `visualVelocity` — the UI-domain velocity at release (what was painted);
- * - `handoffVelocity` — optional velocity of an already-running motion the
- *   release takes over (zero for a plain finger drag);
+ * - `visualVelocity` — the continuity speed judged over the whole gesture
+ *   (pause-protected), the value a launch SHOULD start from;
+ * - `handoffVelocity` — a SECOND carried-velocity source; `startSpeed` is the
+ *   larger aligned of the two, so whichever better reflects the live motion
+ *   wins. It is the velocity of an already-running motion the release takes
+ *   over (an in-flight takeover); a consumer may also pass the deck's raw
+ *   release velocity here for a plain drag, so a fast instantaneous lift-off
+ *   is honoured even when the gesture-averaged `visualVelocity` is lower. Zero
+ *   means "no second source";
  * - `intentSpeed` — the unsigned target speed (e.g. `resolveInertialRelease`
  *   output).
  *

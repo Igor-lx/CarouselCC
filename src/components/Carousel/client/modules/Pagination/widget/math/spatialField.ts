@@ -15,16 +15,15 @@ const buildScales = (
 
 const buildStrip = (
   scales: number[],
+  centerIndex: number,
   spatial: PaginationWidgetSpatialConfig,
 ): number[] => {
-  const count = scales.length;
-  const center = Math.floor(count / 2);
-  const strip = new Array<number>(count).fill(0);
-  for (let i = center + 1; i < count; i += 1) {
+  const strip = new Array<number>(scales.length).fill(0);
+  for (let i = centerIndex + 1; i < scales.length; i += 1) {
     strip[i] =
       strip[i - 1]! + spatial.gap + (spatial.size * (scales[i - 1]! + scales[i]!)) / 2;
   }
-  for (let i = center - 1; i >= 0; i -= 1) {
+  for (let i = centerIndex - 1; i >= 0; i -= 1) {
     strip[i] =
       strip[i + 1]! - spatial.gap - (spatial.size * (scales[i + 1]! + scales[i]!)) / 2;
   }
@@ -42,7 +41,7 @@ export const buildPaginationWidgetGeometry = (
     visibleCount,
     centerIndex,
     scales,
-    strip: buildStrip(scales, spatial),
+    strip: buildStrip(scales, centerIndex, spatial),
     unit: spatial.size + spatial.gap,
   };
 };
