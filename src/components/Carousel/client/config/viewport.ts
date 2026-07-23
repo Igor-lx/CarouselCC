@@ -11,8 +11,8 @@ import { canonicalMediaQueries, type MediaAxes } from "../../../../shared";
  *    by those attributes — the stylesheet holds NO media queries and NO
  *    numbers;
  *  - art-directed slide data (`<source media>`) uses the CANONICAL strings
- *    below (derived from the same axes) — so the box, the asset choice, the
- *    warm and the veil all flip on the same thresholds;
+ *    below (derived from the same axes) — so the box, the asset choice and
+ *    the veil all flip on the same thresholds;
  *  - Diagnostics audits every leg against these axes at runtime.
  *
  * All of it is TUNING owned by the carousel (self-sufficient — nothing here

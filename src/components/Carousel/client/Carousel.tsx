@@ -9,6 +9,7 @@ import {
   CarouselStableContext,
   useDiagnosticContextValue,
   useModuleContextValue,
+  type CarouselSlideMediaView,
 } from "./context";
 import { carouselBoundaryState, deckCarriesImageSets } from "./domain";
 import { useCarouselAutoplay } from "./autoplay/useCarouselAutoplay";
@@ -37,6 +38,11 @@ import { CAROUSEL_SLOTS } from "./slots";
 import { useCarouselState } from "./state";
 import { useCarouselStatusReporter } from "./host-report/useCarouselStatusReporter";
 import type { CarouselProps } from "./public-api/types";
+
+/** Build-time flag: the diagnostic layer (the only consumer of the slide
+ * media descriptors below) is dev-only, so its inputs are not built shipped. */
+const IS_DEV = import.meta.env.DEV;
+const EMPTY_SLIDE_MEDIA: CarouselSlideMediaView[] = [];
 
 const Carousel = memo(function Carousel(props: CarouselProps) {
   const {
@@ -132,22 +138,20 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // render status and retry.
   // Deck-order media descriptors for media modules (ResponsiveImages):
   // low-frequency (changes with the data only), image slides only.
-  const slideMediaViews = useMemo(
+  // Art-direction descriptors consumed ONLY by the Diagnostic slot (it audits
+  // each slide's `<source media>` against the canonical axis strings). Built
+  // only in development: production has no Diagnostic consumer, so the flatMap
+  // never runs — the slimmed descriptor carries just the `sources` the audit
+  // reads (see CarouselSlideMediaView).
+  const slideMediaViews = useMemo<CarouselSlideMediaView[]>(
     () =>
-      isContentImg
-        ? records.flatMap((record) => {
-            const { content, image } = record.slideData;
-            if (typeof content !== "string") return [];
-            return [
-              {
-                src: content,
-                srcSet: image?.srcSet,
-                sizes: image?.sizes,
-                sources: image?.sources,
-              },
-            ];
-          })
-        : [],
+      IS_DEV && isContentImg
+        ? records.flatMap((record) =>
+            typeof record.slideData.content === "string"
+              ? [{ sources: record.slideData.image?.sources }]
+              : []
+          )
+        : EMPTY_SLIDE_MEDIA,
     [isContentImg, records]
   );
 

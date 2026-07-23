@@ -8,7 +8,7 @@
  */
 // The art-direction axes (breakpoint table, canonical media strings) live
 // in ./viewport.ts — one table drives the root's data attributes, the
-// generated <source media> strings, the warm, the veil and Diagnostics.
+// generated <source media> strings, the veil and Diagnostics.
 
 /**
  * Orientation-swap veil timing (one layer, three knobs — diagnostics audit

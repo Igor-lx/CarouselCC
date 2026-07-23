@@ -15,7 +15,8 @@ export interface CarouselStatusView {
 
 export interface CarouselLayoutView {
   pageCount: number;
-  /** Slides per page — modules mapping pages to slides (e.g. preload). */
+  /** Slides per page — modules mapping pages to slides (pagination, the
+   * predecode window). */
   visibleSlidesCount: number;
   isFinite: boolean;
   canSlide: boolean;
@@ -23,7 +24,8 @@ export interface CarouselLayoutView {
   isAtEnd: boolean;
   isTouch: boolean;
   isReducedMotion: boolean;
-  /** Host reduced-data signal — preloading modules must respect it. */
+  /** Host reduced-data signal — the slide fetch respects it (off-band images
+   * load lazily and at low priority; see SlideItem). */
   isDataSaverEnabled: boolean;
   /**
    * True when a Diagnostic slot is attached. Modules with their own checks
@@ -58,18 +60,16 @@ export type CarouselNavigationView = Pick<
  * diagnostic) does not re-render on every click.
  */
 /**
- * Per-slide media descriptor (deck order, page-padding clones included) for
- * media-oriented modules (<ResponsiveImages />): everything needed to warm a
- * slide's image without touching the DOM. `src` is the canonical content URL.
+ * Per-slide art-direction descriptor (deck order, page-padding clones
+ * included), image slides only. Its ONLY consumer is the Diagnostic slot,
+ * which checks that each slide's `<source media>` string is one of the
+ * carousel's canonical axis strings — so a crop can never silently flip on a
+ * threshold the slide box does not (see `collectSlideSourceMediaWarnings`).
+ * Hence the sole field is `sources`; it is built only in development (there is
+ * no production consumer).
  */
 export interface CarouselSlideMediaView {
-  src: string;
-  srcSet?: string;
-  sizes?: string;
-  /** The art-directed sources, so a warm can pick the SAME crop the rendered
-   * `<picture>` would pick for the current viewport. Without them a warm
-   * would fetch the default (e.g. landscape) set while the deck renders the
-   * portrait crop — bytes spent on an asset that never appears. */
+  /** The slide's art-directed `<source>`s (their `media` is what is audited). */
   sources?: readonly SlideImageSource[];
 }
 
