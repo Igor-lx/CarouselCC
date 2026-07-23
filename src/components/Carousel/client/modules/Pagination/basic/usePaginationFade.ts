@@ -5,6 +5,7 @@ import {
   resampleStops,
   useIsomorphicLayoutEffect,
 } from "../../../../../../shared";
+import { mod } from "../../../domain";
 import {
   positionAtNow,
   startPinnedAnimation,
@@ -209,8 +210,8 @@ export function usePaginationFade({
   const settle = useCallback(
     (landedOn: number) => {
       // Normalise: a cyclic step may have taken the offset past either end.
-      offsetRef.current =
-        pageCount > 0 ? ((landedOn % pageCount) + pageCount) % pageCount : landedOn;
+      // (`mod` folds to 0 when pageCount <= 0; keep the raw `landedOn` there.)
+      offsetRef.current = pageCount > 0 ? mod(landedOn, pageCount) : landedOn;
       stepRef.current = null;
       cancelAllFades();
       // Idle: re-read the CSS-owned look so a theme/breakpoint change lands.

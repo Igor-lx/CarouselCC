@@ -11,6 +11,7 @@
  * widget's dot does when the strip slides it past the centre.
  */
 
+import { mod } from "../../../domain";
 import { keyframesAlongStops } from "../../../motion";
 
 export interface DotVisualState {
@@ -71,7 +72,7 @@ export const resolveOffsetTarget = (
 ): number => {
   if (isFinite || pageCount <= 0) return targetPageIndex;
   const base = Math.round(from);
-  const forward = (((targetPageIndex - base) % pageCount) + pageCount) % pageCount;
+  const forward = mod(targetPageIndex - base, pageCount);
   if (forward === 0) return base;
   return direction < 0 ? base + forward - pageCount : base + forward;
 };
@@ -164,7 +165,7 @@ export const reachedDotIndexes = (
   // ones in between).
   const seen = new Set<number>();
   for (let position = low; position <= high; position += 1) {
-    seen.add(((position % pageCount) + pageCount) % pageCount);
+    seen.add(mod(position, pageCount));
   }
   return [...seen].sort((a, b) => a - b);
 };
