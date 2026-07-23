@@ -115,7 +115,7 @@ export const CAROUSEL_SWIPE_CONFIG: CarouselSwipeConfig = {
   // minSwipeDistance for the measured slot; the engine's own
   // swipeThresholdRatio is always forced to 0.
   commit: {
-    slotShare: 0.11,
+    slotShare: 0.2,
     minPx: 20,
     maxPx: 120,
   },
