@@ -148,7 +148,7 @@ export default function App() {
             className={appStyles.button}
             onClick={() => setIsWidgetPagination((prev) => !prev)}
           >
-            {isWidgetPagination ? "▭" : "•••"}
+            {isWidgetPagination ? "•••" : "▭"}
           </button>
         </div>
 

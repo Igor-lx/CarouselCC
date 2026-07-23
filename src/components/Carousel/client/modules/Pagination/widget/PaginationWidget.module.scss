@@ -79,24 +79,28 @@
   will-change: transform, opacity;
 }
 
-@media (width <= 767px) {
-  .container_PW {
-    --widget-padding-inline: 20px;
-    --widget-padding-block: 10px;
+// Mobile tier — keyed on the root's tier attribute (config/viewport.ts), so
+// the strip and the slide box flip on one shared threshold, never two typed
+// numbers that could drift apart.
+[data-breakpoint="mobile"] .container_PW {
+  --widget-padding-inline: 20px;
+  --widget-padding-block: 10px;
 
-    max-width: calc(100vw - 24px);
-  }
+  max-width: calc(100vw - 24px);
 }
 
-@media (orientation: landscape) and (height <= 520px) {
-  .container_PW {
-    --widget-padding-inline: 14px;
-    --widget-padding-block: 7px;
-  }
+[data-short-landscape="true"] .container_PW {
+  --widget-padding-inline: 14px;
+  --widget-padding-block: 7px;
 }
 
+// A widget-PRIVATE threshold: below this the strip padding tightens once more.
+// It has no counterpart in the shared axes (it drives neither art direction
+// nor slide geometry), so it stays a raw query rather than becoming a config
+// axis. Scoped to the mobile tier so its specificity matches the attribute
+// rule above and source order still lets it win.
 @media (width <= 380px) {
-  .container_PW {
+  [data-breakpoint="mobile"] .container_PW {
     --widget-padding-inline: 12px;
     --widget-padding-block: 8px;
   }

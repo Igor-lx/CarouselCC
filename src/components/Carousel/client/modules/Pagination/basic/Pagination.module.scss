@@ -92,18 +92,18 @@
     --pagination-dot-radius: 6px;
   }
 
-  @media (width <= 767px) {
-    .paginationWrapper {
-      --pagination-padding-block-start: 12px;
-      --pagination-padding-inline: 10px;
-      --pagination-row-gap: 8px;
-      --pagination-column-gap: 18px;
-    }
+  // Mobile tier — keyed on the root's tier attribute, not a typed number, so
+  // it flips on the carousel's own threshold (config/viewport.ts).
+  [data-breakpoint="mobile"] .paginationWrapper {
+    --pagination-padding-block-start: 12px;
+    --pagination-padding-inline: 10px;
+    --pagination-row-gap: 8px;
+    --pagination-column-gap: 18px;
+  }
 
-    [data-touch="true"] .dot {
-      --pagination-dot-w: 28px;
-      --pagination-dot-h: 9px;
-    }
+  [data-breakpoint="mobile"][data-touch="true"] .dot {
+    --pagination-dot-w: 28px;
+    --pagination-dot-h: 9px;
   }
 
   [data-reduced-motion="true"] .dot {

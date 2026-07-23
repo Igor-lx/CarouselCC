@@ -282,39 +282,37 @@
     font-size: 30px;
   }
 
-  @media (width <= 1023px) {
-    .outerContainer {
-      --slides-gap: 28px;
-      --slide-radius: 10px;
-      --pagination-gap: 14px;
-    }
+  // Below desktop (tablet + mobile tiers): tighter gaps and radii.
+  .outerContainer[data-breakpoint="tablet"],
+  .outerContainer[data-breakpoint="mobile"] {
+    --slides-gap: 28px;
+    --slide-radius: 10px;
+    --pagination-gap: 14px;
   }
 
-  @media (width <= 767px) {
-    .outerContainer {
-      --slides-gap: 14px;
-      --pagination-gap: 12px;
-      --slide-radius: 8px;
-    }
+  // Mobile: tighter still (wins over the tablet+mobile rule above by order).
+  .outerContainer[data-breakpoint="mobile"] {
+    --slides-gap: 14px;
+    --pagination-gap: 12px;
+    --slide-radius: 8px;
   }
 
   // Portrait phones: one tall 9:16 card — cap its width so the card keeps a
   // phone-like proportion instead of stretching across a wide-but-portrait
   // viewport.
-  @media (width <= 767px) and (orientation: portrait) {
+  .outerContainer[data-breakpoint="mobile"][data-orientation="portrait"]
     .innerContainer {
-      width: min(100%, 360px);
-    }
+    width: min(100%, 360px);
   }
 
   // Compact landscape (low-height handhelds): two 16:9 slides side by side;
   // cap the strip so the derived height stays within the short viewport.
-  @media (orientation: landscape) and (height <= 520px) {
-    .outerContainer {
-      --slides-gap: 26px;
-      --pagination-gap: 6px;
-      --slide-radius: 8px;
-    }
+  // Last of the geometry rules, so its gaps win over the mobile tier's when a
+  // short-landscape phone matches both.
+  .outerContainer[data-short-landscape="true"] {
+    --slides-gap: 26px;
+    --pagination-gap: 6px;
+    --slide-radius: 8px;
 
     .innerContainer {
       width: min(100%, 760px);
