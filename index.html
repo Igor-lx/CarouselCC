@@ -11,15 +11,15 @@
       the media pair the correct value exists the instant the head is parsed,
       and in auto mode it even self-switches with the OS theme, no JS needed.
 
-      This script must run synchronously during head parsing (before first
-      paint), so it cannot import a module. Rather than duplicate the theme
-      constants, the `{{…}}` tokens below are INJECTED at build/dev from the
-      single source (BROWSER_THEME_COLORS / THEME_STORAGE_KEY in
-      src/theme/types.ts) by the `theme-boot-inject` plugin in vite.config.ts
-      — one source, structurally, no hand-kept copy to drift.
+      The colors and the storage key below deliberately DUPLICATE
+      BROWSER_THEME_COLORS / THEME_STORAGE_KEY (src/theme/types.ts): this
+      script must run synchronously during head parsing, before first paint,
+      so it cannot import anything. The duplication is locked by
+      src/theme/themeBootSync.test.ts, which reads this file and fails CI on
+      any drift.
     -->
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="{{THEME_COLOR_LIGHT}}" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="{{THEME_COLOR_DARK}}" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#bfd6f8" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d1520" />
     <!--
       `viewport-fit=cover` extends the page canvas under the iPhone notch /
       status bar. Without it Safari letterboxes the layout inside the safe
@@ -35,8 +35,8 @@
     <title>CAROUSEL</title>
     <script>
       (() => {
-        const COLORS = {{THEME_COLORS_JSON}};
-        const STORAGE_KEY = "{{THEME_STORAGE_KEY}}";
+        const COLORS = { light: "#bfd6f8", dark: "#0d1520" };
+        const STORAGE_KEY = "theme-mode";
 
         let mode = "auto";
         try {
