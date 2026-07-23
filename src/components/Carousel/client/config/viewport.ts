@@ -34,6 +34,20 @@ export const SLIDE_VIEWPORT_BREAKPOINTS = {
 export type SlideViewportBreakpoint = keyof typeof SLIDE_VIEWPORT_BREAKPOINTS;
 
 /**
+ * The BASE tier — the one whose geometry lives in the plain `.outerContainer`
+ * rule, not in a `[data-breakpoint="…"]` block. The stylesheet is written
+ * desktop-first, so its default values ARE the desktop tier and only the
+ * narrower tiers override.
+ *
+ * This is a STYLING fact, not a resolution one, and it cannot be derived from
+ * the table: the resolver's fallback is the NARROWEST tier (`0`), while the
+ * CSS base is the WIDEST — opposite ends. A mobile-first stylesheet would name
+ * `mobile` here instead. Diagnostics reads it to know that this tier styling
+ * "nothing by attribute" is intended (it is the base), not a forgotten block.
+ */
+export const SLIDE_VIEWPORT_BASE_BREAKPOINT: SlideViewportBreakpoint = "desktop";
+
+/**
  * Arbitrary named boolean viewport conditions → `data-<name>` on the root.
  * The current demo declares one — `short-landscape` (a landscape viewport
  * too short in HEIGHT for a tall slide, a handheld held sideways). Add,

@@ -1,5 +1,6 @@
 import {
   SLIDE_CANONICAL_SOURCE_MEDIA,
+  SLIDE_VIEWPORT_BASE_BREAKPOINT,
   SLIDE_VIEWPORT_BREAKPOINTS,
   SLIDE_VIEWPORT_FLAGS,
 } from "../../../config";
@@ -212,7 +213,26 @@ export const collectViewportCssWarnings = (): CarouselDiagnosticWarning[] => {
     });
   }
 
+  // A typo'd base-tier designation would suppress the wrong tier below AND
+  // silently exempt nothing real — flag it first so the exemption is trusted.
+  if (!breakpointNames.has(SLIDE_VIEWPORT_BASE_BREAKPOINT)) {
+    out.push({
+      severity: "LOGICAL",
+      layer: "Viewport",
+      field: "SLIDE_VIEWPORT_BASE_BREAKPOINT",
+      actual: SLIDE_VIEWPORT_BASE_BREAKPOINT,
+      expected: `One of the declared tiers: ${[...breakpointNames].join(", ")}`,
+      consequence:
+        "The base tier names no real tier — the base-rule exemption applies to nothing",
+    });
+  }
+
   for (const name of breakpointNames) {
+    // The BASE tier is styled by the plain `.outerContainer` rule, not by an
+    // attribute block, so it is EXPECTED to have no `[data-breakpoint="…"]`
+    // selector — that is the design, not a forgotten block. Every OTHER tier
+    // that styles nothing is still worth a question.
+    if (name === SLIDE_VIEWPORT_BASE_BREAKPOINT) continue;
     if (!referencedBreakpoints.has(name)) {
       out.push({
         severity: "LOGICAL",
