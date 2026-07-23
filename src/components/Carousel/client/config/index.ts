@@ -73,9 +73,7 @@ export type {
   RepeatedClickSettings,
   InteractionSettings,
   LayoutSettings,
-} from "./types";
-export type {
   CarouselInertialReleaseConfig,
   CarouselSwipeConfig,
   SwipeCommitConfig,
-} from "./gesture";
+} from "./types";
