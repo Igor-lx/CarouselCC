@@ -758,6 +758,56 @@ const collectTeleportTransitionZoneRelation =
   };
 
 /**
+ * A GO_TO ramp budget is a share of ONE page spent inside a multi-page span, so
+ * the flight math works in the ratio `share / span` (timing.ts). That ratio is
+ * trusted as authored — no cap — so a share wider than its span makes the local
+ * ramp claim more than the whole segment. Legitimate tuning cannot reach it
+ * (spans are page counts >= 1, shares are fractions of one page), which is
+ * exactly why it is reported instead of silently clamped.
+ */
+const collectGoToRampBudgetRelations = (): CarouselDiagnosticWarning[] => {
+  const out: CarouselDiagnosticWarning[] = [];
+
+  if (GO_TO_ACCELERATION_DISTANCE_SHARE > GO_TO_PREFLIGHT_PAGE_SPAN) {
+    out.push({
+      severity: "LOGICAL",
+      layer: "Motion",
+      field: "GO_TO_ACCELERATION_DISTANCE_SHARE <= GO_TO_PREFLIGHT_PAGE_SPAN",
+      actual: {
+        accelerationDistanceShare: GO_TO_ACCELERATION_DISTANCE_SHARE,
+        preflightPageSpan: GO_TO_PREFLIGHT_PAGE_SPAN,
+        localAccelerationShare:
+          GO_TO_ACCELERATION_DISTANCE_SHARE / GO_TO_PREFLIGHT_PAGE_SPAN,
+      },
+      expected:
+        "Expected the acceleration budget to fit inside the preflight span",
+      consequence:
+        "The preflight ramp claims more than the whole preflight: its cruise term goes negative and a fast entry can drive the planned preflight duration below zero",
+    });
+  }
+
+  if (GO_TO_DECELERATION_DISTANCE_SHARE > GO_TO_FINAL_APPROACH_PAGE_SPAN) {
+    out.push({
+      severity: "LOGICAL",
+      layer: "Motion",
+      field: "GO_TO_DECELERATION_DISTANCE_SHARE <= GO_TO_FINAL_APPROACH_PAGE_SPAN",
+      actual: {
+        decelerationDistanceShare: GO_TO_DECELERATION_DISTANCE_SHARE,
+        finalApproachPageSpan: GO_TO_FINAL_APPROACH_PAGE_SPAN,
+        localDecelerationShare:
+          GO_TO_DECELERATION_DISTANCE_SHARE / GO_TO_FINAL_APPROACH_PAGE_SPAN,
+      },
+      expected:
+        "Expected the deceleration budget to fit inside the final-approach span",
+      consequence:
+        "The approach ramp claims more than the whole approach, stretching the planned approach duration past its intended envelope",
+    });
+  }
+
+  return out;
+};
+
+/**
  * Audit every hand-written carousel constant used at runtime. The constants
  * are imported by value so the checks always see what the runtime sees.
  */
@@ -814,5 +864,6 @@ export const collectConstantWarnings = (): CarouselDiagnosticWarning[] => {
   if (teleportEnabledType) out.push(teleportEnabledType);
   const teleportTransitionZone = collectTeleportTransitionZoneRelation();
   if (teleportTransitionZone) out.push(teleportTransitionZone);
+  out.push(...collectGoToRampBudgetRelations());
   return out;
 };

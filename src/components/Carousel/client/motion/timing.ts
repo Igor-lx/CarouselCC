@@ -157,7 +157,11 @@ export const resolveGoToApproachDuration = (
   const zones = resolveGoToProfileZones(stepSize, motion);
   const approach = zones.approachDistance;
   if (!(approach > 0) || !(peakSpeed > 0)) return 0;
-  const decelShare = Math.min(1, zones.decelerationDistance / approach);
+  // The ramp budget is trusted as authored: a share wider than its span is a
+  // misconfiguration the Diagnostic layer reports, not one this math silently
+  // caps. Legitimate tuning cannot reach it (spans are page counts >= 1,
+  // shares are fractions of one page).
+  const decelShare = zones.decelerationDistance / approach;
   return (approach * (1 + decelShare)) / peakSpeed;
 };
 
@@ -176,7 +180,11 @@ export const resolveGoToPreflightDuration = (
   const zones = resolveGoToProfileZones(stepSize, motion);
   const preflight = zones.preflightDistance;
   if (!(preflight > 0) || !(peakSpeed > 0)) return 0;
-  const accelShare = Math.min(1, zones.accelerationDistance / preflight);
+  // Trusted as authored — see resolveGoToApproachDuration. Over-budget here is
+  // the sharper failure: the cruise term `(1 - accelShare)` goes negative, and
+  // a fast enough entry can pull the planned duration below zero. That is the
+  // visible failure mode of a broken tuning, reported by Diagnostic.
+  const accelShare = zones.accelerationDistance / preflight;
   const entrySpeed = Math.max(0, startSpeed);
   const accelDistance = accelShare * preflight;
   return (
