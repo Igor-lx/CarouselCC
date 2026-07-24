@@ -78,10 +78,20 @@ export default function App() {
 
   const [isAutoplay, setIsAutoplay] = useState(false);
   const [isInteractive, setIsInteractive] = useState(false);
-  // Which pagination module is mounted. Defaults to the product rule (dots on
-  // a pointer device, the strip widget on touch) and is overridable from the
-  // control bar so both can be compared on one device without a redeploy.
-  const [isWidgetPagination, setIsWidgetPagination] = useState(isTouch);
+  // Which pagination module is mounted. `null` means "follow the product rule"
+  // (dots on a pointer device, the strip widget on touch); an explicit boolean
+  // is a manual override from the control bar, so both can be compared on one
+  // device without a redeploy.
+  //
+  // Derived, NOT seeded via `useState(isTouch)`: that latches whatever `isTouch`
+  // happened to be on the first render and can never resync — which is exactly
+  // how a phone ended up with the dots. Even with the signal now correct on the
+  // first frame, `isTouch` can still flip later (the pointerdown fallback on a
+  // hybrid device), and this form follows it.
+  const [paginationOverride, setPaginationOverride] = useState<boolean | null>(
+    null,
+  );
+  const isWidgetPagination = paginationOverride ?? isTouch;
 
   // Imperative control from another part of the page.
   const carouselRef = useRef<CarouselHandle>(null);
@@ -146,7 +156,7 @@ export default function App() {
           </button>
           <button
             className={appStyles.button}
-            onClick={() => setIsWidgetPagination((prev) => !prev)}
+            onClick={() => setPaginationOverride(!isWidgetPagination)}
           >
             {isWidgetPagination ? "•••" : "▭"}
           </button>

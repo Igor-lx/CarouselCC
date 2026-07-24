@@ -1,11 +1,19 @@
 import { useSyncExternalStore } from "react";
 
 let isTouch = false;
+let initialized = false;
 let mediaQuery: MediaQueryList | null = null;
 const listeners = new Set<() => void>();
 
 const notify = () => {
   listeners.forEach((l) => l());
+};
+
+/** Live read of the coarse-pointer signal; the MediaQueryList is made once. */
+const read = (): boolean => {
+  if (typeof window === "undefined") return false;
+  mediaQuery ??= window.matchMedia("(pointer: coarse)");
+  return mediaQuery.matches;
 };
 
 const onMediaChange = (event: MediaQueryListEvent) => {
@@ -26,10 +34,13 @@ const onPointerDown = (event: PointerEvent) => {
 const subscribe = (callback: () => void) => {
   listeners.add(callback);
 
-  if (typeof window !== "undefined" && !mediaQuery) {
-    mediaQuery = window.matchMedia("(pointer: coarse)");
-    isTouch = mediaQuery.matches;
-    mediaQuery.addEventListener("change", onMediaChange);
+  // Gated on the subscriber COUNT, not on whether the MediaQueryList exists: a
+  // re-subscribe after a full teardown must re-attach the change listener and
+  // re-sync from the live value.
+  if (listeners.size === 1 && typeof window !== "undefined") {
+    isTouch = read();
+    initialized = true;
+    mediaQuery?.addEventListener("change", onMediaChange);
 
     if (!isTouch) {
       window.addEventListener("pointerdown", onPointerDown, { passive: true });
@@ -39,19 +50,30 @@ const subscribe = (callback: () => void) => {
   return () => {
     listeners.delete(callback);
 
-    if (listeners.size === 0 && mediaQuery) {
-      mediaQuery.removeEventListener("change", onMediaChange);
+    if (listeners.size === 0) {
+      mediaQuery?.removeEventListener("change", onMediaChange);
       window.removeEventListener("pointerdown", onPointerDown);
-      mediaQuery = null;
-      // Reset to the declared initial state so a later re-subscribe starts
-      // clean, mirroring `useDataSaver`'s teardown. The next `subscribe` re-
-      // reads `matchMedia`, so this only governs the no-listener gap.
-      isTouch = false;
+      // Dormant: nothing keeps the value fresh any more, so force the next
+      // consumer (subscribe OR a render-time getSnapshot) to re-read.
+      initialized = false;
     }
   };
 };
 
-const getSnapshot = () => isTouch;
+/**
+ * LAZY LIVE read on the first call: React reads the snapshot during render,
+ * BEFORE it subscribes. Returning a cached `false` there reported "not a touch
+ * device" for the whole first frame on every phone — and any consumer that
+ * latched that first value (e.g. `useState(isTouch)`) stayed wrong for good.
+ */
+const getSnapshot = () => {
+  if (!initialized) {
+    isTouch = read();
+    initialized = true;
+  }
+  return isTouch;
+};
+
 const getServerSnapshot = () => false;
 
 /**
