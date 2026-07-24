@@ -22,6 +22,15 @@ const SILENT_VALUE = Object.freeze({
   slots: null,
 }) as unknown as CarouselDiagnosticContextValue;
 
+/**
+ * Production stand-in for an individual sub-view. The hook returns
+ * `SILENT_VALUE` in production, so no sub-view is ever read there — building
+ * them anyway was pure discarded work. Typed `never` so each memo keeps the
+ * exact shape of its DEV branch, while the object literal itself is dropped
+ * from the production bundle with the `IS_DEV` branch.
+ */
+const SILENT_SUBVIEW = null as never;
+
 interface UseDiagnosticContextValueInput {
   /** Full effective state — carries its own layout, so the structural
    * validator inside `<Diagnostic />` can never receive a state/layout pair
@@ -86,14 +95,17 @@ export function useDiagnosticContextValue({
   deckCarriesImageSets,
 }: UseDiagnosticContextValueInput): CarouselDiagnosticContextValue {
   const propsView = useMemo(
-    () => ({
-      visibleSlidesNr,
-      durationAutoplay,
-      durationStep,
-      intervalAutoplay,
-      errAltPlaceholder,
-      userEnvironment,
-    }),
+    () =>
+      IS_DEV
+        ? {
+            visibleSlidesNr,
+            durationAutoplay,
+            durationStep,
+            intervalAutoplay,
+            errAltPlaceholder,
+            userEnvironment,
+          }
+        : SILENT_SUBVIEW,
     [
       durationAutoplay,
       durationStep,
@@ -105,15 +117,18 @@ export function useDiagnosticContextValue({
   );
 
   const layoutView = useMemo(
-    () => ({
-      rawLength,
-      requestedVisibleSlidesCount,
-      extendedLength,
-      didExtendLayout,
-      hasPerfectPageLayout,
-      visibleSlidesCount,
-      canSlide,
-    }),
+    () =>
+      IS_DEV
+        ? {
+            rawLength,
+            requestedVisibleSlidesCount,
+            extendedLength,
+            didExtendLayout,
+            hasPerfectPageLayout,
+            visibleSlidesCount,
+            canSlide,
+          }
+        : SILENT_SUBVIEW,
     [
       canSlide,
       didExtendLayout,
@@ -126,15 +141,18 @@ export function useDiagnosticContextValue({
   );
 
   const slotsView = useMemo(
-    () => ({
-      isControlsOn,
-      hasControlsSlot,
-      isPaginationOn,
-      hasPaginationSlot,
-      isPaginationInteractiveOn,
-      hasResponsiveImagesSlot,
-      deckCarriesImageSets,
-    }),
+    () =>
+      IS_DEV
+        ? {
+            isControlsOn,
+            hasControlsSlot,
+            isPaginationOn,
+            hasPaginationSlot,
+            isPaginationInteractiveOn,
+            hasResponsiveImagesSlot,
+            deckCarriesImageSets,
+          }
+        : SILENT_SUBVIEW,
     [
       deckCarriesImageSets,
       hasControlsSlot,

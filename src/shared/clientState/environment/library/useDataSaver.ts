@@ -19,11 +19,26 @@ const readConnection = (): NetworkInformationLike | null => {
 
 let prefersReducedData = false;
 let saveDataEnabled = false;
+let initialized = false;
 let reducedDataQuery: MediaQueryList | null = null;
 let connection: NetworkInformationLike | null = null;
 const listeners = new Set<() => void>();
 
 const notify = (): void => listeners.forEach((listener) => listener());
+
+/**
+ * Live read of BOTH signals; the MediaQueryList and the connection handle are
+ * created once and reused. `saveDataEnabled` is recomputed from scratch every
+ * time, so an environment without `navigator.connection` can never keep a
+ * stale value.
+ */
+const read = (): void => {
+  if (typeof window === "undefined") return;
+  reducedDataQuery ??= window.matchMedia("(prefers-reduced-data: reduce)");
+  prefersReducedData = reducedDataQuery.matches;
+  connection ??= readConnection();
+  saveDataEnabled = Boolean(connection?.saveData);
+};
 
 const onReducedDataChange = (event: MediaQueryListEvent): void => {
   if (prefersReducedData === event.matches) return;
@@ -41,35 +56,41 @@ const onConnectionChange = (): void => {
 const subscribe = (callback: () => void): (() => void) => {
   listeners.add(callback);
 
-  if (reducedDataQuery === null && typeof window !== "undefined") {
-    reducedDataQuery = window.matchMedia("(prefers-reduced-data: reduce)");
-    prefersReducedData = reducedDataQuery.matches;
-    reducedDataQuery.addEventListener("change", onReducedDataChange);
-
-    connection = readConnection();
-    if (connection) {
-      saveDataEnabled = Boolean(connection.saveData);
-      connection.addEventListener("change", onConnectionChange);
-    }
+  // Gated on the subscriber COUNT, not on whether the MediaQueryList exists: a
+  // re-subscribe after a full teardown must re-attach both change listeners and
+  // re-sync from the live values.
+  if (listeners.size === 1 && typeof window !== "undefined") {
+    read();
+    initialized = true;
+    reducedDataQuery?.addEventListener("change", onReducedDataChange);
+    connection?.addEventListener("change", onConnectionChange);
   }
 
   return () => {
     listeners.delete(callback);
-    if (listeners.size > 0 || reducedDataQuery === null) return;
-    reducedDataQuery.removeEventListener("change", onReducedDataChange);
+    if (listeners.size > 0) return;
+    reducedDataQuery?.removeEventListener("change", onReducedDataChange);
     connection?.removeEventListener("change", onConnectionChange);
-    reducedDataQuery = null;
-    connection = null;
-    // Return the module store to its declared initial state. Otherwise a
-    // teardown followed by a re-subscribe in an environment without
-    // `navigator.connection` would keep a stale `saveDataEnabled`.
-    prefersReducedData = false;
-    saveDataEnabled = false;
+    // Dormant: nothing keeps the values fresh any more, so force the next
+    // consumer (subscribe OR a render-time getSnapshot) to re-read.
+    initialized = false;
   };
 };
 
-/** Snapshot when reduced-data observation is active. */
-const getSnapshot = (): boolean => prefersReducedData || saveDataEnabled;
+/**
+ * Snapshot when reduced-data observation is active — with a LAZY LIVE read on
+ * the first call: React reads the snapshot during render, BEFORE it subscribes.
+ * Returning the cached `false` there reported "data-saver off" for the whole
+ * first frame — which is the very frame the off-band image fetch policy is
+ * decided in, so a data-saving user could still eat the speculative requests.
+ */
+const getSnapshot = (): boolean => {
+  if (!initialized) {
+    read();
+    initialized = true;
+  }
+  return prefersReducedData || saveDataEnabled;
+};
 
 /**
  * Neutral snapshot used both for SSR/hydration and for the disabled hook —
