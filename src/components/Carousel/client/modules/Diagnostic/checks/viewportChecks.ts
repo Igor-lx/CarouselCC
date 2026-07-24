@@ -26,12 +26,19 @@ import type { CarouselDiagnosticWarning } from "../types";
  *    component's own module styles are always same-origin.
  */
 
-const canonical = new Set<string>(SLIDE_CANONICAL_SOURCE_MEDIA);
-const breakpointNames = new Set<string>(
-  Object.keys(SLIDE_VIEWPORT_BREAKPOINTS),
-);
-const flagNames = new Set<string>(Object.keys(SLIDE_VIEWPORT_FLAGS));
-const ORIENTATION_NAMES = new Set(["portrait", "landscape"]);
+/**
+ * These lookup sets are built on demand, NOT at module scope. As module-level
+ * consts each `new Set(...)` was a top-level side effect the bundler cannot
+ * prove pure, so they survived tree-shaking and ran on import in production —
+ * where no diagnostic ever reads them. Behind functions they are unreachable
+ * once the collectors are gated out. Each collector runs at most once per
+ * mount, so rebuilding the sets there costs nothing.
+ */
+const canonicalMediaSet = () => new Set<string>(SLIDE_CANONICAL_SOURCE_MEDIA);
+const breakpointNameSet = () =>
+  new Set<string>(Object.keys(SLIDE_VIEWPORT_BREAKPOINTS));
+const flagNameSet = () => new Set<string>(Object.keys(SLIDE_VIEWPORT_FLAGS));
+const orientationNameSet = () => new Set(["portrait", "landscape"]);
 
 export const collectViewportAxisWarnings =
   (): CarouselDiagnosticWarning[] => {
@@ -116,6 +123,7 @@ export const collectViewportAxisWarnings =
 export const collectSlideSourceMediaWarnings = (
   slides: readonly CarouselSlideMediaView[],
 ): CarouselDiagnosticWarning[] => {
+  const canonical = canonicalMediaSet();
   const offending = new Set<string>();
   for (const slide of slides) {
     for (const source of slide.sources ?? []) {
@@ -164,6 +172,9 @@ const walkRules = (
  */
 export const collectViewportCssWarnings = (): CarouselDiagnosticWarning[] => {
   if (typeof document === "undefined") return [];
+  const breakpointNames = breakpointNameSet();
+  const flagNames = flagNameSet();
+  const ORIENTATION_NAMES = orientationNameSet();
   const out: CarouselDiagnosticWarning[] = [];
   const referencedBreakpoints = new Set<string>();
   const referencedFlags = new Set<string>();

@@ -81,7 +81,16 @@ const checkNumber = (rule: NumericRule): CarouselDiagnosticWarning | null => {
   };
 };
 
-const numericRules: NumericRule[] = [
+/**
+ * Built on demand, NOT at module scope. As a module-level `const` this table
+ * was a top-level side effect (a `.map()` plus a predicate-factory call per
+ * entry), which the bundler cannot prove pure — so it survived tree-shaking and
+ * ran on import in production, where nothing ever reads it. Behind a function
+ * the whole table is unreachable once `collectConstantWarnings` is gated out,
+ * and the module drops from the production bundle entirely. Called once per
+ * mount in development.
+ */
+const buildNumericRules = (): NumericRule[] => [
   // Motion timings / factors
   {
     layer: "Motion",
@@ -813,7 +822,7 @@ const collectGoToRampBudgetRelations = (): CarouselDiagnosticWarning[] => {
  */
 export const collectConstantWarnings = (): CarouselDiagnosticWarning[] => {
   const out: CarouselDiagnosticWarning[] = [];
-  for (const rule of numericRules) {
+  for (const rule of buildNumericRules()) {
     const warning = checkNumber(rule);
     if (warning) out.push(warning);
   }
