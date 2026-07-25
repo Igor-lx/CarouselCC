@@ -24,7 +24,7 @@ const IS_DEV = import.meta.env.DEV;
 const EMPTY: CarouselDiagnosticWarning[] = [];
 
 const BANNER =
-  "[Carousel Diagnostic] enabled. Observe-only: diagnostics reports runtime values and never repairs them.";
+  "[Carousel Diagnostic] enabled. Observe-mode only: diagnostics reports runtime misvalues but never repair or normalizes them.";
 
 const DiagnosticBase = memo(function CarouselDiagnostic() {
   const { state, props, layout, slots } = useCarouselDiagnosticContext();
@@ -38,7 +38,7 @@ const DiagnosticBase = memo(function CarouselDiagnostic() {
   // Stylesheet-dependent audit runs AFTER mount: the scan needs the module
   // styles attached to the document, which render time cannot guarantee.
   const [cssWarnings, setCssWarnings] = useState<CarouselDiagnosticWarning[]>(
-    [],
+    []
   );
   useEffect(() => {
     if (!IS_DEV) return;
@@ -67,27 +67,27 @@ const DiagnosticBase = memo(function CarouselDiagnostic() {
       IS_DEV
         ? [...collectConstantWarnings(), ...collectViewportAxisWarnings()]
         : EMPTY,
-    [],
+    []
   );
   const propWarnings = useMemo(
     () => (IS_DEV ? collectPropWarnings(props) : EMPTY),
-    [props],
+    [props]
   );
   const dataWarnings = useMemo(
     () => (IS_DEV ? collectSlideSourceMediaWarnings(slides) : EMPTY),
-    [slides],
+    [slides]
   );
   const layoutWarnings = useMemo(
     () => (IS_DEV ? collectLayoutWarnings(layout) : EMPTY),
-    [layout],
+    [layout]
   );
   const slotWarnings = useMemo(
     () => (IS_DEV ? collectSlotWarnings(slots) : EMPTY),
-    [slots],
+    [slots]
   );
   const stateWarnings = useMemo(
     () => (IS_DEV ? collectStateWarnings(state) : EMPTY),
-    [state],
+    [state]
   );
 
   const warnings = useMemo<CarouselDiagnosticWarning[]>(
@@ -108,7 +108,7 @@ const DiagnosticBase = memo(function CarouselDiagnostic() {
       propWarnings,
       slotWarnings,
       stateWarnings,
-    ],
+    ]
   );
 
   useGroupedWarnings(warnings);
@@ -116,7 +116,9 @@ const DiagnosticBase = memo(function CarouselDiagnostic() {
   return null;
 });
 
-export const Diagnostic: CarouselSlotComponent<typeof DiagnosticBase, "diagnostic"> =
-  Object.assign(DiagnosticBase, { slot: "diagnostic" as const });
+export const Diagnostic: CarouselSlotComponent<
+  typeof DiagnosticBase,
+  "diagnostic"
+> = Object.assign(DiagnosticBase, { slot: "diagnostic" as const });
 
 export default Diagnostic;

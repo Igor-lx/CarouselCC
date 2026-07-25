@@ -89,7 +89,7 @@ export default function App() {
   // first frame, `isTouch` can still flip later (the pointerdown fallback on a
   // hybrid device), and this form follows it.
   const [paginationOverride, setPaginationOverride] = useState<boolean | null>(
-    null,
+    null
   );
   const isWidgetPagination = paginationOverride ?? isTouch;
 

@@ -14,19 +14,6 @@ import {
   type ReducerEnvelope,
 } from "./types";
 
-/**
- * ADR-001 — layout reconciliation has one pure rule and two boundaries.
- *
- * `CarouselLayout` is derived from props that change in the render phase
- * without any dispatch (viewport resize, `slidesData` replace, `isFinite`
- * toggle). `useCarouselState` projects the committed reducer state through
- * `reconcileStateToLayout` during render, so runtime consumers immediately see
- * a state/layout pair for the live layout even when no command was dispatched.
- * This reducer applies the same pure reconciler at the command boundary, so
- * the physical transition also starts from the live layout. There is one
- * reconciliation rule and no layout-effect catch-up command.
- */
-
 const dragReleasePhase = (
   command: EndDragCommand,
   isInstantMode: boolean,
@@ -40,6 +27,8 @@ export function carouselReducer(
   envelope: ReducerEnvelope,
 ): CarouselState {
   const { context } = envelope;
+  // The command-boundary reconcile: every command starts from the live layout.
+  // See docs/adr/0001-layout-reconciliation.md.
   const synced = reconcileStateToLayout(state, context.layout);
 
   switch (envelope.type) {
