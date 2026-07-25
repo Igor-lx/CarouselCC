@@ -11,12 +11,8 @@ const slideContentKey = (slide: Slide): string => {
   return "react-element";
 };
 
-/**
- * One-pass `dataKey` builder. The previous `records.map(...).join("|")`
- * allocated an intermediate string array of length N before the join; this
- * loop concatenates straight into the result. Same O(n) cost, one fewer
- * heap allocation per layout build.
- */
+/** One-pass `dataKey` builder — concatenates straight into the result (no
+ * intermediate array), one fewer heap allocation per layout build. */
 const buildDataKey = (records: CarouselSlideRecord[]): string => {
   let key = "";
   for (let index = 0; index < records.length; index += 1) {

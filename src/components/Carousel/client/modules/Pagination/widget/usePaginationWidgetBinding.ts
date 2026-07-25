@@ -17,15 +17,9 @@ import {
   isDroppedFallbackFrame,
   type VisualPositionSource,
 } from "../../../visual-position";
-// Per-frame change-detection thresholds for the dot DOM-write path — an
-// IMPLEMENTATION detail of this binding (see the contract in
-// config/index.ts), colocated with the write gates they feed. A new
-// projection value below the matching epsilon does not trigger a style
-// assignment (or even a transform-string allocation): the dot is already
-// visually at the previous value within sub-pixel / sub-percent precision,
-// and writing again only feeds the browser a redundant style invalidation.
-// Sized so "wobble" between two near-equal frames stays smooth while a
-// steady-state idle widget emits zero per-rAF DOM writes.
+// Per-frame write gates: a projection value within the matching epsilon of the
+// last one skips the style assignment (and the transform-string allocation), so
+// a steady-state idle widget emits zero per-rAF DOM writes.
 const DOT_POSITION_EPSILON_PX = 0.25;
 const DOT_SCALE_EPSILON = 0.002;
 const DOT_OPACITY_EPSILON = 0.01;
@@ -46,23 +40,12 @@ import type {
 } from "./types";
 
 /**
- * The widget's motion model (mirrors the deck's engine-first design):
- *
- * - The widget owns a decoupled step counter `offset` (float, unbounded). It
- *   never mirrors the deck's absolute position: a navigation command is one
- *   step forward or back, whether the deck travels one page or teleports ten.
- * - **WAAPI mode** (any engine-planned motion): the plan carries duration +
- *   the percent-progress stops of the deck's profile. Every dot gets ONE
- *   keyframe list folding both curves — the i-th keyframe is the dot's
- *   spatial projection at temporal progress `stops[i]` — pinned to the shared
- *   `startedAt` clock, so widget and deck run the same temporal curve over
- *   different distances, in phase, with zero per-frame work.
- * - **Follow mode** (finger on the deck, or the no-WAAPI legacy fallback):
- *   per-frame writes driven by the visual-position stream, delta-based
- *   (`offset` moves by the deck's page-offset delta), with epsilon write
- *   gates; in the fallback flavour the shared frame-skip rule drops the same
- *   frames the track drops.
- * - **Idle / instant**: finalize to an integer offset and paint statically.
+ * The widget's motion model: a decoupled unbounded step counter `offset` (one
+ * step per command, never the deck's absolute position). WAAPI mode folds the
+ * deck's percent-progress stops into each dot's keyframed projection on the
+ * shared clock (in phase, zero per-frame work); follow mode writes per frame
+ * from the visual-position stream with epsilon gates. See
+ * docs/architecture/modules.md.
  */
 
 /** Extra dot elements beyond the resting window: a step's travel plus an
