@@ -21,14 +21,9 @@ import {
 
 interface UseCarouselGestureInput {
   viewportRef: RefObject<HTMLDivElement | null>;
-  /**
-   * The TRACK — the carousel's draggable surface. Declaring it positively is
-   * what keeps chrome layered inside the viewport (the Controls arrows, any
-   * future overlay) from touching a running ride: a press outside the track
-   * is not the gesture engine's business at all, exactly like a press outside
-   * the component. Pressing a SLIDE still brakes the deck — slides live
-   * inside the track.
-   */
+  /** The TRACK — the draggable surface. Declared positively so chrome layered
+   * inside the viewport (Controls arrows, overlays) never touches a running
+   * ride; a slide press still brakes the deck (slides live inside the track). */
   trackRef: RefObject<HTMLDivElement | null>;
   layout: CarouselLayout;
   /**
@@ -37,16 +32,10 @@ interface UseCarouselGestureInput {
    * pointer handlers, as if the gesture surface did not exist.
    */
   isSwipeOn: boolean;
-  /**
-   * The pending destination of an in-flight ride, `null` while idle. A drag
-   * that GRABS a moving deck anchors its origin page here instead of the
-   * nearest-by-geometry page: otherwise a repeat swipe early in a ride
-   * (visual < 50% of a page) would round back to the ride's start page and
-   * merely re-target the ALREADY incoming page — while the same swipe past
-   * 50% (and every repeated click, uniformly) advances one page beyond it.
-   * Anchoring on the pending target makes the repeat gesture progress-
-   * independent, exactly like the repeated click.
-   */
+  /** Pending destination of an in-flight ride, `null` while idle. A drag that
+   * grabs a moving deck anchors its origin page here (not the nearest-by-
+   * geometry page), making a repeat swipe progress-independent like a repeated
+   * click. See docs/architecture/gesture.md. */
   inFlightTargetPageIndex: number | null;
   dispatch: CarouselDispatch;
   readCurrentPosition: () => number;

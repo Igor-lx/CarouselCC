@@ -26,23 +26,13 @@ import {
 } from "./fadeKeyframes";
 
 /**
- * Engine-driven dot binding — the third consumer of the motion plan (track:
- * pixels, widget: dot steps, pagination: the LOOK of fixed dots).
- *
- * The model is the widget's, in a different domain: one continuous `offset`
- * travels from the page being left to the page being entered along the plan's
- * percent-progress stops, over the plan's duration, pinned to the plan's
- * clock; each dot's look is a function of its distance from that offset (see
- * fadeKeyframes). Because there is exactly ONE motion and ONE clock, a page
- * merely passed through by a repeated click rises to the active look and falls
- * again in step with the deck — no separate, faster curve is authored for it.
- *
- * React flips the `dotActive` class to the target page immediately on every
- * command; the animations mask that flip while a planned motion runs, and the
- * class styles underneath are exactly the values the animations end on.
- *
- * Non-planned changes (mount, drag target flips, the no-WAAPI fallback,
- * reduced motion where the plan source is null) keep the plain CSS transition.
+ * Engine-driven dot binding — the third consumer of the motion plan (track =
+ * pixels, widget = dot steps, pagination = the LOOK of fixed dots). One
+ * `offset` travels the plan's stops on its clock; each dot's look is a function
+ * of its distance from it. React flips the `dotActive` class to the target
+ * immediately; the animations mask the flip and end exactly on the class
+ * styles. Non-planned changes keep the plain CSS transition. See
+ * docs/architecture/modules.md.
  */
 
 const FALLBACK_INACTIVE: DotVisualState = { opacity: 0.2, scale: 1 };
@@ -167,9 +157,9 @@ export function usePaginationFade({
    * frame.
    *
    * The cascade still picks the animation, so the picture stays correct —
-   * which is exactly why the cost stayed invisible. Measured on a Redmi Note
-   * 11S, suppressing the transition for the duration takes a ride from 452
-   * main frames (2696 ms) down to 12 (81 ms). See PERF-INVESTIGATION §3.5.
+   * which is exactly why the cost stays invisible. Suppressing the transition
+   * for the ride is a measured ~40x main-frame reduction on a weak device; do
+   * not remove it.
    */
   const suppressTransition = useCallback((pageIndex: number) => {
     const dot = dotRefs.current[pageIndex];

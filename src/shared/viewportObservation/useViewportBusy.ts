@@ -25,8 +25,8 @@ interface UseViewportBusyInput {
  * themselves are produced on time. That stall is below the web platform:
  * pages get no presentation feedback and no lever over the compositor. The
  * one thing a page CAN do is not START avoidable motion while the viewport
- * is unsettled — this hook is that signal (measured on device: 33–50 ms
- * present gaps at every scroll stop; see PERF-INVESTIGATION §9.3).
+ * is unsettled — this hook is that signal (measured on device: tens of ms of
+ * present gaps at every scroll stop).
  *
  * DELIBERATELY NON-REACTIVE: the result is a stable GETTER, not state. The
  * first version flipped React state inside the `touchstart` handler — which

@@ -1,26 +1,17 @@
 import type { MotionSettings } from "../config";
 
 /**
- * GO_TO timing + geometry.
- *
- * This module is the single source of truth for how a GO_TO is laid out in
- * space. Both the reducer (`state/transitions.ts`, `state/reducer.ts`) and the
- * motion layer (`motion/segmentFactory.ts`) derive their numbers from here, so
- * the logical landing positions and the animated profile can never drift apart.
- *
- * It is a pure leaf module: no React, no controller, type-only config import.
+ * GO_TO timing + geometry — the single source of truth for how a GO_TO is laid
+ * out in space. Both the reducer and `motion/segmentFactory.ts` derive from
+ * here, so logical landings and the animated profile cannot drift apart. Pure
+ * leaf module (no React). See docs/architecture/motion.md.
  */
 
 /** Average speed magnitude: `|distance| / duration`. */
 export const resolveSpeed = (distance: number, duration: number): number =>
   Math.abs(distance) / duration;
 
-/**
- * Peak cruise speed of a GO_TO profile, expressed as a multiple of the normal
- * one-step MOVE speed. `goToSpeedMultiplier` is the tuning knob (see
- * GO_TO_SPEED_MULTIPLIER); the duration of any jump then falls out of
- * distance / profile, so short and far jumps keep one consistent cruise speed.
- */
+/** GO_TO peak cruise speed = normal step speed × `goToSpeedMultiplier`. */
 export const resolveJumpPeakSpeed = (
   stepSize: number,
   stepDuration: number,
@@ -38,13 +29,8 @@ export interface GoToProfileZones {
   approachDistance: number;
 }
 
-/**
- * GO_TO zones are local, not global:
- * - acceleration is measured only inside the first page screen;
- * - deceleration is measured only inside the final page screen;
- * - a far jump shows a configurable preflight, teleports the middle, then
- *   shows the final approach page.
- */
+/** Accel/decel are LOCAL (first/final page screen); a far jump shows preflight,
+ * teleports the middle, then shows the approach page. */
 export const resolveGoToProfileZones = (
   stepSize: number,
   motion: MotionSettings,
@@ -58,41 +44,23 @@ export const resolveGoToProfileZones = (
 export interface GoToPlan {
   /** `true` when the span exceeds the bounded preflight + approach distance. */
   isTeleport: boolean;
-  /**
-   * Unsigned distance the first (preflight) - or, for a short jump, the only -
-   * animated segment covers.
-   */
+  /** Unsigned distance the preflight (or, for a short jump, the only) segment covers. */
   leadDistance: number;
   /** Unsigned instantaneous position jump. `0` for a short jump. */
   teleportDistance: number;
-  /** Unsigned distance the post-teleport approach segment covers. `0` short. */
+  /** Unsigned distance the post-teleport approach covers. `0` for a short jump. */
   approachDistance: number;
 }
 
 /**
- * Lay out a GO_TO of `pageSpan` page screens.
- *
- * Teleport semantics: `goToTeleportMinPageSpan` counts INTERMEDIATE pages —
- * the pages strictly between the start page and the target page (neither
- * endpoint included). A jump FLIES only when BOTH hold:
- *
- *  1. `intermediates >= goToTeleportMinPageSpan` — the knob's threshold;
- *  2. at least ONE intermediate page would never be shown at all:
- *     preflight shows `preflightPageSpan` of them and the approach shows
- *     `finalApproachPageSpan`, so a full page is skipped only when
- *     `intermediates > preflight + approach`. Teleporting between two pages
- *     that are BOTH shown anyway (the old behaviour at the minimum span) is
- *     a pointless blink — the deck just rides continuously instead.
- *
- * The structural gate (2) dominates: a knob set below the floor
- * (`preflight + approach + 1`) never breaks anything — every jump simply
- * rides — it merely fires idle, and Diagnostics reports that.
- *
- * `goToTeleportEnabled: false` short-circuits everything: no jump ever
- * flies (and no ride is ever time-capped — see the flight envelope below),
- * every GO_TO rides the full distance at the shared cruise speed.
- *
- * `pageSpan` is unsigned; the caller applies travel direction.
+ * Lay out a GO_TO of `pageSpan` page screens (unsigned; caller applies
+ * direction). A jump flies only when both hold: intermediates (endpoints
+ * excluded) `>= goToTeleportMinPageSpan`, AND at least one intermediate is
+ * never shown (`intermediates > preflight + approach`) — teleporting between two
+ * shown pages would be a pointless blink. The structural gate dominates, so a
+ * knob below the floor merely fires idle (Diagnostics reports it).
+ * `goToTeleportEnabled: false` short-circuits to a full continuous ride.
+ * See docs/architecture/motion.md.
  */
 export const resolveGoToPlan = (
   pageSpan: number,
@@ -130,24 +98,19 @@ export const resolveGoToPlan = (
   };
 };
 
-/**
- * Distance the post-teleport approach segment covers. Span-independent (it is
- * always the final approach page), so the reducer can resolve the approach
- * origin at `MOTION_SETTLED` time without re-deriving the full span.
- */
+/** Distance the post-teleport approach covers — span-independent, so the
+ * reducer can resolve the approach origin at MOTION_SETTLED without the span. */
 export const resolveGoToApproachDistance = (
   stepSize: number,
   motion: MotionSettings,
 ): number => resolveGoToProfileZones(stepSize, motion).approachDistance;
 
 /**
- * Duration of the post-teleport approach segment, computable BEFORE the
- * approach exists: it always enters at the jump cruise speed, cruises, then
- * decays over the local deceleration budget. Zone times: cruise
- * `(1-d)·A/p` plus deceleration `2·d·A/p` (average speed `p/2`), i.e.
- * `A·(1+d)/p`. Lets the engine plan the TOTAL far-GO_TO time at preflight
- * start, so a one-step consumer (the pagination widget) can run the whole
- * command as a single motion.
+ * Duration of the post-teleport approach (computable before it exists): enters
+ * at cruise, cruises, decays over the local decel budget. Zone times cruise
+ * `(1-d)·A/p` + decel `2·d·A/p` = `A·(1+d)/p`. Lets the engine plan the total
+ * far-GO_TO time up front, so a one-step consumer (the widget) runs it as one
+ * motion.
  */
 export const resolveGoToApproachDuration = (
   stepSize: number,
@@ -157,19 +120,16 @@ export const resolveGoToApproachDuration = (
   const zones = resolveGoToProfileZones(stepSize, motion);
   const approach = zones.approachDistance;
   if (!(approach > 0) || !(peakSpeed > 0)) return 0;
-  // The ramp budget is trusted as authored: a share wider than its span is a
-  // misconfiguration the Diagnostic layer reports, not one this math silently
-  // caps. Legitimate tuning cannot reach it (spans are page counts >= 1,
-  // shares are fractions of one page).
+  // Ramp share trusted as authored — over-budget is a misconfiguration
+  // Diagnostic reports, not one this math caps. Legit tuning cannot reach it.
   const decelShare = zones.decelerationDistance / approach;
   return (approach * (1 + decelShare)) / peakSpeed;
 };
 
 /**
- * Duration of the pre-teleport preflight segment: enter at `startSpeed`,
- * accelerate to cruise over the local acceleration budget, cruise the rest.
- * Zone times: acceleration `2·a·P/(s+p)` (average speed `(s+p)/2`) plus
- * cruise `(1-a)·P/p`. The mirror of `resolveGoToApproachDuration`.
+ * Duration of the pre-teleport preflight: enter at `startSpeed`, accelerate to
+ * cruise over the local accel budget, cruise the rest. Zone times accel
+ * `2·a·P/(s+p)` + cruise `(1-a)·P/p`. Mirror of the approach.
  */
 export const resolveGoToPreflightDuration = (
   stepSize: number,
@@ -180,10 +140,9 @@ export const resolveGoToPreflightDuration = (
   const zones = resolveGoToProfileZones(stepSize, motion);
   const preflight = zones.preflightDistance;
   if (!(preflight > 0) || !(peakSpeed > 0)) return 0;
-  // Trusted as authored — see resolveGoToApproachDuration. Over-budget here is
-  // the sharper failure: the cruise term `(1 - accelShare)` goes negative, and
-  // a fast enough entry can pull the planned duration below zero. That is the
-  // visible failure mode of a broken tuning, reported by Diagnostic.
+  // Trusted as authored (see approach). Over-budget is sharper here: the
+  // `(1 - accelShare)` cruise term goes negative and a fast entry can drive the
+  // planned duration below zero — the visible failure Diagnostic reports.
   const accelShare = zones.accelerationDistance / preflight;
   const entrySpeed = Math.max(0, startSpeed);
   const accelDistance = accelShare * preflight;
@@ -194,20 +153,11 @@ export const resolveGoToPreflightDuration = (
 };
 
 /**
- * TOTAL animated time of a far-GO_TO flight: preflight + approach (the
- * teleport cut itself is instant). This is also the TIME CEILING of every
- * continuous GO_TO ride while the teleport is enabled: a ride that would
- * take longer than a flight is compressed to exactly this duration (it
- * cruises faster than the shared jump speed), so ride and flight durations
- * meet seamlessly at the gate — no jump is ever slower than a farther one.
- * Derived entirely from existing knobs (preflight span, approach span,
- * cruise speed, local ramp budgets) — valid for ANY knob ratio; degenerate
- * tunings (zero animated flight distance) yield `0`, which consumers treat
- * as "no ceiling".
- *
- * With the teleport DISABLED the ceiling is deliberately not applied:
- * every ride keeps the one shared cruise speed and duration grows with
- * distance (consistent SPEED, not consistent time).
+ * Total animated time of a flight (preflight + approach; the cut is instant).
+ * Also the TIME CEILING of every continuous ride while the teleport is enabled
+ * — a longer ride is compressed to this and cruises faster, so no jump is ever
+ * slower than a farther one. Degenerate tunings yield `0` ("no ceiling").
+ * Teleport disabled: no ceiling, duration grows with distance.
  */
 export const resolveGoToFlightDuration = (
   stepSize: number,

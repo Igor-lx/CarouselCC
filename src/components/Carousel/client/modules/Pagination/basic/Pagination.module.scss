@@ -44,12 +44,12 @@
     // fallback). During a planned step `usePaginationFade` suppresses this
     // transition inline and the WAAPI cross-fade owns the dot.
     //
-    // It must never run alongside that fade. An animation does beat a
-    // transition in the cascade — the picture is correct either way — but the
-    // transition still EXISTS as a second effect on opacity/transform, and
-    // Blink refuses to composite a property driven by two effects. It then
-    // ticks the fade on the main thread for the whole ride: measured at 452
-    // main frames per 4 rides instead of 12. See PERF-INVESTIGATION.md §3.5.
+    // It must never run alongside that fade. An animation beats a transition
+    // in the cascade — the picture is correct either way — but the transition
+    // still EXISTS as a second effect on opacity/transform, and Blink refuses
+    // to composite a property driven by two effects, ticking the fade on the
+    // main thread for the whole ride (a measured ~40x main-frame regression).
+    // usePaginationFade suppresses it per-ride; keep the two in sync.
     transition:
       opacity 0.4s,
       transform 0.5s;

@@ -23,24 +23,13 @@ export interface TrackCompositorMotionOptions {
   from: number;
   to: number;
   duration: number;
-  /**
-   * Uniform time-samples of the segment's percent-progress curve. Encoded as
-   * WAAPI keyframes (one transform per stop, evenly distributed, linear
-   * interpolation between them) — the profile's temporal shape rides the
-   * keyframe grid itself, so no easing function is needed and any engine with
-   * `Element.animate` runs the exact curve.
-   */
+  /** Uniform time-samples of the percent-progress curve, encoded as WAAPI
+   * keyframes (one transform per stop, linear between) — the curve rides the
+   * grid, so any `Element.animate` engine runs it. See docs/architecture/motion.md. */
   stops: readonly number[];
-  /**
-   * The segment's clock origin (`performance.now()` domain — the same value
-   * the JS sampler runs on). The WAAPI animation's `startTime` is pinned to
-   * it so the compositor traces the segment on the SAME timeline as the JS
-   * controller. Without this the animation starts when the browser gets
-   * around to it (commit + raster later), so the painted track would run
-   * phase-shifted behind the JS curve — and every later pin to a JS-derived
-   * position (repeated-click takeover, settle) would paint as a visible
-   * forward lurch.
-   */
+  /** The segment's clock origin (`performance.now()` domain). The animation's
+   * `startTime` is pinned to it so the compositor traces the SAME timeline as
+   * the JS controller; without the pin a later handoff paints a forward lurch. */
   startedAt: number;
 }
 

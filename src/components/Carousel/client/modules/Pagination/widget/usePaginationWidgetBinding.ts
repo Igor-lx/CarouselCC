@@ -78,7 +78,7 @@ const ACTIVE_DOT_COUNT = 4;
  * whole step is pinned statically instead of animated: the animation would be
  * invisible yet still cost a full per-frame main-thread style recalc, because
  * every dot's projection is unique and Blink cannot share one ComputedStyle
- * across them (see WIDGET-PERF-INVESTIGATION.md). */
+ * across them. */
 const INVISIBLE_OPACITY = 0.001;
 
 /**
@@ -440,10 +440,9 @@ export function usePaginationWidgetBinding({
         // A dot that stays INVISIBLE for the whole step never needs an
         // animation: it would paint nothing while costing a full per-frame
         // main-thread style recalc (each dot's projection is unique, so Blink
-        // cannot share one ComputedStyle across them — see
-        // WIDGET-PERF-INVESTIGATION.md). Pin it to its (hidden) end state and
-        // skip. The dot stays MOUNTED, so the strip still never runs out of
-        // dots — the coverage margin is untouched, only its animation is.
+        // cannot share one ComputedStyle across them). Pin it to its (hidden)
+        // end state and skip. The dot stays MOUNTED, so the strip never runs
+        // out of dots — the coverage margin is untouched, only its animation.
         if (keyframes.every((frame) => frame.opacity <= INVISIBLE_OPACITY)) {
           const last = keyframes[keyframes.length - 1]!;
           dot.style.transform = last.transform;
