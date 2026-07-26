@@ -129,20 +129,8 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     [layout, state.targetPageIndex]
   );
 
-  // --- image-resource SSOT --------------------------------------------------
-  // One call owns everything store-related: lifecycle (created only when the
-  // carousel renders image content, `null` otherwise) and retention (entries
-  // + retry timers pruned to the live deck). Passed explicitly to each
-  // `SlideItem` (no context) so the data flow stays visible in source; each
-  // slide subscribes to its own URL — the store is the single authority on
-  // render status and retry.
-  // Deck-order media descriptors for media modules (ResponsiveImages):
-  // low-frequency (changes with the data only), image slides only.
-  // Art-direction descriptors consumed ONLY by the Diagnostic slot (it audits
-  // each slide's `<source media>` against the canonical axis strings). Built
-  // only in development: production has no Diagnostic consumer, so the flatMap
-  // never runs — the slimmed descriptor carries just the `sources` the audit
-  // reads (see CarouselSlideMediaView).
+  // Art-direction descriptors, consumed only by the dev-only Diagnostic slot —
+  // the flatMap never runs in production. See docs/architecture/diagnostics.md.
   const slideMediaViews = useMemo<CarouselSlideMediaView[]>(
     () =>
       IS_DEV && isContentImg
@@ -160,6 +148,8 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     [records]
   );
 
+  // Image-resource SSOT: created only for image content, pruned to the live
+  // deck, passed explicitly to each SlideItem. See docs/architecture/slides.md.
   const imageResourceStore = useImageResourceStore({
     isContentImg,
     records,
