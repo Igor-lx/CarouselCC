@@ -1,3 +1,4 @@
+// See docs/architecture/slots.md
 export const CAROUSEL_SLOTS = [
   "pagination",
   "controls",

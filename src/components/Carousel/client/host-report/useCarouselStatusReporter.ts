@@ -1,3 +1,4 @@
+// See docs/architecture/host-report.md
 import { useEffect, useRef } from "react";
 
 import type { CarouselStatusSnapshot } from "../public-api/types";
@@ -12,13 +13,6 @@ interface UseCarouselStatusReporterInput {
   isAtEnd: boolean;
 }
 
-/**
- * Owns the read-only, low-frequency status reported to the host. Fires on
- * mount and whenever the idle flag, target page, page count, or a boundary
- * flag changes — never on a per-frame motion sample; identical consecutive
- * snapshots are deduplicated. The TARGET page (not the settled page) is
- * reported, so the snapshot reflects intent immediately on click/gesture.
- */
 export function useCarouselStatusReporter({
   onCarouselStatusChange,
   isIdle,
