@@ -1,3 +1,4 @@
+// See docs/architecture/context.md
 import { useMemo, type RefObject } from "react";
 
 import type { MotionPlanSource } from "../motion";
@@ -50,9 +51,6 @@ export function useModuleContextValue({
   stable: CarouselStableContextValue;
   motion: CarouselMotionContextValue;
 } {
-  // Derived here from the single source (state.motionPhase) rather than
-  // taking a parallel pre-derived object — one input, no chance of the pair
-  // drifting apart.
   const statusView = useMemo<CarouselStatusView>(() => {
     const status = motionStatus(state.motionPhase);
     return {
@@ -105,11 +103,6 @@ export function useModuleContextValue({
     [navigation.handleNext, navigation.handlePageSelect, navigation.handlePrev],
   );
 
-  // Two values partitioned by update cadence (see context `types.ts`). The
-  // stable half re-identifies only when navigation / layout / visualPosition
-  // change (rare); the motion half re-identifies on every click/gesture/settle.
-  // Keeping them separate means stable-only consumers (e.g. <Controls>) do not
-  // re-render on routine steps.
   const stable = useMemo<CarouselStableContextValue>(
     () => ({
       layout: layoutView,

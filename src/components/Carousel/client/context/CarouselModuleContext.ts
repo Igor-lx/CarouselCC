@@ -1,14 +1,10 @@
+// See docs/architecture/context.md
 import { createContext, useContext } from "react";
 import type {
   CarouselMotionContextValue,
   CarouselStableContextValue,
 } from "./types";
 
-/**
- * The module context is split into two providers by update cadence (see
- * `types.ts`). Modules subscribe only to the half they actually read, so a
- * high-frequency motion change never re-renders a stable-only consumer.
- */
 export const CarouselStableContext =
   createContext<CarouselStableContextValue | null>(null);
 
