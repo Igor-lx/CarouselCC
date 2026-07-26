@@ -1,3 +1,4 @@
+// See docs/architecture/autoplay.md
 import { useCallback, type RefObject } from "react";
 
 import { useViewportBusy, useViewportVisibility } from "../../../../shared";
@@ -10,26 +11,12 @@ interface UseCarouselAutoplayInput {
   state: CarouselState;
   config: CarouselRuntimeConfig;
   navigation: CarouselNavigation;
-  /** Master autoplay switch (the `isAutoplayOn` public prop). */
   isAutoplayOn: boolean;
-  /** Touch environments keep autoplay running under hover. */
   isTouch: boolean;
-  /** Finite-mode end boundary — the next tick loops back to page 0. */
   isAtEnd: boolean;
-  /** The carousel viewport: autoplay pauses while it is mostly off-screen. */
   viewportRef: RefObject<HTMLDivElement | null>;
 }
 
-/**
- * The carousel-specific adapter over the `useAutoplay` timer loop. Owns what the
- * loop needs:
- * - viewport visibility (IntersectionObserver + tab visibility);
- * - the pause rule (off-screen, dragging, moving, or the viewport unsettled —
- *   a tick fired into the settle window can miss the presentation latch and
- *   bounce on weak GPUs, see useViewportBusy);
- * - referentially stable step handlers — a fresh identity per render would
- *   restart the timer, measuring the interval from the render, not the tick.
- */
 export function useCarouselAutoplay({
   state,
   config,
@@ -55,9 +42,6 @@ export function useCarouselAutoplay({
 
   const { isDragging, isMoving } = motionStatus(state.motionPhase);
 
-  // A finger anywhere on the glass, an ongoing scroll/fling, or the chrome
-  // settling: no NEW rides until quiet. A getter checked on tick, not a render
-  // trigger.
   const getIsViewportBusy = useViewportBusy({
     enabled: isAutoplayOn && state.layout.canSlide,
     quietDelayMs: config.interaction.autoplayResettleDelayMs,
