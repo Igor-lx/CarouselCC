@@ -1,3 +1,4 @@
+// See docs/architecture/visual-position.md
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import {
@@ -48,10 +49,7 @@ export function useVisualPosition({
   const stepSizeRef = useRef(visibleSlidesCount);
   stepSizeRef.current = visibleSlidesCount;
 
-  // Streak counter behind `VisualPositionFrame.runningFrameIndex`: running
-  // emits are numbered 0, 1, 2, …; any resting emit resets the streak. Stamped
-  // here, at the single source, so every subscriber sees identical numbering
-  // (the shared fallback frame-skip depends on that).
+  // Streak counter behind runningFrameIndex, stamped once at the single source.
   const runningStreakRef = useRef(0);
   const nextRunningFrameIndex = useCallback(
     (phase: MotionSample["phase"]): number => {
@@ -91,10 +89,8 @@ export function useVisualPosition({
     [],
   );
 
-  // Exact current position from the controller's curve at `now()`, reflow-free.
-  // `captureHandoff` is the controller's coherent continuation point — exactly
-  // what a cold read that starts a new segment wants — so it is the right
-  // source here, not the possibly-stale last-emitted frame.
+  // captureHandoff is the controller's coherent continuation point — the right
+  // cold-read origin, not the possibly-stale last-emitted frame.
   const sampleNow = useCallback<VisualPositionSource["sampleNow"]>(
     () => controller.captureHandoff().position,
     [controller],
