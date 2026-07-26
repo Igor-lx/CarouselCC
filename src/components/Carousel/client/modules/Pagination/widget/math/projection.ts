@@ -1,3 +1,4 @@
+// See docs/architecture/modules.md
 import { EDGE_DOT_DRIFT_FACTOR, EDGE_DOT_RESTING_OPACITY } from "../defaults";
 import type {
   PaginationWidgetDotState,
@@ -6,24 +7,9 @@ import type {
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
-/**
- * The opacity FIELD: a dot's opacity by its absolute distance from the live
- * offset. Three zones —
- *   1 (plateau)                        d ≤ c − 0.5
- *   1 → resting over [c − 0.5, c]      the approach to the edge slot
- *   resting → 0 over [c, c + 1]        the handover fade — one FULL step
- * where c is the centre index and "resting" is EDGE_DOT_RESTING_OPACITY.
- *
- * The outer zone used to span half a step ([c − 0.5, c + 0.5]), which
- * SERIALIZED every edge handover: the leaving dot (d: c → c+1) hit zero at
- * half-way, and only then did the arriving dot (d: c+1 → c) leave zero —
- * measured mid-step as both edges invisible for a dozen frames. Spanning
- * exactly one step makes the two fades mirror images by construction:
- *   dotOpacityAt(c + f) + dotOpacityAt(c + 1 − f) === resting, f ∈ [0, 1]
- * — one dies precisely as fast as the other is born, on any tuning. The
- * inner zones are unchanged, so every resting look and every interior
- * transition is pixel-identical to before.
- */
+/** A dot's opacity by distance from the live offset: plateau, then resting at
+ * the edge slot, then the handover fade over one FULL step — so leaving and
+ * arriving edge dots are exact mirror fades (neither goes dark mid-handover). */
 export const dotOpacityAt = (absDistance: number, centerIndex: number): number => {
   const plateauEnd = centerIndex - 0.5;
   if (absDistance <= plateauEnd) return 1;
@@ -34,11 +20,7 @@ export const dotOpacityAt = (absDistance: number, centerIndex: number): number =
   return Math.max(0, EDGE_DOT_RESTING_OPACITY * (1 - (absDistance - centerIndex)));
 };
 
-/**
- * Write the projection state for one dot directly into `target`. Reusing
- * the target object avoids per-frame allocations for the motion-bound write
- * path.
- */
+/** Write one dot's projection into `target` (reused to avoid per-frame allocs). */
 export const writeDotProjection = (
   target: PaginationWidgetDotState,
   id: number,

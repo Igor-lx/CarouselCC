@@ -1,3 +1,4 @@
+// See docs/architecture/modules.md
 import clsx from "clsx";
 import { memo, useMemo, type CSSProperties } from "react";
 
@@ -13,15 +14,8 @@ import { PAGINATION_WIDGET_DEFAULTS } from "./defaults";
 
 import styles from "./PaginationWidget.module.scss";
 
-/**
- * The widget's JS→CSS custom-property contract — one dot's published
- * variables, DECLARED rather than cast inline (`CSSProperties` cannot express
- * custom properties). Same rule as the root's presentation module: JS hands
- * the stylesheet DATA, the rules stay in the stylesheet.
- */
+/** The widget's JS→CSS custom-property contract for one dot. */
 interface PaginationDotCssVars extends CSSProperties {
-  /** How strongly this dot reads as the active one — drives its colour and
-   * scale accents in CSS. */
   "--dot-active-strength": number;
 }
 
@@ -52,9 +46,7 @@ const PaginationWidgetBase = memo(function PaginationWidget({
   const { intent } = useCarouselMotion();
   const { layout, visualPosition, motionPlan } = useCarouselStable();
 
-  // When reduced motion is on, the binding has nothing to subscribe to and we
-  // render a static snapshot. Otherwise the binding runs the engine's plans:
-  // WAAPI steps for planned motion, per-frame follow while a finger drags.
+  // Reduced motion → static snapshot; otherwise the binding runs the plans.
   const isMotionBound =
     visualPosition !== null && motionPlan !== null && !layout.isReducedMotion;
 

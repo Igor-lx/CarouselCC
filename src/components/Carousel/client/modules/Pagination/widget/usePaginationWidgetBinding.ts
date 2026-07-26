@@ -1,3 +1,4 @@
+// See docs/architecture/modules.md
 import { useCallback, useEffect, useRef } from "react";
 
 import {
@@ -17,9 +18,8 @@ import {
   isDroppedFallbackFrame,
   type VisualPositionSource,
 } from "../../../visual-position";
-// Per-frame write gates: a projection value within the matching epsilon of the
-// last one skips the style assignment (and the transform-string allocation), so
-// a steady-state idle widget emits zero per-rAF DOM writes.
+// Per-frame write gates: within-epsilon values skip the DOM write, so a steady
+// idle widget emits zero per-rAF writes.
 const DOT_POSITION_EPSILON_PX = 0.25;
 const DOT_SCALE_EPSILON = 0.002;
 const DOT_OPACITY_EPSILON = 0.01;
@@ -39,35 +39,18 @@ import type {
   PaginationWidgetGeometry,
 } from "./types";
 
-/**
- * The widget's motion model: a decoupled unbounded step counter `offset` (one
- * step per command, never the deck's absolute position). WAAPI mode folds the
- * deck's percent-progress stops into each dot's keyframed projection on the
- * shared clock (in phase, zero per-frame work); follow mode writes per frame
- * from the visual-position stream with epsilon gates. See
- * docs/architecture/modules.md.
- */
+// The widget's decoupled one-step motion model. See docs/architecture/modules.md
 
-/** Extra dot elements beyond the resting window: a step's travel plus an
- * in-flight retarget can expose one id past each edge of the window that
- * anchors the step. */
+/** Extra dot elements beyond the resting window (step travel + retarget reach). */
 const DOT_COVERAGE_MARGIN = 2;
 
-/** Overlay elements: a retargeted step can span up to two whole steps, whose
- * path touches at most this many integer pages with non-zero strength. */
+/** Overlay elements — a retargeted step touches at most this many pages. */
 const ACTIVE_DOT_COUNT = 4;
 
-/** Below this, a dot paints nothing. A dot that never rises above it during a
- * whole step is pinned statically instead of animated: the animation would be
- * invisible yet still cost a full per-frame main-thread style recalc, because
- * every dot's projection is unique and Blink cannot share one ComputedStyle
- * across them. */
+/** Below this a dot paints nothing: pin it, don't pay for an invisible animation. */
 const INVISIBLE_OPACITY = 0.001;
 
-/** Plan-curve density for the strip — coarser than the track's: a dot travels
- * at most a strip width, so a sparse grid is still sub-pixel, and each stop
- * costs a keyframe per dot in the click frame (mobile main-thread path). Same
- * curve as the track, exact at both ends, so the two stay in sync. */
+/** Strip plan-curve density — coarser than the track's (a dot travels ≤ a strip width). */
 const STRIP_CURVE_INTERVALS = 32;
 
 const emptyDotState = (): PaginationWidgetDotState => ({
@@ -84,8 +67,7 @@ const toTransform = (x: number, scale: number) =>
 
 
 
-/** Caches the transform INPUTS (not the string): comparing against epsilons
- * skips the string alloc and the DOM write when nothing visibly changed. */
+/** Caches the transform inputs (not the string) for the epsilon write gates. */
 interface DotWriteCache {
   x: number;
   scale: number;
@@ -106,8 +88,7 @@ const shouldWriteOpacity = (
   opacity: number,
 ): boolean => last === null || Math.abs(last.opacity - opacity) >= DOT_OPACITY_EPSILON;
 
-/** An in-flight WAAPI step: the shared plan span plus what only the widget
- * needs — direction, destination key, and the animations painting it. */
+/** An in-flight WAAPI step: the plan span plus the widget's direction/key/animations. */
 interface ActiveStep extends InFlightSpan {
   direction: -1 | 0 | 1;
   targetKey: number;
@@ -151,8 +132,7 @@ export function usePaginationWidgetBinding({
   /** The widget's own step counter — where the strip logically sits. */
   const offsetRef = useRef(0);
   const stepRef = useRef<ActiveStep | null>(null);
-  /** The step a finger grab tore down — kept so a repeat swipe advances one
-   * step BEYOND, like a repeat click. Consumed by the next plan, cleared on settle. */
+  /** The step a finger grab tore down — so a repeat swipe advances one step BEYOND. */
   const interruptedStepRef = useRef<WidgetStepMemory | null>(null);
   const followUnsubRef = useRef<(() => void) | null>(null);
   const followBaseRef = useRef<{ pageOffset: number; offset: number } | null>(
@@ -227,8 +207,7 @@ export function usePaginationWidgetBinding({
         const dot = activeDotRefs.current[index];
         if (!dot) continue;
 
-        // Two live overlays (floor/ceil of the offset); the coverage extras
-        // stay hidden outside WAAPI steps.
+        // Two live overlays (floor/ceil); coverage extras stay hidden.
         const id = index === 0 ? floorId : index === 1 ? ceilId : null;
         const isDuplicate = index === 1 && ceilId === floorId;
         const state =
@@ -306,8 +285,7 @@ export function usePaginationWidgetBinding({
 
   // ---- WAAPI step mode -------------------------------------------------------
 
-  /** Live widget offset: mid-step it is sampled from the plan's progress
-   * stops (the same interpolation the compositor applies), never the DOM. */
+  // Live offset: mid-step sampled from the plan's curve, never the DOM.
   const currentOffset = useCallback(
     () =>
       stepRef.current
@@ -334,8 +312,8 @@ export function usePaginationWidgetBinding({
       interruptedStepRef.current = null;
       cancelStepAnimations();
       offsetRef.current = finalOffset;
-      // WAAPI owned the styles; the caches no longer describe the DOM.
-      invalidateWriteCaches();
+      invalidateWriteCaches(); // WAAPI owned the styles; caches are stale
+
       writeOffset(finalOffset);
     },
     [cancelStepAnimations, invalidateWriteCaches, writeOffset],
@@ -343,16 +321,12 @@ export function usePaginationWidgetBinding({
 
   const startWaapiStep = useCallback(
     (plan: WaapiMotionPlan) => {
-      // A far-GO_TO approach slice: the whole command was already planned by
-      // the preflight publication — keep the running step.
-      if (plan.isContinuation && stepRef.current) return;
+      if (plan.isContinuation && stepRef.current) return; // preflight already planned it
 
       const previous = stepRef.current;
       const from = currentOffset();
 
-      // One resolution rule for both memories (see stepTarget.ts): the live
-      // step for click retargets, the grab-interrupted step for swipe
-      // retargets. The memory is consumed — a new step supersedes it.
+      // One rule for both memories: live step (click) + grab-interrupted (swipe).
       const interrupted = interruptedStepRef.current;
       interruptedStepRef.current = null;
       const target = resolveWidgetStepTarget({
@@ -373,16 +347,11 @@ export function usePaginationWidgetBinding({
       invalidateWriteCaches();
 
       const animations: Animation[] = [];
-      // The strip rides a coarser sample of the SAME curve than the track
-      // (see STRIP_CURVE_INTERVALS) — resampled once here, shared by every dot
-      // and overlay below.
       const stripStops = resampleStops(plan.stops, STRIP_CURVE_INTERVALS);
       const lowId =
         Math.floor(Math.min(from, target)) - side - DOT_COVERAGE_MARGIN / 2;
 
-      // Temporal curve and spatial path fold into one keyframe list per dot
-      // (the i-th keyframe is the projection at the plan's progress stop i),
-      // so no easing function is involved — same delivery as the track.
+      // Curve + spatial path fold into one keyframe list per dot (no easing fn).
       for (let index = 0; index < dotCount; index += 1) {
         const dot = dotRefs.current[index];
         if (!dot) continue;
@@ -394,9 +363,7 @@ export function usePaginationWidgetBinding({
           stripStops,
         );
 
-        // A dot invisible for the whole step is pinned to its end state, not
-        // animated (an invisible animation still costs a per-frame recalc). It
-        // stays MOUNTED, so the strip never runs out of dots.
+        // A dot invisible all step is pinned (stays mounted), not animated.
         if (keyframes.every((frame) => frame.opacity <= INVISIBLE_OPACITY)) {
           const last = keyframes[keyframes.length - 1]!;
           dot.style.transform = last.transform;
@@ -404,8 +371,6 @@ export function usePaginationWidgetBinding({
           continue;
         }
 
-        // No WAAPI keyframe support — leave the strip static; the deck
-        // still moves (its own fallback), and the step finalizes below.
         const animation = startPinnedAnimation(dot, keyframes, {
           duration: plan.duration,
           startedAt: plan.startedAt,
@@ -430,8 +395,7 @@ export function usePaginationWidgetBinding({
           geometry,
           stripStops,
         );
-        // Same rule as the dots: an overlay whose active strength never lifts
-        // off zero across the step paints nothing — pin it, do not animate it.
+        // Same invisible-pin rule as the dots.
         if (keyframes.every((frame) => frame.opacity <= INVISIBLE_OPACITY)) {
           overlay.style.opacity = "0";
           continue;
@@ -445,8 +409,7 @@ export function usePaginationWidgetBinding({
       }
 
       if (animations.length === 0) {
-        // Nothing animatable (no refs yet / no keyframe support): land
-        // directly on the target.
+        // Nothing animatable: land directly on the target.
         offsetRef.current = target;
         writeOffset(target);
         return;
@@ -492,8 +455,7 @@ export function usePaginationWidgetBinding({
   const startFollowing = useCallback(
     (isFallback: boolean) => {
       if (followUnsubRef.current || !visualPosition) return;
-      // Take over from wherever the strip visually is right now — and
-      // remember the step this grab tears down (see interruptedStepRef).
+      // Take over from the live offset; remember the step this grab tears down.
       const start = currentOffset();
       interruptedStepRef.current = stepRef.current
         ? {
@@ -510,9 +472,7 @@ export function usePaginationWidgetBinding({
 
       followUnsubRef.current = visualPosition.subscribe(
         (frame) => {
-          // Delta-follow: the widget advances by the deck's page-offset delta,
-          // staying in its own decoupled step domain; the epsilon gates in
-          // `writeOffset` filter imperceptible deltas.
+          // Delta-follow in the widget's own step domain (epsilon-gated writes).
           if (followBaseRef.current === null) {
             followBaseRef.current = {
               pageOffset: frame.pageOffset,
@@ -523,9 +483,7 @@ export function usePaginationWidgetBinding({
           const next = base.offset + (frame.pageOffset - base.pageOffset);
           offsetRef.current = next;
 
-          // Legacy-fallback relief: the SAME source-numbered rule the track
-          // uses, so both drop exactly the same frames. Drag follows
-          // (isFallback false) always paint at full rate.
+          // Fallback relief: same shared frame-drop rule as the track.
           if (isFallback && isDroppedFallbackFrame(frame)) return;
           writeOffset(next);
         },
@@ -574,7 +532,7 @@ export function usePaginationWidgetBinding({
   );
 
   useIsomorphicLayoutEffect(() => {
-    // Initial static paint, then follow the engine's plans.
+    // Initial static paint, then follow plans.
     invalidateWriteCaches();
     writeOffset(offsetRef.current);
     if (!motionPlan) return;

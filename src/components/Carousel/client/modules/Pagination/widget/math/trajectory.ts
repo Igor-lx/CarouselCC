@@ -1,3 +1,5 @@
+// WAAPI keyframe sampling: the plan's temporal stops fold with each dot's
+// spatial path into one keyframe list (no easing fn). See docs/architecture/modules.md
 import { keyframesAlongStops } from "../../../../motion";
 import { writeDotProjection } from "./projection";
 import type {
@@ -5,23 +7,6 @@ import type {
   PaginationWidgetGeometry,
 } from "../types";
 
-/**
- * WAAPI keyframe sampling for a widget step.
- *
- * The engine's plan carries the TEMPORAL shape as percent-progress stops
- * (uniform time samples). A dot's SPATIAL path across a step — position,
- * scale, opacity as a function of step progress — is nonlinear (per-slot
- * interpolation, edge drift, fades). Both fold into ONE keyframe list: the
- * i-th keyframe (at uniform time offset) is the spatial projection evaluated
- * at the temporal progress `stops[i]`. The browser interpolates linearly
- * between keyframes — the exact same piecewise-linear delivery the track
- * uses — so no easing function is needed and any `Element.animate` engine
- * runs the full profile. Sampling on the stops grid keeps the temporal curve
- * exact (no resampling).
- */
-
-/** A type alias (not an interface) so it stays assignable to the DOM
- * `Keyframe` type's index signature. */
 export type DotTrajectoryKeyframe = {
   transform: string;
   opacity: number;
