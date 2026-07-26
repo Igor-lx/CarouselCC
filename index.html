@@ -2,32 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!--
-      Parse-time browser-chrome colors. Two media-paired metas instead of one
-      empty meta: mobile browsers commit the bar tint (incl. the BOTTOM bar)
-      at the first paint of a cold load, before any script-driven update is
-      guaranteed to be observed — an empty `content` at parse time reads as
-      "no color" and the default white can stick for the whole session. With
-      the media pair the correct value exists the instant the head is parsed,
-      and in auto mode it even self-switches with the OS theme, no JS needed.
-
-      The colors and the storage key below deliberately DUPLICATE
-      BROWSER_THEME_COLORS / THEME_STORAGE_KEY (src/theme/types.ts): this
-      script must run synchronously during head parsing, before first paint,
-      so it cannot import anything. The duplication is locked by
-      src/theme/themeBootSync.test.ts, which reads this file and fails CI on
-      any drift.
-    -->
+    <!-- Media-paired metas so the correct bar tint exists at parse time (an empty
+      `content` reads as "no color" and white bars can stick for the session). The
+      colors + storage key below DUPLICATE src/theme/types.ts on purpose — this
+      script runs pre-paint and cannot import; the copy is locked by
+      src/theme/themeBootSync.test.ts. -->
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#bfd6f8" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d1520" />
-    <!--
-      `viewport-fit=cover` extends the page canvas under the iPhone notch /
-      status bar. Without it Safari letterboxes the layout inside the safe
-      area and paints the camera housing strip itself — ignoring the app
-      background. With it the page's own background reaches every edge, and
-      the layout keeps clear of the cutout via `env(safe-area-inset-*)`
-      padding on the app shell (App.module.scss).
-    -->
+    <!-- viewport-fit=cover: page background reaches under the notch; the app shell
+      keeps clear of the cutout via env(safe-area-inset-*) (App.module.scss). -->
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
@@ -44,10 +27,8 @@
         } catch {
           /* storage unavailable -> auto */
         }
-        // Validate the stored value: anything but an explicit choice is auto.
-        // (A stale/corrupted entry used to yield COLORS[garbage] === undefined
-        // -> content="undefined" -> invalid color -> white bars until the
-        // storage was cleared.)
+        // Validate: anything but an explicit choice is auto (a garbage entry
+        // would yield an invalid color and white bars).
         const isExplicit = mode === "light" || mode === "dark";
         const theme = isExplicit
           ? mode
@@ -57,23 +38,19 @@
 
         const root = document.documentElement;
         root.setAttribute("data-theme", theme);
-        // Paint-critical: mobile browser chrome (especially the bottom bar)
-        // also samples the PAGE BACKGROUND at first paint — which happens
-        // before the stylesheet arrives on a cold load, when <html> is still
-        // white. Pin the background inline, pre-paint. ThemeProvider keeps
-        // this inline value in sync on later toggles.
+        // Paint-critical: the chrome also samples the page background pre-stylesheet
+        // on a cold load, so pin it inline (ThemeProvider keeps it in sync later).
         root.style.backgroundColor = COLORS[theme];
 
         if (isExplicit) {
-          // An explicit user choice overrides the media-paired defaults on
-          // both metas, so the bar color no longer follows the OS scheme.
+          // An explicit choice overrides the media-paired defaults on both metas.
           document
             .querySelectorAll('meta[name="theme-color"]')
             .forEach((meta) => meta.setAttribute("content", COLORS[theme]));
         }
       })();
     </script>
-    <script type="module" crossorigin src="/CarouselCC/assets/index-vkX-6GuB.js"></script>
+    <script type="module" crossorigin src="/CarouselCC/assets/index-Br5ny3dC.js"></script>
     <link rel="stylesheet" crossorigin href="/CarouselCC/assets/index-D1oTNu_2.css">
   </head>
   <body>
