@@ -1,3 +1,4 @@
+// See docs/architecture/motion.md
 import { useCallback, useEffect, useRef } from "react";
 
 import {
@@ -30,36 +31,18 @@ export interface UseMotionRunnerInput {
   cancelCompositorMotion: TrackBindingApi["cancelCompositorMotion"];
   /** Publishes the computed motion plan to paint consumers (widget). */
   publishPlan: MotionPlanChannel["publish"];
-  /**
-   * Called by the controller when a segment naturally settles. The argument
-   * is the visual position where it settled, so the reducer can distinguish
-   * a finished current target from an older target that settled after a newer
-   * click had already been queued.
-   */
+  /** The settled visual position, so the reducer can tell current from stale. */
   onSettle: (settledPosition: number) => void;
 }
-
-
 
 const directionOf = (delta: number): MotionPlanDirection =>
   delta > 0 ? 1 : delta < 0 ? -1 : 0;
 
-/**
- * Origin of a post-drag release segment. Drag writes are published into the
- * visual position stream, while END_DRAG records the release position and
- * release velocity in state. The reducer payload stays canonical here because
- * it binds the sampled position and the release velocity to the same event.
- */
 const buildStartFromGesture = (
   state: CarouselState,
   launchPosition: number,
 ): MotionStart => ({
-  // The COASTED launch point, not the recorded release point: the ride
-  // starts from where the deck would be had it kept travelling at the
-  // release velocity through the commit gap (see `gesture/coast.ts`) — the
-  // gap becomes a single catch-up step at the eye's own speed instead of a
-  // freeze and a restart from a stale position. On a fast commit the two
-  // are practically identical.
+  // The COASTED launch point, not the recorded release point (see gesture.md).
   position: launchPosition,
   velocity: state.gesture.uiVelocity,
   strategy: "gesture",
@@ -74,13 +57,6 @@ const buildStartFromState = (
   strategy: "step",
 });
 
-/**
- * The only bridge between logical state and the motion controller, and the
- * single place the motion math is computed: build the segment, sample its curve
- * into stops, hand the same plan to every paint consumer. The JS controller
- * still samples every segment (the visual-position SSOT); in-flight handoffs are
- * one atomic `captureHandoff`. See docs/architecture/motion.md.
- */
 export function useMotionRunner({
   state,
   config,
@@ -134,8 +110,7 @@ export function useMotionRunner({
     }
 
     if (state.motionPhase === "dragging") {
-      // A drag re-takes the track directly through the visual-position stream;
-      // freeze the compositor at the live sample so the finger owns it again.
+      // Freeze the compositor at the live sample so the finger owns the track.
       cancelCompositorMotion(controller.getSnapshot().value);
       publishPlan({ kind: "follow", isFallback: false });
       return;
@@ -179,10 +154,7 @@ export function useMotionRunner({
         startedAt: resolvedStartedAt,
       });
 
-      // One percent-progress curve per segment: the track consumes it below,
-      // the widget receives the same curve through the plan. Each consumer
-      // encodes the stops as its own WAAPI keyframes — no easing function is
-      // involved, so any engine with `Element.animate` runs the curve.
+      // One percent-progress curve per segment, shared by track and widget.
       const stops = profileProgressStops(segment.profile, segment.to - segment.from);
 
       const isComposited = startCompositorMotion({
@@ -197,11 +169,8 @@ export function useMotionRunner({
         cancelCompositorMotion(resolvedStart.position);
       }
 
-      // The controller runs regardless of compositing: it remains the SSOT for
-      // status, handoff, settle, and the follow-mode stream. When composited,
-      // nothing reads its per-frame stream — the compositor paints the same
-      // curve — so it runs the segment passively: no frame loop, one wake-up to
-      // settle. That is what keeps the main thread idle behind a ride.
+      // The controller runs every segment (the SSOT); passively when composited,
+      // so a ride leaves the main thread idle (see motion.md).
       controller.start({
         segment,
         sampler: sampleCarouselSegment,
@@ -215,10 +184,8 @@ export function useMotionRunner({
         return;
       }
 
-      // A far-GO_TO preflight plans the WHOLE command for one-step consumers:
-      // total duration spans preflight + approach, and the curve is the same
-      // GO_TO shape re-authored over one unit step. The approach slice then
-      // arrives flagged as a continuation and is ignored by them.
+      // A preflight plans the WHOLE command (preflight + approach) for one-step
+      // consumers, re-authored over one unit step (see motion.md).
       const isPreflight = state.teleportVirtualIndex !== null;
       let planDuration = segment.duration;
       let planStops: readonly number[] = stops;
@@ -266,10 +233,7 @@ export function useMotionRunner({
     };
 
     if (controller.isActive()) {
-      // Atomic in-flight handoff: position + velocity + time from one sample
-      // of the curve that is painting now. The rebuild happens synchronously
-      // in this commit — the old compositor animation carries the pixels
-      // until the new one replaces it.
+      // Atomic in-flight handoff — one sample gives position + velocity + time.
       const handoff = controller.captureHandoff(motionNow());
       startResolvedMotion(
         {
@@ -298,10 +262,8 @@ export function useMotionRunner({
       return;
     }
 
-    // Cold start from idle: the logical origin is owned by the reducer
-    // (`state.fromVirtualIndex`); only the residual velocity comes from the
-    // controller snapshot. That cross-layer split is intentional — not a
-    // mixed handoff.
+    // Cold start: origin from the reducer, only residual velocity from the
+    // controller — an intentional split, not a mixed handoff (see motion.md).
     const handoff = controller.captureHandoff(startedAt);
     startResolvedMotion(buildStartFromState(state, handoff.velocity), startedAt);
   }, [

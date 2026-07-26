@@ -1,4 +1,3 @@
-/** Float-noise tolerance for motion-sample comparisons (the runner's "already
- * there" check, the reducer's settle identity) — an implementation constant,
- * not a feel knob, so it lives here rather than in config/. */
+// See docs/architecture/motion.md
+/** Float-noise tolerance for motion-sample comparisons — implementation constant, not a knob. */
 export const MOTION_EPSILON = 0.0001;

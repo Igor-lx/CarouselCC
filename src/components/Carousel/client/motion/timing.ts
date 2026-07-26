@@ -1,11 +1,7 @@
+// GO_TO timing + geometry — the single source of truth both the reducer and
+// segmentFactory derive from, so landings and profile can't drift.
+// See docs/architecture/motion.md
 import type { MotionSettings } from "../config";
-
-/**
- * GO_TO timing + geometry — the single source of truth for how a GO_TO is laid
- * out in space. The reducer and `segmentFactory.ts` both derive from here, so
- * logical landings and the animated profile cannot drift apart.
- * See docs/architecture/motion.md.
- */
 
 /** Average speed magnitude: `|distance| / duration`. */
 export const resolveSpeed = (distance: number, duration: number): number =>
@@ -29,8 +25,6 @@ export interface GoToProfileZones {
   approachDistance: number;
 }
 
-/** Accel/decel are LOCAL (first/final page screen); a far jump shows preflight,
- * teleports the middle, then shows the approach page. */
 export const resolveGoToProfileZones = (
   stepSize: number,
   motion: MotionSettings,
@@ -52,14 +46,8 @@ export interface GoToPlan {
   approachDistance: number;
 }
 
-/**
- * Lay out a GO_TO of `pageSpan` page screens (unsigned; caller applies
- * direction). A jump flies only when both hold: intermediates
- * `>= goToTeleportMinPageSpan`, AND at least one is never shown
- * (`intermediates > preflight + approach`) — else a teleport is a pointless
- * blink. `goToTeleportEnabled: false` short-circuits to a continuous ride.
- * See docs/architecture/motion.md.
- */
+// Flies only when intermediates >= min AND at least one is never shown; else a
+// teleport is a pointless blink (see motion.md).
 export const resolveGoToPlan = (
   pageSpan: number,
   stepSize: number,
@@ -96,18 +84,13 @@ export const resolveGoToPlan = (
   };
 };
 
-/** Distance the post-teleport approach covers — span-independent, so the
- * reducer can resolve the approach origin at MOTION_SETTLED without the span. */
+/** Span-independent, so the reducer resolves the approach origin without the span. */
 export const resolveGoToApproachDistance = (
   stepSize: number,
   motion: MotionSettings,
 ): number => resolveGoToProfileZones(stepSize, motion).approachDistance;
 
-/**
- * Duration of the post-teleport approach, computable before it exists: cruise
- * `(1-d)·A/p` + decel `2·d·A/p` = `A·(1+d)/p`. Lets the engine plan the total
- * far-GO_TO time up front, so a one-step consumer runs it as one motion.
- */
+/** Approach duration = `A·(1+d)/p` (cruise + local decel). */
 export const resolveGoToApproachDuration = (
   stepSize: number,
   motion: MotionSettings,
@@ -121,11 +104,7 @@ export const resolveGoToApproachDuration = (
   return (approach * (1 + decelShare)) / peakSpeed;
 };
 
-/**
- * Duration of the pre-teleport preflight: enter at `startSpeed`, accelerate to
- * cruise over the local accel budget, cruise the rest. Zone times accel
- * `2·a·P/(s+p)` + cruise `(1-a)·P/p`. Mirror of the approach.
- */
+/** Preflight duration = accel `2·a·P/(s+p)` + cruise `(1-a)·P/p`. Mirror of the approach. */
 export const resolveGoToPreflightDuration = (
   stepSize: number,
   motion: MotionSettings,
@@ -135,8 +114,7 @@ export const resolveGoToPreflightDuration = (
   const zones = resolveGoToProfileZones(stepSize, motion);
   const preflight = zones.preflightDistance;
   if (!(preflight > 0) || !(peakSpeed > 0)) return 0;
-  // Trusted as authored (see approach). Over-budget bites harder here: the
-  // `(1 - accelShare)` cruise term goes negative — the failure Diagnostic reports.
+  // Over-budget bites harder here: the cruise term goes negative (a Diagnostic).
   const accelShare = zones.accelerationDistance / preflight;
   const entrySpeed = Math.max(0, startSpeed);
   const accelDistance = accelShare * preflight;
@@ -146,12 +124,8 @@ export const resolveGoToPreflightDuration = (
   );
 };
 
-/**
- * Total animated time of a flight (preflight + approach; the cut is instant).
- * Also the TIME CEILING of every continuous ride while teleport is enabled — a
- * longer ride is compressed to this so no jump is ever slower than a farther
- * one. Degenerate tunings yield `0` ("no ceiling").
- */
+/** Total flight time (preflight + approach) — also the ceiling for continuous
+ * rides; `0` means no ceiling (see motion.md). */
 export const resolveGoToFlightDuration = (
   stepSize: number,
   motion: MotionSettings,

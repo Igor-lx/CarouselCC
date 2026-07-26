@@ -1,3 +1,4 @@
+// See docs/architecture/motion.md
 import type { MotionPhase, MoveReason } from "../state";
 
 interface DurationByVirtualSpanInput {

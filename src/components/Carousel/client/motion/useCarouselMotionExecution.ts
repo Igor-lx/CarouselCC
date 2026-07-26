@@ -1,3 +1,4 @@
+// See docs/architecture/motion.md
 import { useCallback } from "react";
 
 import type { CarouselDispatch } from "../state";
@@ -10,12 +11,6 @@ interface UseCarouselMotionExecutionInput
   dispatch: CarouselDispatch;
 }
 
-/**
- * Post-state motion orchestration: wires settle feedback into the state machine
- * and mounts the runner — the sole `state -> segment -> controller` bridge.
- * Temporal presentation data reaches paint via the motion-plan channel, not
- * React values.
- */
 export function useCarouselMotionExecution({
   dispatch,
   ...runnerInput

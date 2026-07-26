@@ -1,10 +1,6 @@
-/**
- * Motion-plan channel: the runner computes each segment once and publishes a
- * plan; paint consumers build their own WAAPI animation from it (same duration,
- * curve and clock, their own property). A plain observable on the stable
- * context — it never re-renders React. See docs/architecture/motion.md.
- */
-
+// Motion-plan channel: one plan per segment, published on a plain observable
+// (never re-renders React); each paint consumer builds its own animation.
+// See docs/architecture/motion.md
 export type MotionPlanDirection = -1 | 0 | 1;
 
 interface MotionPlanBase {
@@ -17,18 +13,10 @@ export interface IdleMotionPlan extends MotionPlanBase {
   kind: "idle";
 }
 
-/**
- * Per-frame follow mode: a finger owns the track (drag), or a segment runs on
- * the JS fallback path. Consumers subscribe to the visual-position stream and
- * follow it frame by frame — exactly the pre-engine behaviour.
- */
+/** Per-frame follow: a finger drag, or the JS fallback path. */
 export interface FollowMotionPlan extends MotionPlanBase {
   kind: "follow";
-  /**
-   * `true` when the follow is the no-WAAPI legacy fallback (an engine-driven
-   * segment painted per frame), `false` for a live finger drag. Consumers use
-   * it to apply legacy-only relief (frame-skip) without throttling the drag.
-   */
+  /** `true` for the no-WAAPI fallback (frame-skip relief), `false` for a drag. */
   isFallback: boolean;
 }
 
@@ -42,39 +30,17 @@ export interface InstantMotionPlan extends MotionPlanBase {
 export interface WaapiMotionPlan extends MotionPlanBase {
   kind: "waapi";
   direction: MotionPlanDirection;
-  /** Total planned duration for a one-step consumer (ms). For a far GO_TO this
-   * spans preflight + approach, so a one-step consumer runs the whole command
-   * as a single motion while the deck runs its two bounded segments. */
+  /** Total one-step-consumer duration (ms); spans preflight + approach for a far GO_TO. */
   duration: number;
-  /** Uniform time-samples of the percent-progress curve. Consumers encode
-   * them as WAAPI keyframes (one per stop, evenly distributed) and use
-   * `sampleProgressStops` for reflow-free mid-flight reads. */
+  /** Uniform time-samples of the percent-progress curve (encoded as keyframes). */
   stops: readonly number[];
-  /** Segment clock origin (`performance.now()` domain) — pin WAAPI
-   * `startTime` to it so every consumer runs in phase. */
+  /** Segment clock origin — pin WAAPI `startTime` to it so consumers run in phase. */
   startedAt: number;
-  /**
-   * Identity of the deck's logical destination (target virtual index). A
-   * re-plan with the SAME key is a retiming of the current step (repeated
-   * click refresh, settle re-anchor) — a one-step consumer keeps its target.
-   * A new key advances the consumer one step further.
-   */
+  /** Logical destination identity; a re-plan with the same key retimes the current step. */
   targetKey: number;
-  /**
-   * True for the post-teleport approach slice of a far GO_TO. The command was
-   * already planned in full by the preflight plan; one-step consumers ignore
-   * continuations.
-   */
+  /** Post-teleport approach slice — one-step consumers ignore continuations. */
   isContinuation: boolean;
-  /**
-   * True when the deck's segment is a GO_TO (strategy "jump"). A far GO_TO
-   * TELEPORTS its middle — the deck never shows the pages in between — so a
-   * consumer that would otherwise travel through intermediate positions (the
-   * plain pagination's offset) must cross-fade DIRECTLY to the destination.
-   * One-step consumers (the widget) ignore it. Structural, not a magnitude:
-   * even an adjacent-dot GO_TO is a jump, and a two-step repeated click is
-   * not.
-   */
+  /** Segment is a GO_TO: a jumping consumer must cross-fade directly (structural, not magnitude). */
   isJump: boolean;
 }
 
@@ -120,9 +86,7 @@ export function createMotionPlanChannel(): MotionPlanChannel {
       },
     },
     publish(plan) {
-      // Steady-state dedupe: consecutive idle publishes (and follow publishes
-      // of the same flavour) are no-ops for every consumer; waapi/instant
-      // always notify (each is a new motion).
+      // Steady-state dedupe: repeat idle / same-flavour follow are no-ops.
       if (plan.kind === "idle" && current.kind === "idle") return;
       if (
         plan.kind === "follow" &&

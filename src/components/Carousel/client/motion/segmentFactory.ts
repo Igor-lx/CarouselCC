@@ -1,3 +1,4 @@
+// See docs/architecture/motion.md
 import {
   buildProfile,
   createProfileSegment,
@@ -47,7 +48,6 @@ const intentFromState = (state: CarouselState, isInstant: boolean): CarouselMoti
   }
 };
 
-/** Profile shape for a duration-authored step, by what initiated it. */
 const stepProfileShares = (
   state: CarouselState,
   motion: MotionSettings,
@@ -66,16 +66,11 @@ interface BuildSegmentInput {
 }
 
 export interface BuildSegmentResult {
-  /** The segment to hand to the controller. */
   segment: CarouselSegment;
-  /** The segment's duration; the runner publishes it as the autoplay-motion
-   * duration for the pagination dot delay. */
+  /** Duration; the runner publishes it for the pagination dot delay. */
   duration: number;
 }
 
-/** Duration-authored step: duration and shape shares are known, the peak speed
- * falls out to cover the distance. A hot handoff (`start.velocity`) becomes the
- * start speed so a retarget stays velocity-continuous. */
 const buildStepProfile = (
   state: CarouselState,
   start: MotionStart,
@@ -111,8 +106,6 @@ const buildStepProfile = (
   });
 };
 
-/** Fast acceleration profile for a repeated click. Drives straight to the page
- * boundary and decays to rest — no intermediate target, no chained follow-up. */
 const buildRepeatedProfile = (
   state: CarouselState,
   start: MotionStart,
@@ -152,9 +145,7 @@ const buildGestureProfile = (
   releaseSpeed: number,
 ): CarouselSegment => {
   const distance = state.virtualIndex - start.position;
-  // CONTINUITY LAUNCH (see gesture/inertia/releaseLaunch): start at the visual
-  // velocity seen at lift-off (handoff velocity is zero during a drag) and
-  // accelerate to the intent cruise; a fast lift-off collapses the ramp itself.
+  // Continuity launch: start at the lift-off visual velocity (see gesture.md).
   const launch = resolveReleaseLaunch({
     distance,
     visualVelocity: state.gesture.launchVelocity,
@@ -173,9 +164,8 @@ const buildGestureProfile = (
     });
 
   let profile = buildRide(launch.cruiseSpeed);
-  // Ride-duration floor: a flick must stay VISIBLE (see minRideDurationMs).
-  // Re-solve the cruise down to the floor; the launch speed is never reduced
-  // (continuity wins — if it alone beats the floor, the ride just arrives early).
+  // Ride-duration floor: re-solve cruise to the floor, but never slow the launch
+  // speed (continuity wins). See gesture.md.
   if (profile.duration < release.minRideDurationMs) {
     const flooredPeak = Math.max(
       resolvePeakSpeedForDuration({
@@ -201,14 +191,6 @@ const buildGestureProfile = (
 
 type GoToProfilePhase = "single" | "preflight" | "approach";
 
-/**
- * Builds one segment of the GO_TO speed profile. Acceleration/deceleration are
- * local page-screen budgets, not shares of the whole jump, so a long jump
- * starts like a short one.
- * - `single`    - direct jump: accelerate in the first page, decelerate in the last.
- * - `preflight` - pre-teleport slice: local acceleration, then cruise.
- * - `approach`  - post-teleport final page: cruise, then decelerate onto target.
- */
 const buildGoToProfile = (
   state: CarouselState,
   start: MotionStart,
@@ -235,8 +217,7 @@ const buildGoToProfile = (
       absDistance > 0 ? zones.decelerationDistance / absDistance : 0;
     endSpeed = 0;
   } else {
-    // Each teleport slice re-expresses an absolute local page-screen budget as
-    // a share of that slice's own distance.
+    // Each teleport slice re-expresses its local page-screen budget as a share.
     if (phase === "preflight") {
       accelerationDistanceShare =
         absDistance > 0 ? zones.accelerationDistance / absDistance : 0;
@@ -260,11 +241,8 @@ const buildGoToProfile = (
     decelerationDistanceShare,
   });
 
-  // Flight-envelope time ceiling (teleport ON only): a continuous ride must
-  // never take LONGER than a flight would, else the longest ride (just below
-  // the gate) sits slower than a farther jump. Longer rides are duration-
-  // authored to exactly the flight time so ride and flight meet at the gate for
-  // any knob ratio; a degenerate envelope (0) means "no ceiling".
+  // Flight-envelope time ceiling: cap a continuous ride at the flight time so no
+  // ride is slower than a farther jump (see motion.md; 0 envelope = no ceiling).
   if (phase === "single" && motion.goToTeleportEnabled) {
     const flightDuration = resolveGoToFlightDuration(
       stepSize,
@@ -375,8 +353,6 @@ export function buildCarouselSegment({
     return { segment, duration: segment.duration };
   }
 
-  // Duration-authored step (click, autoplay, snap-back, non-inertial release):
-  // the step kind picks the shares, the peak speed is derived from the duration.
   const duration = resolveStepDuration({
     motionPhase: state.motionPhase,
     moveReason: state.moveReason,
