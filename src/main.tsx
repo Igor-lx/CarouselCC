@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 
 import "./globals.scss";
 import App from "./app/App";
-import { ThemeProvider } from "./theme/ThemeProvider";
+import { ThemeProvider } from "./shared/theme";
 
 const root = document.getElementById("root");
 if (!root) {

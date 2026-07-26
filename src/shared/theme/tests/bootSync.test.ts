@@ -2,13 +2,14 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { BROWSER_THEME_COLORS, THEME_STORAGE_KEY } from "./constants";
+import { THEME_STORAGE_KEY } from "../internal/core/constants";
+import { BROWSER_THEME_COLORS } from "../internal/chrome/colors";
 
 const html = readFileSync("index.html", "utf8");
 
 const attr = (pattern: RegExp): string | undefined => pattern.exec(html)?.[1];
 
-describe("index.html theme boot stays in sync with src/theme/constants.ts", () => {
+describe("index.html theme boot stays in sync with the theme box", () => {
   it("media-paired theme-color metas carry the canonical colors", () => {
     expect(
       attr(/media="\(prefers-color-scheme: light\)"\s+content="([^"]+)"/),
@@ -22,9 +23,7 @@ describe("index.html theme boot stays in sync with src/theme/constants.ts", () =
     expect(attr(/light:\s*"(#[0-9a-fA-F]{3,8})"/)).toBe(
       BROWSER_THEME_COLORS.light,
     );
-    expect(attr(/dark:\s*"(#[0-9a-fA-F]{3,8})"/)).toBe(
-      BROWSER_THEME_COLORS.dark,
-    );
+    expect(attr(/dark:\s*"(#[0-9a-fA-F]{3,8})"/)).toBe(BROWSER_THEME_COLORS.dark);
   });
 
   it("the boot script's STORAGE_KEY matches the canonical key", () => {

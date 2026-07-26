@@ -17,7 +17,7 @@ import {
 } from "../components/Carousel/client/modules/Pagination";
 import { Diagnostic } from "../components/Carousel/client/modules/Diagnostic";
 import { ResponsiveImages } from "../components/Carousel/client/modules/ResponsiveImages";
-import { useTheme } from "../theme/useTheme";
+import { useTheme } from "../shared/theme";
 
 /**
  * Which slides document the demo shows — two PHOTO COLLECTIONS, each cut for
