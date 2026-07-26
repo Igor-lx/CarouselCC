@@ -18,12 +18,7 @@ const issueToWarning = (issue: CarouselStateIssue): CarouselDiagnosticWarning =>
   consequence: issue.consequence,
 });
 
-/**
- * Adapter between the pure `validateCarouselState` and the diagnostic warning
- * pipeline. Runs only when a `<Diagnostic />` slot is attached — the reducer
- * itself stays pure across every environment. The validator reads the
- * effective state's own `layout`, so this layer just forwards the state.
- */
+/** Adapter from the pure `validateCarouselState` to the warning pipeline. */
 export const collectStateWarnings = (
   state: CarouselDiagnosticContextValue["state"],
 ): CarouselDiagnosticWarning[] =>

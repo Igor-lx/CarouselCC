@@ -97,12 +97,8 @@ export interface EndDragCommand extends VirtualIndexSource {
 
 export interface MotionSettledCommand {
   type: "MOTION_SETTLED";
-  /**
-   * The visual position where the controller actually settled. A click may
-   * replace `state.virtualIndex` between the settling RAF tick and this
-   * command, so the reducer needs it to tell "current target finished" from
-   * "an older target finished while a newer one is pending".
-   */
+  /** Where the controller actually settled — lets the reducer tell current from
+   * stale when a click replaced the target mid-settle (see state.md). */
   settledPosition: number;
 }
 

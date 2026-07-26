@@ -115,12 +115,7 @@ const ENVIRONMENT_FIELDS: ReadonlyArray<{ field: string; consequence: string }> 
   },
 ];
 
-/**
- * The carousel does not detect the environment itself — the host must inject
- * it via the `userEnvironment` prop (see `useUserEnvironment` in `shared`).
- * A missing object, or a missing field, is reported here rather than silently
- * defaulted, so the wiring gap is visible.
- */
+/** Report a missing `userEnvironment` (object or field) rather than defaulting it silently. */
 const collectEnvironmentWarnings = (
   environment: unknown,
 ): CarouselDiagnosticWarning[] => {

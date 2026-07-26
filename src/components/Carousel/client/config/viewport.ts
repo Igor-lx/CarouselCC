@@ -1,7 +1,8 @@
 import { canonicalMediaQueries, type MediaAxes } from "../../../../shared";
 
 // The carousel's viewport axes — the single source of its breakpoint
-// names/numbers and flag conditions. See docs/config/viewport.md and
+// names/numbers and flag conditions.
+// See docs/config/viewport.md and
 // docs/architecture/viewport.md.
 
 export const SLIDE_VIEWPORT_BREAKPOINTS = {
@@ -12,7 +13,8 @@ export const SLIDE_VIEWPORT_BREAKPOINTS = {
 
 export type SlideViewportBreakpoint = keyof typeof SLIDE_VIEWPORT_BREAKPOINTS;
 
-export const SLIDE_VIEWPORT_BASE_BREAKPOINT: SlideViewportBreakpoint = "desktop";
+export const SLIDE_VIEWPORT_BASE_BREAKPOINT: SlideViewportBreakpoint =
+  "desktop";
 
 export const SLIDE_VIEWPORT_FLAGS = {
   "short-landscape": "(orientation: landscape) and (max-height: 520px)",
