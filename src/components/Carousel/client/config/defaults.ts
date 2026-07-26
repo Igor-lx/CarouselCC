@@ -1,8 +1,6 @@
-/**
- * Default values for public props. Sourced from the product contract.
- * These are the "out of the box" values that the demo would render with if
- * no override is provided.
- */
+// Default values substituted for undefined public props (out-of-the-box demo
+// settings). See docs/config/defaults.md; the props themselves are documented
+// in docs/architecture/public-api.md.
 export const CAROUSEL_DEFAULTS = {
   visibleSlidesNr: 3,
   durationAutoplay: 3000,

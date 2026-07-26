@@ -37,6 +37,8 @@ Full props, slot children, DOM contract and the slide-data shape are in
   - [modules.md](./docs/architecture/modules.md) — the slot modules
   - [diagnostics.md](./docs/architecture/diagnostics.md) — the observe-only dev layer
   - [quality.md](./docs/architecture/quality.md) — trade-offs and quality protections
+- **[docs/config/](./docs/config/)** — what every tuning constant governs, one
+  file per `config/` file (the values live in the code; the docs explain them).
 - **[docs/adr/](./docs/adr/)** — the decisions with lasting consequences:
   - [ADR-001](./docs/adr/0001-layout-reconciliation.md) — one pure reconcile rule, two boundaries
   - [ADR-002](./docs/adr/0002-trusted-runtime-inputs.md) — trusted runtime inputs, external validation boundary
