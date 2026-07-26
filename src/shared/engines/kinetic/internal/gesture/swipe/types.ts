@@ -33,11 +33,8 @@ export interface PointerSwipeConfig {
   maxVelocity?: number;
   /** Velocity EMA smoothing weight in (0, 1]. */
   emaAlpha?: number;
-  /**
-   * Per-frame EMA weight of the FLICK-VELOCITY MEMORY — the weighted-average
-   * gesture speed the flick decision and the release speed are based on, so
-   * a fast gesture is not judged by its last (often decelerating) segment.
-   */
+  /** Per-frame EMA weight of the flick-velocity memory (judges the whole
+   * gesture, not its last, often decelerating, segment). */
   flickVelocityAlpha?: number;
   /** Hold before lift-off that costs the flick memory nothing (ms). */
   flickPauseGraceMs?: number;
@@ -51,36 +48,17 @@ export interface PointerSwipeConfig {
   minSwipeDistance?: number;
   /** Distance threshold expressed as fraction of viewport width. */
   swipeThresholdRatio?: number;
-  /**
-   * How long a press must rest before the engine takes ownership (fires
-   * `onPressStart` — the consumer's "catch/brake"), in ms.
-   *
-   * This window is what reconciles two truths that collide on a moving
-   * surface: a finger LANDING should catch the motion, but a finger that is
-   * merely STARTING A PAGE SCROLL across the surface should not hitch it.
-   * At press time the two are indistinguishable — only the next few input
-   * events tell. Within the window: vertical intent hands the gesture to the
-   * browser with the motion never touched; horizontal intent activates the
-   * takeover immediately (no added latency for real swipes); a lift ends as
-   * a clean tap (clicks unaffected). Only a press that OUTLASTS the window is
-   * a deliberate catch — and brakes.
-   *
-   * `0` restores brake-on-contact (and re-introduces the scroll hitch).
-   * Values at or above the OS long-press (~500 ms) would let the context
-   * menu open before the catch — keep it well below.
-   */
+  /** How long a press must rest before the engine takes ownership / brakes
+   * (ms). `0` re-introduces the scroll hitch; keep it well below the OS
+   * long-press or the context menu opens before the catch. */
   catchDelayMs?: number;
 }
 
 export type ResolvedPointerSwipeConfig = Required<PointerSwipeConfig>;
 
 export interface PointerSwipePressPayload {
-  /**
-   * Viewport-domain X where the finger LANDED. A consumer that freezes its
-   * motion under a press (non-interactive surfaces take ownership on the
-   * press itself) uses it to settle a motionless release back onto the
-   * element that was actually pressed.
-   */
+  /** Viewport-domain X where the finger landed — for settling a motionless
+   * release back onto the element that was actually pressed. */
   pressClientX: number;
 }
 
@@ -94,13 +72,9 @@ export interface PointerSwipeReleasePayload extends PointerSwipeMovePayload {
   direction: PointerSwipeDirection;
   pointerReleaseVelocity: number;
   uiReleaseVelocity: number;
-  /**
-   * The UI-domain speed a continuity launch should start the ride at: what the
-   * strip was visibly carrying, judged over the gesture rather than over its
-   * last two frames. `uiReleaseVelocity` is the raw instantaneous reading and a
-   * momentary hold before lift-off zeroes it — which is how a deliberate slow
-   * swipe ends, so the ride would launch from a standstill and crawl.
-   */
+  /** UI-domain speed a continuity launch should start at — judged over the
+   * whole gesture, not the last frames (a momentary hold zeroes the raw
+   * `uiReleaseVelocity`, which would launch from a standstill). */
   launchVelocity: number;
 }
 
