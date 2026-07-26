@@ -66,8 +66,8 @@ externally derived active band (`isActive` / `isActual`):
 - **Responsive rendering** (when the `<ResponsiveImages />` module is mounted —
   see [modules.md](./modules.md)): `image.srcSet` → the default `<img>`, and
   `image.sources` → a `<picture>` of art-directed `<source>`s. The carousel
-  injects a default `sizes` (≈ `100 / visibleSlidesNr` vw), overridable per slide.
-  The `Slide.image` data shape is in [public-api.md](./public-api.md).
+  injects a default `sizes` derived from `visibleSlidesNr`, overridable per
+  slide. The `Slide.image` data shape is in [public-api.md](./public-api.md).
 
 ## Image resources: status, error, retry
 

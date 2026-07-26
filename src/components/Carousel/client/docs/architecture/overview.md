@@ -1,9 +1,10 @@
 # Overview
 
-This folder (`client/`) is the portable unit: the browser carousel component.
-It is self-contained — copy its contents into a project and it runs, pulling
-only from the trimmed `shared/` shelf it ships beside. This document is the map;
-the area docs beside it go deep.
+The carousel component. It is self-contained and a pure function of its props —
+it detects nothing about its environment; the host injects `userEnvironment`.
+Where it needs a general-purpose primitive (a swipe engine, a media store, the
+motion engine) it takes it from the project's shared library. This document is
+the map; the area docs beside it go deep.
 
 ## Ownership model
 
@@ -58,32 +59,31 @@ position never reads logical state; the motion runner is the only bridge.
 ## Folder map
 
 ```
-client/
-├── Carousel.tsx            composition root, no business logic
-├── public-api/             the product contract — props, Slide, handle, schemas
-├── config/                 config resolution (defaults, motion shares, gesture, viewport)
-├── context/                module + diagnostic React contexts, split by update cadence
-├── domain/                 pure functions, no React (math, layout, windowing, visibility)
-├── state/                  reducer-backed state machine + layout reconciliation
-├── motion/                 carousel motion SEMANTICS over shared/engines/motion
-├── visual-position/        the visible-position SSOT (wraps one MotionController)
-├── geometry/               slot measurement + track transform writer + WAAPI compositor
-├── gesture/                pointer-swipe → dispatch + direct position writes
-├── autoplay/               generic interval loop + carousel adapter
-├── navigation/             public click handlers
-├── focus/                  focus recovery on settle
-├── host-report/            deduplicated onCarouselStatusChange emission
-├── presentation/           class names, CSS vars, state attributes
-├── slides/                 SlideItem, render window, image-resource SSOT
-├── viewport/               breakpoint/orientation resolution for the deck
-├── slots/                  slot names + CarouselSlotComponent contract
-├── render-policy/          single owner of slot-attachment / render gating
-├── modules/                slot children:
-│   ├── Controls/
-│   ├── Pagination/         basic/ (dots) + widget/ (scaling strip)
-│   ├── ResponsiveImages/   headless: presence switch + idle warm manager
-│   └── Diagnostic/         dev-only observer (checks/) — see diagnostics.md
-└── docs/                   this documentation set (adr/ + architecture/)
+Carousel.tsx            composition root, no business logic
+public-api/             the product contract — props, Slide, handle, schemas
+config/                 config resolution (defaults, motion shares, gesture, viewport)
+context/                module + diagnostic React contexts, split by update cadence
+domain/                 pure functions, no React (math, layout, windowing, visibility)
+state/                  reducer-backed state machine + layout reconciliation
+motion/                 carousel motion SEMANTICS over the shared motion engine
+visual-position/        the visible-position SSOT (wraps one MotionController)
+geometry/               slot measurement + track transform writer + WAAPI compositor
+gesture/                pointer-swipe → dispatch + direct position writes
+autoplay/               generic interval loop + carousel adapter
+navigation/             public click handlers
+focus/                  focus recovery on settle
+host-report/            deduplicated onCarouselStatusChange emission
+presentation/           class names, CSS vars, state attributes
+slides/                 SlideItem, render window, image-resource SSOT
+viewport/               breakpoint/orientation resolution for the deck
+slots/                  slot names + CarouselSlotComponent contract
+render-policy/          single owner of slot-attachment / render gating
+modules/                slot children:
+  Controls/
+  Pagination/           basic/ (dots) + widget/ (scaling strip)
+  ResponsiveImages/     headless: presence switch + idle predecode manager
+  Diagnostic/           dev-only observer (checks/) — see diagnostics.md
+docs/                   this documentation set (adr/ + architecture/)
 ```
 
 Detail per file lives in the folder itself — this map stays at folder altitude

@@ -20,8 +20,8 @@ flick.
 
 The engine thinks in absolute px of its host; the user's eye thinks in **slots**
 ("how far did content move relative to one slide"). A host-relative threshold
-drifts with `visibleSlidesNr` (11% of a slide at 1 visible vs 32% at 3), so the
-tuning is slot-normalized before it reaches the engine.
+drifts with `visibleSlidesNr` — a fixed px is a larger fraction of a slide the
+fewer are visible — so the tuning is slot-normalized before it reaches the engine.
 
 [`gesture/slotAdaptiveSwipe.ts`](../../gesture/slotAdaptiveSwipe.ts)
 (`resolveSlotAdaptiveSwipeConfig`, pure, unit-tested) translates content
@@ -56,8 +56,8 @@ carousel-specific adapter:
    **synchronously** — `cancelTrackMotion(origin)` tears down any compositor
    animation and pins the track at the live origin — and publishes the origin via
    `applyTrackPosition`. The `START_DRAG` dispatch itself is **deferred** to its
-   own task (the follow stream needs no React; the dragging render used to block
-   frame presentation for the first ~30–80 ms of a fast swipe). Order is still
+   own task (the follow stream needs no React; the dragging render otherwise
+   blocks frame presentation at the very start of a fast swipe). Order is still
    guaranteed: every dependent dispatch site flushes the pending `START_DRAG`
    first, so the reducer always sees START before END.
 2. **Move.** Translates `uiOffset` into a virtual-index delta via the recorded

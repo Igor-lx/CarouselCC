@@ -30,15 +30,8 @@ interface ResolveStepDurationInput {
   stepDuration: number;
 }
 
-/**
- * Resolve durations only for the duration-authored steps: the click step, the
- * autoplay step, the snap-back, and a non-inertial gesture release. The
- * factory then derives the profile's peak speed from this duration.
- *
- * Speed-authored motions are intentionally absent from this resolver -
- * repeated click, inertial gesture release, and every GO_TO / teleport
- * segment derive their duration from distance + zone speeds instead.
- */
+/** Duration for the duration-authored steps only; speed-authored motions
+ * derive their own. See docs/architecture/motion.md. */
 export const resolveStepDuration = ({
   motionPhase,
   moveReason,

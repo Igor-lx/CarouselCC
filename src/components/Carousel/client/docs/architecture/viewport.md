@@ -11,21 +11,18 @@ is in [slides.md](./slides.md); the `Slide.image` data shape is in
 names/numbers and flag conditions are defined. Everything else derives from it —
 all of it carousel-owned tuning, nothing from the host.
 
-- **`SLIDE_VIEWPORT_BREAKPOINTS`** — width tiers as `name: minWidthPx`
-  (`desktop: 1024`, `tablet: 768`, `mobile: 0`). Names are arbitrary:
-  resolution is purely by NUMBER (largest matching threshold wins), so
-  naming/order can never shadow a wider tier. `0` is the always-matching
-  fallback tier.
-- **`SLIDE_VIEWPORT_FLAGS`** — arbitrary named boolean conditions →
-  `data-<name>`. The demo declares one, `short-landscape` (a landscape viewport
-  too short for a tall slide). The value is written LITERALLY here,
-  deliberately NOT imported from the shared `useShortLandscape` primitive, so the
-  component owns it.
-- **`SLIDE_VIEWPORT_BASE_BREAKPOINT`** (`desktop`) — a STYLING fact, not a
-  resolution one, and not derivable from the table: the resolver's fallback is
-  the NARROWEST tier (`0`), while the desktop-first stylesheet's base is the
-  WIDEST. Diagnostics reads it to know that tier styling "nothing by attribute"
-  is intended, not a forgotten block.
+- **`SLIDE_VIEWPORT_BREAKPOINTS`** — width tiers as `name: minWidthPx`. Names
+  are arbitrary: resolution is purely by NUMBER (largest matching threshold
+  wins), so naming/order can never shadow a wider tier. A zero-width tier is the
+  always-matching fallback.
+- **`SLIDE_VIEWPORT_FLAGS`** — arbitrary named boolean viewport conditions →
+  `data-<name>`. Each condition is written literally here, deliberately NOT
+  imported from a shared media primitive, so the component owns it.
+- **`SLIDE_VIEWPORT_BASE_BREAKPOINT`** — names the base tier (styled by the
+  plain rule, not a `[data-breakpoint]` block). A STYLING fact, not derivable
+  from the table: a widest-tier-first stylesheet makes its base the WIDEST tier
+  while the resolver's fallback is the NARROWEST. Diagnostics reads it to know
+  that tier styling nothing by attribute is intended, not a forgotten block.
 
 ## Resolution → data attributes → CSS
 

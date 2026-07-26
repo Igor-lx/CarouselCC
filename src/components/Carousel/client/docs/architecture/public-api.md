@@ -8,11 +8,11 @@ contract, and the slide data shape. Mechanism lives in the area docs
 ## Import
 
 ```tsx
-import Carousel, { type Slide, type CarouselProps } from "<carousel>";
-import { Pagination, PaginationWidget } from "<carousel>/modules/Pagination";
-import { Controls } from "<carousel>/modules/Controls";
-import { ResponsiveImages } from "<carousel>/modules/ResponsiveImages";
-import { Diagnostic } from "<carousel>/modules/Diagnostic";
+import Carousel, { type Slide, type CarouselProps } from "./Carousel";
+import { Pagination, PaginationWidget } from "./Carousel/modules/Pagination";
+import { Controls } from "./Carousel/modules/Controls";
+import { ResponsiveImages } from "./Carousel/modules/ResponsiveImages";
+import { Diagnostic } from "./Carousel/modules/Diagnostic";
 ```
 
 The default export is the deck. `Pagination` and `PaginationWidget` are two
@@ -31,15 +31,12 @@ the rest are one folder each. Modules attach via the `slot` static convention.
 With overrides and an injected environment:
 
 ```tsx
-const userEnvironment = useUserEnvironment(); // from the shared shelf
+const userEnvironment = useUserEnvironment(); // the project's shared hook
 
 <Carousel
   slidesData={slides}
-  visibleSlidesNr={3}
   isAutoplayOn
   isFullPagesOn
-  durationStep={2000}
-  intervalAutoplay={3000}
   userEnvironment={userEnvironment}
   onSlideClick={(slide) => openInNewTab(String(slide.content))}
   onCarouselStatusChange={({ currentPageIndex, pageCount }) =>
@@ -79,7 +76,7 @@ surfaced by the `Diagnostic` slot but never repaired — see
 
 The carousel does **not** detect the environment — it is a pure function of its
 props. The host injects it via one optional object (recommended source: the
-`useUserEnvironment` hook in the shared shelf, which returns a referentially
+project's shared `useUserEnvironment` hook, which returns a referentially
 stable object).
 
 | Prop | Type | Effect |
@@ -98,7 +95,7 @@ stable object).
 
 | Prop | Effect |
 | --- | --- |
-| `isAutoplayOn` | Master autoplay switch. Auto-pauses when the viewport is under `VISIBILITY_THRESHOLD` on screen, during drag/motion, or (desktop) on hover (`HOVER_PAUSE_DELAY`). Loops page-0 via `GO_TO` at the finite end. |
+| `isAutoplayOn` | Master autoplay switch. Auto-pauses when the viewport is under `VISIBILITY_THRESHOLD` on screen, during drag/motion, or (desktop) on hover (`HOVER_PAUSE_DELAY`). Loops to the first page via `GO_TO` at the finite end. |
 | `isPaginationOn` | Gates the attached `Pagination` / `PaginationWidget` slot. `true` with no slot attached renders nothing — the slot must opt in via `children`. |
 | `isControlsOn` | Same contract, for `Controls`. |
 | `isSwipeOn` | Master gesture switch. Off attaches **no listeners at all**. Flipped off under a live finger, the orphaned drag ends as a passive snap ([gesture.md](./gesture.md)). Not a render gate — gesture has no slot. |
@@ -162,7 +159,7 @@ identity:
 ```ts
 interface SlideImageSource {
   media: string;   // a canonical axis string — see viewport.md
-  srcSet: string;  // "crop-480.webp 480w, crop-720.webp 720w"
+  srcSet: string;  // width-descriptor candidates ("<url> <width>w, …")
   sizes?: string;  // defaults to the carousel's auto value
   type?: string;
 }
@@ -186,9 +183,10 @@ Contract guarantees:
   reconciliation — adding/removing/swapping variants (including an orientation
   crop on rotation) never resets the viewing position. Keep `content` stable
   across orientations; vary only `image`.
-- **`sizes` is carousel-supplied** (≈ `100 / visibleSlidesNr` vw) on the `<img>`
-  and each `<source>`, avoiding the "no `sizes` → assume `100vw` → oversized
-  candidate" trap. A slide's own `image.sizes` / `source.sizes` overrides it.
+- **`sizes` is carousel-supplied** — a default derived from `visibleSlidesNr`
+  (about one slide's share of the viewport width) on the `<img>` and each
+  `<source>`, avoiding the "no `sizes` → oversized candidate" trap. A slide's own
+  `image.sizes` / `source.sizes` overrides it.
 - **`<source>` is for exceptions, `<img>` is the default.** With `image.sources`
   present the slide renders a `<picture>`; place normal candidates in
   `image.srcSet`, reserve `sources` for art-directed crops. `<source media>`

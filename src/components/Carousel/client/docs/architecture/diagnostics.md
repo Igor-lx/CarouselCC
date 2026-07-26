@@ -58,8 +58,9 @@ Check sets under [`modules/Diagnostic/checks/`](../../modules/Diagnostic/checks)
   `data-orientation` selector names a real state; every declared tier/flag is
   referenced by some stylesheet — or deliberately isn't).
 - **`stateChecks`** — structural state invariants (via `state/validateState`).
-- **`widgetChecks`** — PaginationWidget prop sanity (odd `visibleDots ≥ 3`,
-  `scaleFactor ∈ (0,1)`, positive px).
+- **`widgetChecks`** — PaginationWidget prop sanity (`visibleDots` an odd
+  integer at or above its floor, `scaleFactor` in the open unit interval,
+  positive pixel sizes).
 
 ## Two collectors, one emitter
 

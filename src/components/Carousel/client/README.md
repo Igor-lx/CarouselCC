@@ -4,17 +4,16 @@ A React carousel component: compositor-driven motion (one WAAPI path for every
 planned ride), touch gestures with inertial release, responsive art-directed
 images, and a dev-only diagnostic layer that compiles out of production.
 
-This folder is the **portable unit** — copy its contents into a project and it
-runs, pulling only from the trimmed `shared/` shelf it ships beside. It detects
-nothing about its environment: the host injects `userEnvironment` and the
-component stays a pure function of its props.
+It is self-contained and detects nothing about its environment: the host injects
+`userEnvironment` and the component stays a pure function of its props. Where it
+needs a general-purpose primitive it takes it from the project's shared library.
 
 ## Minimal usage
 
 ```tsx
-import Carousel from "<carousel>";
-import { Pagination } from "<carousel>/modules/Pagination";
-import { Controls } from "<carousel>/modules/Controls";
+import Carousel from "./Carousel";
+import { Pagination } from "./Carousel/modules/Pagination";
+import { Controls } from "./Carousel/modules/Controls";
 
 <Carousel slidesData={slides}>
   <Pagination />

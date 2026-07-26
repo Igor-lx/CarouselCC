@@ -217,10 +217,9 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     renderWindowBufferMultiplier: config.layout.renderWindowBufferMultiplier,
   });
 
-  // Bandwidth gate: the buffered slides of the render window hold their image
-  // sources until the visible band has reported back, so the slide the user is
-  // looking at does not share the pipe with four it has not asked for yet
-  // (see `useActiveBandGate`).
+  // Bandwidth gate: buffered slides hold their image sources until the visible
+  // band has reported back, so the looked-at slide does not share the pipe with
+  // buffered ones not yet asked for (see `useActiveBandGate`).
   const isOffBandFetchOn = useActiveBandGate({
     virtualSlides,
     isContentImg,
