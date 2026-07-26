@@ -1,3 +1,4 @@
+// See ./README.md
 import { useEffect, useState, type ReactNode } from "react";
 
 import { ThemeContext } from "./ThemeContext";
@@ -10,9 +11,7 @@ import {
   type ThemeMode,
 } from "./types";
 
-/** Storage values are untrusted: anything but an explicit known mode is AUTO
- * (a stale/corrupted entry used to leak into `data-theme` and produce
- * `content="undefined"` browser-chrome colors until the cache was cleared). */
+/** Untrusted storage: anything but an explicit known mode resolves to AUTO. */
 const asThemeMode = (raw: string | null): ThemeMode =>
   raw === THEME_MODES.LIGHT ||
   raw === THEME_MODES.DARK ||
@@ -42,10 +41,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
       setOnScreenTheme(next);
       document.documentElement.setAttribute("data-theme", next);
-      // Keep the boot script's inline background in sync: mobile browser
-      // chrome samples the <html> background, and the inline value (set
-      // pre-paint by index.html) outranks the stylesheet, so it must follow
-      // every toggle.
+      // Keep the boot script's inline <html> background in sync — mobile chrome
+      // samples it and the inline value outranks the stylesheet (see README).
       document.documentElement.style.backgroundColor =
         BROWSER_THEME_COLORS[next];
       localStorage.setItem(THEME_STORAGE_KEY, theme);
@@ -59,10 +56,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [theme]);
 
   useEffect(() => {
-    // Two media-paired metas live in index.html (parse-time correctness for
-    // the mobile bar tint). In auto mode each keeps its own scheme's color —
-    // the browser then switches with the OS theme by itself; an explicit
-    // choice overrides both to the chosen color.
+    // theme-color metas: in auto mode each keeps its own scheme's color (the
+    // browser switches with the OS); an explicit choice overrides both.
     const metas = document.querySelectorAll<HTMLMetaElement>(
       'meta[name="theme-color"]',
     );

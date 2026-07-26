@@ -1,6 +1,5 @@
-/** localStorage key for the persisted theme mode. Lives here (react-free)
- * so build-time consumers (the theme-boot Vite plugin) can import it without
- * pulling React into the config bundle. */
+// See ./README.md
+/** localStorage key for the persisted theme mode (react-free; the boot script mirrors it). */
 export const THEME_STORAGE_KEY = "theme-mode";
 
 export const THEME_MODES = {
