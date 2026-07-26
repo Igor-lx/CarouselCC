@@ -3,10 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
-import { ThemeStateProvider } from "../internal/core/ThemeStateProvider";
-import { useTheme } from "../internal/core/useTheme";
-import { THEME_STORAGE_KEY } from "../internal/core/constants";
-import type { ThemeContextValue } from "../internal/core/types";
+import { ThemeStateProvider } from "../ThemeStateProvider";
+import { useTheme } from "../useTheme";
+import { THEME_STORAGE_KEY } from "../internal/constants";
+import type { ThemeContextValue } from "../internal/types";
 
 let osDark = false;
 const mqlListeners = new Set<() => void>();

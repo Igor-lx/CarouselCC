@@ -7,12 +7,12 @@ import {
   type ReactNode,
 } from "react";
 
-import { useIsomorphicLayoutEffect } from "../../../hooks/useIsomorphicLayoutEffect";
-import { ThemeContext } from "./ThemeContext";
-import { ON_SCREEN_MODES, THEME_MODES, THEME_STORAGE_KEY } from "./constants";
-import { asThemeMode, prefersDark, resolveOnScreen } from "./resolve";
-import { readStoredMode, writeStoredMode } from "./storage";
-import type { OnScreenThemeMode, ThemeContextValue, ThemeMode } from "./types";
+import { useIsomorphicLayoutEffect } from "../hooks/useIsomorphicLayoutEffect";
+import { ThemeContext } from "./internal/ThemeContext";
+import { ON_SCREEN_MODES, THEME_MODES, THEME_STORAGE_KEY } from "./internal/constants";
+import { asThemeMode, prefersDark, resolveOnScreen } from "./internal/resolve";
+import { readStoredMode, writeStoredMode } from "./internal/storage";
+import type { OnScreenThemeMode, ThemeContextValue, ThemeMode } from "./internal/types";
 
 export function ThemeStateProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<ThemeMode>(readStoredMode);

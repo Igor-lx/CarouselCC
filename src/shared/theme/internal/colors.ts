@@ -1,5 +1,5 @@
 // index.html mirrors these (pre-paint boot, can't import); bootSync.test.ts guards the drift.
-import { ON_SCREEN_MODES } from "../core/constants";
+import { ON_SCREEN_MODES } from "./constants";
 
 export const BROWSER_THEME_COLORS = {
   [ON_SCREEN_MODES.LIGHT]: "#bfd6f8",

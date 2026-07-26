@@ -4,9 +4,9 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import { ThemeProvider } from "../ThemeProvider";
-import { useTheme } from "../internal/core/useTheme";
-import { BROWSER_THEME_COLORS } from "../internal/chrome/colors";
-import type { ThemeContextValue } from "../internal/core/types";
+import { useTheme } from "../useTheme";
+import { BROWSER_THEME_COLORS } from "../internal/colors";
+import type { ThemeContextValue } from "../internal/types";
 
 const installMatchMedia = () => {
   vi.stubGlobal("matchMedia", (query: string) => ({

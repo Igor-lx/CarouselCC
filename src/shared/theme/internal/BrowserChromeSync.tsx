@@ -2,9 +2,9 @@
 // See ../../README.md
 import { useEffect } from "react";
 
-import { useIsomorphicLayoutEffect } from "../../../hooks/useIsomorphicLayoutEffect";
-import { ON_SCREEN_MODES, THEME_MODES } from "../core/constants";
-import { useTheme } from "../core/useTheme";
+import { useIsomorphicLayoutEffect } from "../../hooks/useIsomorphicLayoutEffect";
+import { ON_SCREEN_MODES, THEME_MODES } from "./constants";
+import { useTheme } from "../useTheme";
 import { BROWSER_THEME_COLORS } from "./colors";
 
 export function BrowserChromeSync(): null {

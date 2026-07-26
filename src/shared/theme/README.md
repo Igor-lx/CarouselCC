@@ -11,15 +11,18 @@ cold mobile load.
 
 ## Structure
 
-Two responsibilities behind one facade:
+The public entry points sit at the box root; the plumbing is in `internal/`:
 
-- **`internal/core/`** — the portable, SSR-safe theme STATE: the mode, the
-  resolved on-screen look, persistence, cross-tab sync, and `data-theme`. No
-  browser-chrome knowledge; works in any app.
-- **`internal/chrome/`** — the app-shell adapter that makes the mobile browser
-  chrome match: the `theme-color` metas and the inline `<html>` background.
-- **`ThemeProvider.tsx`** — the facade composing both. `ThemeStateProvider`
-  (core only) is exported too, for hosts that don't want the chrome sync.
+- **`ThemeProvider.tsx`** — the turnkey facade: theme state **+** mobile-chrome
+  sync. Use this when you want the mobile browser bar to match.
+- **`ThemeStateProvider.tsx`** — **core only** (theme state, no chrome), for SSR
+  / desktop / embedded hosts that don't need the mobile bar.
+- **`useTheme.ts`** — the consumer hook.
+
+Both providers cover the same two responsibilities, split as separate files under
+`internal/`: the STATE (context, constants, resolution, storage, `data-theme`)
+and the mobile-CHROME adapter (`BrowserChromeSync`, `colors`). Import everything
+from the box barrel (`.../shared/theme`), never from `internal/`.
 
 ## Two concepts
 
@@ -110,8 +113,8 @@ The `COLORS` and `STORAGE_KEY` above DUPLICATE the box on purpose (the script
 can't import). They are locked by [`tests/bootSync.test.ts`](./tests/bootSync.test.ts),
 which reads `index.html` and fails CI on any drift — **so if you change a theme
 color or the storage key in the box, update this snippet too.** Colors live in
-[`internal/chrome/colors.ts`](./internal/chrome/colors.ts), the key in
-[`internal/core/constants.ts`](./internal/core/constants.ts).
+[`internal/colors.ts`](./internal/colors.ts), the key in
+[`internal/constants.ts`](./internal/constants.ts).
 
 > Skipping step 4 is allowed: the theme still works, only the very first paint on
 > mobile may flash the default bar color.
