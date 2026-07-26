@@ -64,26 +64,10 @@ const ACTIVE_DOT_COUNT = 4;
  * across them. */
 const INVISIBLE_OPACITY = 0.001;
 
-/**
- * Serialization density of the plan curve FOR THE STRIP, in intervals.
- *
- * The plan arrives at the density the TRACK needs — one stop per ~16 ms of
- * ride, so a page step carries ~157 of them. That density exists because the
- * track travels a whole viewport and a velocity step there is visible. A
- * widget dot travels at most one strip width, a couple of dozen pixels: at 32
- * intervals its largest per-segment move is a fraction of a pixel, far below
- * anything an eye can read as stepping.
- *
- * The difference is not cosmetic. Every dot builds ONE KEYFRAME PER STOP,
- * every overlay too, and a trajectory has to be built in full BEFORE the
- * invisibility test below can decide to throw it away — so the full density
- * meant `(dots + overlays) × 157` keyframe objects and transform strings in
- * the click frame, the majority discarded. That frame is one of only two the
- * carousel spends main-thread time in, and this path is the MOBILE one.
- *
- * Both grids are uniform samples of the same curve and exact at both ends, so
- * the strip stays synchronized with the track it rides beside.
- */
+/** Plan-curve density for the strip — coarser than the track's: a dot travels
+ * at most a strip width, so a sparse grid is still sub-pixel, and each stop
+ * costs a keyframe per dot in the click frame (mobile main-thread path). Same
+ * curve as the track, exact at both ends, so the two stay in sync. */
 const STRIP_CURVE_INTERVALS = 32;
 
 const emptyDotState = (): PaginationWidgetDotState => ({
@@ -100,13 +84,8 @@ const toTransform = (x: number, scale: number) =>
 
 
 
-/**
- * Cache the *inputs* to the per-frame transform, not the formatted string.
- * Comparing numeric values against epsilons lets us skip both the
- * template-literal allocation in `toTransform(...)` AND the DOM style
- * write when nothing visibly changed since the last frame — a steady-
- * state widget settles into emitting zero DOM writes per rAF.
- */
+/** Caches the transform INPUTS (not the string): comparing against epsilons
+ * skips the string alloc and the DOM write when nothing visibly changed. */
 interface DotWriteCache {
   x: number;
   scale: number;
@@ -127,11 +106,8 @@ const shouldWriteOpacity = (
   opacity: number,
 ): boolean => last === null || Math.abs(last.opacity - opacity) >= DOT_OPACITY_EPSILON;
 
-/** One in-flight WAAPI step: target + the plan data needed to sample the
- * live offset without touching the DOM. */
-/** The shared plan span (from/to/duration/startedAt/stops) plus what only the
- * widget needs: which way it was going, which destination it belongs to, and
- * the animations painting it. */
+/** An in-flight WAAPI step: the shared plan span plus what only the widget
+ * needs — direction, destination key, and the animations painting it. */
 interface ActiveStep extends InFlightSpan {
   direction: -1 | 0 | 1;
   targetKey: number;
@@ -175,10 +151,8 @@ export function usePaginationWidgetBinding({
   /** The widget's own step counter — where the strip logically sits. */
   const offsetRef = useRef(0);
   const stepRef = useRef<ActiveStep | null>(null);
-  /** The step a finger grab tore down (follow mode cancels the running
-   * animation): survives the follow interlude so a repeat swipe advances the
-   * widget one step BEYOND, exactly like a repeat click whose `stepRef`
-   * never dies. Consumed by the next plan, cleared on settle. */
+  /** The step a finger grab tore down — kept so a repeat swipe advances one
+   * step BEYOND, like a repeat click. Consumed by the next plan, cleared on settle. */
   const interruptedStepRef = useRef<WidgetStepMemory | null>(null);
   const followUnsubRef = useRef<(() => void) | null>(null);
   const followBaseRef = useRef<{ pageOffset: number; offset: number } | null>(
@@ -420,12 +394,9 @@ export function usePaginationWidgetBinding({
           stripStops,
         );
 
-        // A dot that stays INVISIBLE for the whole step never needs an
-        // animation: it would paint nothing while costing a full per-frame
-        // main-thread style recalc (each dot's projection is unique, so Blink
-        // cannot share one ComputedStyle across them). Pin it to its (hidden)
-        // end state and skip. The dot stays MOUNTED, so the strip never runs
-        // out of dots — the coverage margin is untouched, only its animation.
+        // A dot invisible for the whole step is pinned to its end state, not
+        // animated (an invisible animation still costs a per-frame recalc). It
+        // stays MOUNTED, so the strip never runs out of dots.
         if (keyframes.every((frame) => frame.opacity <= INVISIBLE_OPACITY)) {
           const last = keyframes[keyframes.length - 1]!;
           dot.style.transform = last.transform;

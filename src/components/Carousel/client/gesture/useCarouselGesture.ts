@@ -78,25 +78,16 @@ export function useCarouselGesture({
   // is looking at (see resolveDragRelease).
   const isInFlightGrabRef = useRef(false);
   const pressedPageIndexRef = useRef<number | null>(null);
-  // Whether the browser's context menu opened during THIS gesture. On Android
-  // the menu ends the gesture as an external cancel — indistinguishable from
-  // the browser stealing the pointer for a page scroll — and the two must
-  // settle differently: a menu-hold lands on the PRESSED slide (the one the
-  // menu describes), a scroll hand-off RESUMES the interrupted ride.
+  // Did the context menu open during THIS gesture? It ends the gesture like an
+  // external cancel, but must settle differently from a scroll hand-off: a
+  // menu-hold lands on the pressed slide, a scroll resumes the interrupted ride.
   const contextMenuSeenRef = useRef(false);
   const slotSizeRef = useRef(0);
 
-  // PRESS-COMMIT DEFERRAL. The follow stream needs no React at all (positions
-  // are written straight to style), but the START_DRAG render used to run
-  // INSIDE the press task — on a weak device that single long task blocked
-  // frame presentation for the first ~30-80ms of a fast swipe, reading as
-  // "content does not follow, then rides after lift-off". The track grab
-  // stays fully synchronous; only the dispatch moves to its own task, opening
-  // a presentation slot between them. ORDER IS GUARANTEED: every dependent
-  // dispatch site flushes the pending START_DRAG synchronously first, so the
-  // reducer always sees START before END — on a gesture faster than the
-  // deferral both land in one task (and one commit), which is semantically
-  // the same release the reducer would have processed anyway.
+  // PRESS-COMMIT DEFERRAL: the track grab is synchronous, but the START_DRAG
+  // dispatch moves to its own task so its render can't block the first frames
+  // of a fast swipe. Order is preserved — every dependent dispatch flushes the
+  // pending START_DRAG first. See docs/architecture/gesture.md.
   const pendingStartRef = useRef<{
     fromVirtualIndex: number;
     targetPageIndex: number;

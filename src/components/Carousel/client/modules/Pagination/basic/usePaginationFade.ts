@@ -87,13 +87,10 @@ export interface PaginationFadeBinding {
 }
 
 /**
- * The motion currently masking the class flip.
- * - `sweep`: the offset TRAVELS the span — steps, repeats, wraps; passed-over
- *   pages light up because the offset really visits them.
- * - `direct`: each involved dot cross-fades straight to its final look —
- *   GO_TO, where the deck teleports its middle and the dots must not tour
- *   pages the deck never shows. The span runs 0 → 1, so `positionAtNow` on
- *   it yields plain temporal progress for mid-flight continuation.
+ * The motion currently masking the class flip. `sweep`: the offset TRAVELS the
+ * span, so passed-over pages light up. `direct`: each dot cross-fades straight
+ * to its final look (GO_TO, whose deck teleports the middle — dots must not tour
+ * pages never shown). See docs/architecture/modules.md.
  */
 interface ActiveFade {
   span: InFlightSpan;
@@ -119,11 +116,8 @@ export function usePaginationFade({
   const offsetRef = useRef(targetPageIndex);
   const stepRef = useRef<ActiveFade | null>(null);
 
-  // The dot look is CSS-owned and does NOT change between rides, but reading
-  // it forces a style recalculation — and the read used to sit inside the
-  // click handler, i.e. in the one frame that must stay cheap (measured: a
-  // getComputedStyle + three getPropertyValue per ride). Cached instead, and
-  // refreshed only while the deck rests, where the cost is invisible.
+  // The dot look is CSS-owned; reading it forces a style recalc, so cache it
+  // and refresh only while the deck rests — never in the click frame.
   const dotStatesRef = useRef<{ inactive: DotVisualState; active: DotVisualState } | null>(null);
 
   const refreshDotStates = useCallback(() => {
