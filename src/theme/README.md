@@ -25,19 +25,32 @@ On every change the provider updates three surfaces:
 
 ## Usage
 
-The app is already wrapped in `<ThemeProvider>`. In any component:
+Wrap the part of your app that needs theming in `<ThemeProvider>` (typically the
+root), then read the theme from any descendant with `useTheme()`:
 
 ```tsx
+import { ThemeProvider } from "@/theme/ThemeProvider";
 import { useTheme } from "@/theme/useTheme";
 
+// once, at the app root:
+<ThemeProvider>
+  <App />
+</ThemeProvider>
+
+// anywhere below it:
 const { theme, onScreenTheme, setTheme, toggleTheme } = useTheme();
 
 <button onClick={toggleTheme}>            // flip light ⇄ dark
 <button onClick={() => setTheme("auto")}> // follow the OS
 ```
 
-`useTheme()` throws if used outside `<ThemeProvider>`. To style by theme, key
+`useTheme()` throws if used outside a `<ThemeProvider>`. To style by theme, key
 your CSS on `:root[data-theme="dark"]` / `[data-theme="light"]`.
+
+For the mobile pre-paint bar tint to be correct on a cold load, the host's
+`index.html` needs the inline boot snippet (see the boot contract below);
+without it the theme still works, only the very first paint may flash the
+default bar color.
 
 ## What it outputs
 
