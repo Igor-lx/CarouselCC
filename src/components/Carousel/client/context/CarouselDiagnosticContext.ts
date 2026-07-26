@@ -1,3 +1,4 @@
+// See docs/architecture/context.md
 import { createContext, useContext } from "react";
 import type { CarouselDiagnosticContextValue } from "./types";
 

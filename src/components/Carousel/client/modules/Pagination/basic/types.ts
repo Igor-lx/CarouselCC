@@ -1,3 +1,4 @@
+// See docs/architecture/modules.md
 export interface PaginationClassMap {
   [key: string]: string | undefined;
   paginationWrapper?: string;

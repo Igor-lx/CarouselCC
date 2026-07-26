@@ -1,3 +1,4 @@
+// See docs/architecture/modules.md
 import { forwardRef, memo } from "react";
 
 interface PaginationWidgetDotProps {

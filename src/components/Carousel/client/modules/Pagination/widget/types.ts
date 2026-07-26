@@ -1,3 +1,4 @@
+// See docs/architecture/modules.md
 import type { CSSProperties } from "react";
 
 export interface PaginationWidgetSpatialConfig {

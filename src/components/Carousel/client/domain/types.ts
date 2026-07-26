@@ -1,3 +1,4 @@
+// See docs/architecture/domain.md
 import type { Slide } from "../public-api/types";
 
 export interface CarouselLayout {

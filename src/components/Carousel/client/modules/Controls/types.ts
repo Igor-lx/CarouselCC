@@ -1,3 +1,4 @@
+// See docs/architecture/modules.md
 export interface ControlsClassMap {
   [key: string]: string | undefined;
   navZone?: string;

@@ -1,3 +1,4 @@
+// See docs/architecture/diagnostics.md
 import type { CarouselDiagnosticWarning } from "./types";
 
 const BANNER = "Carousel Diagnostic";

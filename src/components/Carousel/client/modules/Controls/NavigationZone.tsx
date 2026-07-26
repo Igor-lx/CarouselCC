@@ -1,3 +1,4 @@
+// See docs/architecture/modules.md
 import clsx from "clsx";
 import { memo } from "react";
 

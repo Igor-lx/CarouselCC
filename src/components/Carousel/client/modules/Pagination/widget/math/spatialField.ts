@@ -1,3 +1,4 @@
+// See docs/architecture/modules.md
 import type {
   PaginationWidgetGeometry,
   PaginationWidgetSpatialConfig,
