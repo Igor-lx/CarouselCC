@@ -1,3 +1,4 @@
+// See docs/architecture/slides.md
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 
 import type {
@@ -6,26 +7,16 @@ import type {
   ImageStatus,
 } from "./types";
 
-/**
- * One slide's view of its image resource: the reactive snapshot plus the
- * bound callbacks it uses to report outcomes and request retries. The
- * callbacks are stable for a given URL.
- */
+/** One slide's view of its image resource — snapshot + URL-stable callbacks. */
 export interface ImageResourceHandle {
   readonly status: ImageStatus;
   readonly generation: number;
-  /** Report a successful on-screen `<img>` load. */
   readonly reportLoaded: () => void;
-  /** Report a failed on-screen `<img>` load. */
   readonly reportError: () => void;
-  /** Ask the store to retry this URL (deduped + backed off internally). */
   readonly requestRetry: () => void;
 }
 
-/**
- * Snapshot for an untracked slide — a non-image slide, or any slide while
- * `isContentImg` is off (no store). Treated as permanently ready.
- */
+/** Untracked slide (non-image, or `isContentImg` off): permanently ready. */
 const READY_SNAPSHOT: ImageResourceSnapshot = Object.freeze({
   status: "loaded",
   generation: 0,
@@ -39,21 +30,6 @@ const STATIC_CALLBACKS = Object.freeze({
   requestRetry: noop,
 });
 
-/**
- * Subscribes a slide to its image resource.
- *
- * The store is passed in explicitly (not pulled from context), so the slide's
- * data dependency is visible in source — consistent with how the rest of the
- * carousel threads its per-instance singletons. Pass `null` for `url` on
- * non-image slides; `store` is also `null` for the whole carousel when
- * `isContentImg` is off. In either case the hook short-circuits to
- * `READY_SNAPSHOT` with no-op callbacks and never touches a store — no
- * subscription, no allocation, no work. The call stays unconditional, so the
- * Rules of Hooks hold whatever the slide content is.
- *
- * When tracked, the hook is backed by `useSyncExternalStore`, so the slide
- * re-renders precisely when *its own* URL changes status.
- */
 export function useImageResource(
   url: string | null,
   store: ImageResourceStore | null,
@@ -76,8 +52,7 @@ export function useImageResource(
 
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
-  // Callbacks depend only on (store, url) — kept stable across status changes
-  // so a consumer effect keyed on `requestRetry` does not re-run on every load.
+  // Callbacks stable across status changes (depend only on store+url).
   const callbacks = useMemo(
     () =>
       store !== null && url !== null

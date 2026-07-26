@@ -1,3 +1,4 @@
+// See docs/architecture/slides.md
 import { IMAGE_RETRY } from "../../config";
 import type {
   ImageResourceSnapshot,
@@ -5,11 +6,7 @@ import type {
   ImageStatus,
 } from "./types";
 
-/**
- * Shared snapshot for an untracked URL. A URL the store has never seen is
- * assumed to be `loading` so the slide renders its `<img>` and the element's
- * own `onLoad`/`onError` then become the authoritative report.
- */
+/** Untracked-URL snapshot — assumed `loading` so the slide renders its `<img>`. */
 const LOADING_SNAPSHOT: ImageResourceSnapshot = Object.freeze({
   status: "loading",
   generation: 0,
@@ -28,19 +25,6 @@ interface ImageEntry {
   snapshot: ImageResourceSnapshot;
 }
 
-/**
- * Creates one image-resource store. The store has no React dependency; it is
- * a plain observable map of `url -> ImageEntry`. `useImageResource` adapts it
- * to React with `useSyncExternalStore`.
- *
- * The store is a focused render-status SSOT: exactly one render entry per URL,
- * one `status`, one retry policy. A rendered slide reports its real `<img>`
- * outcome via `reportLoaded` / `reportError`, which is authoritative — it is
- * what the user actually sees. Retry is owned here: one timer per URL,
- * exponential backoff, capped. Speculative offscreen warm-up is intentionally
- * not modeled — image prioritization is delegated to the platform via native
- * `<img loading>` / `fetchpriority` hints on the rendered element.
- */
 export function createImageResourceStore(): ImageResourceStore {
   const entries = new Map<string, ImageEntry>();
   const listeners = new Map<string, Set<() => void>>();
@@ -138,12 +122,8 @@ export function createImageResourceStore(): ImageResourceStore {
 
       entry.retryTimer = window.setTimeout(() => {
         entry.retryTimer = null;
-        // `dispose()` clears this timer, so a fired callback always belongs to
-        // a live store.
         if (entry.status !== "error") return;
-        // Flip to `loading` and bump the generation: the subscribed slide
-        // remounts its `<img>` (new `key`) and the fresh element re-fetches.
-        // Its `onLoad`/`onError` then report the real outcome back here.
+        // Bump generation → slide remounts its `<img>` and re-fetches (see doc).
         commit(entry, url, "loading", true);
       }, delay);
     },
@@ -158,11 +138,7 @@ export function createImageResourceStore(): ImageResourceStore {
     },
 
     dispose() {
-      // Soft, idempotent teardown: releases every retry timer and empties the
-      // maps — but the store stays usable. A subsequent `subscribe` /
-      // `reportLoaded` / `requestRetry` simply re-populates it. This mirrors
-      // `MotionController.destroy()` and lets a React StrictMode
-      // unmount/remount reuse the same instance.
+      // Soft, idempotent — store stays usable, StrictMode-safe (see doc).
       entries.forEach(clearRetryTimer);
       entries.clear();
       listeners.clear();

@@ -1,32 +1,9 @@
+// Masks the stale-crop repaint race on rotation (a VIEW concern, not the
+// resource store's). See docs/architecture/slides.md
 import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { SLIDE_REORIENT_VEIL } from "../config";
 import { useSlideViewport } from "../viewport/useSlideViewport";
-
-/**
- * Orientation-swap choreography for an art-directed slide image.
- *
- * On a device rotation the slide box flips its aspect instantly (CSS
- * `--slide-aspect`) and the browser re-selects the `<source media>` crop —
- * but until the new crop is fetched and decoded it keeps PAINTING the old
- * bitmap, which `object-fit: cover` shows as a zoomed centre of the previous
- * orientation's photo. This hook masks exactly that window: when the
- * orientation condition flips while a bitmap is on screen, the image is
- * veiled (CSS fade via `data-reorienting`) and unveiled the moment the NEW
- * bitmap is decodable.
- *
- * Self-regulating by construction: `img.decode()` on an in-flight request
- * resolves only after the new crop loads and decodes (slow device — the veil
- * holds as long as needed); on a cached resource it resolves immediately (the
- * veil never becomes visible). The one-frame delay lets the browser's source
- * re-selection — triggered by the same viewport flip, outside React — settle
- * before decoding is observed. Engines without `decode()` fall back to the
- * `load`/`error` events, `complete` covering the already-done race.
- *
- * This is deliberately a VIEW concern (paint masking), not an image-resource
- * store concern: the store models load/error lifecycle per URL; the veil
- * models one repaint race on an already-healthy resource.
- */
 
 interface UseOrientationSwapVeilInput {
   /** The live `<img>`; stays `null` for text slides and error placeholders. */
@@ -39,11 +16,7 @@ export function useOrientationSwapVeil({
   imgRef,
   isBitmapShown,
 }: UseOrientationSwapVeilInput): boolean {
-  // One dependency for "the art-direction verdicts changed": any flip that
-  // can re-select a <source media> crop changes this signature. A flip that
-  // does NOT change the rendered crop is absorbed by construction: decode()
-  // on the already-painted resource resolves immediately and the veil never
-  // becomes visible.
+  // Any flip that can re-select a <source media> crop changes this signature.
   const { signature } = useSlideViewport();
   const [isVeiled, setIsVeiled] = useState(false);
   const previousSignatureRef = useRef(signature);
@@ -61,8 +34,7 @@ export function useOrientationSwapVeil({
     };
 
     setIsVeiled(true);
-    // Fail-open: past the cap, the old crop (honest, if zoomed) beats a
-    // hidden image — lift the veil and let the swap finish in the open.
+    // Fail-open past the cap: an honest (if zoomed) crop beats a hidden image.
     const failOpen = window.setTimeout(clear, SLIDE_REORIENT_VEIL.veilMaxMs);
     const frame = requestAnimationFrame(() => {
       const element = imgRef.current;

@@ -1,3 +1,4 @@
+// See docs/architecture/slides.md
 import type { CSSProperties } from "react";
 import type { Slide, SlideClassMap } from "../public-api/types";
 import type { SlideAriaProps } from "../domain";
@@ -8,31 +9,18 @@ export interface SlideItemProps extends SlideAriaProps {
   className: SlideClassMap;
   style: CSSProperties;
   isContentImg: boolean;
-  /** Presence switch of the <ResponsiveImages /> module: gates the whole
-   * responsive surface (sources/srcSet/sizes, rotation veil) and flips the
-   * rendered URL rule (see resolveRenderedImageSrc). */
+  /** Presence switch of <ResponsiveImages />; gates the whole responsive surface. */
   isResponsiveImagesOn: boolean;
   errAltPlaceholder: string;
   isInteractiveOn: boolean;
   isActive: boolean;
   isActual: boolean;
-  /**
-   * Bandwidth gate (see `useActiveBandGate`): `false` means the visible band
-   * is still fetching, so an OFF-band slide withholds its image sources and
-   * does not compete for the pipe. In-band slides ignore it.
-   */
+  /** Bandwidth gate: `false` withholds an off-band slide's sources (see useActiveBandGate). */
   isOffBandFetchOn: boolean;
-  /** The carousel's image-resource store, or `null` when image content is off. */
   imageResourceStore: ImageResourceStore | null;
-  /**
-   * Carousel-derived default `sizes` (from `visibleSlidesCount`) for responsive
-   * `srcSet`/`<source>` selection. A slide's own `image.sizes` overrides it.
-   */
+  /** Carousel-derived default `sizes`; a slide's own `image.sizes` overrides it. */
   imageSizes: string;
-  /**
-   * Host reduced-data signal. When on, off-band images load lazily and at low
-   * fetch priority so the deck does not eagerly pull bandwidth it may not need.
-   */
+  /** Host reduced-data signal — off-band images load lazily at low priority. */
   isDataSaverEnabled: boolean;
   onSlideClick?: (slide: Slide) => void;
 }

@@ -82,6 +82,24 @@ copy. A successful retry remounts the `<img>` and restores the slide. The store
 is observation-only — it never feeds navigation, layout, or motion. Retention
 prunes entries and timers to the live deck.
 
+Internals worth knowing:
+
+- **The `generation` is the `<img>`'s `key`.** A same-URL retry bumps it and
+  flips the entry back to `loading`, so React remounts the element and forces a
+  fresh fetch it would otherwise skip on an unchanged `src`.
+- **`useImageResource` short-circuits when untracked.** A non-image slide (or the
+  whole carousel while `isContentImg` is off, when there is no store) resolves to
+  a frozen "ready" snapshot with no-op callbacks — no subscription, no allocation.
+  The call stays unconditional, so the Rules of Hooks hold whatever the content is;
+  when tracked it is backed by `useSyncExternalStore` and re-renders precisely when
+  its OWN URL changes status.
+- **The store is framework-agnostic** (no React inside) and passed in explicitly
+  rather than pulled from context, so a slide's data dependency is visible in
+  source. Snapshots are frozen and reused until something changes, so React's
+  snapshot comparison is a referential no-op between renders. `dispose()` is a
+  soft, idempotent reset — the store stays usable, so a StrictMode remount reuses
+  the same instance.
+
 ## Orientation swap veil
 
 [`slides/useOrientationSwapVeil.ts`](../../slides/useOrientationSwapVeil.ts)

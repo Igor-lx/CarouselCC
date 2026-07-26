@@ -41,15 +41,9 @@ export function useSlideRenderModel({
   records,
   renderWindowBufferMultiplier,
 }: UseSlideRenderModelInput): UseSlideRenderModelResult {
-  // The expanded render window persists across renders so a slide is never
-  // unmounted mid-flight (it shrinks back only when motion settles). The ref
-  // starts null and is seeded by the idle branch of the memo below on the
-  // first render — the carousel always mounts idle — so `buildRenderWindow`
-  // is computed only inside the memo, never on every render.
+  // Persists across renders so a slide is never unmounted mid-flight (shrinks
+  // on settle); seeded lazily by the idle branch below (the carousel mounts idle).
   const persistedWindowRef = useRef<RenderWindow | null>(null);
-  // The layout origin persists across window shifts and recenters only when
-  // the window drifts past the band (see LAYOUT_ORIGIN_BAND_SLOTS). Seeded
-  // lazily by the first window below.
   const layoutOriginRef = useRef<number | null>(null);
 
   const renderWindow = useMemo(() => {
@@ -60,10 +54,7 @@ export function useSlideRenderModel({
       return next;
     }
 
-    // Non-null here: the idle branch above seeds the ref on the first render.
-    // `next` is a defensive fallback for a hypothetical first-render-while-
-    // moving, which the mount-idle invariant rules out.
-    const previousWindow = persistedWindowRef.current ?? next;
+    const previousWindow = persistedWindowRef.current ?? next; // ?? is a defensive fallback
     const segmentWindow = buildSegmentWindow(previous, current, layout);
 
     if (windowContains(previousWindow, segmentWindow)) return previousWindow;
@@ -73,10 +64,8 @@ export function useSlideRenderModel({
     return expanded;
   }, [current, isMoving, layout, previous, renderWindowBufferMultiplier]);
 
-  // Stable coordinate base for the scroll transform and the slide lanes. It
-  // recenters only when the window has drifted a whole band away (or on a
-  // layout reset that puts the window start out of band), so a per-settle
-  // window shift changes NO slide's lane — the crux of the no-re-raster win.
+  // Stable coordinate base; recenters only on a whole-band drift, so a settle
+  // window shift changes no slide's lane (the no-re-raster win; see motion.md).
   const layoutOrigin = useMemo(() => {
     const origin = layoutOriginRef.current;
     if (

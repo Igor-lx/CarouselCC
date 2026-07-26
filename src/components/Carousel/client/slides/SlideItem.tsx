@@ -1,3 +1,4 @@
+// See docs/architecture/slides.md
 import clsx from "clsx";
 import { memo, useEffect, useRef } from "react";
 
@@ -6,12 +7,6 @@ import { useImageResource } from "./imageResource";
 import { useOrientationSwapVeil } from "./useOrientationSwapVeil";
 import type { SlideItemProps } from "./SlideItem.types";
 
-/**
- * Renders one slide against an externally-derived active band
- * (`isActive`/`isActual`). Image load/error is the image-resource SSOT's, not
- * the slide's; a failed image falls back to a text placeholder, and
- * interactivity requires a loaded image. See docs/architecture/slides.md.
- */
 export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
   const {
     slideData,
@@ -31,9 +26,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
     ...ariaProps
   } = props;
 
-  // The rendered (and store-keyed) URL: canonical content in responsive
-  // mode, the designated defaultSrc (else widest candidate) in single-set
-  // mode — one rule shared with the store retention (resolveRenderedImageSrc).
+  // The rendered (and store-keyed) URL — one rule shared with retention.
   const imageSource =
     isContentImg && slideData
       ? resolveRenderedImageSrc(slideData, isResponsiveImagesOn)
@@ -48,21 +41,15 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
   // The visible band always fetches; the buffer waits for the gate.
   const isFetchOn = isActual || isOffBandFetchOn;
 
-  // Orientation-swap veil: masks the stale-crop repaint window on rotation
-  // (see useOrientationSwapVeil). Applies only while a bitmap is on screen.
+  // Orientation-swap veil — only while a bitmap is on screen.
   const imgRef = useRef<HTMLImageElement | null>(null);
   const isReorienting = useOrientationSwapVeil({
     imgRef,
-    // Without the ResponsiveImages module there is no art-directed source to
-    // swap on rotation — the veil stays inert.
+    // No ResponsiveImages module → no source to swap → veil inert.
     isBitmapShown: isResponsiveImagesOn && isImageSlide && status === "loaded",
   });
 
-  // An errored image that is currently in the active band is retried on a
-  // backed-off schedule owned by the store. A successful retry flips the
-  // resource back to `loading` with a new `generation`, which remounts the
-  // `<img>` below and triggers a fresh fetch. The store deduplicates and caps
-  // attempts, so re-running this effect on every status change is safe.
+  // Retry an in-band errored image (store owns backoff/cap/dedup; see slides.md).
   useEffect(() => {
     if (hasImageError && isActual) requestRetry();
   }, [hasImageError, isActual, requestRetry]);
@@ -74,13 +61,8 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
     Boolean(onSlideClick) && isInteractiveOn && isContentReady;
   const Tag = isClickable ? "button" : "div";
 
-  // Render-only responsive sources (see `Slide.image`). The browser selects the
-  // concrete asset; identity stays `content`. `sizes` is only meaningful with a
-  // `srcSet`, so a plain `<img src>` slide carries none.
+  // Render-only responsive sources, gated by the module's presence (see slides.md).
   const image = slideData.image;
-  // The whole responsive surface is gated by the module's presence: without
-  // it a slide is a plain <img src> of the single-set asset — no sources,
-  // no srcSet, no sizes.
   const sources = isResponsiveImagesOn ? image?.sources ?? [] : [];
   const isResponsive =
     isResponsiveImagesOn && (image?.srcSet !== undefined || sources.length > 0);
@@ -89,15 +71,12 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
   const imageNode =
     imageSource !== null ? (
       <img
-        // Outside `<picture>` the `<img>` carries the retry key (a retry then
-        // remounts it); inside `<picture>` the key lives on the wrapper.
+        // Outside `<picture>` the `<img>` carries the retry key; inside, the wrapper does.
         key={sources.length === 0 ? generation : undefined}
         ref={imgRef}
         data-reorienting={isReorienting || undefined}
-        // Slow-load reveal (see Carousel.module.scss): hold the image
-        // invisible while it still loads, then fade the COMPLETE bitmap in —
-        // instead of the browser's progressive stripe paint. Responsive
-        // module only; plain single-set mode keeps the native behaviour.
+        // Slow-load reveal (see Carousel.module.scss): fade the complete bitmap
+        // in instead of the progressive stripe paint. Responsive module only.
         data-awaiting-image={
           isResponsiveImagesOn && status === "loading" ? "true" : undefined
         }

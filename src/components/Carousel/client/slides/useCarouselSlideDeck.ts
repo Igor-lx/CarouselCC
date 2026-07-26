@@ -1,3 +1,4 @@
+// See docs/architecture/slides.md
 import { useMemo } from "react";
 
 import {
