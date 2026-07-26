@@ -3,7 +3,7 @@ export interface ResponsiveImagesProps {
    * Decode the buffered slides' bitmaps ahead of time.
    *
    * A `.webp` on the wire is compressed bytes; painting it needs those bytes
-   * unpacked into raw pixels, which for a 720×1280 crop is ~3.7 MB of work.
+   * unpacked into raw pixels, which for a full-size crop is megabytes of work.
    * Left alone, that unpacking lands in the frame the slide is first painted
    * — mid-ride, on the weakest device, exactly where a held frame shows. This
    * flag moves it into an idle callback beforehand.

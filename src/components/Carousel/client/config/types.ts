@@ -26,12 +26,11 @@ export interface CarouselInertialReleaseConfig extends InertialReleaseConfig {
   accelerationDistanceShare: number;
   decelerationDistanceShare: number;
   /**
-   * Floor on the ride duration: a vigorous flick on a narrow slot (portrait,
-   * one visible slide) can otherwise collapse the ride to a few dozen ms —
-   * 1–3 painted frames on a weak device, which the eye reads as a teleport,
-   * not a motion. The speed intent is re-solved down so the ride never runs
-   * shorter than this; continuity still wins — a launch speed that alone
-   * beats the floor is never slowed (the segment simply arrives earlier).
+   * Floor on the ride duration: a vigorous flick on a narrow slot can
+   * otherwise collapse the ride to a few painted frames on a weak device, which
+   * the eye reads as a teleport, not a motion. The speed intent is re-solved
+   * down so the ride never runs shorter than this; continuity still wins — a
+   * launch speed that alone beats the floor is never slowed (it arrives earlier).
    */
   minRideDurationMs: number;
 }
@@ -41,8 +40,8 @@ export interface CarouselInertialReleaseConfig extends InertialReleaseConfig {
  * than snap back — expressed in the carousel's OWN units, a fraction of one
  * slide. The engine works in absolute px of the whole host element (which is
  * `visibleSlidesNr` slides wide), so a fixed host-relative threshold would
- * drift with the slide count — ~11% of a slide at 1 visible, ~32% at 3. These
- * knobs stay slot-relative; the slot-adaptive resolver
+ * drift with the slide count. These knobs stay slot-relative; the slot-adaptive
+ * resolver
  * (`gesture/slotAdaptiveSwipe.ts`) translates them into the engine's
  * `minSwipeDistance` for the measured slot, and always disables the engine's
  * own host-relative path (`swipeThresholdRatio -> 0`) so the two never fight.

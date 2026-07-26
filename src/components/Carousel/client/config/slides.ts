@@ -15,7 +15,7 @@
  * the set). Fade-out and fade-in are SEPARATE on purpose — this is not
  * tuning for its own sake, the two directions genuinely read differently:
  * the fade-out starts mid-rotation (the OS flips the orientation condition
- * around 45–60° of physical tilt, so part of the dimming hides inside the
+ * part-way through the physical tilt, so part of the dimming hides inside the
  * system rotation animation), its frames are dropped by the rotation
  * relayout, and the eye registers disappearance as an instant event while
  * appearance reads as a process. With equal durations the fade-out FEELS

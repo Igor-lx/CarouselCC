@@ -7,10 +7,10 @@ import type { CarouselSwipeConfig } from "../config";
  * the tuning constants in `config/gesture.ts`). It answers one question:
  * "at what measured slot width do the raw numbers of `CAROUSEL_SWIPE_CONFIG`
  * (specifically `resistanceCurvature`, a per-px quantity) mean exactly
- * themselves, with no rescaling?" The rubber was hand-tuned on the stand
- * whose slot measured ≈400px; the resolver keeps that feel identical
- * everywhere by rescaling the curvature by `reference / measured slot`
- * (half the slot → double the curvature).
+ * themselves, with no rescaling?" The rubber was hand-tuned at one reference
+ * slot width; the resolver keeps that feel identical everywhere by rescaling
+ * the curvature by `reference / measured slot` (half the slot → double the
+ * curvature).
  *
  * Never adjust it for new image sets, slide sizes or breakpoints — the
  * measured slot adapts by itself. The ONLY reason to touch it: the rubber

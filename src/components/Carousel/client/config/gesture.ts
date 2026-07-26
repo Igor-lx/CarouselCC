@@ -15,10 +15,10 @@ export const CAROUSEL_SWIPE_CONFIG: CarouselSwipeConfig = {
   resistance: 0.33,
   // Rubber length: the resistance curve saturates at
   // 1 / (curvature * r/(1-r)) px of UI travel — the "wall" the finger hits.
-  // (Round-number example: r=0.5, c=0.005 -> wall at 200px.) Lower r or
-  // lower c -> softer early ramp and a farther wall. The curvature is
-  // slot-rescaled at runtime (gesture/slotAdaptiveSwipe.ts), so the wall
-  // sits at the same RELATIVE pull on any slot.
+  // Lower resistance or lower curvature -> softer early ramp and a farther
+  // wall. The curvature is slot-rescaled at runtime
+  // (gesture/slotAdaptiveSwipe.ts), so the wall sits at the same RELATIVE pull
+  // on any slot.
   resistanceCurvature: 0.0046,
   maxVelocity: 4,
   emaAlpha: 0.85,
@@ -40,12 +40,10 @@ export const CAROUSEL_SWIPE_CONFIG: CarouselSwipeConfig = {
   // gesture to the browser with the ride untouched — this is what keeps a
   // page scroll STARTED on the strip from hitching it — a horizontal intent
   // activates the takeover immediately, and a quicker lift stays a clean
-  // tap. Measured on device: a human finger INTENDING to scroll rests
-  // 100-250ms on the glass before its first move (90ms caught most real
-  // scrolls and braked the ride they crossed). A deliberate catch rests far
-  // longer. 0 = brake on contact. Must stay well below the OS long-press
-  // (~500ms), or the context menu would open before the catch (relation
-  // check enforces it).
+  // tap. A finger intending to scroll rests briefly on the glass before its
+  // first move; a deliberate catch rests longer; zero brakes on contact. Must
+  // stay well below the OS long-press, or the context menu would open before
+  // the catch (relation check enforces it).
   catchDelayMs: 250,
   // The swipe-commit threshold, in the carousel's own units (see
   // SwipeCommitConfig). The resolver turns this into the engine's

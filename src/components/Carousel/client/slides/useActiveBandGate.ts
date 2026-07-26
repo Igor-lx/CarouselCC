@@ -11,11 +11,10 @@ import type { ImageResourceStore } from "./imageResource";
  * RENDER_WINDOW_BUFFER_MULTIPLIER` slides per side mounted, and every one of
  * them is a real `<img>` that starts fetching in the same millisecond as the
  * visible one. `fetchpriority` cannot fix that: priority orders a QUEUE, and
- * with five requests against six connections nothing ever queues — all five
- * share the pipe evenly. Measured on an emulated phone (Fast 3G, DPR 3), the
- * one slide the user is actually looking at arrived at 3.7 s while alone it
- * would have taken ~0.5 s; it was simply waiting behind four slides nobody
- * had asked for yet.
+ * with a handful of parallel requests against the browser's connection limit
+ * nothing ever queues — they share the pipe evenly, so the slide the user is
+ * actually looking at waits behind buffered ones nobody has asked for yet
+ * (measured: a large delay to the looked-at slide on a throttled connection).
  *
  * So the deck fetches in two waves instead of one. Nothing loads faster in
  * total — the bytes and the pipe are the same, and the LAST image still lands
