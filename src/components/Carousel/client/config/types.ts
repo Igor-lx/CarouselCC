@@ -4,14 +4,20 @@ import type {
 } from "../../../../shared";
 
 export interface CarouselInertialReleaseConfig extends InertialReleaseConfig {
+  /** Release-ride ramp-up share. */
   accelerationDistanceShare: number;
+  /** Release-ride ramp-down share (the smooth tail). */
   decelerationDistanceShare: number;
+  /** Floor on the ride duration, so a flick cannot collapse to a teleport. */
   minRideDurationMs: number;
 }
 
 export interface SwipeCommitConfig {
+  /** Commit distance as a fraction of one slot. */
   slotShare: number;
+  /** Ergonomic floor on the commit distance (px). */
   minPx: number;
+  /** Ergonomic ceiling on the commit distance (px). */
   maxPx: number;
 }
 
@@ -22,54 +28,73 @@ export type CarouselSwipeConfig = Omit<
 > & { commit: SwipeCommitConfig };
 
 export interface PropDerivedSettings {
+  /** Resolved slides per page. */
   visibleSlidesCount: number;
+  /** Resolved autoplay-step duration (ms). */
   autoplayDuration: number;
+  /** Resolved click / gesture base step duration (ms). */
   stepDuration: number;
+  /** Resolved idle interval between autoplay steps (ms). */
   autoplayInterval: number;
+  /** Resolved image-error placeholder text. */
   errorAltPlaceholder: string;
 }
 
 
 export interface MotionProfileSharesSettings {
+  /** Ramp-up fraction of the travel. */
   accelerationDistanceShare: number;
+  /** Ramp-down fraction of the travel. */
   decelerationDistanceShare: number;
 }
 
 export interface MotionSettings {
+  /** Snap-back duration after a no-intent release (ms). @see SNAP_BACK_DURATION */
   snapBackDuration: number;
+  /** Position tolerance for the motion settle. */
   epsilon: number;
+  /** Click-step accel/decel shares. */
   stepProfile: MotionProfileSharesSettings;
+  /** Autoplay-step accel/decel shares. */
   autoplayProfile: MotionProfileSharesSettings;
+  /** Snap-back accel/decel shares. */
   snapBackProfile: MotionProfileSharesSettings;
-  /** @see GO_TO_PREFLIGHT_PAGE_SPAN */
+  /** Page screens before a far-GO_TO teleport. @see GO_TO_PREFLIGHT_PAGE_SPAN */
   goToPreflightPageSpan: number;
-  /** @see GO_TO_TELEPORT_ENABLED */
+  /** Master switch for the far-GO_TO teleport. @see GO_TO_TELEPORT_ENABLED */
   goToTeleportEnabled: boolean;
-  /** @see GO_TO_TELEPORT_MIN_PAGE_SPAN */
+  /** Min intermediate pages from which a GO_TO flies. @see GO_TO_TELEPORT_MIN_PAGE_SPAN */
   goToTeleportMinPageSpan: number;
-  /** @see GO_TO_FINAL_APPROACH_PAGE_SPAN */
+  /** Page screens after a far-GO_TO teleport. @see GO_TO_FINAL_APPROACH_PAGE_SPAN */
   goToFinalApproachPageSpan: number;
-  /** @see GO_TO_ACCELERATION_DISTANCE_SHARE */
+  /** GO_TO accel share, local to the first page screen. @see GO_TO_ACCELERATION_DISTANCE_SHARE */
   goToAccelerationDistanceShare: number;
-  /** @see GO_TO_DECELERATION_DISTANCE_SHARE */
+  /** GO_TO decel share, local to the final page screen. @see GO_TO_DECELERATION_DISTANCE_SHARE */
   goToDecelerationDistanceShare: number;
-  /** @see GO_TO_SPEED_MULTIPLIER */
+  /** GO_TO peak cruise speed × the normal MOVE speed. @see GO_TO_SPEED_MULTIPLIER */
   goToSpeedMultiplier: number;
 }
 
 export interface RepeatedClickSettings {
+  /** Fast-segment peak speed × a normal MOVE. @see REPEATED_CLICK_SPEED_MULTIPLIER */
   speedMultiplier: number;
+  /** Fast-segment ramp-up share. */
   accelerationDistanceShare: number;
+  /** Fast-segment ramp-down share. */
   decelerationDistanceShare: number;
 }
 
 export interface InteractionSettings {
+  /** Delay before a desktop hover pauses autoplay (ms). */
   hoverPauseDelay: number;
+  /** Viewport fraction visible before autoplay resumes. */
   visibilityThreshold: number;
+  /** Quiet window after viewport activity before an autoplay tick (ms). */
   autoplayResettleDelayMs: number;
 }
 
 export interface LayoutSettings {
+  /** Render-window buffer in page screens. @see RENDER_WINDOW_BUFFER_MULTIPLIER */
   renderWindowBufferMultiplier: number;
 }
 
@@ -80,8 +105,9 @@ export interface CarouselRuntimeConfig extends PropDerivedSettings {
   layout: LayoutSettings;
   swipeConfig: CarouselSwipeConfig;
   releaseConfig: CarouselInertialReleaseConfig;
+  /** Epsilon for drag-release target resolution. */
   dragReleaseEpsilon: number;
-  /** @see GESTURE_COAST_MAX_MS */
+  /** Max coast-bridge interval across the commit gap (ms). @see GESTURE_COAST_MAX_MS */
   gestureCoastMaxMs: number;
 }
 
