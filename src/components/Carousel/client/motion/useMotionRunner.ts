@@ -75,28 +75,11 @@ const buildStartFromState = (
 });
 
 /**
- * The motion runner is the only bridge between logical state and the motion
- * controller — and the single place the motion math is computed.
- *
- * Every motion is one accel/cruise/decel profile. The runner builds the
- * segment, samples its percent-progress curve into uniform stops, and hands
- * the SAME plan to every paint consumer: the track gets it through
- * `startCompositorMotion` (stop-encoded WAAPI keyframes over the segment's
- * pixel distance), the pagination widget gets it through the plan channel
- * (stop-encoded keyframes over one dot step). Same duration, same curve, same
- * `startedAt` clock — synchronized by construction, zero per-frame work while
- * animating, and runnable on any engine with `Element.animate`.
- *
- * The JS motion controller still samples every segment: it stays the
- * visual-position SSOT for handoff, settle, status, and the per-frame FOLLOW
- * mode (finger drag, or the no-WAAPI legacy fallback — in both, consumers
- * track the visual stream frame by frame).
- *
- * In-flight handoffs are taken as a single atomic `controller.captureHandoff`
- * — a coherent `(position, velocity)` from one sample of the old curve — and
- * a retarget rebuilds synchronously in the commit: the previous WAAPI
- * animation keeps painting until the new one replaces it, so the rebuild cost
- * never shows on screen.
+ * The only bridge between logical state and the motion controller, and the
+ * single place the motion math is computed: build the segment, sample its curve
+ * into stops, hand the same plan to every paint consumer. The JS controller
+ * still samples every segment (the visual-position SSOT); in-flight handoffs are
+ * one atomic `captureHandoff`. See docs/architecture/motion.md.
  */
 export function useMotionRunner({
   state,
