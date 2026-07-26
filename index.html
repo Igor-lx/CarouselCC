@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <!-- Media-paired metas so the correct bar tint exists at parse time (an empty
       `content` reads as "no color" and white bars can stick for the session). The
-      colors + storage key below DUPLICATE src/theme/types.ts on purpose — this
-      script runs pre-paint and cannot import; the copy is locked by
-      src/theme/themeBootSync.test.ts. -->
+      colors + storage key below DUPLICATE the theme box (pre-paint script can't
+      import) — locked by src/shared/theme/tests/bootSync.test.ts. See that box's
+      README for this snippet. -->
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#bfd6f8" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d1520" />
     <!-- viewport-fit=cover: page background reaches under the notch; the app shell
