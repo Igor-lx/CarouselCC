@@ -1,3 +1,4 @@
+// See docs/architecture/focus.md
 import { useRef, type RefObject } from "react";
 import { manageFocusShift, useIsomorphicLayoutEffect } from "../../../../shared";
 
@@ -7,11 +8,6 @@ interface UseFocusRecoveryInput {
   targetPageIndex: number;
 }
 
-/**
- * On settle, if the currently-focused element is now hidden inside an
- * inert subtree (a slide that left the active band), move focus into the
- * new active band's first focusable target.
- */
 export function useFocusRecovery({
   containerRef,
   isIdle,

@@ -1,3 +1,4 @@
+// See docs/architecture/navigation.md
 import { useCallback, useMemo } from "react";
 
 import type { CarouselDispatch, MoveReason } from "../state";
