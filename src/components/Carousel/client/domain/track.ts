@@ -1,3 +1,4 @@
+// See docs/architecture/domain.md
 const TRANSFORM_PRECISION = 10_000;
 
 const roundedPx = (value: number) =>
@@ -5,12 +6,8 @@ const roundedPx = (value: number) =>
     ? Math.round(value * TRANSFORM_PRECISION) / TRANSFORM_PRECISION
     : 0;
 
-/**
- * `translate3d(...)` that SCROLLS the track, used once a pixel slot size is
- * measured. `layoutOrigin` is DELIBERATELY not the render-window start: the
- * origin is stable across window shifts, so the transform re-baselines only on
- * a rare recenter and a window shift never moves a slide (no re-raster).
- */
+// `layoutOrigin` is deliberately not the render-window start — it stays stable
+// across window shifts, so a shift never re-rasters a slide (see doc).
 export const trackPixelTransform = (
   position: number,
   layoutOrigin: number,
@@ -21,8 +18,6 @@ export const trackPixelTransform = (
   return `translate3d(${roundedPx(offset)}px, 0, 0)`;
 };
 
-/** Fallback `calc(...)` scroll transform against track width and the gap CSS
- * variable — used before the first pixel measurement, or if none is available. */
 export const trackCssTransform = (
   position: number,
   layoutOrigin: number,
@@ -32,12 +27,7 @@ export const trackCssTransform = (
   return `translateX(calc(-${relative} * (100% + var(--slides-gap, 0px)) / ${visibleSlidesCount})) translateX(0px)`;
 };
 
-/**
- * The slide's LANE: its position in slot strides from the layout origin, handed
- * to the stylesheet as `--slide-lane` (SCSS owns the RULE, JS only the NUMBER).
- * Fixed for the slide's mounted lifetime, so mounting or unmounting a neighbour
- * never moves it — the point of the stable-lane layout.
- */
+/** The slide's lane (`--slide-lane`): SCSS owns the rule, JS only the number. */
 export const slideLane = (virtualIndex: number, layoutOrigin: number): number =>
   virtualIndex - layoutOrigin;
 
@@ -46,8 +36,6 @@ const parseLength = (raw: string) => {
   return Number.isFinite(value) ? value : 0;
 };
 
-/** Slot size = (viewport width + gap) / visibleSlidesCount; the gap is the first
- * defined of `--slides-gap`, `--gap`, `gap`, `column-gap` on the viewport. */
 export const measureSlotSize = (
   viewport: HTMLElement,
   visibleSlidesCount: number,
@@ -64,8 +52,7 @@ export const measureSlotSize = (
   return (viewportWidth + gap) / visibleSlidesCount;
 };
 
-/** Pointer pixel velocity → virtual index per millisecond. Negative: moving the
- * pointer right lowers the virtual index (the track shifts left on screen). */
+// Negative: moving the pointer right lowers the virtual index.
 export const pointerVelocityToVirtual = (pointerVelocity: number, slotSize: number) => {
   if (!(slotSize > 0)) return 0;
   return -(pointerVelocity / slotSize);

@@ -1,3 +1,4 @@
+// See docs/architecture/domain.md
 export const mod = (value: number, total: number) => {
   if (total <= 0) return 0;
   return ((value % total) + total) % total;

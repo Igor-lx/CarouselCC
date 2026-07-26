@@ -1,3 +1,4 @@
+// See docs/architecture/domain.md
 import type { Slide } from "../public-api/types";
 import type { CarouselSlideRecord } from "./types";
 
@@ -22,8 +23,6 @@ export const hasPartialPageLayout = (length: number, visibleSlidesCount: number)
   return length % effective !== 0;
 };
 
-/** Pad the deck with head clones so the length is a multiple of
- * `visibleSlidesCount`, so the last page is never visually short. */
 export const padDeckToFullPage = (
   records: CarouselSlideRecord[],
   visibleSlidesCount: number,
@@ -45,8 +44,6 @@ export const padDeckToFullPage = (
 
 export { clampedVisibleSlidesCount };
 
-/** Largest-width candidate from a `w`-descriptor `srcSet`; entries without a
- * width count as 0, and an empty or malformed srcSet yields `null`. */
 export const resolveLargestSrcSetCandidate = (
   srcSet: string | undefined,
 ): { url: string; width: number } | null => {
@@ -65,9 +62,6 @@ export const resolveLargestSrcSetCandidate = (
   return best;
 };
 
-/** Single-set fallback when the data designates no standalone asset: the
- * widest candidate across the default `srcSet` and every art-directed
- * `<source>`. Ties keep the default srcSet, then earlier source order. */
 export const resolveLargestImageCandidate = (image: Slide["image"]): string | null => {
   let best: { url: string; width: number } | null = null;
   const consider = (srcSet: string | undefined) => {
@@ -80,10 +74,8 @@ export const resolveLargestImageCandidate = (image: Slide["image"]): string | nu
   return best === null ? null : (best as { url: string }).url;
 };
 
-/** The image URL the deck RENDERS for a slide — the one rule the renderer and
- * the resource store share so they can never key on different URLs. Responsive
- * mode: the canonical `content`. Single-set mode: the designated
- * `image.defaultSrc`, else the widest candidate, else `content`. */
+// The one rule the renderer and the resource store share — they must key on
+// the same URL.
 export const resolveRenderedImageSrc = (
   slideData: Slide,
   isResponsiveImagesOn: boolean,
@@ -94,7 +86,6 @@ export const resolveRenderedImageSrc = (
   return image?.defaultSrc ?? resolveLargestImageCandidate(image) ?? content;
 };
 
-/** Whether any slide in the deck carries responsive image variants. */
 export const deckCarriesImageSets = (records: CarouselSlideRecord[]): boolean =>
   records.some(
     (record) =>

@@ -1,3 +1,4 @@
+// See docs/architecture/domain.md
 import type { Slide } from "../public-api/types";
 import { clamp, mod, normalizePageIndex } from "./math";
 import { clampedVisibleSlidesCount } from "./slides";
@@ -11,8 +12,6 @@ const slideContentKey = (slide: Slide): string => {
   return "react-element";
 };
 
-/** One-pass `dataKey` builder — concatenates straight into the result (no
- * intermediate array), one fewer heap allocation per layout build. */
 const buildDataKey = (records: CarouselSlideRecord[]): string => {
   let key = "";
   for (let index = 0; index < records.length; index += 1) {
