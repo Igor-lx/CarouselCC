@@ -5,7 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 
 import { ThemeProvider } from "../ThemeProvider";
 import { useTheme } from "../useTheme";
-import { BROWSER_THEME_COLORS } from "../internal/colors";
+import { BROWSER_THEME_COLORS } from "../colors";
 import type { ThemeContextValue } from "../internal/types";
 
 const installMatchMedia = () => {

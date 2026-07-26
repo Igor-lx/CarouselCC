@@ -11,18 +11,20 @@ cold mobile load.
 
 ## Structure
 
-The public entry points sit at the box root; the plumbing is in `internal/`:
+The public entry points and the one editable knob sit at the box root; the
+plumbing is in `internal/`:
 
 - **`ThemeProvider.tsx`** — the turnkey facade: theme state **+** mobile-chrome
   sync. Use this when you want the mobile browser bar to match.
 - **`ThemeStateProvider.tsx`** — **core only** (theme state, no chrome), for SSR
   / desktop / embedded hosts that don't need the mobile bar.
 - **`useTheme.ts`** — the consumer hook.
+- **`colors.ts`** — the mobile browser-bar colors (see [Colors](#colors) below).
 
-Both providers cover the same two responsibilities, split as separate files under
-`internal/`: the STATE (context, constants, resolution, storage, `data-theme`)
-and the mobile-CHROME adapter (`BrowserChromeSync`, `colors`). Import everything
-from the box barrel (`.../shared/theme`), never from `internal/`.
+The two responsibilities (theme STATE and the mobile-CHROME adapter) live as
+separate files under `internal/` (context, constants, resolution, storage, and
+`BrowserChromeSync`). Import the runtime API from the box barrel
+(`.../shared/theme`), never from `internal/`.
 
 ## Two concepts
 
@@ -113,7 +115,7 @@ The `COLORS` and `STORAGE_KEY` above DUPLICATE the box on purpose (the script
 can't import). They are locked by [`tests/bootSync.test.ts`](./tests/bootSync.test.ts),
 which reads `index.html` and fails CI on any drift — **so if you change a theme
 color or the storage key in the box, update this snippet too.** Colors live in
-[`internal/colors.ts`](./internal/colors.ts), the key in
+[`colors.ts`](./colors.ts), the key in
 [`internal/constants.ts`](./internal/constants.ts).
 
 > Skipping step 4 is allowed: the theme still works, only the very first paint on
@@ -154,6 +156,26 @@ Both wrap the root once; nesting is unnecessary. `useTheme()` throws if used
 outside a provider.
 
 ---
+
+## Colors
+
+The mobile-bar color ends up written in up to **three** places. Here is exactly
+what must match and what is only recommended:
+
+1. **App palette** — text / background / borders inside the page — lives in your
+   stylesheet, keyed on `[data-theme]` (e.g. `globals.scss` `--bg-global`). The
+   box does **not** own this.
+2. **Mobile bar tint** — the box's only color: [`colors.ts`](./colors.ts)
+   (`BROWSER_THEME_COLORS`). For a seamless bar you should set it **by hand to
+   the same value as your page background** (`--bg-global`) — this match is a
+   design choice, **not enforced**.
+3. **Pre-paint copy** — the `index.html` boot snippet can't import, so it repeats
+   the same two values. `colors.ts` and this snippet **must be byte-identical**;
+   [`tests/bootSync.test.ts`](./tests/bootSync.test.ts) fails CI if they drift.
+
+So to change a bar color: edit **`colors.ts` AND the `index.html` snippet** (the
+hard, CI-guarded pair), and — if you want the bar to blend with the page — keep
+your stylesheet's `--bg-global` in step by hand (the third place, not enforced).
 
 ## What `useTheme()` outputs
 

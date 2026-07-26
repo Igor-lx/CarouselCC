@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { THEME_STORAGE_KEY } from "../internal/constants";
-import { BROWSER_THEME_COLORS } from "../internal/colors";
+import { BROWSER_THEME_COLORS } from "../colors";
 
 const html = readFileSync("index.html", "utf8");
 
