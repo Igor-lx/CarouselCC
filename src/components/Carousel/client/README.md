@@ -26,14 +26,30 @@ Full props, slot children, DOM contract and the slide-data shape are in
 
 ## Documentation
 
-- **[docs/architecture/](./docs/architecture/)** — how it works, by area:
+The rationale lives entirely in `docs/`; the code carries only short traps and a
+`// See docs/architecture/<layer>.md` link at the top of each file. There is one
+architecture doc per layer folder.
+
+- **[docs/architecture/](./docs/architecture/)** — how it works:
   - [overview.md](./docs/architecture/overview.md) — ownership, SSOTs, folder map, reading order
   - [public-api.md](./docs/architecture/public-api.md) — the product contract
+  - [state.md](./docs/architecture/state.md) — the reducer state machine, step resolution
+  - [domain.md](./docs/architecture/domain.md) — the pure core: layout, transforms, windowing, visibility
   - [motion.md](./docs/architecture/motion.md) — controller, segments, handoff, teleport, compositor
+  - [visual-position.md](./docs/architecture/visual-position.md) — the visible-position SSOT, fallback pacing
+  - [geometry.md](./docs/architecture/geometry.md) — slot measurement, track binding, the two paint owners
   - [gesture.md](./docs/architecture/gesture.md) — swipe engine, slot-normalized tuning, coasted launch
-  - [state.md](./docs/architecture/state.md) — the reducer state machine
   - [slides.md](./docs/architecture/slides.md) — render window, image resources, rendering
   - [viewport.md](./docs/architecture/viewport.md) — breakpoint/orientation axes, attribute-driven styling
+  - [presentation.md](./docs/architecture/presentation.md) — the JS→CSS contract, the lane-style cache
+  - [styling.md](./docs/architecture/styling.md) — the stylesheet: rules, tuning vars, rendering traps
+  - [context.md](./docs/architecture/context.md) — module context, split by update cadence
+  - [navigation.md](./docs/architecture/navigation.md) — the public command handlers
+  - [autoplay.md](./docs/architecture/autoplay.md) — the interval loop and its adapter
+  - [focus.md](./docs/architecture/focus.md) — focus recovery on settle
+  - [host-report.md](./docs/architecture/host-report.md) — the `onCarouselStatusChange` snapshot
+  - [render-policy.md](./docs/architecture/render-policy.md) — the single owner of slot gating
+  - [slots.md](./docs/architecture/slots.md) — the slot vocabulary and component contract
   - [modules.md](./docs/architecture/modules.md) — the slot modules
   - [diagnostics.md](./docs/architecture/diagnostics.md) — the observe-only dev layer
   - [quality.md](./docs/architecture/quality.md) — trade-offs and quality protections

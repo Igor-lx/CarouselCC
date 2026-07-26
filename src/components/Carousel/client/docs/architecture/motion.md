@@ -188,22 +188,9 @@ magnitude.
 
 ## Module synchronisation
 
-Modules attach via the `slot` static convention, resolved by `resolveSlots`
-against `CAROUSEL_SLOTS = ["pagination", "controls", "diagnostic",
-"responsive-images"]`. The module context is split into **two providers by update
-cadence** ([`context/CarouselModuleContext.ts`](../../context/CarouselModuleContext.ts),
-shapes in [`context/types.ts`](../../context/types.ts)):
-
-- **`CarouselStableContext`** — low-frequency: `layout`, `navigation`,
-  `visualPosition`, `motionPlan`, and slot flags. Re-identifies only on a real
-  layout/boundary change, never on a routine step.
-- **`CarouselMotionContext`** — high-frequency: `status` and `intent`,
-  re-identifying on every click/gesture/settle.
-
-`<Controls>` and the widget diagnostic read the stable half only;
-`<Pagination>` / `<PaginationWidget>` read both and re-render on motion
-transitions (their job). Sub-views are memoised independently. Crucially,
-modules that paint motion do **not** rely on context re-renders: they subscribe
-to the stable observable objects (`motionPlan`, `visualPosition`), so publishing
-per frame never re-renders React — only the logical view (which dot is the
-target, control availability) flows through context at the React tempo.
+Modules that paint motion do **not** rely on React re-renders: they subscribe to
+the stable observable objects (`motionPlan`, `visualPosition`) exposed on the
+module context, so publishing per frame never re-renders React — only the logical
+view (which dot is the target, control availability) flows through context at the
+React tempo. How that context is partitioned by update cadence, and which module
+reads which half, is in [context.md](./context.md).

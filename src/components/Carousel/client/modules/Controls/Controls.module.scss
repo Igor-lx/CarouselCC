@@ -1,8 +1,7 @@
+// See docs/architecture/styling.md
 @layer components {
-  // Sizing tokens. Both the non-touch button (centred in an 8%-wide
-  // hover/focus strip) and the touch zone (which *is* the button) read these
-  // four custom properties. Each breakpoint overrides only the tokens; the
-  // rules that consume them never change.
+  // Sizing tokens read by both the non-touch button and the touch zone; each
+  // tier overrides only the tokens.
   .navZone {
     --nav-button-w: 45px;
     --nav-button-h: 45px;
@@ -54,9 +53,7 @@
     pointer-events: none;
 
     svg {
-      // Explicit size is REQUIRED: the icon carries only a viewBox, and
-      // Safari collapses an unsized inline SVG to 0x0 (Chrome happens to
-      // shrink-fit it to the same glyph these 100% produce).
+      // Explicit size REQUIRED — Safari collapses an unsized viewBox SVG to 0×0.
       width: 100%;
       height: 100%;
       opacity: 0.8;
@@ -90,16 +87,10 @@
     transition: none;
   }
 
-  // Scale the tokens per tier — keyed on the ROOT'S tier attribute, so they
-  // flip on exactly the carousel's own thresholds (config/viewport.ts), never
-  // on numbers typed here, and order-INDEPENDENTLY: the tiers are a single
-  // attribute value (mutually exclusive) and the plain-tier rules exclude the
-  // short-landscape flag, so at most one block matches a given viewport — the
-  // useMedia contract in CSS. (The old `@media (width <= 1024px)` was also off
-  // by one against the tier boundary: at exactly 1024px the carousel is desktop
-  // while the buttons still shrank. Keyed on the tier that cannot happen.)
+  // Tokens per tier, keyed on the root's tier attribute, order-independent (see
+  // styling.md); a raw @media here was off-by-one against the tier boundary.
   :not([data-short-landscape="true"]) {
-    // Below desktop (tablet + mobile): a tall pill, easier to hit by thumb.
+    // Below desktop: a taller pill, easier to thumb.
     &[data-breakpoint="tablet"] .navZone {
       --nav-button-w: 48px;
       --nav-button-h: 96px;
@@ -116,9 +107,7 @@
     }
   }
 
-  // Compact landscape (low-height handhelds): its own state, mutually
-  // exclusive with the plain tiers above — shorter pill that never exceeds
-  // the viewport edge-to-edge.
+  // Compact landscape: its own state, exclusive with the tiers above.
   [data-short-landscape="true"] .navZone {
     --nav-button-w: 36px;
     --nav-button-h: 56px;
@@ -126,9 +115,8 @@
     --nav-edge-inset: 6px;
   }
 
-  // Desktop: reveal the 8%-wide strip on viewport hover or focus-visible.
-  // Scoped to the viewport (a plain descendant `:hover` / `:has`) instead of a
-  // root-level `:has()`, which is cheaper for the style engine to invalidate.
+  // Desktop: reveal on viewport hover/focus, scoped to the viewport not the root
+  // (cheaper to invalidate; see styling.md).
   [data-touch="false"] [data-carousel-viewport]:hover .navZone,
   [data-touch="false"] [data-carousel-viewport]:has(*:focus-visible) .navZone {
     opacity: 1;

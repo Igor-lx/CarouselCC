@@ -9,21 +9,14 @@
   width: 100%;
   min-width: 0;
   min-height: 100vh;
-  // svh, deliberately NOT dvh: dvh re-resolves when the mobile toolbar
-  // hides/shows — i.e. exactly at the finger-lift of a page scroll — forcing a
-  // full-page relayout mid-ride (measured: 33ms main-thread stall at toolbar
-  // settle with dvh, 17ms with svh; the strip visibly hitched). svh is
-  // constant across toolbar transitions; with the toolbar hidden the shell is
-  // merely allowed to be shorter than the screen, and the shared background
-  // makes that invisible.
+  // svh, NOT dvh: dvh re-resolves on mobile-toolbar show/hide (at a scroll's
+  // finger-lift), forcing a full-page relayout mid-ride; svh stays constant.
   min-height: 100svh;
   background-color: var(--bg-global);
   transition: background-color var(--transition-bg);
   overflow-x: hidden;
-  // The page canvas runs edge-to-edge under the notch (`viewport-fit=cover`,
-  // see index.html) so this background tints the camera strip; the insets
-  // keep the actual CONTENT out of the cutout. Zero on notchless devices,
-  // so nothing shifts anywhere else.
+  // Canvas runs under the notch (viewport-fit=cover); the insets keep content
+  // out of the cutout (zero on notchless devices).
   padding-top: env(safe-area-inset-top);
   padding-right: env(safe-area-inset-right);
   padding-bottom: env(safe-area-inset-bottom);
@@ -36,13 +29,8 @@
   align-items: stretch;
   padding: var(--page-padding-block) var(--page-padding-inline) 0;
   min-height: 100vh;
-  // svh, deliberately NOT dvh: dvh re-resolves when the mobile toolbar
-  // hides/shows — i.e. exactly at the finger-lift of a page scroll — forcing a
-  // full-page relayout mid-ride (measured: 33ms main-thread stall at toolbar
-  // settle with dvh, 17ms with svh; the strip visibly hitched). svh is
-  // constant across toolbar transitions; with the toolbar hidden the shell is
-  // merely allowed to be shorter than the screen, and the shared background
-  // makes that invisible.
+  // svh, NOT dvh: dvh re-resolves on mobile-toolbar show/hide (at a scroll's
+  // finger-lift), forcing a full-page relayout mid-ride; svh stays constant.
   min-height: 100svh;
   gap: var(--page-gap);
   box-sizing: border-box;

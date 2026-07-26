@@ -1,3 +1,4 @@
+// See docs/architecture/styling.md
 @layer baseStyles {
   .outerContainer {
     --color: var(--color-component, var(--color-global));
@@ -6,38 +7,11 @@
     --pagination-gap: 20px;
     --slide-radius: 12px;
     --slide-outline-width: 2px;
-    // --slide-reorient-fade-out / --slide-reorient-fade-in are injected
-    // inline by the root from config/slides.ts: values bound to a JS
-    // invariant (the veil fail-open cap) live in config under diagnostics,
-    // not in the stylesheet.
+    // --slide-reorient-fade-* are injected by the root from config (bound to a JS invariant).
     --viewport-radius: var(--slide-radius);
 
-    // ------------------- SLIDE GEOMETRY — pure CSS tuning -------------------
-    // Plain CSS, no contracts with the assets. Slide WIDTH is always computed
-    // (viewport width, slot count and --slides-gap); everything else is yours
-    // to style — ordinary cascading custom properties, tuned per viewport
-    // state via the root's data attributes (see the block after this rule).
-    // A host MAY still override any of them from its own stylesheet, but
-    // never has to: the component is self-sufficient out of the box.
-    //
-    // --slide-aspect  Height as a function of the computed width — nothing
-    //                 more. It is NOT "the aspect of your images" and does
-    //                 not need to match them: it shapes the slide BOX, and
-    //                 the image then fits into that box per --slide-image-fit
-    //                 (standard object-fit semantics, crops or letterboxes
-    //                 like anywhere else in CSS). A box needs SOME height
-    //                 before any image bytes arrive (slides are absolutely
-    //                 positioned; the track takes its height from the sizer
-    //                 below) — this ratio is that height rule, purely layout.
-    // --slide-height  Set a length to PIN the height instead (the browser
-    //                 then ignores aspect-ratio: box = slot-width × length).
-    //                 `auto` keeps the fluid ratio. The slide AND the
-    //                 invisible height sizer both consume this one variable,
-    //                 so slides, track and clip stay in sync by construction.
-    //                 Width stays fluid and the motion math is width-based,
-    //                 so a fixed height never affects scrolling.
-    // --slide-image-fit  How the image fills the box (object-fit). `cover`
-    //                 crops, `contain` letterboxes — a taste knob, not logic.
+    // Slide geometry — restylable public tuning (see styling.md). --slide-aspect
+    // shapes the BOX (not the image); --slide-height PINs a height instead.
     --slide-aspect: 9 / 16;
     --slide-height: auto;
     --slide-image-fit: cover;
@@ -58,26 +32,8 @@
     box-sizing: border-box;
   }
 
-  // The browser's long-press image menu stays AVAILABLE, including mid-ride:
-  // pressing a moving strip brakes it (press-time grab), and a hold that
-  // expressed no direction settles onto the PRESSED page — so the menu always
-  // describes the slide that ends up in front of the eyes. Suppressing it was
-  // tried and rejected: the OS still gives tactile feedback for the long-press,
-  // and feedback with no menu reads as breakage.
-
-  // Per-viewport slide geometry — keyed on the ROOT'S OWN data attributes,
-  // never on media queries: the component stylesheet contains no conditions
-  // and no numbers. The root stamps `data-breakpoint` (custom tier names
-  // from config/viewport.ts), `data-orientation` and one `data-<flag>` per
-  // active flag (e.g. `data-short-landscape`) from the one viewport facade,
-  // so the box, the art-directed asset, the warm and the veil all flip on
-  // the same thresholds by construction. Style any state or combination:
-  //   &[data-breakpoint="desktop"] { ... }
-  //   &[data-breakpoint="tablet"][data-orientation="landscape"] { ... }
-  // Diagnostics cross-checks every state name used here against the config
-  // axes (a typo means a silently dead block). Values below are the DEMO
-  // dataset's tuning (tall 9:16 photos; wide 16:9 only where a tall box
-  // cannot fit) — restyle freely for your data.
+  // Per-viewport geometry keyed on the root's data attributes, never media
+  // queries (see styling.md). Values below are the demo dataset's tuning.
   .outerContainer[data-short-landscape="true"] {
     --slide-aspect: 16 / 9;
   }
@@ -96,19 +52,8 @@
     }
   }
 
-  // MEASUREMENT CONTRACT: the track (and the viewport above it) must carry
-  // NO border and NO padding. Slide widths resolve their percentage against
-  // this element's content box, while the JS slot math (`measureSlotSize`)
-  // reads the viewport's offsetWidth (border box) — any border/padding here
-  // makes the real slide step smaller than the transform step, so motion
-  // overshoots by a couple of pixels and jerks back into place on settle.
-  //
-  // STABLE LAYERS: slides are absolutely positioned by their own virtual
-  // lane (inline `slideLaneStyle`), NOT laid out in flow. Only the track's
-  // `transform` scrolls; a render-window shift mounts/unmounts an edge slide
-  // without moving any other slide, so the compositor never re-rasters the
-  // whole track on settle. The visible inter-slide gap is baked into the
-  // lane stride (`100% + --slides-gap`), so the track needs no flex `gap`.
+  // MEASUREMENT CONTRACT: NO border/padding on track or viewport (motion would
+  // overshoot). Stable lanes — only the transform scrolls (see styling.md).
   .slideContainer {
     position: relative;
     width: 100%;
@@ -116,9 +61,7 @@
     min-width: 0;
   }
 
-  // ONE slot wide. `--visible-slides` is the only thing JS supplies here (the
-  // live `visibleSlidesNr`, set on the root); the rule itself stays in the
-  // stylesheet — same split the widget uses (`--visible-dots-count` & co).
+  // One slot wide; JS supplies only `--visible-slides`, the rule stays here.
   .slideSizer,
   .slide {
     width: calc(
@@ -127,11 +70,7 @@
     );
   }
 
-  // Height sizer: the only in-flow child, one slot wide, its aspect-ratio (or
-  // the --slide-height override) gives the otherwise-collapsed track its
-  // height. It MUST honour the same height source as the slide, or the track
-  // and the slides would desync. Invisible and inert; the real slides are
-  // absolutely positioned OVER it.
+  // Height sizer: the only in-flow child; MUST match the slide's height source.
   .slideSizer {
     visibility: hidden;
     aspect-ratio: var(--slide-aspect);
@@ -146,10 +85,7 @@
     display: block;
     aspect-ratio: var(--slide-aspect);
     height: var(--slide-height);
-    // The slide's own lane. `--slide-lane` (an integer, from JS per slide) is
-    // the ONE per-slide datum; one lane step is the slide's own width plus a
-    // gap — exactly one slot stride, because `translateX(100%)` on an
-    // absolutely-positioned box resolves against its OWN width.
+    // --slide-lane (from JS) × one slot stride (width + gap); see styling.md.
     transform: translateX(
       calc(var(--slide-lane, 0) * (100% + var(--slides-gap, 0px)))
     );
@@ -161,14 +97,7 @@
     font: inherit;
     color: inherit;
     text-align: inherit;
-    // The slide frame (hover / error / text) is an OUTLINE drawn just inside
-    // the box, not a border on its edge: the outer slides sit flush against
-    // the viewport's overflow clip, so an edge border lands exactly on the
-    // clip boundary and sub-pixel rounding shaves it (the bottom row, the
-    // first slide's left edge, the radius corners). An inset outline is
-    // immune to that clip, follows the border-radius, paints ABOVE the image
-    // (outlines are the last paint phase — same reason :focus-visible already
-    // works over photos), and never shifts layout.
+    // Inset outline, not a border — clip-immune at the overflow edge (styling.md).
     outline: var(--slide-outline-width) solid transparent;
     outline-offset: calc(var(--slide-outline-width) * -1);
     transition: outline-color 0.6s ease;
@@ -181,12 +110,7 @@
       outline-color: #700864;
     }
 
-    // <picture> must not introduce its own (inline, auto-height) box: with a
-    // real box in between, the img's percentage height has nothing definite
-    // to resolve against and falls back to the intrinsic ratio — the image
-    // then overflows the slide (bottom-cropped as a <div>, centre-cropped as
-    // an interactive <button>, whose UA layout centres overflowing content).
-    // `display: contents` makes the slide itself the img's containing block.
+    // display: contents so <picture> adds no box (else img % height overflows).
     picture {
       display: contents;
     }
@@ -196,14 +120,8 @@
       width: 100%;
       height: 100%;
       object-fit: var(--slide-image-fit, cover);
-      // Orientation-swap veil (data-reorienting, set by useOrientationSwapVeil):
-      // masks the window where the box already flipped its aspect but the old
-      // crop is still painted. Cached swaps clear before the fade is visible.
-      //
-      // Two durations by design (config/slides.ts explains the perceptual
-      // asymmetry). CSS transitions take the timing of the DESTINATION
-      // state: the base rule governs the fade-IN (attribute removed), the
-      // [data-reorienting] rule the fade-OUT (attribute added).
+      // Orientation-swap veil (data-reorienting) — base rule is fade-IN, the
+      // [data-reorienting] rule fade-OUT (destination-state timing). See styling.md.
       transition: opacity var(--slide-reorient-fade-in) ease;
 
       &[data-reorienting="true"] {
@@ -211,17 +129,8 @@
         transition-duration: var(--slide-reorient-fade-out);
       }
 
-      // Slow-load reveal (data-awaiting-image, set by SlideItem while the
-      // resource is still loading, ResponsiveImages module only): a network
-      // image paints PROGRESSIVELY — stripes crawling top-to-bottom — and on
-      // a slow connection that crawl is the whole first impression. Hidden
-      // instantly here (transition: none — there must be no fade TO
-      // invisible), the bitmap arrives complete behind the veil; dropping
-      // the attribute lands on the base rule above, so the finished image
-      // fades in over the same calm-screen timing the reorient veil uses —
-      // one shared "image appears" duration, not a second knob. The
-      // image-resource store keeps status per URL, so an image seen once
-      // reappears instantly on every later mount.
+      // Slow-load reveal (data-awaiting-image): hide instantly (no fade TO
+      // invisible) so the finished bitmap fades in, not the progressive crawl.
       &[data-awaiting-image="true"] {
         opacity: 0;
         transition: none;
@@ -233,8 +142,7 @@
     cursor: pointer;
   }
 
-  // Reduced motion: the veil still hides the stale crop, just without the
-  // fade — an instant blink is the a11y-consistent variant of the mask.
+  // Reduced motion: the veil still masks, just as an instant blink.
   .outerContainer[data-reduced-motion="true"] img {
     transition: none;
   }
@@ -245,19 +153,9 @@
     }
   }
 
-  // While the deck RIDES, the slide outline stops transitioning.
-  //
-  // The pointer does not have to move for `:hover` to move: the strip travels
-  // under a resting cursor, so every slide boundary that sweeps past it hands
-  // hover from one slide to the next. `outline-color` is not a compositable
-  // property, so each handover starts a 600 ms MAIN-THREAD transition — two of
-  // them, on the slide being left and the slide being entered — in the middle
-  // of a ride whose whole design is that the main thread stays idle. At three
-  // visible slides a single page step crosses the cursor three times.
-  //
-  // Suppressed for the ride only: the hover still moves (a style recalc of a
-  // handful of elements), it simply lands instantly instead of animating. At
-  // rest the fade is exactly as authored — which is where it is ever looked at.
+  // Suppress the outline-color transition during a ride: the strip sweeps :hover
+  // between slides under a resting cursor, and outline-color is not compositable,
+  // so each handover would start a main-thread transition (see styling.md).
   .outerContainer[data-moving="true"] .slide {
     transition: none;
   }
@@ -282,16 +180,8 @@
     font-size: 30px;
   }
 
-  // Per-tier geometry, order-INDEPENDENT by construction — the CSS twin of the
-  // useMedia contract, where the tier is SELECTED (largest matching threshold),
-  // never "the first rule that happens to match". `data-breakpoint` is a single
-  // value, so the tiers are mutually exclusive already; each states its FINAL
-  // geometry directly (no grouped rule that a later one overrides). The one
-  // state that can co-occur with a tier is the `short-landscape` flag, so the
-  // plain-tier rules exclude it — a viewport is EITHER a short-landscape one OR
-  // a plain tier, never both at once. Reorder any of these blocks freely: the
-  // matching one still wins, because at most one ever matches a given viewport.
-  // (`desktop` needs no block — it is the base `.outerContainer` values above.)
+  // Per-tier geometry, order-independent — tiers are mutually exclusive and the
+  // plain-tier rules exclude the flag (see styling.md). desktop = the base above.
   .outerContainer:not([data-short-landscape="true"]) {
     &[data-breakpoint="tablet"] {
       --slides-gap: 28px;
@@ -304,22 +194,15 @@
       --pagination-gap: 12px;
       --slide-radius: 8px;
 
-      // Portrait phones: one tall 9:16 card — cap its width so it keeps a
-      // phone-like proportion instead of stretching across a wide-but-portrait
-      // viewport. (Portrait ⇒ not landscape ⇒ not short-landscape, so this is
-      // already exclusive with the flag block below.)
+      // Portrait phones: cap the width so a tall card keeps a phone proportion.
       &[data-orientation="portrait"] .innerContainer {
         width: min(100%, 360px);
       }
     }
   }
 
-  // The short-landscape flag is its OWN state — a low-height handheld held
-  // sideways: two 16:9 slides side by side. It replaces the tier styling (the
-  // same precedence the host gives the flag in JS), and its `:not()` twin
-  // above keeps the two mutually exclusive, so no rule here depends on order.
-  // Higher specificity than the base `.outerContainer`, so it also wins over
-  // the desktop base when a wide-but-short viewport matches.
+  // short-landscape: its own state (a sideways low-height handheld), replacing
+  // the tier styling; higher specificity than the base, so it also beats desktop.
   .outerContainer[data-short-landscape="true"] {
     --slides-gap: 26px;
     --pagination-gap: 6px;

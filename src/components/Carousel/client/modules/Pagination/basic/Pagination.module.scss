@@ -1,22 +1,15 @@
+// See docs/architecture/styling.md
 @layer components {
   .paginationWrapper {
     --pagination-padding-block-start: 20px;
-    // Clearance below the dots: they must NOT sit flush on the outer
-    // container's overflow-hidden edge. During the WAAPI cross-fade a dot is
-    // rasterized on a compositor layer whose sub-pixel rounding differs from
-    // the in-flow render — flush content gets its bottom sliver clipped
-    // (sharp corners) for the duration of the animation.
-    --pagination-padding-block-end: 4px;
+    --pagination-padding-block-end: 4px; // bottom clearance: layer rounding clips flush content
     --pagination-padding-inline: 15px;
     --pagination-row-gap: 10px;
     --pagination-column-gap: 35px;
     --pagination-dot-w: 25px;
     --pagination-dot-h: 6px;
     --pagination-dot-radius: 2px;
-    // Dot state values live here as custom properties: the SCSS classes below
-    // consume them, and the engine-driven cross-fade (usePaginationFade)
-    // reads the same three vars to build its WAAPI keyframes — one source of
-    // truth for how an active/inactive dot looks.
+    // Dot look — the classes below and usePaginationFade read the same 3 vars.
     --pagination-dot-opacity: 0.2;
     --pagination-dot-opacity-active: 0.8;
     --pagination-dot-scale-active: 1.5;
@@ -40,37 +33,19 @@
     border-radius: var(--pagination-dot-radius);
     background-color: var(--color);
     opacity: var(--pagination-dot-opacity);
-    // Covers ONLY the non-planned flips (mount, drag retarget, the no-WAAPI
-    // fallback). During a planned step `usePaginationFade` suppresses this
-    // transition inline and the WAAPI cross-fade owns the dot.
-    //
-    // It must never run alongside that fade. An animation beats a transition
-    // in the cascade — the picture is correct either way — but the transition
-    // still EXISTS as a second effect on opacity/transform, and Blink refuses
-    // to composite a property driven by two effects, ticking the fade on the
-    // main thread for the whole ride (a measured ~40x main-frame regression).
-    // usePaginationFade suppresses it per-ride; keep the two in sync.
+    // Covers non-planned flips only; usePaginationFade suppresses it per-ride so
+    // it never runs alongside the WAAPI fade (two effects → main thread). styling.md.
     transition:
       opacity 0.4s,
       transform 0.5s;
-    // Keep the dot on a compositor layer PERMANENTLY. The cross-fade
-    // animates it there anyway; toggling between in-flow antialiased
-    // rendering (fractional Y, soft edge rows) and layer rasterization
-    // (pixel-snapped, solid edge rows) makes the dot visibly "fatten" for
-    // the duration of every animation and snap back on finish. One constant
-    // rendering mode, no jump; a dozen ~25x6 layers cost nothing.
+    // Permanent compositor layer — else the dot "fattens" per animation (styling.md).
     will-change: transform, opacity;
     flex-shrink: 0;
     -webkit-tap-highlight-color: transparent;
   }
 
-  // The pointer affordance lives here, not on `.dot`: it is applied only when
-  // the dots accept clicks (`isPaginationInteractiveOn`). Without it the dot
-  // is a plain <div> that the wrapper's `pointer-events: none` leaves inert —
-  // no cursor, no hover, no click target.
-  //
-  // Declared BEFORE `.dotActive` on purpose: both are single-class selectors,
-  // so source order decides, and the active dot must keep `cursor: default`.
+  // Pointer affordance only when interactive; declared BEFORE .dotActive so the
+  // active dot keeps cursor: default (equal-specificity, source order wins).
   .dotInteractive {
     cursor: pointer;
     pointer-events: auto;
@@ -92,8 +67,7 @@
     --pagination-dot-radius: 6px;
   }
 
-  // Mobile tier — keyed on the root's tier attribute, not a typed number, so
-  // it flips on the carousel's own threshold (config/viewport.ts).
+  // Mobile tier — keyed on the root's tier attribute (see styling.md).
   [data-breakpoint="mobile"] .paginationWrapper {
     --pagination-padding-block-start: 12px;
     --pagination-padding-inline: 10px;
