@@ -25,21 +25,13 @@ import {
   type DotVisualState,
 } from "./fadeKeyframes";
 
-/**
- * Engine-driven dot binding — the third consumer of the motion plan (track =
- * pixels, widget = dot steps, pagination = the LOOK of fixed dots). One
- * `offset` travels the plan's stops on its clock; each dot's look is a function
- * of its distance from it. React flips the `dotActive` class to the target
- * immediately; the animations mask the flip and end exactly on the class
- * styles. Non-planned changes keep the plain CSS transition. See
- * docs/architecture/modules.md.
- */
+// Engine-driven dot binding — the third consumer of the motion plan (dot LOOK).
+// See docs/architecture/modules.md
 
 const FALLBACK_INACTIVE: DotVisualState = { opacity: 0.2, scale: 1 };
 const FALLBACK_ACTIVE: DotVisualState = { opacity: 0.8, scale: 1.4 };
 
-/** Below this the dot shows nothing for the whole step — pin it instead of
- * paying for an animation that paints no difference (the widget's rule). */
+/** Below this a dot paints nothing for the whole step — pin it, don't animate. */
 const INVISIBLE_STRENGTH = 0.001;
 
 const DOT_CURVE_INTERVALS = 32;
@@ -49,9 +41,7 @@ const readVar = (styles: CSSStyleDeclaration, name: string, fallback: number) =>
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-/** The dot look is CSS-owned (custom properties on the wrapper); read the
- * same three vars the classes consume so the animation and the resting styles
- * can never disagree. */
+// Dot look is CSS-owned; read the same vars the classes use so they can't disagree.
 const readDotStates = (
   element: HTMLElement,
 ): { inactive: DotVisualState; active: DotVisualState } => {
@@ -76,29 +66,20 @@ interface UsePaginationFadeInput {
   motionPlan: MotionPlanSource | null;
   targetPageIndex: number;
   pageCount: number;
-  /** Cyclic decks have no ends: a step off page 0 lands on the last page one
-   * step away, and the offset must travel that way, not across the strip. */
   isFinite: boolean;
 }
 
 export interface PaginationFadeBinding {
-  /** Accepts either element: a non-interactive dot renders as a <div>. */
   bindDotRef: (pageIndex: number) => (node: HTMLElement | null) => void;
 }
 
-/**
- * The motion currently masking the class flip. `sweep`: the offset TRAVELS the
- * span, so passed-over pages light up. `direct`: each dot cross-fades straight
- * to its final look (GO_TO, whose deck teleports the middle — dots must not tour
- * pages never shown). See docs/architecture/modules.md.
- */
+/** The motion masking the class flip: `sweep` travels the span (passed pages
+ * light up); `direct` cross-fades straight (GO_TO teleports the middle). */
 interface ActiveFade {
   span: InFlightSpan;
   kind: "sweep" | "direct";
-  /** direct only: the endpoints each animated dot travels between. */
   blends: Map<number, { from: DotVisualState; to: DotVisualState }> | null;
-  /** The page the motion lands on (in range) — the offset a direct fade
-   * reports while running, since it has no travelling position. */
+  /** The landing page — what a direct fade reports (it has no travelling offset). */
   landing: number;
 }
 
@@ -116,8 +97,7 @@ export function usePaginationFade({
   const offsetRef = useRef(targetPageIndex);
   const stepRef = useRef<ActiveFade | null>(null);
 
-  // The dot look is CSS-owned; reading it forces a style recalc, so cache it
-  // and refresh only while the deck rests — never in the click frame.
+  // Reading the CSS-owned look forces a recalc, so cache it; refresh only at rest.
   const dotStatesRef = useRef<{ inactive: DotVisualState; active: DotVisualState } | null>(null);
 
   const refreshDotStates = useCallback(() => {
@@ -142,19 +122,8 @@ export function usePaginationFade({
     callbacksRef.current.length = pageCount;
   }, [pageCount]);
 
-  /**
-   * The dot's CSS `transition` covers opacity and transform — the very two
-   * properties these animations drive. Whenever the active-dot class moves,
-   * that transition fires, and Blink is left with two effects on one property:
-   * it cannot composite that, so it drops the animation onto the main thread
-   * for the rest of the ride, dragging a full paint lifecycle through every
-   * frame.
-   *
-   * The cascade still picks the animation, so the picture stays correct —
-   * which is exactly why the cost stays invisible. Suppressing the transition
-   * for the ride is a measured ~40x main-frame reduction on a weak device; do
-   * not remove it.
-   */
+  // Load-bearing: suppress the dot's CSS transition for the ride or Blink drops
+  // the animation to the main thread. Do NOT remove (see modules.md).
   const suppressTransition = useCallback((pageIndex: number) => {
     const dot = dotRefs.current[pageIndex];
     if (dot) dot.style.transition = "none";
@@ -162,13 +131,10 @@ export function usePaginationFade({
 
   const restoreTransition = useCallback((pageIndex: number) => {
     const dot = dotRefs.current[pageIndex];
-    // Back to the stylesheet: the transition still owns every non-planned flip.
     if (dot) dot.style.transition = "";
   }, []);
 
-  /** One motion owns the whole strip, so cancellation is always collective:
-   * after the cancel the class styles underneath already hold exactly the
-   * values the animations ended on, so restoring transitions nothing. */
+  // Collective cancel — the class styles already hold the end values.
   const cancelAllFades = useCallback(() => {
     animationsRef.current.forEach((animation, pageIndex) => {
       try {
@@ -181,9 +147,7 @@ export function usePaginationFade({
     animationsRef.current.clear();
   }, [restoreTransition]);
 
-  /** Where the offset is now: sampled from the running motion's own curve —
-   * never read back from the DOM. A direct fade has no travelling offset (the
-   * deck teleported), so it reports its landing page. */
+  // Sampled from the running curve, never the DOM; a direct fade reports its landing.
   const liveOffset = useCallback(() => {
     const fade = stepRef.current;
     if (!fade) return offsetRef.current;
@@ -193,13 +157,10 @@ export function usePaginationFade({
 
   const settle = useCallback(
     (landedOn: number) => {
-      // Normalise: a cyclic step may have taken the offset past either end.
-      // (`mod` folds to 0 when pageCount <= 0; keep the raw `landedOn` there.)
       offsetRef.current = pageCount > 0 ? mod(landedOn, pageCount) : landedOn;
       stepRef.current = null;
       cancelAllFades();
-      // Idle: re-read the CSS-owned look so a theme/breakpoint change lands.
-      refreshDotStates();
+      refreshDotStates(); // re-read the CSS look at rest (theme/breakpoint change)
     },
     [cancelAllFades, pageCount, refreshDotStates],
   );
@@ -208,34 +169,24 @@ export function usePaginationFade({
     (plan: CarouselMotionPlan) => {
       switch (plan.kind) {
         case "waapi": {
-          // A far-GO_TO approach slice: the preflight plan already spans the
-          // whole command for one-step consumers.
-          if (plan.isContinuation) return;
+          if (plan.isContinuation) return; // preflight already spans the command
 
           const anyDot = dotRefs.current.find((dot) => dot) ?? null;
           if (!anyDot) {
             settle(targetRef.current);
             return;
           }
-          // A dot travels a few pixels: it reads no velocity step at any
-          // density, so it rides a COARSER re-sample of the same curve —
-          // one keyframe per stop, per dot, on every ride is what the full
-          // track density would otherwise cost here.
+          // A dot travels a few px, so it rides a coarser re-sample of the curve.
           const dotStops = resampleStops(plan.stops, DOT_CURVE_INTERVALS);
           if (!dotStatesRef.current) refreshDotStates();
           const { inactive, active } = dotStatesRef.current ?? readDotStates(anyDot);
 
-          // GO_TO: the deck TELEPORTS its middle, so the dots must not tour
-          // it. Each involved dot cross-fades straight to its final look —
-          // still on the plan's curve, duration and clock, so the landing dot
-          // arrives WITH the picture exactly as a swept one does.
+          // GO_TO teleports the middle → dots cross-fade straight (direct), still
+          // on the plan's curve/clock so the landing dot arrives with the picture.
           if (plan.isJump) {
             const target = targetRef.current;
             const previous = stepRef.current;
-            // Continue from what the PREVIOUS motion has painted by now,
-            // resolved from its own curve (never the DOM): a sweep gives an
-            // offset to evaluate dots at, a direct fade gives per-dot blends
-            // at its temporal progress.
+            // Continue from the previous motion's own curve (never the DOM).
             const previousProgress =
               previous?.kind === "direct"
                 ? positionAtNow(previous.span, motionNow())
@@ -281,14 +232,10 @@ export function usePaginationFade({
                 { duration: plan.duration, startedAt: plan.startedAt },
               );
               if (!animation) {
-                // No keyframe support: back to the class flip + CSS
-                // transition — an acceptable instant-ish switch.
-                restoreTransition(index);
+                restoreTransition(index); // no keyframe support: class flip
                 continue;
               }
               animationsRef.current.set(index, animation);
-              // The landing dot preferred; any animation will do if the
-              // target happens to already look active.
               if (index === target || settleOwner === null) settleOwner = animation;
             }
             if (settleOwner) {
@@ -324,24 +271,14 @@ export function usePaginationFade({
           );
           if (from === to) return;
 
-          // One motion for the whole strip: every dot the offset passes near
-          // gets the SAME curve over the SAME duration on the SAME clock.
+          // One motion for the whole strip: same curve/duration/clock per dot.
           cancelAllFades();
           for (const index of reachedDotIndexes(from, to, pageCount, isFinite)) {
             const dot = dotRefs.current[index];
             if (!dot) continue;
 
-            // A dot the offset never comes within a step of paints nothing all
-            // the way through — leave it to its class styles.
-            //
-            // Scanned on the COARSE grid the dot actually rides, not on the
-            // plan's full density. Both grids sample the same curve, and the
-            // question asked here — "does this dot ever come within one step
-            // of the offset" — is about the offset's path, which a 32-interval
-            // sample describes as faithfully as a 157-interval one. The full
-            // grid meant ~157 evaluations per candidate dot in the click frame,
-            // which is one of the only two frames the carousel spends
-            // main-thread time in.
+            // A dot the offset never nears paints nothing — leave it to its
+            // class styles. Scanned on the coarse grid the dot actually rides.
             const staysInvisible =
               dotStops.every(
                 (p) =>
@@ -372,14 +309,12 @@ export function usePaginationFade({
               { duration: plan.duration, startedAt: plan.startedAt },
             );
             if (!animation) {
-              // No keyframe support: hand the dot back to the class flip + CSS
-              // transition, which produce an acceptable instant-ish switch.
-              restoreTransition(index);
+              restoreTransition(index); // no keyframe support: class flip
               continue;
             }
             animationsRef.current.set(index, animation);
 
-            // The destination dot outlives every other: settle on its finish.
+            // The destination dot outlives the rest: settle on its finish.
             if (index === targetRef.current) {
               animation.onfinish = () => {
                 if (animationsRef.current.get(index) !== animation) return;
@@ -405,8 +340,7 @@ export function usePaginationFade({
         case "instant":
         case "idle":
         case "follow": {
-          // Snap / rest / finger-follow (or the no-WAAPI fallback): the class
-          // flip plus the plain CSS transition own the dots.
+          // Snap / rest / follow / fallback: the class flip + CSS transition own the dots.
           settle(targetRef.current);
           return;
         }

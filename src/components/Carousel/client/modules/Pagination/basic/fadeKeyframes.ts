@@ -1,10 +1,5 @@
-/**
- * Dot look as a FUNCTION OF POSITION: one continuous `offset` travels the plan's
- * stops and each dot's look is read off its distance from it — so a page merely
- * passed through rises and falls on the deck's clock, nothing authored in time.
- * See docs/architecture/modules.md.
- */
-
+// Dot look as a function of position — one offset travels the plan's stops, each
+// dot's look reads off its distance from it. See docs/architecture/modules.md
 import { mod } from "../../../domain";
 import { keyframesAlongStops } from "../../../motion";
 
@@ -21,20 +16,11 @@ export type DotFadeKeyframe = {
   transform: string;
 };
 
-/**
- * How strongly the ACTIVE look applies to a dot `distance` steps from the live
- * offset: full right under it, zero a whole step away. Linear deliberately, so
- * a single step blends exactly as a plain two-dot cross-fade would.
- */
+/** Active-look strength for a dot `distance` steps away: full under it, zero a step away. */
 export const dotActiveStrength = (distance: number): number =>
   Math.max(0, 1 - Math.abs(distance));
 
-/**
- * Distance from a dot to the live offset. In cyclic mode the strip has no
- * ends: stepping back off page 0 lands on the last page, one step away — not
- * `pageCount - 1` away. Measuring that as a plain difference is what made the
- * offset sweep the whole strip on a wrap.
- */
+/** Dot→offset distance; cyclic mode wraps (one step off page 0 is one, not pageCount-1). */
 export const offsetDistance = (
   index: number,
   offset: number,
@@ -47,12 +33,7 @@ export const offsetDistance = (
   return Math.min(wrapped, pageCount - wrapped);
 };
 
-/**
- * Where the offset must travel for this command. In cyclic mode the target
- * page is reachable both ways round; the plan's DIRECTION says which way the
- * deck actually went, and the offset follows it — one step off the end goes
- * to `-1` or `pageCount`, never the long way across every dot.
- */
+/** Where the offset travels; cyclic mode follows the plan's DIRECTION, not the long way. */
 export const resolveOffsetTarget = (
   from: number,
   targetPageIndex: number,
@@ -85,12 +66,7 @@ export const dotStateAt = (
   };
 };
 
-/**
- * Keyframes for one dot as the offset travels `fromOffset -> toOffset` along
- * the temporal `stops`: the i-th keyframe is the dot's look at the offset the
- * plan has reached by stop i. Same stop-encoded transport the track and the
- * widget use, so the dot rides the deck's curve without an easing function.
- */
+/** Keyframes for one dot as the offset travels the plan's stops (sweep). */
 export const buildDotKeyframes = (
   index: number,
   fromOffset: number,
@@ -116,12 +92,7 @@ export const blendDotStates = (
   scale: from.scale + (to.scale - from.scale) * progress,
 });
 
-/**
- * Keyframes fading one dot STRAIGHT between two looks along the plan's
- * temporal stops — the GO_TO delivery. The deck teleports a far jump's
- * middle, so a dot must not ride the offset through pages the deck never
- * shows; it blends directly, still on the deck's own curve and clock.
- */
+/** Keyframes fading one dot STRAIGHT between two looks (GO_TO direct delivery). */
 export const dotKeyframesBetween = (
   from: DotVisualState,
   to: DotVisualState,
@@ -132,9 +103,7 @@ export const dotKeyframesBetween = (
     return { opacity: state.opacity, transform: `scaleX(${state.scale})` };
   });
 
-/** Dots that can show anything at all along `fromOffset -> toOffset`: strength
- * reaches zero a full step away, so only these need animating — the rest stay
- * on their class styles. */
+/** Dots that can show anything along the sweep — only these need animating. */
 export const reachedDotIndexes = (
   fromOffset: number,
   toOffset: number,
@@ -150,9 +119,7 @@ export const reachedDotIndexes = (
     }
     return ids;
   }
-  // Cyclic: the path may run past either end, so fold the swept positions back
-  // onto real dot indexes (a wrap touches the dots at the far end, not the
-  // ones in between).
+  // Cyclic: fold swept positions back onto real dot indexes (a wrap touches the far end).
   const seen = new Set<number>();
   for (let position = low; position <= high; position += 1) {
     seen.add(mod(position, pageCount));

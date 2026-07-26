@@ -1,3 +1,4 @@
+// See docs/architecture/modules.md
 import { memo, useMemo } from "react";
 
 import { mergeStyleMaps } from "../../../../../../shared";
@@ -18,10 +19,7 @@ const PaginationBase = memo(function Pagination({ className }: PaginationProps) 
     [className],
   );
 
-  // React marks the target dot active immediately on every command; for
-  // engine-planned motions the fade binding masks the flip with a WAAPI
-  // cross-fade over the plan's own curve, so the dot arrives WITH the
-  // picture. Reduced motion (null plan source) stays static.
+  // React flips the target dot immediately; the fade binding masks it (see doc).
   const { bindDotRef } = usePaginationFade({
     motionPlan,
     targetPageIndex: intent.targetPageIndex,

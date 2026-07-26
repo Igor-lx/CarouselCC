@@ -29,6 +29,22 @@ AT; page indication reaches screen readers via `aria-current="step"` on the
 visible band. The slot renders only when `canSlide` (`shouldRenderPagination`),
 so a single-page deck shows no dots — no internal `pageCount <= 1` guard.
 
+**Transition suppression (a load-bearing trap).** The dot's CSS `transition`
+covers opacity and transform — the very two properties the fade animations drive.
+Whenever the active-dot class moves, that transition fires, and Blink is left with
+two effects on one property; it cannot composite that, so it drops the animation
+onto the main thread for the rest of the ride, dragging a full paint lifecycle
+through every frame. So `usePaginationFade` sets `transition: none` on each
+animated dot for the ride and restores it after — a large measured main-frame
+reduction on a weak device. The cascade still picks the animation so the picture
+stays correct, which is exactly why the cost is invisible until measured. Do not
+remove it. One motion owns the whole strip, so cancellation is collective and the
+class styles underneath already hold the animations' end values, so restoring
+transitions nothing. Everything is sampled from the plan's own curve, never read
+back from the DOM; a dot that would stay invisible for the whole step is left to
+its class styles rather than paying for an animation, scanned on the coarse grid
+the dot actually rides.
+
 ## `<PaginationWidget />`
 
 Touch dot pagination — a fixed-width odd-count strip with exponentially
