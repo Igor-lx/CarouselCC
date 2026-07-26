@@ -6,9 +6,9 @@ import {
 import { buildInitialState } from "./initial";
 import { ZERO_GESTURE_RELEASE, type CarouselState } from "./types";
 
-// `dataKey` identifies the record sequence (so it pins `length`), and with
-// `visibleSlidesCount` it fully determines `canSlide` and `virtualLength`.
-// Comparing these four fields is therefore a complete layout-equivalence check.
+// `dataKey` pins `length` and, with `visibleSlidesCount`, fully determines
+// `canSlide` and `virtualLength` — so these four fields are a complete
+// layout-equivalence check.
 const sameLayout = (a: CarouselLayout, b: CarouselLayout) =>
   a.dataKey === b.dataKey &&
   a.visibleSlidesCount === b.visibleSlidesCount &&
@@ -16,11 +16,10 @@ const sameLayout = (a: CarouselLayout, b: CarouselLayout) =>
   a.pageCount === b.pageCount;
 
 /**
- * Brings a previous state into a new layout. If the layout is the same
- * shape, the state is unchanged (or carries over with a swapped layout
- * reference). Otherwise the page indexes are mapped proportionally and the
- * virtual indexes reset to the page start; the motion is collapsed to an
- * instant snap so the visual catches up cleanly.
+ * Brings a previous state into a new layout. Same shape: state is unchanged
+ * (bar a swapped layout reference). Otherwise page indexes are mapped
+ * proportionally, virtual indexes reset to the page start, and motion collapses
+ * to an instant snap so the visual catches up cleanly.
  */
 export const reconcileStateToLayout = (
   state: CarouselState,

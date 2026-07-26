@@ -105,12 +105,10 @@ export function carouselReducer(
       const isInstant = Boolean(envelope.isInstant || context.isInstantMode);
       const command = { ...envelope, isInstant };
 
-      // A repeated same-direction MOVE click during in-flight motion. The
-      // reducer keeps processing it (so rapid clicks "pick each other up"
-      // as visual progresses past page boundaries), but `stepOrigin` will
-      // anchor the cursor on the live visual page instead of the pending
-      // target — so the destination tracks one page ahead of what the user
-      // sees and never accumulates beyond that.
+      // A repeated same-direction MOVE click during motion. Still processed (so
+      // rapid clicks pick each other up as visual crosses page boundaries), but
+      // `stepOrigin` anchors on the live visual page, keeping the destination
+      // one page ahead of what the user sees and no further.
       const isRepeatedClickAdvance =
         command.type === "MOVE" &&
         command.moveReason === "click" &&
@@ -136,12 +134,10 @@ export function carouselReducer(
         nextVirtualIndex === synced.virtualIndex;
 
       if (isNoop) {
-        // Two no-op cases land here: a finite-mode boundary press (target
-        // and virtual unchanged, no fast profile to flag), and a repeated
-        // click while visual is still inside the current page (target is
-        // already where the new click would aim — keep the fast profile
-        // flag on so the motion runner rebuilds the active segment with
-        // the repeated-click peak speed and the live `fromVirtualIndex`).
+        // Two no-op cases: a finite-mode boundary press (nothing to flag), and
+        // a repeated click while visual is still inside the current page — keep
+        // the fast-profile flag on so the runner rebuilds the active segment at
+        // repeated-click peak speed from the live `fromVirtualIndex`.
         return {
           ...synced,
           fromVirtualIndex: nextFromVirtualIndex,

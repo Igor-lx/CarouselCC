@@ -1,11 +1,8 @@
 import type { CarouselLayout } from "../domain";
 import type { CarouselRuntimeConfig } from "../config";
 
-/**
- * What initiated the current motion. A real reason is always carried by the
- * command that starts a step; `null` is the pre-action initial state, before
- * the carousel has moved for any reason.
- */
+/** What initiated the current motion; `null` only in the pre-action initial
+ * state, before the carousel has moved. */
 export type MoveReason = "click" | "gesture" | "autoplay";
 
 export type MotionPhase =
@@ -19,14 +16,12 @@ export type MotionPhase =
 export interface GestureRelease {
   pointerVelocity: number;
   uiVelocity: number;
-  /** The speed the ride's CONTINUITY LAUNCH starts from — the strip's visible
-   * speed, protected from a terminal micro-hold (see `launchVelocity` on the
-   * engine's release payload). `uiVelocity` remains the raw instantaneous
-   * reading and still drives everything else. */
+  /** Speed the continuity launch starts from — visible strip speed protected
+   * from a terminal micro-hold; `uiVelocity` stays the raw reading for
+   * everything else (see `launchVelocity` on the engine's release payload). */
   launchVelocity: number;
-  /** `motionNow()` reading recorded by the END_DRAG dispatch. The motion
-   * runner coasts the ride's launch position over the commit gap it measures
-   * against this clock (see `gesture/coast.ts`). */
+  /** `motionNow()` at the END_DRAG dispatch — the clock the runner coasts the
+   * launch position over the commit gap against (see `gesture/coast.ts`). */
   releasedAt: number;
 }
 
@@ -43,25 +38,16 @@ export interface CarouselState {
   fromVirtualIndex: number;
   virtualIndex: number;
   /**
-   * Final virtual position of a far GO_TO after its bounded preflight. While
-   * set, `virtualIndex` is the bounded preflight landing and `targetPageIndex`
-   * already names the final logical destination. Kept bounded on purpose: the
-   * render window is built from `virtualIndex`, so the far target must not
-   * leak into it before the teleport. `null` for every non-teleport step.
+   * Final virtual position of a far GO_TO after its bounded preflight; `null`
+   * for every non-teleport step. While set, `virtualIndex` stays the preflight
+   * landing so the far target never leaks into the render window built from it.
    */
   teleportVirtualIndex: number | null;
-  /**
-   * True for the post-teleport approach segment of a far GO_TO. Selects the
-   * approach slice of the GO_TO profile: it enters at cruise speed and decays
-   * to rest at the final target.
-   */
+  /** Post-teleport approach segment of a far GO_TO: enters at cruise speed and
+   * decays to rest at the final target. */
   isTeleportApproach: boolean;
-  /**
-   * True when this segment was started by a click that arrived while the
-   * carousel was already moving in the same direction. It selects the fast
-   * acceleration profile instead of the normal step profile - the segment still
-   * drives straight to the page boundary and decays to zero speed.
-   */
+  /** Segment started by a same-direction click during motion: selects the fast
+   * acceleration profile; still drives to the page boundary and decays to rest. */
   isRepeatedClickAdvance: boolean;
   motionPhase: MotionPhase;
   /** `null` until the carousel first moves; a concrete reason thereafter. */
@@ -111,13 +97,10 @@ export interface EndDragCommand extends VirtualIndexSource {
 export interface MotionSettledCommand {
   type: "MOTION_SETTLED";
   /**
-   * The visual position where the controller actually settled.
-   *
-   * Between the RAF tick that settles a segment and the reducer turn that
-   * handles MOTION_SETTLED, another click may already have replaced
-   * `state.virtualIndex` with a later target. The reducer needs the settled
-   * position to distinguish "the current target finished" from "an older
-   * target finished while a newer one is already pending".
+   * The visual position where the controller actually settled. A click may
+   * replace `state.virtualIndex` between the settling RAF tick and this
+   * command, so the reducer needs it to tell "current target finished" from
+   * "an older target finished while a newer one is pending".
    */
   settledPosition: number;
 }

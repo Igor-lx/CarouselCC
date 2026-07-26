@@ -22,11 +22,8 @@ export const hasPartialPageLayout = (length: number, visibleSlidesCount: number)
   return length % effective !== 0;
 };
 
-/**
- * Pad the deck with clones drawn from the head so the total length is a
- * multiple of `visibleSlidesCount`. Used when `isFullPagesOn` is true so
- * the last page is not visually short.
- */
+/** Pad the deck with head clones so the length is a multiple of
+ * `visibleSlidesCount`, so the last page is never visually short. */
 export const padDeckToFullPage = (
   records: CarouselSlideRecord[],
   visibleSlidesCount: number,
@@ -48,11 +45,8 @@ export const padDeckToFullPage = (
 
 export { clampedVisibleSlidesCount };
 
-/**
- * Parse a `w`-descriptor `srcSet` and return the LARGEST candidate URL with
- * its width. Entries without a width descriptor count as width 0; a
- * malformed or empty srcSet yields `null`.
- */
+/** Largest-width candidate from a `w`-descriptor `srcSet`; entries without a
+ * width count as 0, and an empty or malformed srcSet yields `null`. */
 export const resolveLargestSrcSetCandidate = (
   srcSet: string | undefined,
 ): { url: string; width: number } | null => {
@@ -71,15 +65,9 @@ export const resolveLargestSrcSetCandidate = (
   return best;
 };
 
-/**
- * The single-set-mode FALLBACK candidate for data that does not designate
- * one (`image.defaultSrc` absent): the widest candidate across ALL of the
- * slide's sets (the default `srcSet` AND every art-directed `<source>`).
- * `w` descriptors are the only size signal the data carries, so width is
- * the whole rule — the resolver never guesses heights, orientations or
- * layouts. Exact ties keep the default `srcSet`'s candidate, then earlier
- * source order — deterministic, semantics-free.
- */
+/** Single-set fallback when the data designates no standalone asset: the
+ * widest candidate across the default `srcSet` and every art-directed
+ * `<source>`. Ties keep the default srcSet, then earlier source order. */
 export const resolveLargestImageCandidate = (image: Slide["image"]): string | null => {
   let best: { url: string; width: number } | null = null;
   const consider = (srcSet: string | undefined) => {
@@ -92,21 +80,10 @@ export const resolveLargestImageCandidate = (image: Slide["image"]): string | nu
   return best === null ? null : (best as { url: string }).url;
 };
 
-/**
- * The image URL the deck actually RENDERS for a slide, and therefore the URL
- * the image-resource store tracks (load / error / retry). One resolution rule
- * shared by the slide renderer and the store retention, so they can never
- * key on different URLs:
- *
- * - responsive mode (`<ResponsiveImages />` mounted): the canonical
- *   `content` URL — the browser upgrades it via `srcSet` / `<source>`;
- * - single-set mode (module absent): the publisher's DESIGNATED asset
- *   (`image.defaultSrc`) when the data declares one — a human who split the
- *   deck into sets already knows which asset stands alone; otherwise the
- *   widest candidate across all sets (`resolveLargestImageCandidate`), and
- *   finally the `content` URL itself. Slide identity is untouched either
- *   way (`dataKey` stays on `id + content`).
- */
+/** The image URL the deck RENDERS for a slide — the one rule the renderer and
+ * the resource store share so they can never key on different URLs. Responsive
+ * mode: the canonical `content`. Single-set mode: the designated
+ * `image.defaultSrc`, else the widest candidate, else `content`. */
 export const resolveRenderedImageSrc = (
   slideData: Slide,
   isResponsiveImagesOn: boolean,
