@@ -1,3 +1,4 @@
+// See docs/architecture/state.md
 import { clamp, normalizePageIndex } from "../domain";
 import { resolveGoToApproachDistance } from "../motion/timing";
 import { reconcileStateToLayout } from "./reconcile";
@@ -27,8 +28,7 @@ export function carouselReducer(
   envelope: ReducerEnvelope,
 ): CarouselState {
   const { context } = envelope;
-  // The command-boundary reconcile: every command starts from the live layout.
-  // See docs/adr/0001-layout-reconciliation.md.
+  // Command-boundary reconcile — see adr/0001-layout-reconciliation.md.
   const synced = reconcileStateToLayout(state, context.layout);
 
   switch (envelope.type) {
@@ -105,10 +105,7 @@ export function carouselReducer(
       const isInstant = Boolean(envelope.isInstant || context.isInstantMode);
       const command = { ...envelope, isInstant };
 
-      // A repeated same-direction MOVE click during motion. Still processed (so
-      // rapid clicks pick each other up as visual crosses page boundaries), but
-      // `stepOrigin` anchors on the live visual page, keeping the destination
-      // one page ahead of what the user sees and no further.
+      // Repeated same-direction click during motion (see doc: step resolution).
       const isRepeatedClickAdvance =
         command.type === "MOVE" &&
         command.moveReason === "click" &&
@@ -134,10 +131,8 @@ export function carouselReducer(
         nextVirtualIndex === synced.virtualIndex;
 
       if (isNoop) {
-        // Two no-op cases: a finite-mode boundary press (nothing to flag), and
-        // a repeated click while visual is still inside the current page — keep
-        // the fast-profile flag on so the runner rebuilds the active segment at
-        // repeated-click peak speed from the live `fromVirtualIndex`.
+        // Boundary press, or a repeat click still inside the current page: keep
+        // the fast-profile flag so the runner rebuilds the active segment.
         return {
           ...synced,
           fromVirtualIndex: nextFromVirtualIndex,
@@ -176,8 +171,7 @@ export function carouselReducer(
         context.config.motion.epsilon;
 
       if (targetChanged) {
-        // A newer click already replaced the target while this segment was
-        // settling - re-anchor to where it actually settled, keep motion.
+        // A newer target replaced this one mid-settle: re-anchor, keep motion.
         return {
           ...synced,
           fromVirtualIndex: settledPosition,
@@ -189,9 +183,7 @@ export function carouselReducer(
       }
 
       if (synced.teleportVirtualIndex !== null) {
-        // A far GO_TO's bounded preflight just settled. Teleport across the
-        // un-rendered middle and start the fixed approach from a bounded
-        // origin, so the render window never spans the full jump.
+        // Preflight settled: cut across the middle, start the bounded approach.
         const direction = Math.sign(
           synced.teleportVirtualIndex - settledPosition,
         );

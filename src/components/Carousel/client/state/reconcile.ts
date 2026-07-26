@@ -1,3 +1,4 @@
+// See docs/architecture/state.md + adr/0001-layout-reconciliation.md
 import {
   pageStart,
   reconciledPageIndex,
@@ -6,21 +7,13 @@ import {
 import { buildInitialState } from "./initial";
 import { ZERO_GESTURE_RELEASE, type CarouselState } from "./types";
 
-// `dataKey` pins `length` and, with `visibleSlidesCount`, fully determines
-// `canSlide` and `virtualLength` — so these four fields are a complete
-// layout-equivalence check.
+// These four fields are a complete layout-equivalence check (dataKey pins the rest).
 const sameLayout = (a: CarouselLayout, b: CarouselLayout) =>
   a.dataKey === b.dataKey &&
   a.visibleSlidesCount === b.visibleSlidesCount &&
   a.isFinite === b.isFinite &&
   a.pageCount === b.pageCount;
 
-/**
- * Brings a previous state into a new layout. Same shape: state is unchanged
- * (bar a swapped layout reference). Otherwise page indexes are mapped
- * proportionally, virtual indexes reset to the page start, and motion collapses
- * to an instant snap so the visual catches up cleanly.
- */
 export const reconcileStateToLayout = (
   state: CarouselState,
   nextLayout: CarouselLayout,

@@ -1,3 +1,4 @@
+// See docs/architecture/state.md
 import type { CarouselLayout } from "../domain";
 import { ZERO_GESTURE_RELEASE, type CarouselState } from "./types";
 

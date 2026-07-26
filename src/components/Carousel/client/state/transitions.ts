@@ -1,3 +1,4 @@
+// See docs/architecture/state.md
 import {
   alignedVirtualIndex,
   clamp,
@@ -17,15 +18,6 @@ import type {
 const repeatedClickStep = (step: number): number =>
   Math.sign(step) * REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES;
 
-/**
- * Picks the "from" page for the next step.
- * - Default: the cursor is `state.targetPageIndex` (the pending destination
- *   while queued, the settled page while idle); the origin is only the lane
- *   reference for a fresh handoff.
- * - Same-direction repeat click: the cursor is the LIVE visual page, so a
- *   rapid click resolves one page ahead of where the deck is now and never
- *   accumulates further ahead than the user sees.
- */
 const stepOrigin = (
   state: CarouselState,
   fromVirtualIndex: number,
@@ -63,10 +55,7 @@ interface StepResolution {
   nextFromVirtualIndex: number;
   nextTargetPageIndex: number;
   nextVirtualIndex: number;
-  /**
-   * Final virtual position of a far GO_TO, or `null` for a step that does not
-   * teleport. When set, `nextVirtualIndex` is the bounded preflight landing.
-   */
+  /** Far-GO_TO final position, `null` otherwise (then nextVirtualIndex is the preflight landing). */
   nextTeleportVirtualIndex: number | null;
   phase: MotionPhase;
 }
@@ -90,9 +79,6 @@ export const resolveStepTransition = (
   const stepSize = layout.visibleSlidesCount;
   const nextFromVirtualIndex = command.fromVirtualIndex ?? state.virtualIndex;
   const step = command.type === "MOVE" ? command.step : 0;
-  // A same-direction repeat click lands `REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES`
-  // ahead of the live visual page (see `stepOrigin`), so rapid clicks extend
-  // the run instead of bunching up on the first segment.
   const effectiveMoveStep = isSameDirectionRepeat
     ? repeatedClickStep(step)
     : step;
@@ -118,24 +104,17 @@ export const resolveStepTransition = (
     const resolved = layout.isFinite
       ? clamp(command.targetPageIndex, 0, layout.pageCount - 1)
       : normalizePageIndex(command.targetPageIndex, layout.pageCount);
-    // Dot-scale direction, NOT the shortest cyclic path: the plain difference
-    // rides the deck the way the user moved on the pagination strip (a dot to
-    // the left always travels left). A cyclic shortcut would sometimes ride
-    // against the strip and saves nothing — a far span is already bounded by
-    // the teleport plan below. Cyclic wrap stays the business of ±1 steps.
+    // Dot-scale direction, not shortest cyclic path (see doc).
     pageDelta = resolved - currentPageIndex;
     nextTargetPageIndex = resolved;
   }
 
-  // The full visual destination, before any teleport bounding is applied.
   const canonicalVirtualIndex = layout.isFinite
     ? pageStart(nextTargetPageIndex, stepSize)
     : currentVirtualIndex + pageDelta * stepSize;
 
-  // A long GO_TO animates a bounded preflight, teleports the middle, then
-  // animates a fixed approach. `virtualIndex` stays at the preflight landing on
-  // purpose — the render window is built from it, so it must not name the far
-  // target.
+  // virtualIndex stays at the preflight landing while a teleport is pending —
+  // the render window is built from it, so the far target must not leak in.
   const goToPlan =
     command.type === "GO_TO" && !command.isInstant && !isInstantMode
       ? resolveGoToPlan(Math.abs(pageDelta), stepSize, motion)
@@ -155,8 +134,6 @@ export const resolveStepTransition = (
   };
 };
 
-/** A MOVE click arriving while the deck already animates the same direction.
- * It only selects the fast motion profile — the destination model is unchanged. */
 export const isSameDirectionRepeat = (
   state: CarouselState,
   step: number,

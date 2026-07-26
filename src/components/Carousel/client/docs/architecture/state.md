@@ -33,6 +33,36 @@ never captured from closure.
   `MoveReason | null`, where `null` is the pre-action initial state — before the
   carousel has moved for any reason.
 
+## Step resolution
+
+`resolveStepTransition` turns a `MOVE` / `GO_TO` command into the next state
+(`transitions.ts`). Its subtleties are the reason the reducer stays small:
+
+- **The step origin.** `stepOrigin` picks the "from" page a step counts from.
+  Normally the cursor is `state.targetPageIndex` — the pending destination while a
+  ride is queued, the settled page while idle — and the caller's origin only
+  supplies the lane reference for a fresh handoff. On a same-direction repeat
+  click, the cursor is instead the LIVE visual page, so a rapid click resolves one
+  page ahead of where the deck is NOW and never accumulates further ahead than the
+  user can see.
+- **Repeated clicks.** A `MOVE` click arriving while the deck already animates the
+  same direction is a "same-direction repeat" (`isSameDirectionRepeat`). It does
+  not change the destination model — it selects the fast motion profile — but its
+  effective step lands `REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES` ahead of the live
+  visual page, so rapid clicks visibly extend the run instead of bunching up on
+  the first segment.
+- **Dot-scale direction.** A `GO_TO` uses the plain page difference, NOT the
+  shortest cyclic path: a dot to the left always travels left, matching how the
+  user moved on the pagination strip. A cyclic shortcut would sometimes ride
+  against the strip and saves nothing, because a far span is already bounded by
+  the teleport plan. Cyclic wrap stays the business of ±1 steps.
+- **Teleport bounding.** A long `GO_TO` animates a bounded preflight, teleports
+  the hidden middle, then animates a fixed approach (see [motion](./motion.md)
+  for the profile). While a teleport is pending, `virtualIndex` deliberately stays
+  at the preflight landing — the render window is built from it, so the far target
+  must never leak into it — and `teleportVirtualIndex` carries the real
+  destination until `MOTION_SETTLED` performs the cut.
+
 ## Reconciliation
 
 `CarouselLayout` is derived from props that can change without any command
