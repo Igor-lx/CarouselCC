@@ -3,38 +3,17 @@ import { Children, isValidElement, type ReactNode } from "react";
 import type { CarouselProps } from "./public-api/types";
 
 /**
- * The memo comparator for `<Carousel>`.
- *
- * WHY IT EXISTS. Modules are passed the natural way — as inline JSX children:
- *
- *   <Carousel …>
- *     <Pagination />
- *     <Controls />
- *   </Carousel>
- *
- * JSX creates FRESH element objects on every render of the host, so the
- * default shallow comparison sees a new `children` prop every time and the
- * memo never holds. Any host re-render — a status label, a theme toggle,
- * anything — then reconciles the whole deck, and on a slow device that lands
- * as a stutter in the frame where a ride starts. Making hosts hand-memoise
- * their children (an array with manual keys) works but punishes ordinary,
- * correct React for a problem the component can solve once, for everyone.
- *
- * So children are compared STRUCTURALLY: same count, same element types, same
- * keys, shallow-equal props. Equivalent trees skip the render; anything the
- * comparison cannot vouch for (a changed module prop, a swapped module, an
- * inline callback, a non-element child) falls through to a re-render, which
- * is always the safe direction.
+ * The memo comparator for `<Carousel>`. Modules are passed as inline JSX
+ * children, which are FRESH objects every host render — so the default shallow
+ * compare never holds and any host re-render would reconcile the whole deck.
+ * This compares children STRUCTURALLY (count, type, key, shallow props);
+ * anything it cannot vouch for falls through to a re-render, the safe direction.
+ * Do not remove it — the deck would re-reconcile on every unrelated host render.
  */
 
-/**
- * Props are compared by identity, EXCEPT `children` — nested JSX is a fresh
- * object for exactly the same reason the top level is, so a wrapper (a
- * fragment, a module that wraps content) would otherwise never compare equal
- * and would defeat the whole comparator. The recursion is bounded by the JSX
- * the host literally wrote, and walking it is strictly cheaper than the
- * reconciliation it avoids.
- */
+/** Props compared by identity, EXCEPT `children`: nested JSX is fresh for the
+ * same reason, so a wrapper would otherwise never compare equal. Recursion is
+ * bounded by the JSX the host actually wrote. */
 function shallowEqualProps(
   a: Readonly<Record<string, unknown>>,
   b: Readonly<Record<string, unknown>>,
