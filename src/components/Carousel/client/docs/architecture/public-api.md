@@ -116,6 +116,23 @@ stable object).
 | --- | --- | --- |
 | `className` | `ClassNameMap` | Partial map keyed by `outerContainer`, `innerContainer`, `slideContainer`, `slide`, `slideInteractive`, `slideError`, `slideText`. Merged via `mergeStyleMaps`; unset keys keep the built-in styles. |
 
+## Validating slide data
+
+`Slide`, `SlideImageVariants` and `SlideImageSource` are inferred (`z.infer`)
+from Zod schemas in `public-api/schemas.ts`, so the validated shape and the
+compile-time type cannot drift. A host may validate external slide data (an API
+response, a CMS payload, the generated JSON) against `CarouselSlidesDataSchema`
+before passing it as `slidesData` — the only thing Zod is used for here; the
+carousel never runtime-validates its own props (invalid input surfaces through
+the Diagnostic slot, never repaired — [ADR-002](../adr/0002-trusted-runtime-inputs.md)).
+
+Importing a TYPE from the contract is erased; importing a SCHEMA pulls in Zod.
+So `schemas.ts` is deliberately NOT re-exported from the barrel or the entry —
+that keeps Zod out of the app bundle. Hosts opt in with an explicit deep import
+(`.../public-api/schemas`). String fields are trimmed and non-empty, so an empty
+`media`/`srcSet` is rejected at the host boundary rather than emitted as a dead
+`<source>`.
+
 ## Slot children
 
 `children` accepts module elements identified by a `slot` static:

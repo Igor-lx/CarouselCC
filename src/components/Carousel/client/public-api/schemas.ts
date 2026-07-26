@@ -1,27 +1,8 @@
+// Zod schemas for the slide-data contract — the `Slide`* types are inferred
+// from these. NOT re-exported from the barrel, to keep Zod out of the app
+// bundle (host deep-imports to validate). See docs/architecture/public-api.md
 import type { ReactElement } from "react";
 import { z } from "zod";
-
-/**
- * Zod schemas for the slide-data contract — the single source of truth for the
- * shape of the `carousel-slides.json` document the component consumes.
- *
- * Two jobs, one definition:
- *  - `Slide`, `SlideImageVariants` and `SlideImageSource` are inferred from these
- *    schemas (`z.infer`, type-only — see `types.ts`), so the validated shape and
- *    the compile-time type cannot drift.
- *  - A host validates external slide data (an API response, a CMS payload, the
- *    generated JSON) against `CarouselSlidesDataSchema` before passing it as
- *    `slidesData`. This is the ONLY thing Zod is used for here — there are no
- *    prop/callback schemas. The carousel never runtime-validates its own props:
- *    invalid input propagates and is surfaced by the `Diagnostic` slot as
- *    DEV-only warnings, keeping the failure mode visible at the source.
- *
- * Importing a TYPE from the contract is erased; importing a SCHEMA (a value)
- * pulls in Zod. So this module is deliberately NOT re-exported from the contract
- * barrel or the component entry — that keeps Zod out of the app bundle. Hosts
- * opt in with an explicit deep import:
- *   import { CarouselSlidesDataSchema } from "@/components/Carousel/client/public-api/schemas";
- */
 
 const ReactElementSchema = z.custom<ReactElement>((value) => {
   if (typeof value !== "object" || value === null) return false;
@@ -38,12 +19,6 @@ const ContentSchema = z.union([
   ReactElementSchema,
 ]);
 
-/**
- * Source of truth for the `SlideImageSource` type (inferred in `types.ts`).
- * Strings are trimmed and must be non-empty: an empty `media`/`srcSet` is never
- * a valid source and is rejected at the host boundary rather than emitted as a
- * dead `<source>`.
- */
 export const SlideImageSourceSchema = z.object({
   media: z.string().trim().min(1),
   srcSet: z.string().trim().min(1),
@@ -51,25 +26,14 @@ export const SlideImageSourceSchema = z.object({
   type: z.string().trim().min(1).optional(),
 });
 
-/**
- * Source of truth for the `SlideImageVariants` type. `sources` is `.readonly()`
- * so the inferred type is `readonly SlideImageSource[]` — the carousel only ever
- * reads it.
- */
 export const SlideImageVariantsSchema = z.object({
   srcSet: z.string().trim().min(1).optional(),
   sizes: z.string().trim().min(1).optional(),
-  // The publisher's DESIGNATED single-set asset: the one to render when
-  // responsive selection is off (<ResponsiveImages /> not mounted) or
-  // unavailable. A deck built from several sets already has a human who
-  // knows which asset is the canonical stand-alone one — this field records
-  // that decision instead of making the code derive it. Typically
-  // duplicates one of the srcSet/sources candidates — by design.
+  /** The publisher's designated single-set asset (rendered when responsive is off). */
   defaultSrc: z.string().trim().min(1).optional(),
   sources: z.array(SlideImageSourceSchema).readonly().optional(),
 });
 
-/** Source of truth for the `Slide` type (inferred in `types.ts`). */
 export const SlideSchema = z.object({
   id: z.union([z.string(), z.number()]),
   content: ContentSchema,
@@ -77,9 +41,5 @@ export const SlideSchema = z.object({
   image: SlideImageVariantsSchema.optional(),
 });
 
-/**
- * The `slidesData` array — the shape of the `carousel-slides.json` document a
- * host validates before handing the data to the carousel. The single public
- * entry point for validation.
- */
+/** The `slidesData` array — the single public entry point for validation. */
 export const CarouselSlidesDataSchema = z.array(SlideSchema);
