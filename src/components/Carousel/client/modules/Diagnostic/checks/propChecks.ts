@@ -11,11 +11,8 @@ const LAYER = "Props";
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
-/**
- * Audit the public props the user passed in. Each check fires only when the
- * prop was *explicitly* provided (an `undefined` prop is the public-default
- * contract and is not an error).
- */
+// See docs/architecture/diagnostics.md
+/** Audit explicitly-provided public props (an `undefined` prop is the default, not an error). */
 export const collectPropWarnings = (
   props: CarouselDiagnosticContextValue["props"],
 ): CarouselDiagnosticWarning[] => {

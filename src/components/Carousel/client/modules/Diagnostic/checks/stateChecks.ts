@@ -7,11 +7,8 @@ import type { CarouselDiagnosticWarning } from "../types";
 
 const LAYER = "State";
 
-/**
- * Structural state violations are always `CRITICAL`: they describe a state
- * the reducer should physically never produce, and downstream motion, layout,
- * and navigation layers will misbehave on them.
- */
+// See docs/architecture/diagnostics.md
+/** Structural state violations — always CRITICAL (the reducer should never produce them). */
 const issueToWarning = (issue: CarouselStateIssue): CarouselDiagnosticWarning => ({
   severity: "CRITICAL",
   layer: LAYER,

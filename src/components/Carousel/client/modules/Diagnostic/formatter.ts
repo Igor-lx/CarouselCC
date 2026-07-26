@@ -28,12 +28,7 @@ const finishSentence = (message: string) => {
   return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
 };
 
-/**
- * Build the canonical warning line shared by every diagnostic check.
- *
- *   [Carousel Diagnostic][SEVERITY] <Layer> -> <field> has value <actual>.
- *   <expected>. <consequence>. Diagnostics is observe-only.
- */
+/** The canonical warning line: `[Carousel Diagnostic][SEVERITY] Layer -> field ...`. */
 export const formatWarning = (warning: CarouselDiagnosticWarning): string =>
   [
     `[${BANNER}][${warning.severity}] ${warning.layer} -> ${warning.field}`,

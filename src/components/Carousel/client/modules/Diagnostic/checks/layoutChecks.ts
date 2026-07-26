@@ -1,13 +1,11 @@
+// See docs/architecture/diagnostics.md
 import type { CarouselDiagnosticContextValue } from "../../../context";
 import type { CarouselDiagnosticWarning } from "../types";
 
 const LAYOUT_LAYER = "Layout";
 const SLOT_LAYER = "Slots";
 
-/**
- * Slot attachment mismatch (LOGICAL): user asked for a Controls / Pagination
- * module but did not pass the corresponding child.
- */
+/** Slot-attachment mismatches (a module gated on but its child not passed). */
 export const collectSlotWarnings = (
   slots: CarouselDiagnosticContextValue["slots"],
 ): CarouselDiagnosticWarning[] => {
@@ -79,19 +77,13 @@ export const collectSlotWarnings = (
   return out;
 };
 
-/**
- * Layout invariants (LOGICAL): partial page layout without padding, or the
- * deck cannot slide because of slide count vs. visibleSlidesNr.
- */
+/** Layout invariants: over-large visibleSlidesNr, partial pages, cannot-slide. */
 export const collectLayoutWarnings = (
   layout: CarouselDiagnosticContextValue["layout"],
 ): CarouselDiagnosticWarning[] => {
   const out: CarouselDiagnosticWarning[] = [];
 
-  // The visible band cannot exceed the deck: `buildCarouselLayout` coerces a
-  // too-large `visibleSlidesNr` down to the deck length. That coercion is a
-  // correct, load-bearing runtime adaptation (not a repair) — but a silent
-  // one, so surface it: requested N, deck M, used M.
+  // A too-large visibleSlidesNr is coerced to the deck length — correct but silent.
   if (layout.requestedVisibleSlidesCount > layout.rawLength) {
     out.push({
       severity: "LOGICAL",

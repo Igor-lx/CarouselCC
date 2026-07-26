@@ -7,26 +7,23 @@ import {
 import type { PaginationWidgetProps } from "../../Pagination/widget/types";
 import type { CarouselDiagnosticWarning } from "../types";
 
+// See docs/architecture/diagnostics.md
 const LAYER = "PaginationWidget";
 
-// Widget-specific composite: the strip needs a centre dot, hence odd >= 3.
+// The strip needs a centre dot, hence odd >= 3.
 const isOddIntegerAtLeastThree = (value: unknown): value is number =>
   isPositiveInteger(value) && value >= 3 && value % 2 === 1;
 
 const isValidScaleFactor = inRangeExclusiveLower(0, 1);
 
-/** The widget's own tunable props, values widened to `unknown`: Diagnostics
- * audits the RAW values the caller wrote. Keying the shape on
- * `PaginationWidgetProps` (type-only import; erased) means a new widget prop
- * grows a required field here, forcing an explicit audit decision. */
+/** The widget's tunable props widened to `unknown` (audit the RAW caller values);
+ * keyed on `PaginationWidgetProps` so a new prop forces an audit decision. */
 export type WidgetDiagnosticInput = {
   [K in keyof Omit<PaginationWidgetProps, "className">]-?: unknown;
 };
 
 /**
- * Audit PaginationWidget props. Each entry fires when the *resolved* value
- * (default-substituted if `undefined`) is out of its expected domain. The
- * runtime uses the same value either way — Diagnostics only describes it.
+ * Audit PaginationWidget props against their resolved (default-substituted) value.
  */
 export const collectWidgetWarnings = (
   input: WidgetDiagnosticInput,

@@ -1,3 +1,4 @@
+// See docs/architecture/diagnostics.md
 import {
   atLeast,
   greaterThan,
@@ -41,14 +42,10 @@ import {
   AUTOPLAY_RESETTLE_DELAY_MS,
   REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES,
 } from "../../../config";
-// Implementation constants live with their subsystems (see the contract in
-// config/index.ts); Diagnostics still audits them against accidental
-// edits, importing from the homes.
+// Implementation constants imported from their subsystem homes (audited here).
 import { MOTION_EPSILON } from "../../../motion/tolerances";
 import { DRAG_RELEASE_EPSILON } from "../../../domain/dragRelease";
 import { GESTURE_COAST_MAX_MS } from "../../../gesture/coast";
-// The calibration record lives with the computation it anchors, not among
-// the tuning knobs — see gesture/slotAdaptiveSwipe.ts.
 import { SWIPE_REFERENCE_SLOT_PX } from "../../../gesture/slotAdaptiveSwipe";
 import type { CarouselDiagnosticWarning } from "../types";
 
@@ -59,9 +56,7 @@ interface NumericRule {
   expected: string;
   consequence: string;
   severity: CarouselDiagnosticWarning["severity"];
-  /** Shared numeric guard (see `shared/math`) — self-sufficient, implies
-   * finiteness; `checkNumber` keeps its own finite gate only as a safety
-   * net for future hand-written lambdas. */
+  /** Shared numeric guard (see `shared/math`); implies finiteness. */
   predicate: (value: unknown) => boolean;
 }
 
@@ -77,15 +72,8 @@ const checkNumber = (rule: NumericRule): CarouselDiagnosticWarning | null => {
   };
 };
 
-/**
- * Built on demand, NOT at module scope. As a module-level `const` this table
- * was a top-level side effect (a `.map()` plus a predicate-factory call per
- * entry), which the bundler cannot prove pure — so it survived tree-shaking and
- * ran on import in production, where nothing ever reads it. Behind a function
- * the whole table is unreachable once `collectConstantWarnings` is gated out,
- * and the module drops from the production bundle entirely. Called once per
- * mount in development.
- */
+// Built on demand, not at module scope: a module-level const would be an
+// impure top-level side effect that survives tree-shaking into production.
 const buildNumericRules = (): NumericRule[] => [
   // Motion timings / factors
   {
@@ -416,9 +404,6 @@ const buildNumericRules = (): NumericRule[] => [
     field: "CAROUSEL_SWIPE_CONFIG.catchDelayMs",
     value: CAROUSEL_SWIPE_CONFIG.catchDelayMs,
     severity: "LOGICAL",
-    // The OS long-press sits near 500ms: a catch window at or beyond it lets
-    // the context menu open BEFORE the strip is braked, so the menu would
-    // describe a slide that is still riding away.
     expected:
       "Expected 0 <= catchDelayMs < 400ms (well below the OS long-press ~500ms)",
     consequence:
@@ -488,8 +473,6 @@ const buildNumericRules = (): NumericRule[] => [
     consequence: "Quick-flick offset gate is invalid and gesture intent becomes inconsistent",
     predicate: atLeast(0),
   },
-  // Swipe-commit knobs (CAROUSEL_SWIPE_CONFIG.commit) — the carousel-unit
-  // group the slot resolver turns into the engine's minSwipeDistance.
   {
     layer: "Gesture",
     field: "CAROUSEL_SWIPE_CONFIG.commit.slotShare",
@@ -585,13 +568,8 @@ const buildNumericRules = (): NumericRule[] => [
   },
 ];
 
-/**
- * Overallocated accel+decel shares (> 1) are NO LONGER rescued by the runtime:
- * the engine trusts the raw shares (see profile.ts), so the cruise budget goes
- * negative, its zone is dropped, and the ramps over-fill the travel. Detection
- * is pure arithmetic on the carousel's own constants — the check owns it, with
- * no dependency on the engine. Report every pair that over-allocates.
- */
+// Over-allocated accel+decel (> 1) is trusted by the engine, not rescued —
+// report every pair (ADR-002).
 const collectProfileShareRelation = (
   field: string,
   accelerationDistanceShare: number,
@@ -616,8 +594,7 @@ const collectProfileShareRelation = (
 };
 
 const collectReorientVeilRelation = (): CarouselDiagnosticWarning | null => {
-  // The cap must leave room for a full fade OUT and back IN, otherwise the
-  // fail-open lift truncates the mask mid-transition.
+  // The cap must cover a full fade out + in, else the fail-open truncates it.
   const fullRoundTrip =
     SLIDE_REORIENT_VEIL.fadeOutMs + SLIDE_REORIENT_VEIL.fadeInMs;
   if (SLIDE_REORIENT_VEIL.veilMaxMs >= fullRoundTrip) return null;
@@ -638,8 +615,7 @@ const collectReorientVeilRelation = (): CarouselDiagnosticWarning | null => {
 };
 
 const collectRideFloorRelation = (): CarouselDiagnosticWarning | null => {
-  // The floor must stay well under the default step duration, otherwise a
-  // flick stops being faster than an ordinary click step.
+  // The floor must stay under the default step, else a flick isn't faster.
   if (CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs < CAROUSEL_DEFAULTS.durationStep) {
     return null;
   }
@@ -704,11 +680,7 @@ const collectRetryDelayRelation = (): CarouselDiagnosticWarning | null => {
   };
 };
 
-/**
- * The teleport switch is the only boolean knob — a dedicated check, since
- * the numeric rules cannot audit it. Anything but a literal boolean means
- * the gate comparison in resolveGoToPlan silently coerces.
- */
+// The only boolean knob — a dedicated check the numeric rules cannot cover.
 const collectTeleportEnabledType = (): CarouselDiagnosticWarning | null => {
   if (typeof GO_TO_TELEPORT_ENABLED === "boolean") return null;
   return {
@@ -722,23 +694,11 @@ const collectTeleportEnabledType = (): CarouselDiagnosticWarning | null => {
   };
 };
 
-/**
- * Implementation threshold of the CHECK below (not a tuning knob): how much
- * faster than the shared GO_TO cruise the widest still-riding jump may go
- * before Diagnostics calls the transition zone uncomfortable. 2x is where a
- * time-capped ride starts reading as a blur next to a flight.
- */
+/** Warn threshold of the check below (not a tuning knob). */
 const TRANSITION_ZONE_CRUISE_WARN_FACTOR = 2;
 
-/**
- * With the teleport enabled, rides longer than the flight envelope are
- * time-capped to it (see resolveGoToFlightDuration) and cruise FASTER than
- * the shared jump speed. The widest such ride is the one just below the
- * teleport gate; raising GO_TO_TELEPORT_MIN_PAGE_SPAN far above its floor
- * widens that zone until its cruise visibly outruns the nominal jump speed.
- * Distance-proportional estimate in page units (zero start speed, local
- * ramp budgets included) — exact enough for a warning.
- */
+// A too-high teleport gate widens the time-capped transition zone until rides
+// just below it visibly outrun the nominal jump speed (distance estimate).
 const collectTeleportTransitionZoneRelation =
   (): CarouselDiagnosticWarning | null => {
     if (GO_TO_TELEPORT_ENABLED !== true) return null;
@@ -763,14 +723,8 @@ const collectTeleportTransitionZoneRelation =
     };
   };
 
-/**
- * A GO_TO ramp budget is a share of ONE page spent inside a multi-page span, so
- * the flight math works in the ratio `share / span` (timing.ts). That ratio is
- * trusted as authored — no cap — so a share wider than its span makes the local
- * ramp claim more than the whole segment. Legitimate tuning cannot reach it
- * (spans are page counts >= 1, shares are fractions of one page), which is
- * exactly why it is reported instead of silently clamped.
- */
+// A GO_TO ramp share wider than its page span makes the local ramp claim more
+// than the whole segment — trusted, not clamped, so reported.
 const collectGoToRampBudgetRelations = (): CarouselDiagnosticWarning[] => {
   const out: CarouselDiagnosticWarning[] = [];
 
@@ -813,10 +767,7 @@ const collectGoToRampBudgetRelations = (): CarouselDiagnosticWarning[] => {
   return out;
 };
 
-/**
- * Audit every hand-written carousel constant used at runtime. The constants
- * are imported by value so the checks always see what the runtime sees.
- */
+/** Audit every hand-written runtime constant (imported by value). */
 export const collectConstantWarnings = (): CarouselDiagnosticWarning[] => {
   const out: CarouselDiagnosticWarning[] = [];
   for (const rule of buildNumericRules()) {

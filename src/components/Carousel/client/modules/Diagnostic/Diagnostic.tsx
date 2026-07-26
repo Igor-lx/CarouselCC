@@ -15,9 +15,9 @@ import {
 import type { CarouselDiagnosticWarning } from "./types";
 import { useGroupedWarnings } from "./useGroupedWarnings";
 
-/** Build-time constant: the whole diagnostic layer is a development tool.
- * Substituted by the bundler, so every branch guarded by it — and every
- * `collect*` import behind that branch — leaves the production bundle. */
+// See docs/architecture/diagnostics.md
+// Build-time constant, so every IS_DEV branch (and its collect* imports) drops
+// from the production bundle.
 const IS_DEV = import.meta.env.DEV;
 
 /** One frozen empty result, shared by every gated-off collection. */
@@ -35,8 +35,7 @@ const DiagnosticBase = memo(function CarouselDiagnostic() {
     console.info(BANNER);
   }, []);
 
-  // Stylesheet-dependent audit runs AFTER mount: the scan needs the module
-  // styles attached to the document, which render time cannot guarantee.
+  // Stylesheet audit runs AFTER mount (styles must be attached).
   const [cssWarnings, setCssWarnings] = useState<CarouselDiagnosticWarning[]>(
     []
   );
@@ -48,20 +47,8 @@ const DiagnosticBase = memo(function CarouselDiagnostic() {
     return () => cancelAnimationFrame(frame);
   }, []);
 
-  // Split by what each group actually depends on. The carousel state changes
-  // on every dispatch — twice per ride, in the frames where the animation
-  // starts and settles — and the constant/axis audits do not depend on it at
-  // all: recomputing ~60 numeric rules and a `matchMedia` call per canonical
-  // condition there was pure work in the worst possible frame.
-  //
-  // Every collection is additionally gated on IS_DEV. Reporting was already
-  // dev-only (`useGroupedWarnings`), but the collecting was not: a production
-  // build still re-validated the whole state on every dispatch and threw the
-  // result away. Measured on the two frames that matter — the click frame and
-  // the settle window are the ONLY frames the carousel spends main-thread time
-  // in, so anything discarded there is the cheapest possible win. `IS_DEV` is
-  // substituted at build time, so the branches (and with them every `collect*`
-  // import) drop out of the production bundle entirely.
+  // Each group is memoised on only what it depends on, and gated on IS_DEV so
+  // no collection runs (or ships) in production.
   const constantWarnings = useMemo(
     () =>
       IS_DEV

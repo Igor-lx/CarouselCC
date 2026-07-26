@@ -7,33 +7,11 @@ import {
 import type { CarouselSlideMediaView } from "../../../context";
 import type { CarouselDiagnosticWarning } from "../types";
 
-/**
- * Viewport-axes audit (config/viewport.ts). The axes table is the single
- * source for breakpoint NAMES and NUMBERS; these checks verify every leg
- * that derives from it at runtime:
- *  - the numbers themselves (finite, non-negative, unique — NO ordering or
- *    naming semantics: names are custom by design and resolution is purely
- *    numeric, so declaration order cannot shadow anything);
- *  - the canonical media strings parse in THIS browser (`matchMedia` reports
- *    an unparseable query as `"not all"` — the real parser, not a regex);
- *  - the LIVE slide data: every `<source media>` the host actually fed the
- *    carousel uses a canonical string (unlike the CI sync test, this covers
- *    arbitrary hosts and hand-written data);
- *  - the stylesheets: every `[data-breakpoint="…"]` /
- *    `[data-orientation="…"]` selector references a REAL state name — a typo
- *    there is a silently dead style block. Cross-origin sheets cannot be
- *    read (the browser throws on `cssRules`) and are skipped; the
- *    component's own module styles are always same-origin.
- */
+// Viewport-axes audit (config/viewport.ts): breakpoint numbers, canonical media
+// parseability, live slide <source media>, and CSS state names.
+// See docs/architecture/diagnostics.md
 
-/**
- * These lookup sets are built on demand, NOT at module scope. As module-level
- * consts each `new Set(...)` was a top-level side effect the bundler cannot
- * prove pure, so they survived tree-shaking and ran on import in production —
- * where no diagnostic ever reads them. Behind functions they are unreachable
- * once the collectors are gated out. Each collector runs at most once per
- * mount, so rebuilding the sets there costs nothing.
- */
+// Lookup sets built on demand (a module-level const would survive tree-shaking).
 const canonicalMediaSet = () => new Set<string>(SLIDE_CANONICAL_SOURCE_MEDIA);
 const breakpointNameSet = () =>
   new Set<string>(Object.keys(SLIDE_VIEWPORT_BREAKPOINTS));
@@ -162,14 +140,7 @@ const walkRules = (
   }
 };
 
-/**
- * Stylesheet scan — call AFTER mount (styles must be attached). Verifies the
- * two directions of the names contract:
- *  1. every state name referenced in CSS exists in the axes (a typo is a
- *     silently dead block) — firm warning;
- *  2. a declared breakpoint tier never referenced in CSS — soft note, since
- *     a state may deliberately ride on the base variables.
- */
+// Stylesheet scan (call AFTER mount): CSS state names ↔ axes, both directions.
 export const collectViewportCssWarnings = (): CarouselDiagnosticWarning[] => {
   if (typeof document === "undefined") return [];
   const breakpointNames = breakpointNameSet();
@@ -187,10 +158,7 @@ export const collectViewportCssWarnings = (): CarouselDiagnosticWarning[] => {
       continue; // cross-origin sheet — unreadable by design, skip
     }
     walkRules(rules, (selector) => {
-      // Flags surface as `data-<flag>` attributes (the flag name IS the
-      // attribute), so unlike data-breakpoint/orientation there is no fixed
-      // anchor to typo-detect against — a typo'd `data-<flag>` is instead
-      // caught indirectly by the "declared but unreferenced" note below.
+      // Flags have no fixed anchor to typo-check; caught by the unreferenced note below.
       for (const flag of flagNames) {
         if (selector.includes(`[data-${flag}=`)) referencedFlags.add(flag);
       }
@@ -224,8 +192,7 @@ export const collectViewportCssWarnings = (): CarouselDiagnosticWarning[] => {
     });
   }
 
-  // A typo'd base-tier designation would suppress the wrong tier below AND
-  // silently exempt nothing real — flag it first so the exemption is trusted.
+  // Flag a bad base-tier name first, so the exemption below is trusted.
   if (!breakpointNames.has(SLIDE_VIEWPORT_BASE_BREAKPOINT)) {
     out.push({
       severity: "LOGICAL",
@@ -239,10 +206,7 @@ export const collectViewportCssWarnings = (): CarouselDiagnosticWarning[] => {
   }
 
   for (const name of breakpointNames) {
-    // The BASE tier is styled by the plain `.outerContainer` rule, not by an
-    // attribute block, so it is EXPECTED to have no `[data-breakpoint="…"]`
-    // selector — that is the design, not a forgotten block. Every OTHER tier
-    // that styles nothing is still worth a question.
+    // The base tier is styled by the plain rule, so no attribute block is expected.
     if (name === SLIDE_VIEWPORT_BASE_BREAKPOINT) continue;
     if (!referencedBreakpoints.has(name)) {
       out.push({
