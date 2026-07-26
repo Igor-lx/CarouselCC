@@ -66,6 +66,24 @@ carousel-specific adapter:
    ([`domain/dragRelease.ts`](../../domain/dragRelease.ts)) and dispatches
    `END_DRAG` with the resolved target, both release velocities and `releasedAt`.
 
+## Directionless release: hold vs scroll
+
+A directionless END of an owned in-flight grab is ambiguous, and the adapter
+splits it two ways:
+
+- **A deliberate hold** (a lift, or the long-press context menu opening) settles
+  onto the PRESSED slide — the one the eye and the menu are looking at. The
+  `contextmenu` event fires on the host right as the menu opens, before the
+  pointer is cancelled, so a per-gesture flag records it.
+- **A page scroll that crossed the strip** (the engine saw vertical intent, or
+  the browser stole the pointer with no menu open) is a false-positive catch, so
+  the adapter RESUMES the interrupted ride to its own destination instead of
+  re-routing it onto the pressed page.
+
+The pressed page is found once, at press: press-X → slot lane under the finger →
+its page (one rect read). Unmeasurable falls back to the anchor — the interrupted
+ride's destination.
+
 ## Coasted launch (the commit gap)
 
 A click retarget is carried through the commit by the previous WAAPI animation,
