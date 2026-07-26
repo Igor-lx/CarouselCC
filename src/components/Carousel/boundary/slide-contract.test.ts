@@ -1,20 +1,9 @@
+// See ./README.md
 import { describe, expect, it } from "vitest";
 
 import type { Slide } from "../client/public-api/types";
 import type { GeneratedSlide } from "../data-gen/types";
 
-/**
- * Contract test — locks the seam between the two halves: the slide the
- * `data-gen/` kit EMITS must be a valid component `Slide`. The two types are
- * deliberately defined independently (so the halves stay decoupled), so this is
- * the one place that asserts they stay compatible.
- *
- * The guarantee is at compile time: the `const asSlide: Slide = generated`
- * assignment below fails `tsc` if `GeneratedSlide` ever drifts out of `Slide`
- * (a renamed field, a widened type). Lives in the box's `boundary/` folder
- * (neutral ground, above both halves), so importing both halves' types does not
- * cross the runtime boundary.
- */
 describe("Slide contract (data-gen → client)", () => {
   it("a generated slide is assignable to the component Slide", () => {
     const generated: GeneratedSlide = {
