@@ -1,4 +1,3 @@
-// See ./README.md — values live in ./constants.ts; this file is types only.
 import type { THEME_MODES, ON_SCREEN_MODES } from "./constants";
 
 export type ThemeMode = (typeof THEME_MODES)[keyof typeof THEME_MODES];

@@ -17,11 +17,19 @@ pre-paint window on a cold mobile load.
 
 On every change the provider updates three surfaces:
 
-- `document.documentElement` gets `data-theme="light|dark"` — the stylesheet keys
-  off it (`:root[data-theme="dark"]` … in `globals.scss`).
-- the inline `<html>` background-color (mobile chrome samples it — see the boot
-  contract below).
-- the `theme-color` meta tags (the browser bar tint).
+- **`data-theme` on `<html>`** (`"light" | "dark"`) — the stylesheet keys off it
+  (`:root[data-theme="dark"]` … in `globals.scss`).
+- **The inline `<html>` background-color.** This looks redundant with the
+  stylesheet but is NOT: mobile browser chrome (the bottom bar, overscroll areas)
+  samples the `<html>` background, and the inline value — first set pre-paint by
+  the boot script (see below) — outranks the stylesheet. The provider re-sets it
+  on every toggle so the chrome follows. **Removing this line reintroduces white
+  bars on theme change** on mobile.
+- **The `theme-color` meta tags** (the browser bar tint). Two media-paired metas
+  live in `index.html`. In **auto** mode each keeps its own scheme's color, so the
+  browser switches the bar with the OS on its own; an **explicit** choice
+  overrides both metas to the chosen color. If the host has no such meta (didn't
+  add the boot snippet), the provider creates one.
 
 ## Usage
 

@@ -1,4 +1,3 @@
-// See ./README.md
 import { useEffect, useState, type ReactNode } from "react";
 
 import { ThemeContext } from "./ThemeContext";
@@ -10,7 +9,6 @@ import {
 } from "./constants";
 import type { OnScreenThemeMode, ThemeMode } from "./types";
 
-/** Untrusted storage: anything but an explicit known mode resolves to AUTO. */
 const asThemeMode = (raw: string | null): ThemeMode =>
   raw === THEME_MODES.LIGHT ||
   raw === THEME_MODES.DARK ||
@@ -40,8 +38,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
       setOnScreenTheme(next);
       document.documentElement.setAttribute("data-theme", next);
-      // Keep the boot script's inline <html> background in sync — mobile chrome
-      // samples it and the inline value outranks the stylesheet (see README).
+      // Do NOT drop: mobile chrome samples the inline <html> bg (outranks the stylesheet).
       document.documentElement.style.backgroundColor =
         BROWSER_THEME_COLORS[next];
       localStorage.setItem(THEME_STORAGE_KEY, theme);
@@ -55,8 +52,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [theme]);
 
   useEffect(() => {
-    // theme-color metas: in auto mode each keeps its own scheme's color (the
-    // browser switches with the OS); an explicit choice overrides both.
     const metas = document.querySelectorAll<HTMLMetaElement>(
       'meta[name="theme-color"]',
     );
