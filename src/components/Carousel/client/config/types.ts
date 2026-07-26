@@ -3,6 +3,24 @@ import type {
   PointerSwipeConfig,
 } from "../../../../shared";
 
+export interface ReorientVeilTiming {
+  /** Veil fade-out on rotation; needs extra time (starts mid-rotation). */
+  fadeOutMs: number;
+  /** Veil fade-in; also times the slow-load reveal. */
+  fadeInMs: number;
+  /** Fail-open cap — past it the veil lifts (must cover a full fade out + in). */
+  veilMaxMs: number;
+}
+
+export interface ImageRetryPolicy {
+  /** First backoff delay for a failed slide image. */
+  baseDelayMs: number;
+  /** Backoff ceiling (must be >= base). */
+  maxDelayMs: number;
+  /** Attempts before the slide gives up. */
+  maxAttempts: number;
+}
+
 export interface CarouselInertialReleaseConfig extends InertialReleaseConfig {
   /** Release-ride ramp-up share. */
   accelerationDistanceShare: number;

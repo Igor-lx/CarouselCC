@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SLIDE_REORIENT_FADE_IN_MS, SLIDE_REORIENT_FADE_OUT_MS } from "../config";
+import { SLIDE_REORIENT_VEIL } from "../config";
 import { SLIDE_CLASS_KEYS } from "../public-api/types";
 import { buildRootCssVars, buildSlideCssVars } from "./cssVars";
 import { buildFlagAttributes, buildSlideClassMap } from "./domPayload";
@@ -22,10 +22,10 @@ describe("buildRootCssVars", () => {
   it("formats the config timings as CSS time tokens", () => {
     const vars = buildRootCssVars(3);
     expect(vars["--slide-reorient-fade-out"]).toBe(
-      `${SLIDE_REORIENT_FADE_OUT_MS}ms`,
+      `${SLIDE_REORIENT_VEIL.fadeOutMs}ms`,
     );
     expect(vars["--slide-reorient-fade-in"]).toBe(
-      `${SLIDE_REORIENT_FADE_IN_MS}ms`,
+      `${SLIDE_REORIENT_VEIL.fadeInMs}ms`,
     );
   });
 

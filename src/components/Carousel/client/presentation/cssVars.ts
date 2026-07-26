@@ -1,9 +1,6 @@
 import type { CSSProperties } from "react";
 
-import {
-  SLIDE_REORIENT_FADE_IN_MS,
-  SLIDE_REORIENT_FADE_OUT_MS,
-} from "../config";
+import { SLIDE_REORIENT_VEIL } from "../config";
 import { slideLane } from "../domain";
 
 /**
@@ -41,8 +38,8 @@ const ms = (value: number): string => `${value}ms`;
 export const buildRootCssVars = (
   visibleSlidesCount: number,
 ): CarouselRootCssVars => ({
-  "--slide-reorient-fade-out": ms(SLIDE_REORIENT_FADE_OUT_MS),
-  "--slide-reorient-fade-in": ms(SLIDE_REORIENT_FADE_IN_MS),
+  "--slide-reorient-fade-out": ms(SLIDE_REORIENT_VEIL.fadeOutMs),
+  "--slide-reorient-fade-in": ms(SLIDE_REORIENT_VEIL.fadeInMs),
   "--visible-slides": visibleSlidesCount,
 });
 

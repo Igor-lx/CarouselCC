@@ -1,8 +1,4 @@
-import {
-  IMAGE_RETRY_BASE_DELAY_MS,
-  IMAGE_RETRY_MAX_ATTEMPTS,
-  IMAGE_RETRY_MAX_DELAY_MS,
-} from "../../config";
+import { IMAGE_RETRY } from "../../config";
 import type {
   ImageResourceSnapshot,
   ImageResourceStore,
@@ -133,11 +129,11 @@ export function createImageResourceStore(): ImageResourceStore {
       const entry = entries.get(url);
       if (!entry || entry.status !== "error") return;
       if (entry.retryTimer !== null) return; // a retry is already scheduled
-      if (entry.failureCount >= IMAGE_RETRY_MAX_ATTEMPTS) return; // gave up
+      if (entry.failureCount >= IMAGE_RETRY.maxAttempts) return; // gave up
 
       const delay = Math.min(
-        IMAGE_RETRY_MAX_DELAY_MS,
-        IMAGE_RETRY_BASE_DELAY_MS * 2 ** (entry.failureCount - 1),
+        IMAGE_RETRY.maxDelayMs,
+        IMAGE_RETRY.baseDelayMs * 2 ** (entry.failureCount - 1),
       );
 
       entry.retryTimer = window.setTimeout(() => {

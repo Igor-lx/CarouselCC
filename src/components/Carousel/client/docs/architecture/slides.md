@@ -91,7 +91,7 @@ painting the OLD bitmap (a zoomed centre under `object-fit: cover`) until the ne
 crop decodes. When the orientation condition flips while a bitmap is on screen
 the image is veiled (CSS fade via `data-reorienting`) and unveiled the moment the
 new bitmap is decodable (`img.decode()`, self-regulating: instant on cache, held
-as long as needed on a slow device; `SLIDE_REORIENT_VEIL_MAX_MS` is the
+as long as needed on a slow device; `SLIDE_REORIENT_VEIL.veilMaxMs` is the
 fail-open cap). This is deliberately a VIEW concern (paint masking on a healthy
 resource), not an image-resource-store concern (URL load/error lifecycle).
 

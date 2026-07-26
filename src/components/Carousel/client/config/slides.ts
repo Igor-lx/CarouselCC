@@ -1,9 +1,17 @@
 // Slide-layer image tuning. See docs/config/slides.md for what each governs.
 
-export const SLIDE_REORIENT_FADE_OUT_MS = 650;
-export const SLIDE_REORIENT_FADE_IN_MS = 550;
-export const SLIDE_REORIENT_VEIL_MAX_MS = 2250;
+import type { ImageRetryPolicy, ReorientVeilTiming } from "./types";
 
-export const IMAGE_RETRY_BASE_DELAY_MS = 400;
-export const IMAGE_RETRY_MAX_DELAY_MS = 8000;
-export const IMAGE_RETRY_MAX_ATTEMPTS = 5;
+/** Orientation-swap veil timing (ms). */
+export const SLIDE_REORIENT_VEIL = {
+  fadeOutMs: 650,
+  fadeInMs: 550,
+  veilMaxMs: 2250,
+} satisfies ReorientVeilTiming;
+
+/** Failed-image retry policy (ms / attempts). */
+export const IMAGE_RETRY = {
+  baseDelayMs: 400,
+  maxDelayMs: 8000,
+  maxAttempts: 5,
+} satisfies ImageRetryPolicy;

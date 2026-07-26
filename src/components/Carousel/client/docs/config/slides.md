@@ -1,32 +1,32 @@
 # config/slides.ts — slide-layer image tuning
 
-Image and reorientation tuning for the slide layer. (Art-direction axes live in
-`config/viewport.ts` — see [viewport.md](./viewport.md).)
+Image and reorientation tuning for the slide layer, grouped into two typed
+objects. (Art-direction axes live in `config/viewport.ts` — see
+[viewport.md](./viewport.md).)
 
-## Orientation-swap veil
+## `SLIDE_REORIENT_VEIL` — orientation-swap veil timing
 
 Masks the stale-crop repaint on device rotation (see
-[../architecture/slides.md](../architecture/slides.md)). Fade-out and fade-in are
-separate knobs on purpose — the two directions read differently.
+[../architecture/slides.md](../architecture/slides.md)). Fade-out and fade-in
+are separate on purpose — the two directions read differently.
 
-- **`SLIDE_REORIENT_FADE_OUT_MS`** — veil fade-out. Starts mid-rotation (the OS
-  flips orientation part-way through the tilt, so part of it hides inside the
-  system rotation animation) and its frames are dropped by the relayout;
-  disappearance also reads as instant while appearance reads as a process — so
-  the fade-out needs extra time to stay perceptible.
-- **`SLIDE_REORIENT_FADE_IN_MS`** — veil fade-in; runs on a calm settled screen,
-  so it needs less. Also times the slow-load reveal (a still-loading image held
-  invisible, then faded in) — the same perceptual act, deliberately one knob.
-- **`SLIDE_REORIENT_VEIL_MAX_MS`** — fail-open cap: past it, showing the old crop
-  beats hiding the image, so the veil lifts. Must cover a full fade out + in
-  (diagnosed).
+- **`fadeOutMs`** — veil fade-out. Starts mid-rotation (the OS flips orientation
+  part-way through the tilt, so part of it hides inside the system rotation
+  animation) and its frames are dropped by the relayout; disappearance also
+  reads as instant while appearance reads as a process — so the fade-out needs
+  extra time to stay perceptible.
+- **`fadeInMs`** — veil fade-in; runs on a calm settled screen, so it needs
+  less. Also times the slow-load reveal (a still-loading image held invisible,
+  then faded in) — the same perceptual act, deliberately one knob.
+- **`veilMaxMs`** — fail-open cap: past it, showing the old crop beats hiding the
+  image, so the veil lifts. Must cover a full fade out + in (diagnosed).
 
-## Image retry
+## `IMAGE_RETRY` — failed-image retry policy
 
 A failed slide image retries while the slide sits in the active band, on
-exponential backoff (`BASE * 2^(failures - 1)`, clamped to `MAX`), and is given
-up after `MAX_ATTEMPTS`.
+exponential backoff (`baseDelayMs * 2^(failures - 1)`, clamped to `maxDelayMs`),
+and is given up after `maxAttempts`.
 
-- **`IMAGE_RETRY_BASE_DELAY_MS`** — first backoff delay.
-- **`IMAGE_RETRY_MAX_DELAY_MS`** — backoff ceiling (must be ≥ base, diagnosed).
-- **`IMAGE_RETRY_MAX_ATTEMPTS`** — attempts before the slide gives up.
+- **`baseDelayMs`** — first backoff delay.
+- **`maxDelayMs`** — backoff ceiling (must be ≥ base, diagnosed).
+- **`maxAttempts`** — attempts before the slide gives up.

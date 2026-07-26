@@ -1,10 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  IMAGE_RETRY_BASE_DELAY_MS,
-  IMAGE_RETRY_MAX_ATTEMPTS,
-} from "../../config";
+import { IMAGE_RETRY } from "../../config";
 import { createImageResourceStore } from "./createImageResourceStore";
 import type { ImageResourceStore } from "./types";
 
@@ -66,7 +63,7 @@ describe("render-status SSOT", () => {
     store.reportLoaded("u"); // a later retry succeeded
     store.reportError("u"); // a fresh failure starts backoff from scratch
     store.requestRetry("u");
-    vi.advanceTimersByTime(IMAGE_RETRY_BASE_DELAY_MS);
+    vi.advanceTimersByTime(IMAGE_RETRY.baseDelayMs);
     expect(store.getSnapshot("u").status).toBe("loading");
   });
 });
@@ -82,7 +79,7 @@ describe("retry policy", () => {
     expect(before.status).toBe("error");
 
     store.requestRetry("u");
-    vi.advanceTimersByTime(IMAGE_RETRY_BASE_DELAY_MS);
+    vi.advanceTimersByTime(IMAGE_RETRY.baseDelayMs);
 
     const after = store.getSnapshot("u");
     expect(after.status).toBe("loading");
@@ -104,13 +101,13 @@ describe("retry policy", () => {
 
     store.requestRetry("u");
     store.requestRetry("u");
-    vi.advanceTimersByTime(IMAGE_RETRY_BASE_DELAY_MS);
+    vi.advanceTimersByTime(IMAGE_RETRY.baseDelayMs);
 
     expect(listener).toHaveBeenCalledTimes(1); // one loading frame, not two
   });
 
   it("gives up after the capped number of attempts", () => {
-    for (let i = 0; i < IMAGE_RETRY_MAX_ATTEMPTS; i += 1) {
+    for (let i = 0; i < IMAGE_RETRY.maxAttempts; i += 1) {
       store.reportError("u");
     }
     store.requestRetry("u");
@@ -151,7 +148,7 @@ describe("soft lifecycle / reuse after dispose", () => {
     store.dispose();
     store.reportError("u");
     store.requestRetry("u");
-    vi.advanceTimersByTime(IMAGE_RETRY_BASE_DELAY_MS);
+    vi.advanceTimersByTime(IMAGE_RETRY.baseDelayMs);
     expect(store.getSnapshot("u").status).toBe("loading");
   });
 

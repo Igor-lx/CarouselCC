@@ -25,12 +25,8 @@ import {
   GO_TO_TELEPORT_ENABLED,
   GO_TO_TELEPORT_MIN_PAGE_SPAN,
   HOVER_PAUSE_DELAY,
-  IMAGE_RETRY_BASE_DELAY_MS,
-  IMAGE_RETRY_MAX_ATTEMPTS,
-  IMAGE_RETRY_MAX_DELAY_MS,
-  SLIDE_REORIENT_FADE_IN_MS,
-  SLIDE_REORIENT_FADE_OUT_MS,
-  SLIDE_REORIENT_VEIL_MAX_MS,
+  IMAGE_RETRY,
+  SLIDE_REORIENT_VEIL,
 
   REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
   REPEATED_CLICK_DECELERATION_DISTANCE_SHARE,
@@ -273,8 +269,8 @@ const buildNumericRules = (): NumericRule[] => [
   },
   {
     layer: "Slides",
-    field: "IMAGE_RETRY_BASE_DELAY_MS",
-    value: IMAGE_RETRY_BASE_DELAY_MS,
+    field: "IMAGE_RETRY.baseDelayMs",
+    value: IMAGE_RETRY.baseDelayMs,
     severity: "LOGICAL",
     expected: "Expected a positive finite number of milliseconds",
     consequence: "Retry backoff starts from an invalid delay",
@@ -282,8 +278,8 @@ const buildNumericRules = (): NumericRule[] => [
   },
   {
     layer: "Slides",
-    field: "IMAGE_RETRY_MAX_DELAY_MS",
-    value: IMAGE_RETRY_MAX_DELAY_MS,
+    field: "IMAGE_RETRY.maxDelayMs",
+    value: IMAGE_RETRY.maxDelayMs,
     severity: "LOGICAL",
     expected: "Expected a positive finite number of milliseconds",
     consequence: "Retry backoff clamps to an invalid delay",
@@ -291,8 +287,8 @@ const buildNumericRules = (): NumericRule[] => [
   },
   {
     layer: "Slides",
-    field: "IMAGE_RETRY_MAX_ATTEMPTS",
-    value: IMAGE_RETRY_MAX_ATTEMPTS,
+    field: "IMAGE_RETRY.maxAttempts",
+    value: IMAGE_RETRY.maxAttempts,
     severity: "LOGICAL",
     expected: "Expected a positive finite integer",
     consequence: "Image retry cap becomes incoherent",
@@ -300,8 +296,8 @@ const buildNumericRules = (): NumericRule[] => [
   },
   {
     layer: "Slides",
-    field: "SLIDE_REORIENT_FADE_OUT_MS",
-    value: SLIDE_REORIENT_FADE_OUT_MS,
+    field: "SLIDE_REORIENT_VEIL.fadeOutMs",
+    value: SLIDE_REORIENT_VEIL.fadeOutMs,
     severity: "LOGICAL",
     expected: "Expected a positive finite number of milliseconds",
     consequence: "Orientation-swap fade-out collapses to an instant blink or a negative transition",
@@ -309,8 +305,8 @@ const buildNumericRules = (): NumericRule[] => [
   },
   {
     layer: "Slides",
-    field: "SLIDE_REORIENT_FADE_IN_MS",
-    value: SLIDE_REORIENT_FADE_IN_MS,
+    field: "SLIDE_REORIENT_VEIL.fadeInMs",
+    value: SLIDE_REORIENT_VEIL.fadeInMs,
     severity: "LOGICAL",
     expected: "Expected a positive finite number of milliseconds",
     consequence: "Orientation-swap fade-in collapses to an instant blink or a negative transition",
@@ -318,8 +314,8 @@ const buildNumericRules = (): NumericRule[] => [
   },
   {
     layer: "Slides",
-    field: "SLIDE_REORIENT_VEIL_MAX_MS",
-    value: SLIDE_REORIENT_VEIL_MAX_MS,
+    field: "SLIDE_REORIENT_VEIL.veilMaxMs",
+    value: SLIDE_REORIENT_VEIL.veilMaxMs,
     severity: "LOGICAL",
     expected: "Expected a positive finite number of milliseconds",
     consequence:
@@ -622,16 +618,17 @@ const collectProfileShareRelation = (
 const collectReorientVeilRelation = (): CarouselDiagnosticWarning | null => {
   // The cap must leave room for a full fade OUT and back IN, otherwise the
   // fail-open lift truncates the mask mid-transition.
-  const fullRoundTrip = SLIDE_REORIENT_FADE_OUT_MS + SLIDE_REORIENT_FADE_IN_MS;
-  if (SLIDE_REORIENT_VEIL_MAX_MS >= fullRoundTrip) return null;
+  const fullRoundTrip =
+    SLIDE_REORIENT_VEIL.fadeOutMs + SLIDE_REORIENT_VEIL.fadeInMs;
+  if (SLIDE_REORIENT_VEIL.veilMaxMs >= fullRoundTrip) return null;
   return {
     severity: "LOGICAL",
     layer: "Slides",
-    field: "SLIDE_REORIENT_VEIL_MAX_MS >= SLIDE_REORIENT_FADE_OUT_MS + SLIDE_REORIENT_FADE_IN_MS",
+    field: "SLIDE_REORIENT_VEIL.veilMaxMs >= .fadeOutMs + .fadeInMs",
     actual: {
-      fadeOutMs: SLIDE_REORIENT_FADE_OUT_MS,
-      fadeInMs: SLIDE_REORIENT_FADE_IN_MS,
-      veilMaxMs: SLIDE_REORIENT_VEIL_MAX_MS,
+      fadeOutMs: SLIDE_REORIENT_VEIL.fadeOutMs,
+      fadeInMs: SLIDE_REORIENT_VEIL.fadeInMs,
+      veilMaxMs: SLIDE_REORIENT_VEIL.veilMaxMs,
     },
     expected:
       "Expected the fail-open cap to cover a full fade out plus fade in",
@@ -693,14 +690,14 @@ const collectSwipeCommitRelations = (): CarouselDiagnosticWarning[] => {
 };
 
 const collectRetryDelayRelation = (): CarouselDiagnosticWarning | null => {
-  if (IMAGE_RETRY_MAX_DELAY_MS >= IMAGE_RETRY_BASE_DELAY_MS) return null;
+  if (IMAGE_RETRY.maxDelayMs >= IMAGE_RETRY.baseDelayMs) return null;
   return {
     severity: "LOGICAL",
     layer: "Slides",
-    field: "IMAGE_RETRY_MAX_DELAY_MS >= IMAGE_RETRY_BASE_DELAY_MS",
+    field: "IMAGE_RETRY.maxDelayMs >= .baseDelayMs",
     actual: {
-      baseDelayMs: IMAGE_RETRY_BASE_DELAY_MS,
-      maxDelayMs: IMAGE_RETRY_MAX_DELAY_MS,
+      baseDelayMs: IMAGE_RETRY.baseDelayMs,
+      maxDelayMs: IMAGE_RETRY.maxDelayMs,
     },
     expected: "Expected max retry delay to be greater than or equal to the base delay",
     consequence: "Exponential backoff clamps below its own starting delay",

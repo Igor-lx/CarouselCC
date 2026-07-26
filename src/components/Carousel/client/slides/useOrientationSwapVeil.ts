@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
-import { SLIDE_REORIENT_VEIL_MAX_MS } from "../config";
+import { SLIDE_REORIENT_VEIL } from "../config";
 import { useSlideViewport } from "../viewport/useSlideViewport";
 
 /**
@@ -63,7 +63,7 @@ export function useOrientationSwapVeil({
     setIsVeiled(true);
     // Fail-open: past the cap, the old crop (honest, if zoomed) beats a
     // hidden image — lift the veil and let the swap finish in the open.
-    const failOpen = window.setTimeout(clear, SLIDE_REORIENT_VEIL_MAX_MS);
+    const failOpen = window.setTimeout(clear, SLIDE_REORIENT_VEIL.veilMaxMs);
     const frame = requestAnimationFrame(() => {
       const element = imgRef.current;
       if (!element) {
