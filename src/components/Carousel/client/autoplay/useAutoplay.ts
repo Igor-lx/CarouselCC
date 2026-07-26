@@ -6,12 +6,10 @@ interface UseAutoplayInput {
   isAtEnd: boolean;
   intervalMs: number;
   /**
-   * Poll-time tick gate, checked when the timer FIRES — deliberately a getter
-   * and not a reactive flag: its sources (touch anywhere on the glass, scroll
-   * and browser-chrome activity) change at input frequency, and flipping
-   * React state on a touchstart re-rendered the whole deck at the exact
-   * moment a finger landed, visibly hitching an in-flight ride. A deferred
-   * tick re-arms a full interval — the same resume feel as every other pause.
+   * Poll-time tick gate, checked when the timer FIRES — a getter, not a reactive
+   * flag: its sources change at input frequency, and flipping React state on a
+   * touchstart re-renders the deck mid-ride. A deferred tick re-arms a full
+   * interval, the same resume feel as any other pause.
    */
   shouldDeferTick?: () => boolean;
   hoverPauseDelayMs: number;

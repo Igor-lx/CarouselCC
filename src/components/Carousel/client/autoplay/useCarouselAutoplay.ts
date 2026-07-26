@@ -21,22 +21,14 @@ interface UseCarouselAutoplayInput {
 }
 
 /**
- * The carousel-specific autoplay adapter over the `useAutoplay` timer loop —
- * the same SHAPE as `useCarouselGesture` over `usePointerSwipe`, but a
- * different TIER: the pointer-swipe primitive is a reusable engine in
- * `shared`, while both autoplay halves live inside the component on purpose
- * (an internal redistribution for clarity; nothing outside the carousel needs
- * an autoplay loop). Owns everything the loop needs:
- * - viewport visibility (IntersectionObserver + tab visibility) — consumed by
- *   autoplay alone, so the subscription lives here, not in the root;
- * - the pause rule (off-screen, dragging, already moving, or the glass /
- *   viewport unsettled — see useViewportBusy: an autoplay tick fired into the
- *   browser-chrome settle window lands on a display compositor that is busy
- *   aggregating two live surfaces, and on weak GPUs the ride's first frames
- *   miss the presentation latch and visibly bounce);
- * - referentially stable step handlers (they sit in the deps of the interval
- *   effect — a fresh identity per render would restart the timer, measuring
- *   the interval from the last render instead of the last tick).
+ * The carousel-specific adapter over the `useAutoplay` timer loop. Owns what the
+ * loop needs:
+ * - viewport visibility (IntersectionObserver + tab visibility);
+ * - the pause rule (off-screen, dragging, moving, or the viewport unsettled —
+ *   a tick fired into the settle window can miss the presentation latch and
+ *   bounce on weak GPUs, see useViewportBusy);
+ * - referentially stable step handlers — a fresh identity per render would
+ *   restart the timer, measuring the interval from the render, not the tick.
  */
 export function useCarouselAutoplay({
   state,
@@ -63,9 +55,9 @@ export function useCarouselAutoplay({
 
   const { isDragging, isMoving } = motionStatus(state.motionPhase);
 
-  // A finger anywhere on the glass (not just on the carousel), an ongoing
-  // scroll/fling, or the browser chrome settling: no NEW rides until quiet.
-  // A GETTER, checked when a tick fires — never a render trigger.
+  // A finger anywhere on the glass, an ongoing scroll/fling, or the chrome
+  // settling: no NEW rides until quiet. A getter checked on tick, not a render
+  // trigger.
   const getIsViewportBusy = useViewportBusy({
     enabled: isAutoplayOn && state.layout.canSlide,
     quietDelayMs: config.interaction.autoplayResettleDelayMs,
