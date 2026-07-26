@@ -14,38 +14,13 @@ const scheduleIdle = (work: () => void): (() => void) => {
 };
 
 /**
- * The responsive-image module — a HEADLESS slot (renders nothing). Its
- * PRESENCE switches the carousel's responsive stack on (art-directed
- * `<source>`s, `srcSet`/`sizes`, the rotation veil, the portrait aspect flip
- * — see `resolveRenderedImageSrc` and the root's `data-responsive-images`);
- * its BODY is the predecode manager.
- *
- * THERE IS NO PRELOAD HERE, deliberately. The render window already mounts
- * `visibleSlidesCount × RENDER_WINDOW_BUFFER_MULTIPLIER` slides per side as
- * real `<img>`s, and those elements ARE the preload — they fetch ahead of the
- * ride by existing. A second warm window with its own page count could only
- * duplicate them (identical URLs, deduplicated by the HTTP cache) or diverge
- * from them; both were true of the previous implementation. One window, owned
- * by the thing that renders, cannot disagree with itself. Ordering within
- * that window — visible band first, buffer behind it — belongs to the deck
- * and lives in `useActiveBandGate`.
- *
- * What is left is the one thing the markup does NOT do: DECODE. A buffered
- * `<img decoding="async">` unpacks its bitmap when it is first painted, which
- * is mid-ride. With `isPredecodeOn` the unpacking is pulled forward into idle
- * callbacks, one at a time, never while the deck moves.
- *
- * The file to decode is not computed — it is READ, from `img.currentSrc` of
- * the buffered element itself. That property is the browser's own answer to
- * "which candidate did I pick", already resolved through `<source media>`,
- * `srcSet` and `sizes`. Re-deriving it here (as this module once did) meant
- * maintaining a hand-written copy of the selection algorithm that could, and
- * did, disagree with the markup — and a disagreement means warming a file the
- * deck will never show while leaving the one it will show cold.
- *
- * Unmounted, none of this exists: one native set everywhere (the designated
- * `defaultSrc`), no responsive markup, no predecode — and this module's code
- * is tree-shaken out of the bundle.
+ * The responsive-image module — a HEADLESS slot. Its PRESENCE switches the
+ * responsive stack on (art-directed sources, srcSet/sizes, rotation veil,
+ * portrait flip); its body is the predecode manager. There is deliberately no
+ * preload — the render window's mounted `<img>`s ARE the preload. Predecode
+ * decodes buffered bitmaps in idle, reading the file from the element's own
+ * `currentSrc` (never a re-derived guess). Unmounted, it tree-shakes out. See
+ * docs/architecture/modules.md.
  */
 const ResponsiveImagesBase = memo(function ResponsiveImages({
   isPredecodeOn = false,

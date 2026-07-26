@@ -7,17 +7,10 @@ import { useOrientationSwapVeil } from "./useOrientationSwapVeil";
 import type { SlideItemProps } from "./SlideItem.types";
 
 /**
- * Renders one slide. The active band is derived externally via
- * `isActive` / `isActual`.
- *
- * Image content is governed by the image-resource SSOT (`useImageResource`):
- * the slide does not keep its own load/error state. It renders the `<img>`
- * while the resource is `loading` or `loaded`, reports the element's real
- * outcome back to the store, and falls back to a text placeholder on `error`.
- *
- * A slide is interactive only when it is configured interactive, a click
- * handler is provided, and — for image slides — the image has actually
- * loaded. Text slides are interactive as soon as a handler is provided.
+ * Renders one slide against an externally-derived active band
+ * (`isActive`/`isActual`). Image load/error is the image-resource SSOT's, not
+ * the slide's; a failed image falls back to a text placeholder, and
+ * interactivity requires a loaded image. See docs/architecture/slides.md.
  */
 export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
   const {

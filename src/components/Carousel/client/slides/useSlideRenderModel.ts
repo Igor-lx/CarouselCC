@@ -28,15 +28,9 @@ interface UseSlideRenderModelResult {
   layoutOrigin: number;
 }
 
-/**
- * How far (in slots) the render window may drift from the layout origin
- * before the origin recenters. The origin is the coordinate base for the
- * scroll transform and every slide's lane; keeping it stable is what makes a
- * per-settle window shift move no slide (no re-raster). A finite deck's
- * window never leaves `[0, length)`, so its origin never moves. An infinite
- * deck recenters only after this many slots of one-way drift — a rare,
- * atomic re-baseline that also bounds the transform magnitude.
- */
+/** Slots the render window may drift from the layout origin before it recenters
+ * — a rare atomic re-baseline, so a per-settle window shift re-rasters nothing.
+ * See docs/architecture/motion.md. */
 const LAYOUT_ORIGIN_BAND_SLOTS = 512;
 
 export function useSlideRenderModel({
