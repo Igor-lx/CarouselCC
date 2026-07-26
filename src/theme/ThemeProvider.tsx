@@ -7,9 +7,8 @@ import {
   THEME_STORAGE_KEY,
   ON_SCREEN_MODES,
   THEME_MODES,
-  type OnScreenThemeMode,
-  type ThemeMode,
-} from "./types";
+} from "./constants";
+import type { OnScreenThemeMode, ThemeMode } from "./types";
 
 /** Untrusted storage: anything but an explicit known mode resolves to AUTO. */
 const asThemeMode = (raw: string | null): ThemeMode =>

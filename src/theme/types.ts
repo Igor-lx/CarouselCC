@@ -1,22 +1,5 @@
-// See ./README.md
-/** localStorage key for the persisted theme mode (react-free; the boot script mirrors it). */
-export const THEME_STORAGE_KEY = "theme-mode";
-
-export const THEME_MODES = {
-  LIGHT: "light",
-  DARK: "dark",
-  AUTO: "auto",
-} as const;
-
-export const ON_SCREEN_MODES = {
-  LIGHT: "light",
-  DARK: "dark",
-} as const;
-
-export const BROWSER_THEME_COLORS = {
-  [ON_SCREEN_MODES.LIGHT]: "#bfd6f8",
-  [ON_SCREEN_MODES.DARK]: "#0d1520",
-} as const;
+// See ./README.md — values live in ./constants.ts; this file is types only.
+import type { THEME_MODES, ON_SCREEN_MODES } from "./constants";
 
 export type ThemeMode = (typeof THEME_MODES)[keyof typeof THEME_MODES];
 export type OnScreenThemeMode =

@@ -2,15 +2,15 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { BROWSER_THEME_COLORS, THEME_STORAGE_KEY } from "./types";
+import { BROWSER_THEME_COLORS, THEME_STORAGE_KEY } from "./constants";
 
 // Guards that the pre-paint boot in index.html (which cannot import) does not
-// drift from types.ts — colors, storage key, and the validation gate. See ./README.md
+// drift from constants.ts — colors, storage key, and the validation gate. See ./README.md
 const html = readFileSync("index.html", "utf8");
 
 const attr = (pattern: RegExp): string | undefined => pattern.exec(html)?.[1];
 
-describe("index.html theme boot stays in sync with src/theme/types.ts", () => {
+describe("index.html theme boot stays in sync with src/theme/constants.ts", () => {
   it("media-paired theme-color metas carry the canonical colors", () => {
     expect(
       attr(/media="\(prefers-color-scheme: light\)"\s+content="([^"]+)"/),

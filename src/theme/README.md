@@ -74,7 +74,7 @@ saved under, so the choice survives reloads. It is:
 - **validated, not trusted**: any value that is not exactly `light`/`dark`/`auto`
   resolves to `auto` (a stale or corrupted entry once leaked into `data-theme`
   and produced `content="undefined"` bar colors until the cache was cleared);
-- **react-free** (defined in `types.ts`) so the non-React pre-paint boot script
+- **react-free** (defined in `constants.ts`) so the non-React pre-paint boot script
   can use the same key.
 
 ## The pre-paint boot contract (why values are duplicated)
@@ -83,17 +83,18 @@ On a cold mobile load the browser commits the bar tint at the **first paint**,
 before the JS bundle runs. So `index.html` carries an inline script plus two
 media-paired `theme-color` metas that set `data-theme`, the `<html>` background,
 and the bar color synchronously during head parsing. That script cannot
-`import`, so it **duplicates** the colors and the storage key from `types.ts`.
+`import`, so it **duplicates** the colors and the storage key from `constants.ts`.
 
 `themeBootSync.test.ts` is the guard: it reads `index.html` and fails CI if the
-duplicated colors, storage key, or the validation gate drift from `types.ts`.
+duplicated colors, storage key, or the validation gate drift from `constants.ts`.
 
-**So: to change a theme color or the storage key, edit `types.ts` AND
+**So: to change a theme color or the storage key, edit `constants.ts` AND
 `index.html` together** — the test enforces it.
 
 ## Files
 
-- `types.ts` — SSOT: mode/color constants, the storage key, and the types.
+- `constants.ts` — value SSOT: the modes, the on-screen looks, the **colors**, and the storage key.
+- `types.ts` — the types (derived from `constants.ts`).
 - `ThemeContext.ts` — the React context object.
 - `ThemeProvider.tsx` — the effects (resolve mode → apply `data-theme`, bg, metas;
   persist; cross-tab sync).
