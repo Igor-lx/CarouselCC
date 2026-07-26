@@ -11,10 +11,10 @@ interface UseCarouselMotionExecutionInput
 }
 
 /**
- * Post-state motion orchestration: wires the settle feedback into the state
- * machine and mounts the runner — the sole `state -> segment -> controller`
- * bridge. Temporal presentation data reaches paint consumers through the
- * motion-plan channel, not through React values.
+ * Post-state motion orchestration: wires settle feedback into the state machine
+ * and mounts the runner — the sole `state -> segment -> controller` bridge.
+ * Temporal presentation data reaches paint via the motion-plan channel, not
+ * React values.
  */
 export function useCarouselMotionExecution({
   dispatch,

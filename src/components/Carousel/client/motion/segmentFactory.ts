@@ -68,21 +68,14 @@ interface BuildSegmentInput {
 export interface BuildSegmentResult {
   /** The segment to hand to the controller. */
   segment: CarouselSegment;
-  /**
-   * The segment's duration. Published by the runner as the autoplay-motion
-   * duration for the pagination dot delay; the controller derives its own
-   * timing from the segment.
-   */
+  /** The segment's duration; the runner publishes it as the autoplay-motion
+   * duration for the pagination dot delay. */
   duration: number;
 }
 
-/**
- * A duration-authored step (click, autoplay, snap-back, non-inertial gesture
- * release): the target duration and the shape shares are known; the peak
- * speed falls out so the profile covers the distance in that duration. A hot
- * handoff (`start.velocity`) is preserved as the profile's start speed, so a
- * retarget stays velocity-continuous.
- */
+/** Duration-authored step: duration and shape shares are known, the peak speed
+ * falls out to cover the distance. A hot handoff (`start.velocity`) becomes the
+ * start speed so a retarget stays velocity-continuous. */
 const buildStepProfile = (
   state: CarouselState,
   start: MotionStart,
@@ -118,12 +111,8 @@ const buildStepProfile = (
   });
 };
 
-/**
- * Fast acceleration profile for a repeated click - a same-direction click
- * that arrives while the carousel is already moving. The segment drives
- * straight to the page boundary (`state.virtualIndex`) and decays to zero
- * speed; there is no intermediate target and no chained follow-up.
- */
+/** Fast acceleration profile for a repeated click. Drives straight to the page
+ * boundary and decays to rest — no intermediate target, no chained follow-up. */
 const buildRepeatedProfile = (
   state: CarouselState,
   start: MotionStart,
@@ -163,10 +152,9 @@ const buildGestureProfile = (
   releaseSpeed: number,
 ): CarouselSegment => {
   const distance = state.virtualIndex - start.position;
-  // CONTINUITY LAUNCH (see gesture/inertia/releaseLaunch): start at the
-  // visual velocity the eye saw at lift-off (the follow stream's ui
-  // velocity; the handoff velocity is zero during a drag), accelerate to
-  // the intent cruise. A fast lift-off collapses the ramp by itself.
+  // CONTINUITY LAUNCH (see gesture/inertia/releaseLaunch): start at the visual
+  // velocity seen at lift-off (handoff velocity is zero during a drag) and
+  // accelerate to the intent cruise; a fast lift-off collapses the ramp itself.
   const launch = resolveReleaseLaunch({
     distance,
     visualVelocity: state.gesture.launchVelocity,
@@ -185,10 +173,9 @@ const buildGestureProfile = (
     });
 
   let profile = buildRide(launch.cruiseSpeed);
-  // Ride-duration floor: a flick must stay a VISIBLE motion (see
-  // minRideDurationMs). Re-solve the cruise down to the floor duration; the
-  // launch speed is never reduced (continuity wins — if it alone beats the
-  // floor, the ride just arrives earlier, same as the solver's contract).
+  // Ride-duration floor: a flick must stay VISIBLE (see minRideDurationMs).
+  // Re-solve the cruise down to the floor; the launch speed is never reduced
+  // (continuity wins — if it alone beats the floor, the ride just arrives early).
   if (profile.duration < release.minRideDurationMs) {
     const flooredPeak = Math.max(
       resolvePeakSpeedForDuration({
@@ -215,18 +202,12 @@ const buildGestureProfile = (
 type GoToProfilePhase = "single" | "preflight" | "approach";
 
 /**
- * Builds one segment of the GO_TO speed profile.
- *
- * Acceleration and deceleration are local page-screen budgets, not shares of
- * the whole visible jump. A long jump therefore starts the same way as a short
- * one: accelerate inside the first page screen, cruise, teleport the hidden
- * middle, then cruise/decelerate inside the final page screen.
- *
- * - `single`    - a direct jump: acceleration lives in the first page screen,
- *   deceleration in the last page screen.
- * - `preflight` - the pre-teleport slice: local acceleration, then cruise.
- * - `approach`  - the post-teleport final page: cruise until the configured
- *   deceleration distance starts, then stop on target.
+ * Builds one segment of the GO_TO speed profile. Acceleration/deceleration are
+ * local page-screen budgets, not shares of the whole jump, so a long jump
+ * starts like a short one.
+ * - `single`    - direct jump: accelerate in the first page, decelerate in the last.
+ * - `preflight` - pre-teleport slice: local acceleration, then cruise.
+ * - `approach`  - post-teleport final page: cruise, then decelerate onto target.
  */
 const buildGoToProfile = (
   state: CarouselState,
@@ -280,13 +261,10 @@ const buildGoToProfile = (
   });
 
   // Flight-envelope time ceiling (teleport ON only): a continuous ride must
-  // never take LONGER than a flight would — otherwise the longest ride (just
-  // below the teleport gate) sits slower than a farther jump. Rides at or
-  // under the envelope keep the shared cruise untouched; longer ones are
-  // duration-authored to exactly the flight time (same solver as the steps),
-  // so ride and flight durations meet seamlessly at the gate for ANY
-  // preflight/approach/gate knob ratio. A degenerate envelope (0 — nothing
-  // animated in a flight) means "no ceiling".
+  // never take LONGER than a flight would, else the longest ride (just below
+  // the gate) sits slower than a farther jump. Longer rides are duration-
+  // authored to exactly the flight time so ride and flight meet at the gate for
+  // any knob ratio; a degenerate envelope (0) means "no ceiling".
   if (phase === "single" && motion.goToTeleportEnabled) {
     const flightDuration = resolveGoToFlightDuration(
       stepSize,
@@ -397,9 +375,8 @@ export function buildCarouselSegment({
     return { segment, duration: segment.duration };
   }
 
-  // Duration-authored step: click, autoplay, snap-back, and a non-inertial
-  // gesture release. The step kind picks the profile shares; the peak speed
-  // is derived so the profile covers the distance in the resolved duration.
+  // Duration-authored step (click, autoplay, snap-back, non-inertial release):
+  // the step kind picks the shares, the peak speed is derived from the duration.
   const duration = resolveStepDuration({
     motionPhase: state.motionPhase,
     moveReason: state.moveReason,

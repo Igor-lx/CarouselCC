@@ -2,9 +2,9 @@ import type { MotionSettings } from "../config";
 
 /**
  * GO_TO timing + geometry — the single source of truth for how a GO_TO is laid
- * out in space. Both the reducer and `motion/segmentFactory.ts` derive from
- * here, so logical landings and the animated profile cannot drift apart. Pure
- * leaf module (no React). See docs/architecture/motion.md.
+ * out in space. The reducer and `segmentFactory.ts` both derive from here, so
+ * logical landings and the animated profile cannot drift apart.
+ * See docs/architecture/motion.md.
  */
 
 /** Average speed magnitude: `|distance| / duration`. */
@@ -54,12 +54,10 @@ export interface GoToPlan {
 
 /**
  * Lay out a GO_TO of `pageSpan` page screens (unsigned; caller applies
- * direction). A jump flies only when both hold: intermediates (endpoints
- * excluded) `>= goToTeleportMinPageSpan`, AND at least one intermediate is
- * never shown (`intermediates > preflight + approach`) — teleporting between two
- * shown pages would be a pointless blink. The structural gate dominates, so a
- * knob below the floor merely fires idle (Diagnostics reports it).
- * `goToTeleportEnabled: false` short-circuits to a full continuous ride.
+ * direction). A jump flies only when both hold: intermediates
+ * `>= goToTeleportMinPageSpan`, AND at least one is never shown
+ * (`intermediates > preflight + approach`) — else a teleport is a pointless
+ * blink. `goToTeleportEnabled: false` short-circuits to a continuous ride.
  * See docs/architecture/motion.md.
  */
 export const resolveGoToPlan = (
@@ -106,11 +104,9 @@ export const resolveGoToApproachDistance = (
 ): number => resolveGoToProfileZones(stepSize, motion).approachDistance;
 
 /**
- * Duration of the post-teleport approach (computable before it exists): enters
- * at cruise, cruises, decays over the local decel budget. Zone times cruise
+ * Duration of the post-teleport approach, computable before it exists: cruise
  * `(1-d)·A/p` + decel `2·d·A/p` = `A·(1+d)/p`. Lets the engine plan the total
- * far-GO_TO time up front, so a one-step consumer (the widget) runs it as one
- * motion.
+ * far-GO_TO time up front, so a one-step consumer runs it as one motion.
  */
 export const resolveGoToApproachDuration = (
   stepSize: number,
@@ -120,8 +116,7 @@ export const resolveGoToApproachDuration = (
   const zones = resolveGoToProfileZones(stepSize, motion);
   const approach = zones.approachDistance;
   if (!(approach > 0) || !(peakSpeed > 0)) return 0;
-  // Ramp share trusted as authored — over-budget is a misconfiguration
-  // Diagnostic reports, not one this math caps. Legit tuning cannot reach it.
+  // Ramp share trusted as authored — over-budget is a Diagnostic, not a cap.
   const decelShare = zones.decelerationDistance / approach;
   return (approach * (1 + decelShare)) / peakSpeed;
 };
@@ -140,9 +135,8 @@ export const resolveGoToPreflightDuration = (
   const zones = resolveGoToProfileZones(stepSize, motion);
   const preflight = zones.preflightDistance;
   if (!(preflight > 0) || !(peakSpeed > 0)) return 0;
-  // Trusted as authored (see approach). Over-budget is sharper here: the
-  // `(1 - accelShare)` cruise term goes negative and a fast entry can drive the
-  // planned duration below zero — the visible failure Diagnostic reports.
+  // Trusted as authored (see approach). Over-budget bites harder here: the
+  // `(1 - accelShare)` cruise term goes negative — the failure Diagnostic reports.
   const accelShare = zones.accelerationDistance / preflight;
   const entrySpeed = Math.max(0, startSpeed);
   const accelDistance = accelShare * preflight;
@@ -154,10 +148,9 @@ export const resolveGoToPreflightDuration = (
 
 /**
  * Total animated time of a flight (preflight + approach; the cut is instant).
- * Also the TIME CEILING of every continuous ride while the teleport is enabled
- * — a longer ride is compressed to this and cruises faster, so no jump is ever
- * slower than a farther one. Degenerate tunings yield `0` ("no ceiling").
- * Teleport disabled: no ceiling, duration grows with distance.
+ * Also the TIME CEILING of every continuous ride while teleport is enabled — a
+ * longer ride is compressed to this so no jump is ever slower than a farther
+ * one. Degenerate tunings yield `0` ("no ceiling").
  */
 export const resolveGoToFlightDuration = (
   stepSize: number,

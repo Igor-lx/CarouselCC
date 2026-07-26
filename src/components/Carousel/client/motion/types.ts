@@ -1,11 +1,9 @@
 import type { ProfileSegment } from "../../../../shared";
 
 /**
- * Every carousel motion is one accel/cruise/decel profile — there is no
- * second segment shape and no easing-curve path. The strategy names what
- * initiated the segment:
- * - `"step"`     — duration-authored steps: click, autoplay, snap-back, and a
- *                  non-inertial gesture release;
+ * Every carousel motion is one accel/cruise/decel profile; the strategy names
+ * what initiated the segment:
+ * - `"step"`     — duration-authored step (click, autoplay, snap-back, non-inertial release);
  * - `"gesture"`  — inertial gesture release (speed-authored from the flick);
  * - `"repeated"` — repeated-click fast advance;
  * - `"jump"`     — every GO_TO slice (direct, preflight, approach);
