@@ -11,9 +11,5 @@ export type {
   UserEnvironment,
 } from "./public-api";
 export { SLIDE_CLASS_KEYS } from "./public-api";
-// Responsive image content is produced by the self-contained `data-gen/` kit
-// (Node-only; copy it to where the assets live and run it). It is deliberately
-// NOT re-exported here — the browser entry stays free of `node:fs`.
-// Host-side opt-in Zod schemas. Imported separately from
-// "@/components/Carousel/contract/schemas" so Zod is not pulled into
-// the component's runtime bundle.
+// The Node-only data-gen/ kit and the opt-in Zod schemas are deliberately not
+// re-exported here, so the browser entry stays free of node:fs and Zod.

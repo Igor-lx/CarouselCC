@@ -1,19 +1,12 @@
+// The memo comparator for <Carousel>. Inline JSX children are fresh objects every
+// host render, so a structural compare (count/type/key/shallow props) is needed to
+// stop unrelated host re-renders reconciling the whole deck. Do NOT remove it.
+// See docs/architecture/overview.md
 import { Children, isValidElement, type ReactNode } from "react";
 
 import type { CarouselProps } from "./public-api/types";
 
-/**
- * The memo comparator for `<Carousel>`. Modules are passed as inline JSX
- * children, which are FRESH objects every host render — so the default shallow
- * compare never holds and any host re-render would reconcile the whole deck.
- * This compares children STRUCTURALLY (count, type, key, shallow props);
- * anything it cannot vouch for falls through to a re-render, the safe direction.
- * Do not remove it — the deck would re-reconcile on every unrelated host render.
- */
-
-/** Props compared by identity, EXCEPT `children`: nested JSX is fresh for the
- * same reason, so a wrapper would otherwise never compare equal. Recursion is
- * bounded by the JSX the host actually wrote. */
+/** Props compared by identity, except `children` (fresh JSX, compared structurally). */
 function shallowEqualProps(
   a: Readonly<Record<string, unknown>>,
   b: Readonly<Record<string, unknown>>,
@@ -51,8 +44,7 @@ function areChildrenEquivalent(a: ReactNode, b: ReactNode): boolean {
     const prev = listA[i];
     const next = listB[i];
     if (Object.is(prev, next)) continue;
-    // Only ELEMENTS can be judged equivalent; text/number/null children that
-    // differ are a real change, and anything exotic is not worth guessing at.
+    // Only elements can be judged equivalent; differing text/exotic = real change.
     if (!isValidElement(prev) || !isValidElement(next)) return false;
     if (prev.type !== next.type || prev.key !== next.key) return false;
     if (

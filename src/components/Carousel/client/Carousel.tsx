@@ -1,3 +1,4 @@
+// Composition root — see docs/architecture/overview.md
 import { memo, useImperativeHandle, useMemo, useRef } from "react";
 
 import styles from "./Carousel.module.scss";
@@ -39,9 +40,8 @@ import { useCarouselState } from "./state";
 import { useCarouselStatusReporter } from "./host-report/useCarouselStatusReporter";
 import type { CarouselProps } from "./public-api/types";
 
-/** Build-time flag: the diagnostic layer (the only consumer of the slide
- * media descriptors below) is dev-only, so its inputs are not built shipped. */
-const IS_DEV = import.meta.env.DEV;
+const IS_DEV = import.meta.env.DEV; // gates the dev-only slide media descriptors
+
 const EMPTY_SLIDE_MEDIA: CarouselSlideMediaView[] = [];
 
 const Carousel = memo(function Carousel(props: CarouselProps) {
@@ -70,11 +70,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   } = props;
 
   // --- environment (injected, never self-detected) --------------------------
-  // The carousel is a pure function of its props: it does not read matchMedia
-  // / navigator itself. The host supplies the environment via `userEnvironment`
-  // (see `useUserEnvironment` in `shared`). An unset signal resolves to `false`
-  // — full motion, desktop behaviour, warm-up enabled — and the omission is
-  // surfaced by the Diagnostic slot rather than silently repaired.
   const isInstantMode = userEnvironment?.reducedMotion ?? false;
   const isTouch = userEnvironment?.touch ?? false;
   const isDataSaverEnabled = userEnvironment?.dataSaver ?? false;
@@ -85,14 +80,9 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     [children]
   );
 
-  // The responsive-image stack (art-directed sources, srcSet/sizes, rotation
-  // veil, aspect flip) is switched by the PRESENCE of the <ResponsiveImages>
-  // slot: no module — one native set everywhere, largest candidate, zero
-  // responsive machinery (see resolveRenderedImageSrc).
+  // The responsive-image stack is switched by the <ResponsiveImages> slot's presence.
   const isResponsiveImagesOn = Boolean(slots["responsive-images"]);
 
-  // Live viewport axes (breakpoint tier / orientation / flags) — stamped on
-  // the root below; the SCSS slide geometry keys on them.
   const slideViewport = useSlideViewport();
 
 
@@ -120,17 +110,13 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     isInstantMode,
   });
 
-  // --- boundary state -------------------------------------------------------
-  // Lifted above the status-snapshot effect so the snapshot can carry the
-  // same `isAtStart` / `isAtEnd` flags that `<Controls>` uses internally.
-  // The motion / autoplay paths below consume the same memo.
+  // --- boundary state (shared by status, motion, autoplay) ------------------
   const { isAtStart, isAtEnd } = useMemo(
     () => carouselBoundaryState(state.targetPageIndex, layout),
     [layout, state.targetPageIndex]
   );
 
-  // Art-direction descriptors, consumed only by the dev-only Diagnostic slot —
-  // the flatMap never runs in production. See docs/architecture/diagnostics.md.
+  // Art-direction descriptors — dev Diagnostic slot only (never runs shipped).
   const slideMediaViews = useMemo<CarouselSlideMediaView[]>(
     () =>
       IS_DEV && isContentImg
@@ -148,30 +134,21 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     [records]
   );
 
-  // Image-resource SSOT: created only for image content, pruned to the live
-  // deck, passed explicitly to each SlideItem. See docs/architecture/slides.md.
   const imageResourceStore = useImageResourceStore({
     isContentImg,
     records,
     isResponsiveImagesOn,
   });
 
-  // --- DOM refs --------------------------------------------------------------
-  // Declared here (before `imageSizes`) because the responsive-`sizes` hook
-  // measures the live viewport to size its candidate hint.
+  // --- DOM refs (before imageSizes, which measures the viewport) ------------
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
 
-  // Carousel-owned default `sizes` for responsive slide images, measured from
-  // the real (capped + padded) slot so the browser never up-picks a candidate
-  // larger than the slot actually needs (see `useResponsiveImageSizes`).
   const imageSizes = useResponsiveImageSizes({
     viewportRef,
     visibleSlidesCount: layout.visibleSlidesCount,
   });
 
-  // Read-only, low-frequency status reported to the host (deduplicated;
-  // reflects intent immediately — see useCarouselStatusReporter).
   useCarouselStatusReporter({
     onCarouselStatusChange,
     isIdle: status.isIdle,
@@ -194,22 +171,14 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   const { virtualSlides, layoutOrigin } = useSlideRenderModel({
     current: state.virtualIndex,
     previous: state.fromVirtualIndex,
-    // Any non-idle phase, INCLUDING dragging. A catch-and-hold brakes the
-    // strip at a fractional position and the reducer sits in "dragging"; with
-    // the flag false the active band collapsed to [current, current+visible)
-    // — which a fractional current tilts PAST the leftmost on-screen slide.
-    // That slide went inert under the user's finger: hit-testing died, so the
-    // browser's long-press menu gave its haptic and then refused to open
-    // (always the LEFT slide, in both scroll directions — measured on device).
+    // Non-idle INCLUDING dragging: a catch-and-hold at a fractional position must
+    // not let the active band go inert under the finger (breaks the long-press menu).
     isMoving: !status.isIdle,
     layout,
     records,
     renderWindowBufferMultiplier: config.layout.renderWindowBufferMultiplier,
   });
 
-  // Bandwidth gate: buffered slides hold their image sources until the visible
-  // band has reported back, so the looked-at slide does not share the pipe with
-  // buffered ones not yet asked for (see `useActiveBandGate`).
   const isOffBandFetchOn = useActiveBandGate({
     virtualSlides,
     isContentImg,
@@ -231,10 +200,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   });
 
   // --- motion plan channel ---------------------------------------------------
-  // The engine computes every non-drag motion once (duration + percent
-  // progress curve) and publishes it here; paint consumers (the pagination
-  // widget) build their own WAAPI animation from the plan. A plain observable
-  // — publishing never re-renders React.
   const planChannelRef = useRef<MotionPlanChannel | null>(null);
   if (planChannelRef.current === null) {
     planChannelRef.current = createMotionPlanChannel();
@@ -261,9 +226,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     onSlideClick,
   });
 
-  // --- imperative handle ----------------------------------------------------
-  // External prev/next control routes through the very same navigation
-  // pipeline as the built-in <Controls> — no second control path.
+  // --- imperative handle (same pipeline as <Controls>) ----------------------
   useImperativeHandle(
     ref,
     () => ({
@@ -289,8 +252,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   });
 
   // --- autoplay (visibility-aware) ------------------------------------------
-  // One call owns the whole loop: viewport visibility, the pause rule, and
-  // stable step handlers — see useCarouselAutoplay.
   const { handleHoverChange } = useCarouselAutoplay({
     state,
     config,
@@ -308,10 +269,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     targetPageIndex: state.targetPageIndex,
   });
 
-  // --- module render policy & values ---------------------------------------
-  // The policy owns the whole decision: `moduleSlots` are the slot children
-  // ALREADY gated (a silenced module is `null`), so the view below just renders
-  // them — no per-slot conditionals duplicated in JSX.
+  // --- module render policy & values (moduleSlots are already gated) --------
   const renderPolicy = useModuleRenderPolicy({
     controlsSlot: slots.controls,
     paginationSlot: slots.pagination,
@@ -342,8 +300,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     });
 
   // --- diagnostic context ---------------------------------------------------
-  // Raw props + observable layout/slot state, mirrored exactly as the runtime
-  // sees them; never feeds back into runtime (see useDiagnosticContextValue).
   const diagnosticContextValue = useDiagnosticContextValue({
     state,
     visibleSlidesNr,
@@ -396,14 +352,9 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
             data-carousel-root=""
             data-touch={isTouch}
             data-reduced-motion={isInstantMode}
-            // Rides suppress the slide-outline transition (see the stylesheet):
-            // a moving strip hands :hover from slide to slide under a resting
-            // cursor, and outline-color is not compositable.
+            // Suppresses the non-compositable slide-outline transition during a ride.
             data-moving={!status.isIdle}
-            // The viewport axes (config/viewport.ts), stamped as the styling
-            // contract: the component SCSS shapes slide geometry by these
-            // attributes and carries no media queries of its own. Each active
-            // flag adds a `data-<flag>` attribute (see presentation/domPayload).
+            // Viewport axes as the styling contract (see viewport.md); flags add data-<flag>.
             data-breakpoint={slideViewport.breakpoint}
             data-orientation={slideViewport.orientation}
             {...flagAttributes}
@@ -414,8 +365,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
               data-carousel-viewport=""
               onMouseEnter={() => handleHoverChange(true)}
               onMouseLeave={() => handleHoverChange(false)}
-              // ref + listeners + engine styles, one bundle: the engine owns
-              // the host and forwards the node into viewportRef.
+              // ref + listeners + engine styles in one bundle (engine forwards to viewportRef).
               {...dragHostProps}
             >
               <div
