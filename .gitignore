@@ -3,3 +3,6 @@ dist/
 coverage/
 .DS_Store
 *.local
+
+# Design-time image masters — kept locally / backed up elsewhere, not in the repo.
+/assets/
