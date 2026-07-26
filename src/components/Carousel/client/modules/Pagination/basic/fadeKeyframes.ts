@@ -1,14 +1,8 @@
 /**
- * Dot look as a FUNCTION OF POSITION — the pagination's half of the model the
- * widget already runs.
- *
- * The dots do not move, but the carousel's position between them does. The
- * binding animates one continuous `offset` from the page being left to the
- * page being entered, along the plan's percent-progress stops; every dot's
- * look is then read off its distance from that offset. Nothing about a dot is
- * authored in time, so a page merely PASSED THROUGH (a repeated click) rises
- * to the active look and falls again on the deck's own clock, exactly as the
- * widget's dot does when the strip slides it past the centre.
+ * Dot look as a FUNCTION OF POSITION: one continuous `offset` travels the plan's
+ * stops and each dot's look is read off its distance from it — so a page merely
+ * passed through rises and falls on the deck's clock, nothing authored in time.
+ * See docs/architecture/modules.md.
  */
 
 import { mod } from "../../../domain";
@@ -28,13 +22,9 @@ export type DotFadeKeyframe = {
 };
 
 /**
- * How strongly the ACTIVE look applies to a dot `distance` steps away from the
- * live offset: fully right under it, not at all a whole step away or further.
- *
- * Linear deliberately: across a single step it reproduces exactly the blend
- * the old two-dot cross-fade produced (a dot one step ahead has strength
- * `progress`), so an ordinary click looks the way it always did — only the
- * repeated click changes.
+ * How strongly the ACTIVE look applies to a dot `distance` steps from the live
+ * offset: full right under it, zero a whole step away. Linear deliberately, so
+ * a single step blends exactly as a plain two-dot cross-fade would.
  */
 export const dotActiveStrength = (distance: number): number =>
   Math.max(0, 1 - Math.abs(distance));

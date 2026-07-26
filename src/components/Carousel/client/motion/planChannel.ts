@@ -1,17 +1,8 @@
 /**
- * Motion-plan channel — how the engine hands a computed motion to every
- * consumer that paints it.
- *
- * The motion runner (the only producer) computes each segment ONCE — profile,
- * duration, normalized percent-progress curve — and publishes a plan. Paint
- * consumers (the pagination widget's step, the pagination dots' cross-fade;
- * the track receives the same data directly through `startCompositorMotion`)
- * subscribe and build their own WAAPI animation from it: same `duration`,
- * same curve, same `startedAt` clock, their own animated property — pixels,
- * dot steps, opacity. Time-synchronized by construction, no per-frame work.
- *
- * The channel is a plain observable value on the stable module context — it
- * never re-renders React; consumers react inside effects/subscriptions.
+ * Motion-plan channel: the runner computes each segment once and publishes a
+ * plan; paint consumers build their own WAAPI animation from it (same duration,
+ * curve and clock, their own property). A plain observable on the stable
+ * context — it never re-renders React. See docs/architecture/motion.md.
  */
 
 export type MotionPlanDirection = -1 | 0 | 1;
