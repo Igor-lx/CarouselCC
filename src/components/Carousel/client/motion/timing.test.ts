@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCarouselConfig } from "../config/buildConfig";
+import { buildCarouselConfig } from "../config/resolve/buildConfig";
 import type { MotionSettings } from "../config";
 import {
   resolveGoToApproachDistance,

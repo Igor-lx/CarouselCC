@@ -27,7 +27,7 @@ export interface PointerSwipeConfig {
    * finger travel more as the pull grows. Applied to the whole offset on
    * every sample — the engine has no notion of edges. `0` = 1:1 tracking. */
   resistance?: number;
-  /** How quickly the resistance lag ramps up with distance. */
+  /** How quickly the resistance lag ramps up with distance.*/
   resistanceCurvature?: number;
   /** Velocity safety clamp (px / ms). */
   maxVelocity?: number;

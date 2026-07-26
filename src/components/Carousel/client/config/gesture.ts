@@ -1,11 +1,12 @@
+// Swipe + inertial-release feel.
+// See docs/config/gesture.md for what each field governs;
+
+
 import type {
   CarouselInertialReleaseConfig,
   CarouselSwipeConfig,
 } from "./types";
 
-// Swipe + inertial-release feel (part of the visual contract).
-// See docs/config/gesture.md for what each field governs; the shapes are in
-// config/types.ts.
 
 export const CAROUSEL_SWIPE_CONFIG: CarouselSwipeConfig = {
   cooldownMs: 150,

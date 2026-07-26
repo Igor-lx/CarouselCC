@@ -1,5 +1,5 @@
-// Slide-layer image tuning. See docs/config/slides.md for what each governs.
-// (Art-direction axes live in ./viewport.ts — see docs/config/viewport.md.)
+// Slide-layer image tuning.
+// See docs/config/slides.md for what each governs.
 
 export const SLIDE_REORIENT_FADE_OUT_MS = 650;
 export const SLIDE_REORIENT_FADE_IN_MS = 550;

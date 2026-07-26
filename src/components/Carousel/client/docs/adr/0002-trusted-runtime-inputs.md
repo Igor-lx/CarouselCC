@@ -15,7 +15,7 @@ where the host already passes correct data.
 
 Treat all such values as **caller-owned runtime values**. The carousel applies
 documented defaults only for `undefined` public props
-([`config/buildConfig.ts`](../../config/buildConfig.ts)); it does **not**
+([`config/resolve/buildConfig.ts`](../../config/resolve/buildConfig.ts)); it does **not**
 validate, coerce, repair, deduplicate, or enforce these values during
 production runtime.
 

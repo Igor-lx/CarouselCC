@@ -1,4 +1,4 @@
-// Motion-profile distance shares and GO_TO geometry (feel constants).
+// Motion-profile distance shares and GO_TO geometry.
 // See docs/config/motion.md for what each governs.
 
 export const REPEATED_CLICK_SPEED_MULTIPLIER = 5;

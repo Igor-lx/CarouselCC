@@ -17,7 +17,7 @@ values flow only through hook arguments and the context provider.
 | --- | --- |
 | Public props (frozen contract) | `Carousel.tsx` / `public-api/types.ts` |
 | User environment | host application (injected via `userEnvironment`; the carousel never detects touch / reduced-motion / data-saver itself) |
-| Resolved runtime config | `config/useCarouselConfig` — defaults for `undefined` props only; never normalises explicit values, and nothing downstream does either |
+| Resolved runtime config | `config/resolve/useCarouselConfig` — defaults for `undefined` props only; never normalises explicit values, and nothing downstream does either |
 | Slide records + layout facts | `slides/useCarouselSlideDeck` |
 | Logical state | `state/useCarouselState` (reducer-backed) |
 | Visual sampled position | `visual-position/useVisualPosition` — sole SSOT for the visible track offset |

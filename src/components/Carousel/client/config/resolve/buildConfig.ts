@@ -1,12 +1,12 @@
-import { CAROUSEL_DEFAULTS } from "./defaults";
-import { RENDER_WINDOW_BUFFER_MULTIPLIER } from "./layout";
-// Implementation constants are colocated with their subsystems (see the
-// folder contract at the top of ./index.ts); the runtime config still plumbs
-// them so consumers and tests keep one injection point.
-import { MOTION_EPSILON } from "../motion/tolerances";
-import { DRAG_RELEASE_EPSILON } from "../domain/dragRelease";
-import { GESTURE_COAST_MAX_MS } from "../gesture/coast";
-import { CAROUSEL_SWIPE_CONFIG, CAROUSEL_INERTIAL_RELEASE_CONFIG } from "./gesture";
+import { CAROUSEL_DEFAULTS } from "../defaults";
+import { RENDER_WINDOW_BUFFER_MULTIPLIER } from "../layout";
+import { MOTION_EPSILON } from "../../motion/tolerances";
+import { DRAG_RELEASE_EPSILON } from "../../domain/dragRelease";
+import { GESTURE_COAST_MAX_MS } from "../../gesture/coast";
+import {
+  CAROUSEL_SWIPE_CONFIG,
+  CAROUSEL_INERTIAL_RELEASE_CONFIG,
+} from "../gesture";
 import {
   AUTOPLAY_ACCELERATION_DISTANCE_SHARE,
   AUTOPLAY_DECELERATION_DISTANCE_SHARE,
@@ -25,19 +25,17 @@ import {
   SNAP_BACK_DURATION,
   STEP_ACCELERATION_DISTANCE_SHARE,
   STEP_DECELERATION_DISTANCE_SHARE,
-} from "./motion";
-import { HOVER_PAUSE_DELAY, VISIBILITY_THRESHOLD, AUTOPLAY_RESETTLE_DELAY_MS } from "./interaction";
-import type { CarouselRuntimeConfig, RawConfigInput } from "./types";
+} from "../motion";
+import {
+  HOVER_PAUSE_DELAY,
+  VISIBILITY_THRESHOLD,
+  AUTOPLAY_RESETTLE_DELAY_MS,
+} from "../interaction";
+import type { CarouselRuntimeConfig, RawConfigInput } from "../types";
 
 const useDefault = <T>(value: unknown, fallback: T): T =>
   typeof value === "undefined" ? fallback : (value as T);
 
-/**
- * Assemble the runtime config. Defaults are applied only when a prop is
- * `undefined`; any explicitly-provided value flows through unchanged. The
- * carousel intentionally trusts its inputs - see the diagnostic layer for
- * observability.
- */
 export const buildCarouselConfig = ({
   visibleSlidesNr,
   durationAutoplay,
@@ -45,11 +43,23 @@ export const buildCarouselConfig = ({
   intervalAutoplay,
   errAltPlaceholder,
 }: RawConfigInput): CarouselRuntimeConfig => ({
-  visibleSlidesCount: useDefault(visibleSlidesNr, CAROUSEL_DEFAULTS.visibleSlidesNr),
-  autoplayDuration: useDefault(durationAutoplay, CAROUSEL_DEFAULTS.durationAutoplay),
+  visibleSlidesCount: useDefault(
+    visibleSlidesNr,
+    CAROUSEL_DEFAULTS.visibleSlidesNr
+  ),
+  autoplayDuration: useDefault(
+    durationAutoplay,
+    CAROUSEL_DEFAULTS.durationAutoplay
+  ),
   stepDuration: useDefault(durationStep, CAROUSEL_DEFAULTS.durationStep),
-  autoplayInterval: useDefault(intervalAutoplay, CAROUSEL_DEFAULTS.intervalAutoplay),
-  errorAltPlaceholder: useDefault(errAltPlaceholder, CAROUSEL_DEFAULTS.errAltPlaceholder),
+  autoplayInterval: useDefault(
+    intervalAutoplay,
+    CAROUSEL_DEFAULTS.intervalAutoplay
+  ),
+  errorAltPlaceholder: useDefault(
+    errAltPlaceholder,
+    CAROUSEL_DEFAULTS.errAltPlaceholder
+  ),
   motion: {
     snapBackDuration: SNAP_BACK_DURATION,
     epsilon: MOTION_EPSILON,
