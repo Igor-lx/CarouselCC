@@ -49,12 +49,7 @@ export const buildCarouselLayout = (
   };
 };
 
-/**
- * Reconstructs the virtual index for a page so that it stays on the same
- * cyclic "lane" as the reference virtual index. Used when navigating to a
- * page index that may live on a different cycle than the current motion
- * origin.
- */
+/** Virtual index for a page on the same cyclic lane as a reference index. */
 export const alignedVirtualIndex = (
   pageIndex: number,
   referenceVirtualIndex: number,
@@ -67,12 +62,8 @@ export const alignedVirtualIndex = (
   return start + lane * layout.virtualLength;
 };
 
-/**
- * The page a given SLIDE (virtual index) belongs to — floor-based, unlike
- * `nearestPageIndex`, which rounds a fractional strip POSITION to the closest
- * page boundary. Used to resolve "the slide the finger landed on" into a
- * navigation target.
- */
+/** The page a virtual index belongs to — floor-based (contrast
+ * `nearestPageIndex`, which rounds a fractional position to the nearest page). */
 export const pageContaining = (virtualIndex: number, layout: CarouselLayout) => {
   if (layout.pageCount <= 0 || layout.visibleSlidesCount <= 0) return 0;
   const raw = Math.floor(Math.floor(virtualIndex) / layout.visibleSlidesCount);
