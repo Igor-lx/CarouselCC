@@ -1,3 +1,4 @@
+// See docs/architecture/modules.md
 import { memo, useEffect, useRef } from "react";
 
 import { useCarouselMotion, useCarouselStable } from "../../context";
@@ -13,23 +14,15 @@ const scheduleIdle = (work: () => void): (() => void) => {
   return () => window.clearTimeout(handle);
 };
 
-/**
- * The responsive-image module — a HEADLESS slot. Its PRESENCE switches the
- * responsive stack on (art-directed sources, srcSet/sizes, rotation veil,
- * portrait flip); its body is the predecode manager. There is deliberately no
- * preload — the render window's mounted `<img>`s ARE the preload. Predecode
- * decodes buffered bitmaps in idle, reading the file from the element's own
- * `currentSrc` (never a re-derived guess). Unmounted, it tree-shakes out. See
- * docs/architecture/modules.md.
- */
+// Headless slot: presence switches the responsive stack on; body is the
+// predecode manager (no preload — the mounted <img>s are the preload).
 const ResponsiveImagesBase = memo(function ResponsiveImages({
   isPredecodeOn = false,
 }: ResponsiveImagesProps) {
   const { trackRef, isOffBandFetchOn } = useCarouselStable();
   const { status, intent } = useCarouselMotion();
 
-  // URLs already handed to a decode, pruned to the live buffer on each pass:
-  // leaving the window re-arms the URL for a future revisit.
+  // URLs already handed to a decode, pruned to the live buffer each pass.
   const decodedRef = useRef(new Set<string>());
 
   useEffect(() => {
@@ -38,9 +31,8 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
     const track = trackRef.current;
     if (!track) return;
 
-    // The buffered slides: everything the render window mounts OUTSIDE the
-    // visible band. The band itself is already on screen — its bitmaps were
-    // decoded by the act of painting them.
+    // The buffered slides — mounted outside the visible band (the band's
+    // bitmaps decoded by being painted).
     const buffered = Array.from(
       track.querySelectorAll<HTMLImageElement>(
         '[data-active-zone="false"] img',
@@ -63,18 +55,13 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
       if (isStopped) return;
       const url = queue.shift();
       if (url === undefined) return;
-      // A detached copy, decoded and dropped — see `isPredecodeOn`. The URL is
-      // already in the HTTP cache (the rendered element fetched it), so this
-      // costs no network.
+      // A detached copy, decoded and dropped; the URL is already cached, so no network.
       const image = new Image();
       image.src = url;
       image
         .decode()
         .catch(() => {
-          // Broken file, cache eviction race, aborted navigation — all
-          // non-events: the slide's own error path owns retries. Re-arm the
-          // URL so a later idle pass may try again.
-          decoded.delete(url);
+          decoded.delete(url); // re-arm; the slide's own error path owns retries
         })
         .finally(() => {
           if (!isStopped && queue.length > 0) cancelIdle = scheduleIdle(pump);
@@ -88,9 +75,7 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
       if (cancelIdle === null && !isStopped) cancelIdle = scheduleIdle(pump);
     };
 
-    // `currentSrc` is empty until the element has selected and begun loading,
-    // so an element that is not there yet is picked up by its own `load`
-    // rather than guessed at or polled.
+    // currentSrc is empty until the element begins loading, so pick it up via `load`.
     const detachListeners: Array<() => void> = [];
     for (const image of buffered) {
       if (image.complete && image.currentSrc !== "") {
@@ -108,9 +93,7 @@ const ResponsiveImagesBase = memo(function ResponsiveImages({
       for (const detach of detachListeners) detach();
     };
   }, [
-    // The buffer's elements mount when the bandwidth gate opens, and change
-    // when the deck settles somewhere new — the two moments there is anything
-    // new to decode.
+    // Re-run when the buffer mounts (gate opens) or the deck settles anew.
     intent.targetPageIndex,
     isOffBandFetchOn,
     isPredecodeOn,

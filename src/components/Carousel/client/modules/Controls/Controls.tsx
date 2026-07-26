@@ -1,3 +1,4 @@
+// See docs/architecture/modules.md
 import { memo, useMemo } from "react";
 
 import { mergeStyleMaps } from "../../../../../shared";
