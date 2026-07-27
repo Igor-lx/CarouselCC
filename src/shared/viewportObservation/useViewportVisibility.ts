@@ -1,3 +1,4 @@
+// See ./README.md
 import { useRef, useState, type RefObject } from "react";
 import { useIsomorphicLayoutEffect } from "../hooks/useIsomorphicLayoutEffect";
 
