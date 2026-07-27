@@ -1,4 +1,4 @@
-# `engines` — the motion / gesture blanks
+# engines
 
 Three self-contained blanks for animating a value and turning a finger into
 intent. Each imports nothing but React and itself (a

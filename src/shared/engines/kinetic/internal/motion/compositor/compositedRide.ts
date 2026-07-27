@@ -6,37 +6,14 @@ import { sampleProfileSegment } from "../profile/profileSegment";
 import type { MotionController, MotionSample } from "../runtime/types";
 import { startPinnedAnimation } from "./pinnedAnimation";
 
-/**
- * The turnkey compositor path for the CANONICAL shape: one controller (one
- * number) painted through ONE element's WAAPI animation — a strip, a knob, a
- * progress bar, the tutorial circle. It bundles what such a consumer would
- * otherwise assemble by hand from this library's parts:
- *
- *   stops from the profile → keyframes in the caller's domain →
- *   `startPinnedAnimation` → controller runs the SAME segment passively
- *   (no frame loop; it stays the position SSOT for handoffs) → on finish the
- *   final style is pinned and the animation dropped → on cancel the live
- *   position is pinned and the controller's loop woken to take the paint
- *   back.
- *
- * Consumers that fan ONE value out into MANY elements (a dot strip, where
- * each element runs its own derived keyframes) are the OTHER shape: their
- * choreography is domain logic by nature, and they compose the same
- * primitives directly — `keyframesAlongStops` + `startPinnedAnimation` per
- * element. This rider deliberately does not try to cover them.
- *
- * JS fallback is built in: when the compositor cannot take the ride (no
- * WAAPI, engine throw, no element), the controller runs the segment with its
- * frame loop and the consumer's paint subscription (see `useMotionPaint`)
- * carries the pixels — `start` reports which path was taken.
- */
+// Compositor path for ONE controller painted through ONE element: stops →
+// keyframes → pinned animation, controller runs the same segment passively. JS
+// fallback built in. (Fork trims flyTo/dragBinding.) See shared/motion/README.md.
 
 export interface CompositedRideStart<Strategy extends string> {
   element: Element | null;
   segment: ProfileSegment<Strategy>;
-  /** The caller's domain: the style of `value`. Property names are style
-   * properties (`transform`, `opacity`, …) — the same shape WAAPI keyframes
-   * use, so one function serves the keyframes AND the pins. */
+  /** `value` → a style-property keyframe; one fn serves keyframes and pins. */
   toKeyframe: (value: number) => Keyframe;
   /** Forwarded to the controller — fires when the segment settles. */
   onSettle?: (sample: MotionSample<Strategy>) => void;
@@ -46,12 +23,8 @@ export interface CompositedRide<Strategy extends string> {
   /** Start (or replace) a ride. Returns `true` when the compositor took it,
    * `false` when the controller's JS loop is painting instead. */
   start: (options: CompositedRideStart<Strategy>) => boolean;
-  /**
-   * Tear the compositor animation down and hand the paint back to the
-   * controller's loop, pinned at `position` (default: the live handoff
-   * position — sampled from the curve on the shared clock, so it matches
-   * what the compositor just painted). A no-op when nothing is composited.
-   */
+  /** Tear the animation down, hand paint back pinned at `position` (default:
+   * the live handoff). No-op when nothing is composited. */
   cancel: (position?: number) => void;
   /** A compositor animation currently owns the paint. */
   isComposited: () => boolean;
@@ -59,10 +32,7 @@ export interface CompositedRide<Strategy extends string> {
 
 const KEYFRAME_META = new Set(["offset", "easing", "composite"]);
 
-/** Write one keyframe's style properties directly onto the element — the pin
- * used at origin, finish and cancel, so the painted style and the animation
- * endpoints can never disagree about what a `value` looks like. Exported in
- * this fork: the fused hook paints through the same function. */
+/** Write a keyframe's style props onto the element (the pin at origin/finish/cancel). */
 export const applyKeyframe = (element: Element, keyframe: Keyframe) => {
   const style = (element as HTMLElement).style;
   if (!style) return;
@@ -88,8 +58,7 @@ export const createCompositedRide = <Strategy extends string>(
     if (!animation || !ridden) return;
     const active = animation;
     const pin = position ?? controller.captureHandoff().position;
-    // Pin BEFORE cancelling: cancel drops the fill and the element would
-    // flash back to its pre-ride style for a frame.
+    // Pin BEFORE cancelling — cancel drops the fill, else a 1-frame flash back.
     applyKeyframe(ridden.element, ridden.toKeyframe(pin));
     drop();
     try {
@@ -97,10 +66,7 @@ export const createCompositedRide = <Strategy extends string>(
     } catch {
       // already gone
     }
-    // The compositor was this segment's paint owner and the controller is
-    // passive; wake its loop or the value freezes here and teleports at the
-    // settle. Harmlessly superseded when a new segment starts right after.
-    controller.wake();
+    controller.wake(); // passive controller has no loop → wake or it freezes
   };
 
   const start = ({
@@ -135,8 +101,7 @@ export const createCompositedRide = <Strategy extends string>(
         ridden = { element, toKeyframe };
         started.onfinish = () => {
           if (animation !== started) return;
-          // Park the exact destination style, then drop the animation — the
-          // element keeps the pinned style, no one-frame gap.
+          // Pin the exact destination style, then drop (no one-frame gap).
           applyKeyframe(element, toKeyframe(segment.to));
           drop();
           try {
@@ -164,12 +129,8 @@ export const createCompositedRide = <Strategy extends string>(
   return { start, cancel, isComposited: () => animation !== null };
 };
 
-/**
- * React ownership of a {@link CompositedRide}: one rider per controller
- * identity, no per-render allocation. Cleanup is the consumer's segment
- * teardown (`controller.destroy()` via `useMotionController`) — the rider
- * itself holds no timers, only the animation handle its `cancel` releases.
- */
+// One rider per controller identity; holds no timers, only the animation handle.
+// See shared/motion/README.md.
 export function useCompositedRide<Strategy extends string>(
   controller: MotionController<Strategy>,
 ): CompositedRide<Strategy> {

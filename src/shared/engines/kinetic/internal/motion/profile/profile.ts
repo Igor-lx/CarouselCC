@@ -1,3 +1,4 @@
+// See shared/motion/README.md
 import { clamp } from "./clamp";
 
 export interface MotionProfileZone {
@@ -24,11 +25,7 @@ export interface MotionProfileInput {
   decelerationDistanceShare: number;
 }
 
-/**
- * Lower bound for the average speed used to compute zone duration. Avoids
- * a 0-divide singularity in `distance / averageSpeed`; not a substitution
- * for an invalid input.
- */
+/** Average-speed floor to avoid a 0-divide in `distance / averageSpeed`. */
 const MIN_PROFILE_SPEED = 1e-6;
 const smoothstep = (progress: number) => progress * progress * (3 - 2 * progress);
 
@@ -79,11 +76,7 @@ export const createMotionProfile = ({
   decelerationDistanceShare,
 }: MotionProfileInput): MotionProfile => {
   const absDistance = Math.abs(distance);
-  // The engine trusts its inputs: over-allocated shares (accel + decel > 1)
-  // are NOT reshaped here. The cruise share simply goes negative and its zone
-  // is skipped (`pushZone` drops share <= 0), so the ramps consume the whole
-  // travel. Callers own share validity; the carousel surfaces over-allocation
-  // through its Diagnostic layer, not by a silent runtime rescue.
+  // Shares trusted as-is: over-allocation → negative cruise, its zone skipped (see README).
   const accelerationShare = accelerationDistanceShare;
   const decelerationShare = decelerationDistanceShare;
   const cruiseShare = 1 - accelerationShare - decelerationShare;

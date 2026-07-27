@@ -14,21 +14,9 @@ import {
 import { KINETIC_DEFAULTS } from "./internal/defaults";
 import type { KineticConfig, UseKineticValueInput, KineticValue } from "./internal/types";
 
-/**
- * THE blank: one draggable, flyable value painted through one element, fused
- * from the gesture and motion forks this folder carries. Everything the two
- * standalone engines leave to the consumer's rig — the drag→value binding,
- * the mid-flight catch, the release kinetics, the ride construction, the
- * compositor delivery with its JS fallback, the paint subscription — is
- * wired here once. The consumer supplies only the three things no library
- * can know: which elements (JSX), what the value LOOKS like (`keyframe`),
- * and — optionally — where a release should land (`resolveTarget`).
- *
- * Inertia is entirely behind the curtain: the embedded gesture engine
- * measures the gesture's kinetics during the drag (pause-protected launch
- * velocity among them), and this hook turns them into the ride — a
- * momentum glide by default, a custom policy when given.
- */
+// The facade hook: fuses the gesture + motion forks into one draggable/flyable
+// value. Wires every seam the standalone engines leave to the consumer; the
+// consumer supplies only keyframe (+ optional resolveTarget). See README.md.
 export function useKineticValue({
   keyframe,
   initialValue = 0,
@@ -122,9 +110,8 @@ export function useKineticValue({
     enabled,
     surfaceRef,
     config: config?.swipe,
-    // The finger owns the value 1:1: catch a flying value inside read()
-    // (cancel pins the element at the live position and the drag picks it
-    // up), write every move straight into the controller.
+    // Finger owns the value 1:1: read() catches a flying value (cancel pins
+    // the live position), write() feeds every move into the controller.
     value: {
       read: () => {
         const handoff = controller.captureHandoff();
@@ -146,15 +133,13 @@ export function useKineticValue({
           : from + launchVelocity * cfg.glideMomentumMs;
 
       if (to === null || to === from) {
-        // Rest where dropped — still a settle, so onSettle stays the single
-        // "the value came to rest" signal for every path. Immediate: nothing
-        // animates, so the rest IS the release moment.
+        // Rest where dropped — still a settle (onSettle is the one "came to
+        // rest" signal); immediate, nothing animates.
         controller.snap(from, { onComplete: settle, completion: "immediate" });
         return;
       }
 
-      // Continuity launch: start at the speed the eye saw at lift-off,
-      // accelerate to the intent cruise — a fast flick collapses the ramp.
+      // Continuity launch (see README § facade / ../gesture § Release model).
       const launch = resolveReleaseLaunch({
         distance: to - from,
         visualVelocity: launchVelocity,

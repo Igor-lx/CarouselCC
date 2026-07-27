@@ -1,25 +1,15 @@
-/**
- * Pure numeric internals of the pointer-swipe engine. No DOM, no React —
- * every function here is a total function over numbers.
- */
+// Pure numeric internals — no DOM, no React; total functions over numbers.
+// See shared/gesture/README.md § Recognition internals.
 
 const FRAME_BUDGET_MS = 1000 / 60;
 
-/**
- * Lower bound for the `1 - resistance` denominator in the stiffness term.
- * Keeps `applyResistance` finite as `resistance` approaches 1.
- */
+/** Keeps `applyResistance` finite as `resistance` → 1. */
 const MIN_RESISTANCE_DENOMINATOR = 0.001;
 
 export const safeResistance = (value: number) => Math.max(0, Math.min(1, value));
 
-/**
- * Progressive drag resistance: the UI offset lags the raw finger offset more
- * and more as the pull grows. Applied to the WHOLE offset on every sample —
- * the engine knows nothing about edges or boundaries; near zero the output
- * tracks the finger almost 1:1, and the lag stiffens with distance
- * (`resistance` sets how strongly, `curvature` how fast it ramps).
- */
+/** Progressive drag resistance: UI offset lags the finger more as the pull
+ * grows (`resistance` = how strongly, `curvature` = how fast it ramps). */
 export const applyResistance = (
   offset: number,
   resistance: number,
@@ -42,23 +32,15 @@ export const calculateEma = (
   alpha: number,
 ) => previous * (1 - alpha) + instant * alpha;
 
-/**
- * EMA weight adjusted for a variable frame gap: a sample that arrives after
- * N frame budgets carries the weight N single-frame applications would have.
- */
+/** EMA weight adjusted for a variable frame gap (N budgets → N applications). */
 export const frameAdjustedAlpha = (alpha: number, dt: number) => {
   const safe = Math.max(0, Math.min(1, alpha));
   const frames = Math.max(1, dt / FRAME_BUDGET_MS);
   return 1 - Math.pow(1 - safe, frames);
 };
 
-/**
- * Human-scale pause decay: a hold shorter than `graceMs` costs nothing (a
- * finger settling before lift-off is part of a normal gesture), beyond it
- * the velocity halves every `halfLifeMs`. Used for the flick-velocity
- * memory, where the per-frame EMA decay below would zero a fast gesture
- * after a ~2-frame stick.
- */
+/** Human-scale pause decay: a hold under `graceMs` costs nothing, beyond it the
+ * velocity halves every `halfLifeMs`. See shared/gesture/README.md (the ride-crawl fix). */
 export const pauseDecayedVelocity = (
   velocity: number,
   pauseMs: number,

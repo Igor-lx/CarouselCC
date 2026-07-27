@@ -30,11 +30,8 @@ import type {
   ResolvedPointerSwipeConfig,
 } from "./types";
 
-/**
- * The engine's own out-of-the-box tuning. A consumer config is merged OVER
- * these per field, so passing nothing (or a partial object) always yields a
- * fully working engine.
- */
+// See ./types.ts for field meanings and shared/gesture/README.md for recognition internals.
+/** Out-of-the-box tuning; a partial consumer `config` merges over it per field. */
 export const POINTER_SWIPE_DEFAULTS: ResolvedPointerSwipeConfig = {
   cooldownMs: 150,
   intentThreshold: 8,
@@ -49,10 +46,8 @@ export const POINTER_SWIPE_DEFAULTS: ResolvedPointerSwipeConfig = {
   flickVelocityHalfLifeMs: 250,
   minSwipeDistance: 20,
   swipeThresholdRatio: 0.2,
-  // Measured on device: a human finger INTENDING to scroll rests 100-250ms
-  // on the glass before its first move — 90ms caught most real scrolls and
-  // braked the ride they crossed. 250ms lets them through; a deliberate
-  // catch-and-hold rests far longer (the long-press menu itself is ~500ms).
+  // 250ms: lets a real scroll (rests 100-250ms) through, catches a hold (~500ms
+  // long-press). See shared/gesture/README.md § Recognition internals.
   catchDelayMs: 250,
 };
 
@@ -70,27 +65,11 @@ interface InternalSample {
   uiOffset: number;
   rawVelocity: number;
   uiVelocity: number;
-  /** Weighted-average gesture speed (EMA of the raw instantaneous velocity):
-   * the flick decision and the release speed judge the GESTURE, not its
-   * last — often decelerating — segment. */
+  /** Weighted-average gesture speed (raw-velocity EMA): the flick decision
+   * judges the GESTURE, not its last (decelerating) segment. */
   flickVelocity: number;
-  /**
-   * The velocity the CONTINUITY LAUNCH starts the ride at — `uiVelocity`'s
-   * meaning, but on the flick's slow law instead of the fast per-frame EMA.
-   *
-   * `uiVelocity` uses `emaAlpha` (0.85), which zeroes after a ~2-frame stick.
-   * Humans finishing a slow, deliberate swipe hold the finger still for exactly
-   * that long before lifting — so the launch velocity collapsed to ~0 while the
-   * flick memory (slow law, pause-protected) stayed high. The ride then had to
-   * accelerate the full ramp from a standstill: the strip crawled out of the
-   * release and only picked up speed ~300 ms later. That crawl is what the eye
-   * reads as a hitch mid-ride, and no frame counter can see it — every frame is
-   * delivered on time; the CURVE is what stalls.
-   *
-   * A momentary hold is motor noise, not an instruction to stop. This velocity
-   * survives it on the same grace + half-life law the flick memory already uses;
-   * a genuinely long hold still decays it, and the ride correctly starts at rest.
-   */
+  /** Continuity-launch speed on the flick's slow law (not the fast per-frame
+   * EMA). See shared/gesture/README.md § Recognition internals (the ride-crawl fix). */
   launchVelocity: number;
   width: number;
   timestamp: number;
@@ -112,14 +91,8 @@ const resolveConfig = (config?: PointerSwipeConfig): ResolvedPointerSwipeConfig 
   ...config,
 });
 
-/**
- * The gesture clock reads the EVENT's hardware-side timestamp, not the
- * handler's processing time: on a congested main thread events queue before
- * they are handled, which inflates dt and DEFLATES every computed velocity —
- * the slower the device, the number the flick. `timeStamp` shares the
- * `performance.now()` timebase in every modern engine; the fallback covers
- * synthetic events dispatched with a zero timestamp.
- */
+/** Event hardware-time, not handler time — else a congested thread deflates
+ * every velocity. See shared/gesture/README.md § Recognition internals. */
 const eventTime = (event: { timeStamp: number }): number =>
   event.timeStamp > 0 ? event.timeStamp : performance.now();
 
@@ -138,16 +111,12 @@ export function usePointerSwipe({
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
-  // The optional drag→value binding (see PointerSwipeValueBinding). Ref-held
-  // like the settings, so an inline object never re-wires anything; the
-  // anchor is captured at drag activation and every write is anchor-relative.
+  // Ref-held drag→value binding: anchor captured at activation, writes anchor-relative.
   const valueRef = useRef(value);
   valueRef.current = value;
   const valueAnchorRef = useRef(0);
 
-  // The full pointer phase is internal and synchronous. Consumers own their
-  // public dragging state through the callbacks, so pointer bookkeeping never
-  // re-renders React by itself.
+  // Pointer phase is internal + synchronous — never re-renders by itself.
   const phaseRef = useRef<PointerSwipePhase>("idle");
 
   const lockUntilRef = useRef(0);
@@ -157,12 +126,8 @@ export function usePointerSwipe({
   const gestureRef = useRef({
     startX: 0,
     startY: 0,
-    /** Anchor for the VISUAL offset. Starts at `startX`, re-anchored to the
-     * finger the moment the drag activates: the OS suppresses the first
-     * touch moves (touch slop) and queues input, so by activation the finger
-     * is already 20–40px away from `startX` — measuring the visual offset
-     * from there would teleport the deck on the first drag frame. Commit and
-     * flick judgment keep the full `startX`-based travel (`rawOffset`). */
+    /** Visual-offset anchor; re-anchored to the finger at activation. See
+     * shared/gesture/README.md § Recognition internals (visual re-anchor). */
     visualStartX: 0,
     lastX: 0,
     lastTime: 0,
@@ -177,12 +142,8 @@ export function usePointerSwipe({
     phaseRef.current = phase;
   }, []);
 
-  // The engine owns the host element itself: `hostProps.ref` below is the
-  // ONLY way an element becomes the host, so the listeners, the host styles
-  // and the native suppressors land on the same element BY CONSTRUCTION —
-  // there is no wiring contract a consumer could get wrong. The ref-state
-  // pair exists because the native-listener effect must re-run when the host
-  // node itself changes, not only when `enabled` flips.
+  // ref+state pair: the native-listener effect must re-run when the host NODE
+  // changes, not only when `enabled` flips.
   const hostElementRef = useRef<HTMLElement | null>(null);
   const [hostElement, setHostElement] = useState<HTMLElement | null>(null);
 
@@ -190,8 +151,7 @@ export function usePointerSwipe({
     (node: HTMLElement | null) => {
       hostElementRef.current = node;
       setHostElement(node);
-      // Forward to the consumer's own ref (optional): the consumer often
-      // needs the same element for its own concerns.
+      // Forward to the consumer's optional ref.
       if (typeof externalHostRef === "function") externalHostRef(node);
       else if (externalHostRef) externalHostRef.current = node;
     },
@@ -209,9 +169,8 @@ export function usePointerSwipe({
     }
   }, []);
 
-  // The pending catch (see `catchDelayMs`): a press only becomes a brake if
-  // it outlasts the intent window. Vertical intent, a lift, or a new press
-  // all void it; horizontal intent activates ahead of it.
+  // Pending catch: a press becomes a brake only if it outlasts the window.
+  // See shared/gesture/README.md § Recognition internals (the catch window).
   const catchTimerRef = useRef<number | null>(null);
 
   const clearCatchTimer = useCallback(() => {
@@ -228,9 +187,8 @@ export function usePointerSwipe({
       ensureCapture(target, pointerId);
       if (!gesture.isActivated) {
         gesture.isActivated = true;
-        // Where the finger LANDED (not where it is now): a consumer that
-        // freezes motion under the press can settle back onto the element
-        // that was actually pressed.
+        // Where the finger LANDED (not where it is now) — for settling back
+        // onto the pressed element.
         onPressStart?.({ pressClientX: gesture.startX });
       }
     },
@@ -292,9 +250,7 @@ export function usePointerSwipe({
         ),
         cfg.maxVelocity,
       );
-      // The launch velocity is the UI-domain twin of the flick memory: same slow
-      // law, so a terminal micro-hold cannot erase the speed the strip was
-      // visibly carrying (see `launchVelocity` on InternalSample).
+      // Launch velocity: UI-domain twin of the flick memory (same slow law).
       const launchVelocity = clampMagnitude(
         calculateEma(
           sampleRef.current.launchVelocity,
@@ -337,8 +293,7 @@ export function usePointerSwipe({
       timestamp?: number,
     ) => {
       const isCancel = endReason !== "release";
-      // A pending catch dies with the gesture: a lift inside the window is a
-      // tap, a vertical hand-off means the motion was never ours to brake.
+      // A pending catch dies with the gesture (a lift inside the window is a tap).
       clearCatchTimer();
       const target = hostElementRef.current;
       const now = timestamp ?? performance.now();
@@ -369,20 +324,15 @@ export function usePointerSwipe({
 
       const hasMovementOnRelease =
         typeof currentX === "number" && currentX !== gesture.lastX;
-      // The flick memory survives a lift-off hold on the human pause law
-      // (grace + half-life) — NOT the per-frame EMA decay below, which zeroes
-      // a fast gesture after a ~2-frame stick. Captured before createSample
-      // so a last-instant micro-twitch cannot wipe the gesture's speed.
+      // Flick + launch memory survive a lift-off hold on the pause law (grace +
+      // half-life), captured BEFORE the terminal sample so a last-instant twitch
+      // can't wipe them. See shared/gesture/README.md § Recognition internals.
       const pausedFlickVelocity = pauseDecayedVelocity(
         sampleRef.current.flickVelocity,
         now - sampleRef.current.timestamp,
         settingsRef.current.flickPauseGraceMs,
         settingsRef.current.flickVelocityHalfLifeMs,
       );
-      // The launch velocity gets the SAME pause law. It used to be read off the
-      // fast EMA, which a two-frame hold before lift-off zeroes — and that is
-      // precisely how a deliberate slow swipe ends. The ride then launched from
-      // a standstill and crawled through its whole acceleration ramp.
       const pausedLaunchVelocity = pauseDecayedVelocity(
         sampleRef.current.launchVelocity,
         now - sampleRef.current.timestamp,
@@ -476,14 +426,9 @@ export function usePointerSwipe({
       const target = event.currentTarget as HTMLElement;
       const interactive = getInteractiveTarget(event.target, target);
 
-      // Not the engine's surface → not the engine's press. Two ways an
-      // element declares that, both handed straight back with no capture, no
-      // ownership, no drag and no phase change — and with the click marked
-      // allowed so the post-swipe cooldown cannot swallow it either:
-      //  1. it lies outside the declared `surfaceRef` subtree (a whole chrome
-      //     layer — arrows, overlays — excluded by construction);
-      //  2. it carries `data-drag-ignore="true"` (a point exception INSIDE the
-      //     surface, e.g. a button on a card).
+      // Not the engine's surface → handed straight back (click marked allowed).
+      // Two ways to declare it: outside `surfaceRef`, or `data-drag-ignore="true"`.
+      // See shared/gesture/README.md § Principle.
       const surface = surfaceRef?.current ?? null;
       const offSurface =
         surface && event.target instanceof Node && !surface.contains(event.target);
@@ -520,15 +465,8 @@ export function usePointerSwipe({
       sampleRef.current = createIdleSample(gestureRef.current.width, now);
       setPhase("press");
 
-      // Ownership goes to any press that OUTLASTS the catch window, whatever
-      // the target — a resting finger IS the interaction ("catch the strip"),
-      // and the consumer brakes its motion under it. The window is what keeps
-      // a page scroll STARTED on the surface from hitching that motion: at
-      // press time a catch and a scroll are indistinguishable, so the engine
-      // waits `catchDelayMs` — vertical intent inside it hands the gesture to
-      // the browser untouched, horizontal intent activates ahead of it, and a
-      // quick lift stays a clean tap (click suppression is tied to a completed
-      // DRAG, never to ownership, so interactive children keep their clicks).
+      // Ownership goes to any press that outlasts the catch window (a resting
+      // finger IS the "catch the strip" interaction). See shared/gesture/README.md § Recognition internals.
       ensureCapture(target, event.pointerId);
       scheduleCatch(target, event.pointerId);
     },
@@ -560,16 +498,13 @@ export function usePointerSwipe({
           if (event.cancelable) event.preventDefault();
           activateOwnership(event.currentTarget as HTMLElement, event.pointerId);
 
-          // Re-anchor the visual origin to the finger: the deck starts its
-          // follow from rest (offset 0) instead of snapping to the distance
-          // accumulated during OS touch slop and input latency.
+          // Re-anchor the visual origin to the finger (see README § visual re-anchor).
           gesture.visualStartX = event.clientX;
 
           const sample = createSample(event.clientX, now);
           sampleRef.current = sample;
           setPhase("dragging");
-          // Value binding: anchor at the ACTIVATION read (uiOffset is ~0
-          // here, so the first write continues the value seamlessly), then
+          // Value binding: anchor at the activation read (uiOffset ~0 here),
           // write before the callbacks so they observe the fresh value.
           const binding = valueRef.current;
           if (binding) {
@@ -654,10 +589,8 @@ export function usePointerSwipe({
     };
   }, [clearCatchTimer, enabled, hostElement]);
 
-  // One inseparable bundle: the ref that MAKES an element the host travels
-  // together with the listeners and the required styles, so they cannot be
-  // applied to different elements. `ref` is present even while disabled —
-  // re-enabling and the forwarded consumer ref keep working.
+  // One inseparable bundle (ref + listeners + styles); `ref` present even while
+  // disabled so re-enabling and the forwarded consumer ref keep working.
   const hostProps = useMemo<PointerSwipeHostProps>(() => {
     if (!enabled) return { ref: setHostNode };
     return {
@@ -667,9 +600,7 @@ export function usePointerSwipe({
       onPointerMove: handlePointerMove,
       onPointerUp: (event) =>
         finishInteraction("release", event.clientX, eventTime(event)),
-      // The browser stealing the pointer mid-press (native pan, a context
-      // menu, a system gesture) — the consumer decides what an owned press
-      // that ended this way MEANS (see PointerSwipeEndReason).
+      // Browser stole the pointer mid-press (see README § End reasons).
       onPointerCancel: (event) =>
         finishInteraction("external-cancel", event.clientX, eventTime(event)),
       onLostPointerCapture: (event) =>

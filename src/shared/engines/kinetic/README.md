@@ -1,9 +1,28 @@
-# `kinetic` — the turnkey draggable value
+# kinetic
 
 One hook, one value, one element: the finger drags it, a release glides it on
 momentum (or snaps it — your policy), buttons fly it, and every ride runs as a
 WAAPI animation on the compositor with a JS fallback. The most ready-to-deploy
 member of the collection.
+
+## What it is — a facade assembly
+
+`kinetic` adds no new physics. It is a FACADE over its two forked engines
+(`internal/gesture` + `internal/motion`): `useKineticValue` wires, once, every
+seam the standalone engines leave to the consumer's rig —
+
+- the drag→value binding (finger writes straight into the motion controller);
+- the mid-flight catch (a drag's `read()` cancels the flying ride and returns
+  the live position, so the finger picks the value up without a seam);
+- the release kinetics → ride construction (a momentum glide by default, a
+  custom `resolveTarget` landing policy when given) via a single `rideTo`;
+- the compositor delivery + JS fallback + the one paint subscription.
+
+The consumer supplies only the three things no library can know: which elements
+(JSX), what the value LOOKS like (`keyframe`), and — optionally — where a release
+lands (`resolveTarget`). For the physics themselves see the digested engines:
+[`../motion`](../motion/README.md) and [`../gesture`](../gesture/README.md); the
+forks under `internal/` mirror them (and may drift by design).
 
 ## Which blank do I take?
 

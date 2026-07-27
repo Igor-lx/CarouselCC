@@ -29,27 +29,17 @@ export interface KineticConfig {
 }
 
 export interface UseKineticValueInput {
-  /** THE domain function: what a value looks like. Style-property shape
-   * (`transform`, `opacity`, …) — serves the paint, the WAAPI keyframes and
-   * the pins alike. */
+  /** THE domain function: value → style-property keyframe (`transform`,
+   * `opacity`, …); serves paint, WAAPI keyframes and pins alike. */
   keyframe: (value: number) => Keyframe;
   initialValue?: number;
   enabled?: boolean;
   config?: Partial<KineticConfig>;
-  /**
-   * Optional target policy. Absent — the built-in momentum glide. Present —
-   * it fully owns the landing: return the target value, or `null` to rest
-   * where released (e.g. snap grids: `Math.round(from / step) * step`).
-   */
+  /** Optional landing policy; absent = built-in momentum glide. Returns the
+   * target, or `null` to rest where released. See README.md § Quick start. */
   resolveTarget?: (release: KineticRelease) => number | null;
-  /**
-   * Optional: the draggable SURFACE inside the host. By default the whole
-   * host owns the finger, so a control placed inside it (the -> button in
-   * the quick start) BRAKES a flying value when pressed and held. Point this
-   * at the subtree that should actually be draggable and everything else
-   * under the host becomes chrome: no ownership, no brake, no drag, and its
-   * click still fires.
-   */
+  /** Optional draggable SURFACE inside the host; everything else becomes chrome
+   * (no brake, no drag, click still fires). See README.md § Chrome inside the host. */
   surfaceRef?: { readonly current: HTMLElement | null };
   /** Fires when any ride (glide, flyTo, snap) settles. */
   onSettle?: (value: number) => void;

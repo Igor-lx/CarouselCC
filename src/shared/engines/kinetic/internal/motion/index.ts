@@ -1,16 +1,5 @@
-/**
- * INTERNAL FORK of `shared/motion` — deliberately duplicated, not imported.
- * See the note in ../gesture/index.ts: every blank in the collection is
- * self-sufficient by contract and carries its own copies.
- */
-/**
- * The MOTION library — everything to make a numeric value travel beautifully,
- * one facade, gesture-agnostic. Sub-modules by concern: `profile/` — the
- * curve mathematics (accel/cruise/decel profiles, percent-progress stops for
- * WAAPI keyframe transport, peak-speed solver, WAAPI gate); `runtime/` — the
- * execution engine (RAF controller, the motion clock). See README.md; this
- * folder imports nothing outside itself, so it can be copied alone.
- */
+// Internal fork of shared/motion (duplicated, not imported; may drift — by
+// design). Curve math + runtime traps documented in shared/motion/README.md.
 export { createMotionController } from "./runtime/createMotionController";
 export { useMotionController } from "./runtime/useMotionController";
 export { useMotionPaint } from "./runtime/useMotionPaint";

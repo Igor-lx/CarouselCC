@@ -4,18 +4,8 @@ export type PointerSwipePhase = "idle" | "press" | "dragging" | "cooldown";
 
 export type PointerSwipeDirection = "left" | "right" | "none";
 
-/**
- * How an owned gesture ended. The distinction carries MEANING for a consumer
- * that brakes motion on the press (catch-and-hold):
- *  - "release": the finger lifted — a deliberate hold ends here (and a
- *    long-press menu also ends here on iOS);
- *  - "vertical-scroll": the engine itself recognised vertical intent — the
- *    touch was a page scroll crossing the surface, never a catch;
- *  - "external-cancel": the browser stole the pointer (native pan already in
- *    progress, a context menu opening, a system gesture). On Android the
- *    long-press menu arrives THIS way, so consumers that must tell "menu"
- *    from "scroll" watch the `contextmenu` event alongside.
- */
+/** How an owned gesture ended — carries meaning for catch-and-hold consumers.
+ * See shared/gesture/README.md § End reasons (Android long-press → `external-cancel`). */
 export type PointerSwipeEndReason = "release" | "vertical-scroll" | "external-cancel";
 
 export interface PointerSwipeConfig {
@@ -27,7 +17,7 @@ export interface PointerSwipeConfig {
    * finger travel more as the pull grows. Applied to the whole offset on
    * every sample — the engine has no notion of edges. `0` = 1:1 tracking. */
   resistance?: number;
-  /** How quickly the resistance lag ramps up with distance. */
+  /** How quickly the resistance lag ramps up with distance.*/
   resistanceCurvature?: number;
   /** Velocity safety clamp (px / ms). */
   maxVelocity?: number;
@@ -72,9 +62,8 @@ export interface PointerSwipeReleasePayload extends PointerSwipeMovePayload {
   direction: PointerSwipeDirection;
   pointerReleaseVelocity: number;
   uiReleaseVelocity: number;
-  /** UI-domain speed a continuity launch should start at — judged over the
-   * whole gesture, not the last frames (a momentary hold zeroes the raw
-   * `uiReleaseVelocity`, which would launch from a standstill). */
+  /** UI-domain continuity-launch speed, judged over the whole gesture (not the
+   * last frames). See shared/gesture/README.md § End reasons. */
   launchVelocity: number;
 }
 
@@ -86,13 +75,8 @@ export interface PointerSwipeListeners {
   onLostPointerCapture?: (e: ReactPointerEvent) => void;
 }
 
-/**
- * Everything the host element needs, as ONE spreadable bundle:
- * `<div {...hostProps}>`. The `ref` inside is what makes an element the
- * host, so the listeners, the required styles and the engine's native
- * suppressors land on the same element by construction. `ref` is always
- * present; listeners and `style` only while enabled.
- */
+/** Everything the host needs as one spreadable bundle (`<div {...hostProps}>`);
+ * the `ref` is what makes an element the host. See shared/gesture/README.md § Principle. */
 export interface PointerSwipeHostProps extends PointerSwipeListeners {
   ref: (node: HTMLElement | null) => void;
   style?: CSSProperties;
@@ -103,28 +87,8 @@ export type PointerSwipeHostRef =
   | ((node: HTMLElement | null) => void)
   | { current: HTMLElement | null };
 
-/**
- * Turnkey "the finger drags your value" — the binding that removes the last
- * consumer-side drag boilerplate (the anchor ref and the per-move write).
- *
- * When present, the engine anchors itself at drag ACTIVATION (`read()`) and
- * calls `write(anchor + uiOffset)` on activation and on every move. The
- * anchor is read at activation, not at press: `uiOffset` is measured from
- * the finger's re-anchored position and starts at ~0 there, so the first
- * write equals `read()` — the value continues from exactly where it was,
- * whatever the OS swallowed as touch slop.
- *
- * The binding is 1:1 with the finger: one pixel of travel is one unit of
- * value. A consumer whose value lives in another unit (the carousel's
- * slot-adaptive pixels→slides mapping) keeps the plain callbacks — a unit
- * conversion is domain knowledge the engine must not guess.
- *
- * `write` is where a motion-library consumer plugs its controller
- * (`controller.set(v, { phase: "dragging" })`), and `read` is where a flying
- * value gets caught: cancel the ride inside `read` and return the live
- * position — the drag then picks the value up mid-flight without a seam.
- * The callbacks (`onDragStart`/`onDragMove`) still fire after each write.
- */
+/** Turnkey "the finger drags your value". See shared/gesture/README.md § Turnkey drag→value
+ * (anchors at activation; 1:1 px↔unit; `read` catches a flying value). */
 export interface PointerSwipeValueBinding {
   /** The value's live position at drag activation — the drag's anchor. */
   read: () => number;
@@ -133,27 +97,11 @@ export interface PointerSwipeValueBinding {
 }
 
 export interface PointerSwipeProps {
-  /**
-   * OPTIONAL consumer ref: the engine owns the host element itself through
-   * `hostProps.ref` and forwards the node here, so a consumer that also
-   * needs the element (visibility, focus, measurement) does not wire a
-   * second ref onto the DOM node.
-   */
+  /** Optional consumer ref the engine forwards the owned host node into (no
+   * second ref on the DOM). */
   hostRef?: PointerSwipeHostRef;
-  /**
-   * OPTIONAL: the draggable SURFACE inside the host. When given (and
-   * mounted), only presses landing INSIDE this subtree are the engine's
-   * business — everything else under the host is CHROME (arrows, overlays,
-   * toolbars) and is handed straight back: no pointer capture, no ownership,
-   * no brake, no drag, no phase change, and its click is never swallowed by
-   * the post-swipe cooldown. A press on chrome leaves a running ride exactly
-   * as it was, just like a press on an element outside the host.
-   *
-   * Declaring the surface POSITIVELY is what makes chrome safe by
-   * construction: a control added inside the host later is excluded
-   * automatically, with nothing to remember to mark. Omit it (or leave the
-   * ref empty) and the whole host is the surface — the default, unchanged.
-   */
+  /** Optional draggable SURFACE inside the host; presses outside it are chrome,
+   * handed straight back. See shared/gesture/README.md § Principle. */
   surfaceRef?: { readonly current: HTMLElement | null };
   enabled?: boolean;
   config?: PointerSwipeConfig;

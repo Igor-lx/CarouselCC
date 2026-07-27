@@ -1,9 +1,4 @@
-/**
- * The motion time domain, as one importable clock: `performance.now()` when
- * available, `Date.now()` otherwise (SSR-safe). Controller samples, segment
- * `startedAt` stamps, and WAAPI `startTime` pinning all live in this single
- * domain — consumers read the clock from here and never mix in another time
- * source, or the compositor and the JS controller drift out of phase.
- */
+// THE motion clock — one time domain for samples, startedAt, and WAAPI pins.
+// Never mix in another time source (see shared/motion/README.md § One clock domain).
 export const motionNow = (): number =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
