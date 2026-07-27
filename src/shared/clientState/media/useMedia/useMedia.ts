@@ -26,19 +26,8 @@ export interface MediaState {
   signature: string;
 }
 
-/**
- * THE media facade — one call resolves a whole set of media axes (width
- * tiers + orientation + arbitrary flag conditions) for a caller-supplied
- * config. Combines the single-axis library primitives over the ONE shared
- * `useMediaQuery` store (a single browser listener per distinct condition,
- * no matter how many consumers or how many times this is called). Distinct
- * from the base `useMediaQuery` primitive: that evaluates ONE query to a
- * bool; this resolves a NAMED set of axes to a structured state.
- *
- * `axes` MUST be a static module constant: one hook is subscribed per
- * tracked condition, so the set's size and order may not change between
- * renders.
- */
+// See ./README.md — `axes` MUST be a static module constant: one hook is
+// subscribed per tracked condition, so its size/order may not change per render.
 export function useMedia(axes: MediaAxes): MediaState {
   const queries = canonicalMediaQueries(axes);
   const bits = queries.map((query) =>

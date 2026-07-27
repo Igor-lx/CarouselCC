@@ -9,13 +9,7 @@ export const LANDSCAPE_ORIENTATION_QUERY = "(orientation: landscape)";
 
 export type ViewportOrientation = "portrait" | "landscape";
 
-/**
- * The viewport orientation as a NAME. Pure aspect of the viewport (is the
- * height greater than the width) — nothing about device class or size;
- * contrast `useShortLandscape`, which adds an independent max-HEIGHT ceiling
- * (a handheld held sideways). A desktop monitor is `landscape` here but
- * never compact-landscape.
- */
+/** Viewport orientation by aspect only (contrast `useShortLandscape`, which caps height). */
 export function useOrientation(): ViewportOrientation {
   return useMediaQuery(PORTRAIT_ORIENTATION_QUERY) ? "portrait" : "landscape";
 }

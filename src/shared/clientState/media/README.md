@@ -1,6 +1,6 @@
-# `media` — reactive CSS media conditions
+# media
 
-Everything that answers "does this media condition hold right now" — width
+Reactive CSS media conditions. Everything that answers "does this media condition hold right now" — width
 tiers, orientation, arbitrary queries. Two ways to take it:
 
 | Folder | Take it when |

@@ -1,6 +1,6 @@
-# `useMedia` — the media facade
+# useMedia
 
-One call resolves a whole set of media axes at once.
+The media facade. One call resolves a whole set of media axes at once.
 
 ```ts
 const m = useMedia({ breakpoints: { desktop: 1024, mobile: 0 }, flags: { tall: "(orientation: portrait)" } });
