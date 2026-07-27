@@ -1,14 +1,4 @@
-/**
- * Universal numeric validators — pure, dependency-free type guards for
- * checking configuration values, props, and constants (the diagnostic
- * layer's vocabulary, but nothing here is component-specific).
- *
- * Every guard (and every guard a factory returns) accepts `unknown` and
- * implies finiteness: `NaN`, `±Infinity`, and non-numbers never pass. That
- * makes each predicate self-sufficient — callers do not need a separate
- * finite pre-check.
- */
-
+// See ./README.md — every guard accepts `unknown` and implies finiteness.
 export const isFiniteNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
 

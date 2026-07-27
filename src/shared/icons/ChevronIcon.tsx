@@ -1,3 +1,4 @@
+// See ./README.md
 export type ChevronDirection = "right" | "left" | "up" | "down";
 
 interface ChevronIconProps {

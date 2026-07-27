@@ -1,15 +1,10 @@
+// See ./README.md
 import { Children, isValidElement, type ReactNode } from "react";
 
 interface SlottedComponent {
   slot?: string;
 }
 
-/**
- * Reads `children` and returns a record keyed by the known slot names. Each
- * child whose `type.slot` matches one of the names is assigned to that slot
- * (last child wins). Unknown slots are dropped in production and warned in
- * development. Missing slots are returned as `null`.
- */
 export function resolveSlots<T extends string>(
   children: ReactNode,
   slots: readonly T[],
