@@ -34,9 +34,7 @@ const onPointerDown = (event: PointerEvent) => {
 const subscribe = (callback: () => void) => {
   listeners.add(callback);
 
-  // Gated on the subscriber COUNT, not on whether the MediaQueryList exists: a
-  // re-subscribe after a full teardown must re-attach the change listener and
-  // re-sync from the live value.
+  // Count-gated: re-subscribe after teardown must re-attach + re-sync (see README).
   if (listeners.size === 1 && typeof window !== "undefined") {
     isTouch = read();
     initialized = true;
@@ -53,19 +51,13 @@ const subscribe = (callback: () => void) => {
     if (listeners.size === 0) {
       mediaQuery?.removeEventListener("change", onMediaChange);
       window.removeEventListener("pointerdown", onPointerDown);
-      // Dormant: nothing keeps the value fresh any more, so force the next
-      // consumer (subscribe OR a render-time getSnapshot) to re-read.
-      initialized = false;
+      initialized = false; // dormant → next consumer re-reads live
     }
   };
 };
 
-/**
- * LAZY LIVE read on the first call: React reads the snapshot during render,
- * BEFORE it subscribes. Returning a cached `false` there reported "not a touch
- * device" for the whole first frame on every phone — and any consumer that
- * latched that first value (e.g. `useState(isTouch)`) stayed wrong for good.
- */
+// Lazy live read: a cached `false` would be wrong the whole first frame — and a
+// latched consumer (useState(isTouch)) forever. See ../README.md
 const getSnapshot = () => {
   if (!initialized) {
     isTouch = read();
@@ -76,11 +68,6 @@ const getSnapshot = () => {
 
 const getServerSnapshot = () => false;
 
-/**
- * Reports whether the device is touch-first. Backed by `useSyncExternalStore`,
- * which handles the SSR/hydration snapshot split natively via
- * `getServerSnapshot` — no manual mount gate needed.
- */
 export function useIsTouchDevice(): boolean {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

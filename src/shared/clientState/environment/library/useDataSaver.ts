@@ -1,10 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-/**
- * Minimal shape of the non-standard `navigator.connection` (Network
- * Information API). Only `saveData` and its change events are needed; the
- * rest of the surface is intentionally not modeled.
- */
+/** Minimal shape of the non-standard `navigator.connection` (only `saveData`). */
 interface NetworkInformationLike extends EventTarget {
   readonly saveData?: boolean;
 }
@@ -26,12 +22,7 @@ const listeners = new Set<() => void>();
 
 const notify = (): void => listeners.forEach((listener) => listener());
 
-/**
- * Live read of BOTH signals; the MediaQueryList and the connection handle are
- * created once and reused. `saveDataEnabled` is recomputed from scratch every
- * time, so an environment without `navigator.connection` can never keep a
- * stale value.
- */
+// Live read of both signals; handles made once, saveData recomputed each time.
 const read = (): void => {
   if (typeof window === "undefined") return;
   reducedDataQuery ??= window.matchMedia("(prefers-reduced-data: reduce)");
@@ -56,9 +47,7 @@ const onConnectionChange = (): void => {
 const subscribe = (callback: () => void): (() => void) => {
   listeners.add(callback);
 
-  // Gated on the subscriber COUNT, not on whether the MediaQueryList exists: a
-  // re-subscribe after a full teardown must re-attach both change listeners and
-  // re-sync from the live values.
+  // Count-gated: re-subscribe after teardown must re-attach + re-sync (see README).
   if (listeners.size === 1 && typeof window !== "undefined") {
     read();
     initialized = true;
@@ -71,19 +60,12 @@ const subscribe = (callback: () => void): (() => void) => {
     if (listeners.size > 0) return;
     reducedDataQuery?.removeEventListener("change", onReducedDataChange);
     connection?.removeEventListener("change", onConnectionChange);
-    // Dormant: nothing keeps the values fresh any more, so force the next
-    // consumer (subscribe OR a render-time getSnapshot) to re-read.
-    initialized = false;
+    initialized = false; // dormant → next consumer re-reads live
   };
 };
 
-/**
- * Snapshot when reduced-data observation is active — with a LAZY LIVE read on
- * the first call: React reads the snapshot during render, BEFORE it subscribes.
- * Returning the cached `false` there reported "data-saver off" for the whole
- * first frame — which is the very frame the off-band image fetch policy is
- * decided in, so a data-saving user could still eat the speculative requests.
- */
+// Lazy live read: a cached `false` on the first frame (when the fetch policy is
+// decided) would let a data-saving user eat speculative requests. See ../README.md
 const getSnapshot = (): boolean => {
   if (!initialized) {
     read();
@@ -92,29 +74,12 @@ const getSnapshot = (): boolean => {
   return prefersReducedData || saveDataEnabled;
 };
 
-/**
- * Neutral snapshot used both for SSR/hydration and for the disabled hook —
- * in either case there is no observed signal, so data-saving reads as off.
- */
+// Neutral snapshot for SSR + the disabled hook (no observed signal → off).
 const getNeutralSnapshot = (): boolean => false;
-
-/** No-op subscription for the disabled hook: never touches the store. */
 const noopSubscribe = (): (() => void) => () => undefined;
 
-/**
- * Reports whether the user has opted into reduced data usage — via the
- * `prefers-reduced-data` media query or the Network Information API's
- * `saveData` flag. Backed by `useSyncExternalStore`, which handles the
- * SSR/hydration snapshot split natively.
- *
- * Pass `enabled = false` to call the hook unconditionally (Rules of Hooks)
- * without subscribing to the store — for callers whose feature is itself
- * inactive, so they would never act on the result anyway.
- *
- * Intended only to skip *speculative* network work (e.g. image warm-up). It
- * must never gate correctness-critical work — error handling, retry, or
- * anything the user actually sees.
- */
+// SPECULATIVE work only — never gate correctness. enabled=false skips the store
+// (Rules of Hooks) for inactive callers. See ../README.md
 export function useDataSaver(enabled = true): boolean {
   return useSyncExternalStore(
     enabled ? subscribe : noopSubscribe,
