@@ -1,3 +1,4 @@
+// See ../README.md
 import type {
   MotionCompletionMode,
   MotionController,
@@ -142,9 +143,8 @@ export function createMotionController<Strategy extends string = string>(
     frameId = requestFrame(tick);
   };
 
-  // The passive counterpart of `tick`: one wake-up at the segment's end instead
-  // of one per frame. Settling from `endTime` (never from the timer's own,
-  // possibly early, firing) keeps the final sample exactly the curve's end.
+  // Passive counterpart of tick: one wake-up at the end; settle from endTime
+  // (not the timer's own firing) so the final sample is exactly the curve's end.
   const scheduleSettle = (endTime: number) =>
     setTimeout(
       () => {
@@ -156,9 +156,7 @@ export function createMotionController<Strategy extends string = string>(
 
   return {
     captureHandoff(timestamp = now()): MotionHandoff<Strategy> {
-      // One coherent point: position and velocity from the SAME sample of the
-      // active curve (or the resting sample when idle). No emit, no cancel, no
-      // subscriber notification — just the math.
+      // Position + velocity from the SAME sample; no emit/cancel/notify.
       const point = active ? sampleActive(timestamp) : sample;
       if (active) sample = point;
       return {
@@ -226,8 +224,7 @@ export function createMotionController<Strategy extends string = string>(
 
     wake() {
       if (!active || frameId !== null) return;
-      // The settle timer was the passive segment's only wake-up; the frame
-      // loop it hands over to finalizes at the curve's end on its own.
+      // Drop the passive settle timer; the frame loop finalizes at the end itself.
       if (settleTimerId !== null) {
         clearTimeout(settleTimerId);
         settleTimerId = null;
@@ -286,12 +283,7 @@ export function createMotionController<Strategy extends string = string>(
       });
     },
 
-    /**
-     * Soft, idempotent teardown: cancels any active motion and clears
-     * subscribers. The controller stays usable afterwards — `start`,
-     * `subscribe`, `captureHandoff` all work — so a React StrictMode
-     * unmount/remount can reuse the same instance. Call on real unmount.
-     */
+    /** Soft, idempotent teardown — the controller stays usable (StrictMode-safe). */
     destroy() {
       this.cancel();
       subscribers.clear();

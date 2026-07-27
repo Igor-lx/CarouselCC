@@ -12,55 +12,18 @@ import type { MotionController, MotionSample } from "../runtime/types";
 import { useMotionPaint } from "../runtime/useMotionPaint";
 import { startPinnedAnimation } from "./pinnedAnimation";
 
-/**
- * The turnkey compositor path for the CANONICAL shape: one controller (one
- * number) painted through ONE element's WAAPI animation — a strip, a knob, a
- * progress bar, the tutorial circle. It bundles what such a consumer would
- * otherwise assemble by hand from this library's parts:
- *
- *   stops from the profile → keyframes in the caller's domain →
- *   `startPinnedAnimation` → controller runs the SAME segment passively
- *   (no frame loop; it stays the position SSOT for handoffs) → on finish the
- *   final style is pinned and the animation dropped → on cancel the live
- *   position is pinned and the controller's loop woken to take the paint
- *   back.
- *
- * On top of the low-level `start(segment)` it offers the whole high-level
- * vocabulary a simple consumer needs, so no ride is ever assembled by hand:
- *
- *  - `flyTo({ to, cruiseSpeed })` — build the profile AND the segment
- *    internally, continuing velocity-seamlessly from the live handoff;
- *  - `dragBinding()` — the standard finger↔value glue, shaped to drop
- *    straight into the gesture library's `value` prop (matched structurally;
- *    the libraries still never import each other);
- *  - `position()` — the live value off the curve, never the DOM.
- *
- * Consumers that fan ONE value out into MANY elements (a dot strip, where
- * each element runs its own derived keyframes) are the OTHER shape: their
- * choreography is domain logic by nature, and they compose the same
- * primitives directly — `keyframesAlongStops` + `startPinnedAnimation` per
- * element. This rider deliberately does not try to cover them.
- *
- * JS fallback is built in: when the compositor cannot take the ride (no
- * WAAPI, engine throw, no element), the controller runs the segment with its
- * frame loop and the consumer's paint subscription (see `useMotionPaint`,
- * or the hook's built-in paint below) carries the pixels — `start`/`flyTo`
- * report which path was taken.
- */
+// The turnkey compositor path for ONE controller painted through ONE element
+// (strip, knob, progress bar): stops → keyframes → pinned animation, controller
+// runs the same segment passively. Fan-out-to-many is the other shape (compose
+// the primitives directly). JS fallback built in. See ../README.md.
 
-/**
- * Default profile shape of a `flyTo` ride: 30% of the distance accelerating,
- * 40% decelerating, the rest cruising — a soft, generic S that reads well
- * from a standstill and into a landing alike. Override per call.
- */
+/** Default `flyTo` ride shape (accel / decel distance shares); override per call. */
 export const DEFAULT_RIDE_SHARES = {
   accelerationDistanceShare: 0.3,
   decelerationDistanceShare: 0.4,
 } as const;
 
-/** Rider-level defaults: the moving element (a React ref object) and the
- * caller's domain function. Given once, they free every `flyTo`/`start` call
- * from repeating them — and let the hook wire the paint automatically. */
+/** Rider-level defaults (the element + the caller's `value → keyframe`). */
 export interface CompositedRideDefaults {
   element?: { current: Element | null };
   toKeyframe?: (value: number) => Keyframe;
@@ -69,9 +32,7 @@ export interface CompositedRideDefaults {
 export interface CompositedRideStart<Strategy extends string> {
   element?: Element | null;
   segment: ProfileSegment<Strategy>;
-  /** The caller's domain: the style of `value`. Property names are style
-   * properties (`transform`, `opacity`, …) — the same shape WAAPI keyframes
-   * use, so one function serves the keyframes AND the pins. */
+  /** `value` → a keyframe (style props); one fn serves both keyframes and pins. */
   toKeyframe?: (value: number) => Keyframe;
   /** Forwarded to the controller — fires when the segment settles. */
   onSettle?: (sample: MotionSample<Strategy>) => void;
@@ -111,12 +72,8 @@ export interface CompositedRide<Strategy extends string> {
   /** Build and start one ride — profile, segment, handoff continuation and
    * delivery all internal. The whole "button" and "release" story. */
   flyTo: (options: CompositedRideFlight<Strategy>) => boolean;
-  /**
-   * Tear the compositor animation down and hand the paint back to the
-   * controller's loop, pinned at `position` (default: the live handoff
-   * position — sampled from the curve on the shared clock, so it matches
-   * what the compositor just painted). A no-op when nothing is composited.
-   */
+  /** Tear the compositor animation down and hand paint back, pinned at `position`
+   * (default: the live handoff). No-op when nothing is composited. */
   cancel: (position?: number) => void;
   /** The standard drag glue: `read` catches any flying ride at its live
    * position, `write` feeds the finger straight into the controller. Drop
@@ -130,9 +87,7 @@ export interface CompositedRide<Strategy extends string> {
 
 const KEYFRAME_META = new Set(["offset", "easing", "composite"]);
 
-/** Write one keyframe's style properties directly onto the element — the pin
- * used at origin, finish and cancel, so the painted style and the animation
- * endpoints can never disagree about what a `value` looks like. */
+/** Write a keyframe's style props onto the element (the pin at origin/finish/cancel). */
 export const applyKeyframe = (element: Element, keyframe: Keyframe) => {
   const style = (element as HTMLElement).style;
   if (!style) return;
@@ -159,8 +114,7 @@ export const createCompositedRide = <Strategy extends string>(
     if (!animation || !ridden) return;
     const active = animation;
     const pin = position ?? controller.captureHandoff().position;
-    // Pin BEFORE cancelling: cancel drops the fill and the element would
-    // flash back to its pre-ride style for a frame.
+    // Pin BEFORE cancelling — cancel drops the fill, else a 1-frame flash back.
     applyKeyframe(ridden.element, ridden.toKeyframe(pin));
     drop();
     try {
@@ -168,10 +122,8 @@ export const createCompositedRide = <Strategy extends string>(
     } catch {
       // already gone
     }
-    // The compositor was this segment's paint owner and the controller is
-    // passive; wake its loop or the value freezes here and teleports at the
-    // settle. Harmlessly superseded when a new segment starts right after.
-    controller.wake();
+    controller.wake(); // passive controller has no loop → wake or it freezes
+
   };
 
   const start = ({
@@ -206,8 +158,7 @@ export const createCompositedRide = <Strategy extends string>(
         ridden = { element, toKeyframe };
         started.onfinish = () => {
           if (animation !== started) return;
-          // Park the exact destination style, then drop the animation — the
-          // element keeps the pinned style, no one-frame gap.
+          // Pin the exact destination style, then drop (no one-frame gap).
           applyKeyframe(element, toKeyframe(segment.to));
           drop();
           try {
@@ -270,8 +221,7 @@ export const createCompositedRide = <Strategy extends string>(
   };
 
   const binding: RideDragBinding = {
-    // Catch a flying value at its live position: cancel pins the element
-    // there and the drag picks it up seamlessly.
+    // Catch a flying value at its live position (drag picks it up seamlessly).
     read: () => {
       const handoff = controller.captureHandoff();
       cancel(handoff.position);
@@ -290,15 +240,8 @@ export const createCompositedRide = <Strategy extends string>(
   };
 };
 
-/**
- * React ownership of a {@link CompositedRide}: one rider per controller
- * identity, no per-render allocation. When `defaults` carry the element and
- * the domain function, the hook ALSO wires the paint subscription — the
- * consumer then writes no `useMotionPaint` of its own: drags, JS-fallback
- * frames and settle emits all paint through the same keyframe function the
- * rides use. `defaults.toKeyframe` is read through a ref, so an inline
- * function never re-wires anything.
- */
+// One rider per controller; with defaults it also wires the paint subscription
+// (drags + JS-fallback + settle) through the same keyframe fn. See ../README.md.
 export function useCompositedRide<Strategy extends string>(
   controller: MotionController<Strategy>,
   defaults?: CompositedRideDefaults,
@@ -318,8 +261,7 @@ export function useCompositedRide<Strategy extends string>(
           return defaultsRef.current?.element;
         },
         get toKeyframe() {
-          // Presence-aware and latest-read: absent stays absent (the JS
-          // path), present reads THROUGH the ref on every call.
+          // Presence-aware, latest-read: absent stays absent (JS path).
           return defaultsRef.current?.toKeyframe
             ? (value: number) => defaultsRef.current!.toKeyframe!(value)
             : undefined;

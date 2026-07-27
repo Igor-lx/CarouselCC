@@ -1,57 +1,9 @@
+// See ../README.md § Curve math + WAAPI transport.
 import { clamp } from "./clamp";
 import { sampleMotionProfile, type MotionProfile } from "./profile";
 
-/**
- * Progress-curve sampling — the bridge that lets ANY accel/cruise/decel
- * motion profile run on the compositor thread.
- *
- * The engine computes a `MotionProfile` once (zones, speeds, duration). This
- * module renders that profile's *temporal shape* into a percent domain:
- * uniform samples of distance-progress (0..1) over time-progress (0..1). The
- * normalized curve is consumer-agnostic — the track maps it onto N page
- * screens of pixels, the pagination widget onto one dot step — which is what
- * keeps every consumer synchronized while travelling different distances.
- *
- * The stops are delivered to the compositor as WAAPI KEYFRAMES (one keyframe
- * per stop, evenly distributed, default linear interpolation between them) —
- * deliberately NOT as a CSS `linear()` easing, which would express the same
- * piecewise-linear curve but only on 2023+ engines. Keyframes make every
- * engine with `Element.animate` (~2015+) run the exact same curve; only
- * engines with no WAAPI at all fall back to the JS per-frame path.
- */
-
-/**
- * Serialization density of a curve, derived from the CURVE ITSELF.
- *
- * The browser interpolates LINEARLY between keyframes, so a serialized curve
- * is a polyline: position error is tiny (~h²·|f''|/8, sub-pixel at any sane
- * density), but VELOCITY is piecewise-CONSTANT and jumps at every stop. What
- * the eye reads is that jump — and what makes it visible is its SIZE relative
- * to the speed being tracked, not how long the segment lasted.
- *
- * That distinction decides the whole rule, because the relative jump is
- * dimensionless in time. A zone's steepest acceleration is `1.5·Δv/T` (the
- * smoothstep speed law peaks at 1.5× its mean slope, at the zone's midpoint),
- * so over a segment of length `h` the speed moves by `1.5·Δv·h/T`. Divide by
- * the peak speed and both the profile's timescale and the display's cancel
- * out: the answer is a stop COUNT, and it is the same count for a 300 ms
- * flick and a 3 s ride, on a 60 Hz panel and a 120 Hz one.
- *
- * Two rules this replaces, both wrong in the same way — they fixed the wrong
- * quantity:
- *  - a fixed COUNT (32) let a long ride's relative jump reach ~15%, above the
- *    ~10% at which smooth-pursuit vision reads a velocity change, so slow
- *    button rides stepped;
- *  - a fixed INTERVAL (one stop per 16 ms) silently encoded a 60 Hz display.
- *    Re-derived honestly from the refresh rate it would have doubled the
- *    keyframe count on a 120 Hz panel — and the keyframes are built in the
- *    frame the ride STARTS, one of only two frames the carousel spends
- *    main-thread time in — to shrink a 3% jump to 1.5%, which no eye reads.
- *
- * Deriving the count from the profile also keeps it honest under tuning: make
- * the launch sharper (a smaller acceleration share) and the density rises on
- * its own, because that is what actually changed.
- */
+// Density derived from the curve so the relative velocity step stays ~5%
+// regardless of duration/refresh (see README). Clamped to [32, 256].
 const MAX_RELATIVE_VELOCITY_STEP = 0.05;
 const MIN_PROGRESS_STOP_INTERVALS = 32;
 const MAX_PROGRESS_STOP_INTERVALS = 256;
@@ -73,8 +25,7 @@ export const resolveProgressStopIntervals = (profile: MotionProfile): number => 
     );
   }
 
-  // A profile with no speed change anywhere (pure cruise) has no velocity
-  // step to hide; the floor is all it needs.
+  // Pure cruise has no velocity step to hide; the floor is enough.
   if (!(peakSpeed > 0) || !(peakAcceleration > 0)) {
     return MIN_PROGRESS_STOP_INTERVALS;
   }
@@ -87,12 +38,7 @@ export const resolveProgressStopIntervals = (profile: MotionProfile): number => 
   );
 };
 
-/**
- * Uniform distance-progress samples of a profile: index `i` is the progress
- * at time `duration * i / (stops - 1)`. First stop is exactly 0, last exactly
- * 1, and the sequence is forced monotonic so float noise can never serialize
- * a backwards step.
- */
+/** Uniform distance-progress samples (0..1); forced monotonic, ends exact. */
 export const profileProgressStops = (
   profile: MotionProfile,
   distance: number,
@@ -115,13 +61,7 @@ export const profileProgressStops = (
   return stops;
 };
 
-/**
- * Piecewise-linear read of a stops array at `timeFraction` (0..1) — the same
- * interpolation the browser applies between the keyframes built from the
- * stops. Used by consumers that need the current progress of a running
- * compositor animation without reading the DOM (e.g. the widget re-planning
- * a step from its mid-flight position).
- */
+/** Piecewise-linear read of a stops array (same as the browser's keyframe interp). */
 export const sampleProgressStops = (
   stops: readonly number[],
   timeFraction: number,
@@ -136,19 +76,7 @@ export const sampleProgressStops = (
   return stops[lower]! + (stops[upper]! - stops[lower]!) * t;
 };
 
-/**
- * Re-sample a stops array to a COARSER uniform grid, on the same curve.
- *
- * Serialization density is chosen for the widest-travelling consumer (the
- * one where a velocity step is visible at all — see the density note above).
- * A consumer whose element travels a few pixels — a pagination dot — reads
- * no step at any density, yet pays the full price: one keyframe per stop,
- * per element, built on every ride. Handing it a coarser grid of the SAME
- * curve keeps every consumer on one temporal shape while cutting that cost.
- *
- * Uniform in time and exact at both ends, so a re-sampled curve stays
- * synchronized with the full-density one it came from.
- */
+/** Re-sample stops to a coarser uniform grid on the same curve (see README). */
 export const resampleStops = (
   stops: readonly number[],
   intervals: number,
@@ -163,21 +91,7 @@ export const resampleStops = (
   return out;
 };
 
-/**
- * Peak speed that makes an accel/cruise/decel profile cover `distance` in
- * exactly `duration` (duration-authored motions: click step, autoplay step,
- * snap-back, non-inertial gesture release).
- *
- * With zone shares a/c/d (normalized), start speed s0 and end speed 0, the
- * zone times sum to
- *   T = 2aD/(s0+p) + cD/p + 2dD/p
- * which rearranges into the quadratic
- *   T·p² + (T·s0 − 2aD − (c+2d)D)·p − (c+2d)·D·s0 = 0
- * whose positive root is the peak. When the handed-off `startSpeed` already
- * exceeds the solved peak, the profile builder raises the peak to cover it
- * and the segment simply arrives earlier than `duration` — continuity of the
- * visible motion wins over exact timing.
- */
+/** Peak speed so the profile covers `distance` in `duration` (quadratic root; see README). */
 export const resolvePeakSpeedForDuration = ({
   distance,
   duration,
@@ -194,9 +108,7 @@ export const resolvePeakSpeedForDuration = ({
   const absDistance = Math.abs(distance);
   if (!(absDistance > 0) || !(duration > 0)) return 0;
 
-  // Raw shares, trusted as-is (the engine no longer reshapes over-allocation);
-  // an over-allocated pair yields a negative cruise share, mirroring the
-  // profile builder.
+  // Shares trusted as-is; over-allocation → negative cruise, mirroring the builder.
   const accelerationShare = accelerationDistanceShare;
   const decelerationShare = decelerationDistanceShare;
   const cruiseShare = 1 - accelerationShare - decelerationShare;
@@ -223,27 +135,13 @@ export interface InFlightSpan {
   stops: readonly number[];
 }
 
-/**
- * Where the span has reached at `now` — sampled from the curve itself, never
- * read back from the DOM. A finished (or degenerate) span reads as its end.
- * The consumer-side twin of `profileProgressStops`: whoever runs a stop-encoded
- * motion needs this the moment a NEW motion arrives mid-flight and must be
- * continued from the live position.
- */
+/** Where the span has reached at `now`, sampled from the curve (never the DOM). */
 export const positionAtNow = (span: InFlightSpan, now: number): number => {
   const fraction = span.duration > 0 ? (now - span.startedAt) / span.duration : 1;
   return span.from + (span.to - span.from) * sampleProgressStops(span.stops, fraction);
 };
 
-/**
- * One keyframe per stop: the i-th is `evaluate` applied to the position the
- * motion has reached by `stops[i]`. Uniform time offsets with linear
- * interpolation between them — the same delivery `profileProgressStops` was
- * designed for, closing the transport loop inside the engine: produce the
- * stops here, turn them into keyframes here. Each consumer supplies only the
- * mapping from a position to whatever it paints (pixels, projections,
- * opacities), which is what keeps this domain-agnostic.
- */
+/** One keyframe per stop; the consumer supplies only position → its own paint value. */
 export const keyframesAlongStops = <T>(
   from: number,
   to: number,
@@ -260,11 +158,7 @@ export const keyframesAlongStops = <T>(
 
 let waapiSupport: boolean | null = null;
 
-/**
- * Cached capability check for the Web Animations API — the ONLY gate between
- * the compositor path and the per-frame JS fallback. Keyframe-encoded curves
- * need nothing newer than `Element.animate` itself.
- */
+/** Cached WAAPI capability check — the only gate to the compositor path. */
 export const isWaapiSupported = (): boolean => {
   if (waapiSupport === null) {
     waapiSupport =

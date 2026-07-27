@@ -18,13 +18,7 @@ export interface MotionSampleData<Strategy extends string = string> {
   strategy: Strategy;
 }
 
-/**
- * An atomic motion-continuation point: the coherent `(position, velocity)` of
- * the controller as of one `timestamp`. Returned by `captureHandoff` so a
- * caller starting a new segment cannot accidentally mix a position from one
- * moment with a velocity from another — there is exactly one method and one
- * answer. Distinct from `MotionSample` (the full visual frame for UI).
- */
+// See ../README.md — atomic continuation point (one method, one answer).
 export interface MotionHandoff<Strategy extends string = string> {
   position: number;
   velocity: number;
@@ -55,19 +49,8 @@ export interface MotionStartOptions<
   sampler: MotionSegmentSampler<Segment, Strategy>;
   onComplete?: (sample: MotionSample<Strategy>) => void;
   completion?: MotionCompletionMode;
-  /**
-   * Set when this segment's paint is owned elsewhere — a compositor animation
-   * running the same curve — so no subscriber needs the per-frame stream.
-   *
-   * The controller then runs the segment without a frame loop: it sleeps and
-   * wakes once, at the end, to settle. It stays the position SSOT throughout —
-   * on-demand reads (`captureHandoff`, `sampleAt`) sample the live curve, so
-   * an interruption mid-segment is as precise as it is under a frame loop.
-   *
-   * Ticking a segment nobody reads is not free: a frame callback registered
-   * every frame drags the main thread through a full paint lifecycle behind a
-   * ride that needs none of it.
-   */
+  /** Paint owned elsewhere (a compositor animation): run with NO frame loop,
+   * still the position SSOT. See ../README.md § Passive segments. */
   isPassive?: boolean;
 }
 
@@ -90,12 +73,7 @@ export type MotionSubscriber<Strategy extends string = string> = (
 ) => void;
 
 export interface MotionController<Strategy extends string = string> {
-  /**
-   * The atomic motion-continuation point as of `timestamp` — a coherent
-   * `(position, velocity)` from the active curve (or the resting sample when
-   * idle). The single API for handing motion off to a new segment; it cannot
-   * be mixed with `getSnapshot`. Does not emit, cancel, or notify subscribers.
-   */
+  /** Atomic handoff for starting a new segment — never mix with getSnapshot. */
   captureHandoff: (timestamp?: number) => MotionHandoff<Strategy>;
   /** The last *emitted* visual frame — for UI reads, not motion handoff. */
   getSnapshot: () => MotionSample<Strategy>;
@@ -109,14 +87,8 @@ export interface MotionController<Strategy extends string = string> {
   ) => void;
   set: (value: number, options?: MotionSetOptions<Strategy>) => void;
   snap: (value: number, options?: MotionSnapOptions<Strategy>) => void;
-  /**
-   * Resume the frame loop for a passive segment whose external paint owner
-   * disappeared mid-flight (its compositor animation was cancelled — a
-   * geometry re-base, a rotation). The controller takes the paint back and
-   * emits the segment's remaining frames itself; without this the strip
-   * freezes where the animation died and teleports at the settle. A no-op
-   * when idle or already ticking.
-   */
+  /** Resume the frame loop for a passive segment whose paint owner vanished
+   * (else freeze + teleport at settle). See ../README.md § wake. */
   wake: () => void;
   cancel: () => void;
   destroy: () => void;
