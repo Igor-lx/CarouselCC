@@ -1,11 +1,5 @@
-/**
- * The GESTURE library — everything for touch (finger) control, one facade.
- * Sub-modules by concern: `swipe/` — gesture registration (the hook, host
- * props, recognition); `inertia/` — the kinetic meaning of a release
- * (intent speed, continuity launch). See README.md for the quick start and
- * the standard rig with the `motion` library (referenced by name — this
- * folder imports nothing outside itself, so it can be copied alone).
- */
+// The gesture library facade: swipe/ (registration) + inertia/ (release meaning).
+// Imports nothing outside itself → copy-portable. See README.md.
 export { usePointerSwipe, POINTER_SWIPE_DEFAULTS } from "./swipe/usePointerSwipe";
 export { DRAG_IGNORE_ATTRIBUTE } from "./swipe/internals/index";
 export type {

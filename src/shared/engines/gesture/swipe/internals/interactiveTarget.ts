@@ -1,15 +1,7 @@
-/**
- * Recognition of interactive descendants: a press that starts on a button,
- * link, form control (or anything opted out via the drag-ignore attribute)
- * must stay a click unless the finger clearly turns it into a horizontal
- * drag.
- */
+// Interactive-descendant recognition: a press on a control stays a click unless
+// the finger clearly turns it into a horizontal drag. See ../../README.md § Principle.
 
-/**
- * Opt-out escape hatch: any element carrying `data-drag-ignore="true"` (or a
- * descendant of one) is treated as interactive — the engine never starts a
- * drag from it and never suppresses its clicks after a swipe.
- */
+/** Opt-out marker: `data-drag-ignore="true"` → never a drag, click preserved. */
 export const DRAG_IGNORE_ATTRIBUTE = "data-drag-ignore";
 
 const INTERACTIVE_TARGET_SELECTOR = [
@@ -40,17 +32,9 @@ export const getInteractiveTarget = (
   return interactive;
 };
 
-/**
- * The explicit opt-out, on its own: an element (or ancestor) marked
- * `data-drag-ignore="true"` is NOT part of the draggable surface. Unlike
- * plain interactivity — a `<button>` may well BE the surface, e.g. an
- * interactive slide — this marker is a deliberate statement by the host, so
- * the engine takes no ownership and starts no drag from it.
- *
- * Use it for point exceptions INSIDE the surface (a like button on a card).
- * For a whole chrome layer, declare the surface positively instead
- * (`surfaceRef`) — that cannot be forgotten on the next element added.
- */
+/** The explicit opt-out alone: `data-drag-ignore="true"` is a deliberate
+ * "not the surface" for point exceptions inside it (a like button on a card).
+ * For a whole chrome layer use `surfaceRef`. See ../../README.md § Principle. */
 export const getDragIgnoreTarget = (
   target: EventTarget | null,
   boundary: HTMLElement,

@@ -1,25 +1,6 @@
+// See ../README.md § Release model — flick intent + continuity launch in one call.
 import { resolveInertialRelease } from "./inertialRelease";
 import { resolveReleaseLaunch } from "./releaseLaunch";
-
-/**
- * The WHOLE kinetic meaning of a release, in one call — the fusion of this
- * module's two primitives, so a consumer no longer needs to know the recipe
- * that combines them:
- *
- *  1. `resolveInertialRelease` judges the INTENT: was this a flick? If the
- *     finger left faster than the consumer's base tempo, the ride's cruise
- *     is the boosted release speed (`inertiaBoost`) — a hard flick rides
- *     visibly faster than a lazy one. Otherwise the base tempo stands.
- *  2. `resolveReleaseLaunch` shapes the CONTINUITY: the ride starts at the
- *     velocity the eye saw at lift-off (pause-protected `launchVelocity`)
- *     and accelerates to that intent — content never jumps above its
- *     visible speed, and a fast lift-off collapses the ramp by itself.
- *
- * Feed the release payload's fields straight in (the extra payload fields
- * are ignored), name the travel and the base tempo — get the profile
- * endpoints back. The primitives stay exported for consumers with bespoke
- * pipelines (a carousel's duration-authored tempo and ride floors).
- */
 
 export interface ReleaseKineticsConfig {
   /** Flick amplification over the raw release speed. */
@@ -69,8 +50,7 @@ export const resolveReleaseKinetics = ({
 }: ReleaseKineticsInput): ReleaseKinetics => {
   const { inertiaBoost } = { ...RELEASE_KINETICS_DEFAULTS, ...config };
 
-  // The intent primitive is duration-authored; express the base SPEED as
-  // "cover this distance in this time" for it.
+  // The intent primitive is duration-authored; express base SPEED as a duration.
   const baseDuration =
     baseSpeed > 0 && Math.abs(distance) > 0 ? Math.abs(distance) / baseSpeed : 0;
 

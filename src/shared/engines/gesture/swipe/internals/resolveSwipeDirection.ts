@@ -1,18 +1,8 @@
 import type { ResolvedPointerSwipeConfig } from "../types";
 import { dominantMagnitude, safeResistance } from "./math";
 
-/**
- * Commit decision at release: did this gesture register as a swipe, and in
- * which direction? Two independent ways to commit:
- *  - quick flick: high gesture speed over at least a token distance. The
- *    speed is the DOMINANT of the last instantaneous velocity and the
- *    weighted-average flick memory, so a fast gesture whose finger
- *    decelerates or sticks before lift-off still reads as a flick;
- *  - distance swipe: the raw offset crossed the (resistance-adapted)
- *    distance threshold — `max(minSwipeDistance, width * swipeThresholdRatio)`
- *    scaled down by `1 - resistance`, because the user FEELS the resisted UI
- *    offset, not the raw finger travel.
- */
+// Commit decision at release (flick OR distance swipe, resistance-adapted).
+// See ../../README.md § Recognition internals (Commit decision).
 
 interface ResolveDirectionInput {
   rawOffset: number;
@@ -32,9 +22,7 @@ export const resolveSwipeDirection = ({
   config,
   canCommit,
 }: ResolveDirectionInput) => {
-  // The gesture's speed intent: judged by the whole gesture, not by the
-  // last (often decelerating) segment. Also handed out as the release
-  // velocity so a committed swipe RIDES at the speed it was flicked with.
+  // Speed intent = dominant of last-instant and flick memory (also the release velocity).
   const gestureVelocity = dominantMagnitude(rawVelocity, flickVelocity);
 
   if (!canCommit) {

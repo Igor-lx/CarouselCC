@@ -17,11 +17,8 @@ interface ResolveReleaseInput {
   config: InertialReleaseConfig;
 }
 
-/**
- * Resolve the speed intent of an inertial release. Inputs are trusted —
- * the caller is responsible for finite, in-range values. The function performs
- * algorithmic math only.
- */
+// Flick judgment: raw pointer faster than base tempo → boosted cruise, else
+// base. Inputs trusted (caller guards finite/in-range). See ../README.md.
 export function resolveInertialRelease({
   gestureReleaseVelocity,
   distanceToTarget,

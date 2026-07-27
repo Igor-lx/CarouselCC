@@ -16,8 +16,7 @@
     min-height: 100%;
   }
 
-  // Mobile chrome samples the root background — set it explicitly (the
-  // index.html boot script pins the same color inline pre-stylesheet).
+
   html {
     background-color: var(--bg-global);
   }
@@ -68,7 +67,7 @@
 
 :root {
   --theme-marker: light;
-  // Declared page scheme so UA surfaces (chrome tint, scrollbars, form controls) follow it.
+
   color-scheme: light;
 
   --transition-color: 0.25s ease;
