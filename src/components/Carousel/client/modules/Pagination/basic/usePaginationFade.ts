@@ -14,6 +14,10 @@ import {
   type MotionPlanSource,
 } from "../../../motion";
 import {
+  isDroppedFallbackFrame,
+  type VisualPositionSource,
+} from "../../../visual-position";
+import {
   blendDotStates,
   buildDotKeyframes,
   dotActiveStrength,
@@ -27,6 +31,10 @@ import {
 
 // Engine-driven dot binding — the third consumer of the motion plan (dot LOOK).
 // See docs/architecture/modules.md
+//
+// One travelling offset owns the whole strip; every mode (WAAPI step, per-frame
+// follow, rest) writes the SAME function of that offset, so a mode change is a
+// change of who paints, never a change of where the strip sits.
 
 const FALLBACK_INACTIVE: DotVisualState = { opacity: 0.2, scale: 1 };
 const FALLBACK_ACTIVE: DotVisualState = { opacity: 0.8, scale: 1.4 };
@@ -35,6 +43,11 @@ const FALLBACK_ACTIVE: DotVisualState = { opacity: 0.8, scale: 1.4 };
 const INVISIBLE_STRENGTH = 0.001;
 
 const DOT_CURVE_INTERVALS = 32;
+
+/** Per-frame follow write gate. It sits on the dimensionless active-strength,
+ * not on the looks it drives, so it keeps its meaning under ANY declared
+ * opacity/scale span (a near-flat span would swallow an absolute gate whole). */
+const FOLLOW_STRENGTH_EPSILON = 1 / 512;
 
 const readVar = (styles: CSSStyleDeclaration, name: string, fallback: number) => {
   const parsed = Number.parseFloat(styles.getPropertyValue(name));
@@ -64,6 +77,8 @@ const readDotStates = (
 
 interface UsePaginationFadeInput {
   motionPlan: MotionPlanSource | null;
+  /** Per-frame position stream — the follow mode's source (`null` under reduced motion). */
+  visualPosition: VisualPositionSource | null;
   targetPageIndex: number;
   pageCount: number;
   isFinite: boolean;
@@ -85,6 +100,7 @@ interface ActiveFade {
 
 export function usePaginationFade({
   motionPlan,
+  visualPosition,
   targetPageIndex,
   pageCount,
   isFinite,
@@ -93,9 +109,21 @@ export function usePaginationFade({
   const callbacksRef = useRef<Array<((node: HTMLElement | null) => void) | null>>([]);
   const animationsRef = useRef(new Map<number, Animation>());
 
+  /** Dots whose inline layer (look + suppressed transition) the binding owns.
+   * Non-empty exactly while a motion is in flight — at rest the classes own everything. */
+  const ownedDotsRef = useRef(new Set<number>());
+  /** Last strength WRITTEN per owned dot — the follow write gate's memory. */
+  const writtenStrengthRef = useRef(new Map<number, number>());
+
   /** Where the carousel LOOKS to be, in pages — fractional while a step runs. */
   const offsetRef = useRef(targetPageIndex);
   const stepRef = useRef<ActiveFade | null>(null);
+  const followUnsubRef = useRef<(() => void) | null>(null);
+  const followBaseRef = useRef<{ pageOffset: number; offset: number } | null>(null);
+  /** Which follow the live subscription is serving. A drag that releases into the
+   * no-WAAPI path switches flavour WITHOUT a new subscription, and the frame-drop
+   * rule has to switch with it or the strip outruns the track. */
+  const isFallbackFollowRef = useRef(false);
 
   // Reading the CSS-owned look forces a recalc, so cache it; refresh only at rest.
   const dotStatesRef = useRef<{ inactive: DotVisualState; active: DotVisualState } | null>(null);
@@ -122,32 +150,51 @@ export function usePaginationFade({
     callbacksRef.current.length = pageCount;
   }, [pageCount]);
 
-  // Load-bearing: suppress the dot's CSS transition for the ride or Blink drops
-  // the animation to the main thread. Do NOT remove (see modules.md).
-  const suppressTransition = useCallback((pageIndex: number) => {
+  // Load-bearing: suppress the dot's CSS transition for as long as the binding
+  // paints it, or Blink is left with two effects on one property and drops the
+  // animation to the main thread. Do NOT remove (see modules.md). Idempotent, so
+  // a dot that mounts mid-motion is claimed by the write that first reaches it.
+  const takeDotOwnership = useCallback((pageIndex: number): HTMLElement | null => {
     const dot = dotRefs.current[pageIndex];
-    if (dot) dot.style.transition = "none";
+    if (!dot) return null;
+    if (!ownedDotsRef.current.has(pageIndex)) {
+      dot.style.transition = "none";
+      ownedDotsRef.current.add(pageIndex);
+    }
+    return dot;
   }, []);
 
-  const restoreTransition = useCallback((pageIndex: number) => {
+  /** Hand one dot back to its class styles — look AND transition, together. */
+  const releaseDot = useCallback((pageIndex: number) => {
+    ownedDotsRef.current.delete(pageIndex);
+    writtenStrengthRef.current.delete(pageIndex);
     const dot = dotRefs.current[pageIndex];
-    if (dot) dot.style.transition = "";
+    if (!dot) return;
+    dot.style.opacity = "";
+    dot.style.transform = "";
+    dot.style.transition = "";
   }, []);
 
-  // Collective cancel — the class styles already hold the end values.
+  // Collective hand-back — the class styles already hold the end values.
+  const releaseAllDots = useCallback(() => {
+    for (const pageIndex of [...ownedDotsRef.current]) releaseDot(pageIndex);
+  }, [releaseDot]);
+
+  // Cancel only: ownership outlives a re-plan, so the inline layer never blinks
+  // back to the classes between two motions.
   const cancelAllFades = useCallback(() => {
-    animationsRef.current.forEach((animation, pageIndex) => {
+    animationsRef.current.forEach((animation) => {
       try {
         animation.cancel();
       } catch {
         // already gone
       }
-      restoreTransition(pageIndex);
     });
     animationsRef.current.clear();
-  }, [restoreTransition]);
+  }, []);
 
-  // Sampled from the running curve, never the DOM; a direct fade reports its landing.
+  // Sampled from the running curve, never the DOM; a direct fade reports its
+  // landing, and follow mode reports the offset its last frame left behind.
   const liveOffset = useCallback(() => {
     const fade = stepRef.current;
     if (!fade) return offsetRef.current;
@@ -160,16 +207,113 @@ export function usePaginationFade({
       offsetRef.current = pageCount > 0 ? mod(landedOn, pageCount) : landedOn;
       stepRef.current = null;
       cancelAllFades();
+      releaseAllDots();
       refreshDotStates(); // re-read the CSS look at rest (theme/breakpoint change)
     },
-    [cancelAllFades, pageCount, refreshDotStates],
+    [cancelAllFades, pageCount, refreshDotStates, releaseAllDots],
   );
+
+  // ---- follow mode (finger drag / JS fallback) -------------------------------
+
+  /** One frame of the strip: every dot's look read off its distance from the
+   * offset — the same `dotStateAt` the sweep keyframes are built from. */
+  const writeFollowOffset = useCallback(
+    (offset: number) => {
+      const states = dotStatesRef.current;
+      if (!states) return;
+      const written = writtenStrengthRef.current;
+
+      for (let index = 0; index < pageCount; index += 1) {
+        const strength = dotActiveStrength(
+          offsetDistance(index, offset, pageCount, isFinite),
+        );
+        const last = written.get(index);
+        // Gate on strength, paint from dotStateAt — one look function, one owner.
+        if (last !== undefined && Math.abs(last - strength) <= FOLLOW_STRENGTH_EPSILON) {
+          continue;
+        }
+        const dot = takeDotOwnership(index);
+        if (!dot) continue;
+        const state = dotStateAt(
+          index,
+          offset,
+          states.inactive,
+          states.active,
+          pageCount,
+          isFinite,
+        );
+        dot.style.opacity = String(state.opacity);
+        dot.style.transform = `scaleX(${state.scale})`;
+        written.set(index, strength);
+      }
+    },
+    [isFinite, pageCount, takeDotOwnership],
+  );
+
+  const stopFollowing = useCallback(() => {
+    followUnsubRef.current?.();
+    followUnsubRef.current = null;
+    followBaseRef.current = null;
+  }, []);
+
+  const startFollowing = useCallback(
+    (isFallback: boolean) => {
+      isFallbackFollowRef.current = isFallback;
+      if (followUnsubRef.current || !visualPosition) return;
+
+      // Take over from the LIVE offset, so a grab mid-ride keeps the position the
+      // strip had reached instead of re-anchoring on the logical target.
+      const start = liveOffset();
+      cancelAllFades();
+      stepRef.current = null;
+      offsetRef.current = start;
+      followBaseRef.current = null;
+      if (!dotStatesRef.current) refreshDotStates();
+      writtenStrengthRef.current.clear(); // WAAPI owned the look; the gate is blind
+      // The first write claims EVERY dot: the class flip may sit anywhere on the
+      // strip, and an unclaimed dot would keep painting it.
+      writeFollowOffset(start);
+
+      followUnsubRef.current = visualPosition.subscribe(
+        (frame) => {
+          // Delta-follow in the page domain: the deck's absolute position is not
+          // the strip's (a cyclic wrap must not teleport the dots).
+          if (followBaseRef.current === null) {
+            followBaseRef.current = {
+              pageOffset: frame.pageOffset,
+              offset: offsetRef.current,
+            };
+          }
+          const base = followBaseRef.current;
+          const next = base.offset + (frame.pageOffset - base.pageOffset);
+          offsetRef.current = next;
+
+          // Fallback relief: the same shared frame-drop rule the track and the
+          // widget apply, so the three consumers cannot desync.
+          if (isFallbackFollowRef.current && isDroppedFallbackFrame(frame)) return;
+          writeFollowOffset(next);
+        },
+        { emitCurrent: true },
+      );
+    },
+    [
+      cancelAllFades,
+      liveOffset,
+      refreshDotStates,
+      visualPosition,
+      writeFollowOffset,
+    ],
+  );
+
+  // ---- plan routing -----------------------------------------------------------
 
   const applyPlan = useCallback(
     (plan: CarouselMotionPlan) => {
       switch (plan.kind) {
         case "waapi": {
           if (plan.isContinuation) return; // preflight already spans the command
+
+          stopFollowing();
 
           const anyDot = dotRefs.current.find((dot) => dot) ?? null;
           if (!anyDot) {
@@ -216,6 +360,10 @@ export function usePaginationFade({
             }
 
             cancelAllFades();
+            // Drop any inline layer a preceding follow left: the animations below
+            // re-take exactly the dots they paint, the rest fall back to their
+            // classes — which already hold the look they were left at.
+            releaseAllDots();
             if (blends.size === 0) {
               settle(target);
               return;
@@ -223,16 +371,15 @@ export function usePaginationFade({
 
             let settleOwner: Animation | null = null;
             for (const [index, blend] of blends) {
-              const dot = dotRefs.current[index];
+              const dot = takeDotOwnership(index);
               if (!dot) continue;
-              suppressTransition(index);
               const animation = startPinnedAnimation(
                 dot,
                 dotKeyframesBetween(blend.from, blend.to, dotStops),
                 { duration: plan.duration, startedAt: plan.startedAt },
               );
               if (!animation) {
-                restoreTransition(index); // no keyframe support: class flip
+                releaseDot(index); // no keyframe support: class flip
                 continue;
               }
               animationsRef.current.set(index, animation);
@@ -269,10 +416,16 @@ export function usePaginationFade({
             plan.direction,
             isFinite,
           );
-          if (from === to) return;
+          // Nothing to travel — but a preceding follow may still own the strip,
+          // so this is a settle, not a bare return.
+          if (from === to) {
+            settle(to);
+            return;
+          }
 
           // One motion for the whole strip: same curve/duration/clock per dot.
           cancelAllFades();
+          releaseAllDots();
           for (const index of reachedDotIndexes(from, to, pageCount, isFinite)) {
             const dot = dotRefs.current[index];
             if (!dot) continue;
@@ -293,7 +446,7 @@ export function usePaginationFade({
               ) && index !== targetRef.current;
             if (staysInvisible) continue;
 
-            suppressTransition(index);
+            takeDotOwnership(index);
             const animation = startPinnedAnimation(
               dot,
               buildDotKeyframes(
@@ -309,7 +462,7 @@ export function usePaginationFade({
               { duration: plan.duration, startedAt: plan.startedAt },
             );
             if (!animation) {
-              restoreTransition(index); // no keyframe support: class flip
+              releaseDot(index); // no keyframe support: class flip
               continue;
             }
             animationsRef.current.set(index, animation);
@@ -337,10 +490,23 @@ export function usePaginationFade({
           };
           return;
         }
-        case "instant":
-        case "idle":
         case "follow": {
-          // Snap / rest / follow / fallback: the class flip + CSS transition own the dots.
+          // A finger on the deck, or the no-WAAPI fallback: the strip keeps
+          // moving, per frame, from wherever it had got to.
+          if (!visualPosition) {
+            // No stream to follow. The carousel nulls both sources together, so
+            // this is reachable only from a caller that splits them — hand the
+            // dots back rather than leave a dead motion on screen.
+            settle(targetRef.current);
+            return;
+          }
+          startFollowing(plan.isFallback);
+          return;
+        }
+        case "instant":
+        case "idle": {
+          // Snap / rest: the class flip + CSS transition own the dots again.
+          stopFollowing();
           settle(targetRef.current);
           return;
         }
@@ -351,9 +517,14 @@ export function usePaginationFade({
       isFinite,
       liveOffset,
       pageCount,
-      restoreTransition,
+      refreshDotStates,
+      releaseAllDots,
+      releaseDot,
       settle,
-      suppressTransition,
+      startFollowing,
+      stopFollowing,
+      takeDotOwnership,
+      visualPosition,
     ],
   );
 
@@ -362,11 +533,20 @@ export function usePaginationFade({
     const unsubscribe = motionPlan.subscribe(applyPlan);
     return () => {
       unsubscribe();
+      stopFollowing();
       cancelAllFades();
+      releaseAllDots();
     };
-  }, [applyPlan, cancelAllFades, motionPlan]);
+  }, [applyPlan, cancelAllFades, motionPlan, releaseAllDots, stopFollowing]);
 
-  useEffect(() => () => cancelAllFades(), [cancelAllFades]);
+  useEffect(
+    () => () => {
+      stopFollowing();
+      cancelAllFades();
+      releaseAllDots();
+    },
+    [cancelAllFades, releaseAllDots, stopFollowing],
+  );
 
   return { bindDotRef };
 }

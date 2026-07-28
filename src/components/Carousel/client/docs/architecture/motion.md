@@ -148,7 +148,7 @@ Guarantees:
   runs the per-frame path, dropping the same Nth frames
   (`FALLBACK_DROP_EVERY_NTH_FRAME`, evaluated by
   [`visual-position/fallbackPacing.ts`](../../visual-position/fallbackPacing.ts)
-  on source-numbered frames, so track and widget can't desync).
+  on source-numbered frames, so track, widget and dots can't desync).
 - **Graceful fallback** — `startCompositorMotion` returns `false` on no measured
   slot, no `Element.animate`, degenerate input, or a throwing engine.
 - **Origin coherence** — the animation paints `from` synchronously and pins

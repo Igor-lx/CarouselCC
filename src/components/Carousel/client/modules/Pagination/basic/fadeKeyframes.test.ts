@@ -170,6 +170,21 @@ describe("reachedDotIndexes", () => {
     // 0 -> -1 sweeps positions -2..1, i.e. dots 10, 11, 0, 1.
     expect(reachedDotIndexes(0, -1, PAGES, CYCLIC)).toEqual([0, 1, 10, 11]);
   });
+
+  /** A release after a drag starts the sweep from a FRACTIONAL offset, so the
+   * reached set must be taken from where the strip actually is — a set computed
+   * off a rounded origin would leave the dot the finger was passing unanimated. */
+  it("covers the dots around a fractional origin", () => {
+    expect(reachedDotIndexes(0.4, 1, 9, FINITE)).toEqual([0, 1, 2]);
+    expect(reachedDotIndexes(0.6, 0, 9, FINITE)).toEqual([0, 1]);
+  });
+
+  /** A long cyclic drag leaves the offset UNWRAPPED (e.g. -3.4); the fold must
+   * still land on real dot indexes. */
+  it("folds an unwrapped fractional origin back onto the strip", () => {
+    // -3.4 -> -3 sweeps positions -4.4..-2, i.e. dots 8, 9, 10 (of 12).
+    expect(reachedDotIndexes(-3.4, -3, PAGES, CYCLIC)).toEqual([8, 9, 10]);
+  });
 });
 
 describe("dotKeyframesBetween (the GO_TO direct fade)", () => {

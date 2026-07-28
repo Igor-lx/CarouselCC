@@ -11,7 +11,7 @@ import type { PaginationProps } from "./types";
 
 const PaginationBase = memo(function Pagination({ className }: PaginationProps) {
   const { intent } = useCarouselMotion();
-  const { layout, navigation, motionPlan, isPaginationInteractiveOn } =
+  const { layout, navigation, motionPlan, visualPosition, isPaginationInteractiveOn } =
     useCarouselStable();
 
   const classNames = useMemo(
@@ -22,6 +22,7 @@ const PaginationBase = memo(function Pagination({ className }: PaginationProps) 
   // React flips the target dot immediately; the fade binding masks it (see doc).
   const { bindDotRef } = usePaginationFade({
     motionPlan,
+    visualPosition,
     targetPageIndex: intent.targetPageIndex,
     pageCount: layout.pageCount,
     isFinite: layout.isFinite,

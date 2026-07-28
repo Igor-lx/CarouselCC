@@ -7,22 +7,46 @@ half it needs.
 ## `<Pagination />`
 
 Desktop dot pagination — one `PaginationDot` per page. Reads
-`intent.targetPageIndex` + `layout.pageCount` and `motionPlan` from the stable
-half; a click dispatches `navigation.handlePageSelect(pageIndex)` as `GO_TO`.
+`intent.targetPageIndex` + `layout.pageCount`, and `motionPlan` +
+`visualPosition` from the stable half; a click dispatches
+`navigation.handlePageSelect(pageIndex)` as `GO_TO`.
 
 The active dot is the **third consumer of the motion plan** (track = pixels,
-widget = dot steps, pagination = opacity). React flips the target dot active
-immediately; `usePaginationFade` masks the flip with two WAAPI animations
-(outgoing → resting, incoming → active) built by `buildFadeKeyframes` from the
-plan's percent-progress stops, over the plan's duration, pinned to its
-`startedAt` clock — the dot decelerates exactly with the deck. Dot looks are
-CSS-owned: the fade reads the same three custom properties
+widget = dot steps, pagination = opacity). ONE travelling offset owns the whole
+strip — fractional while the deck moves — and every dot's look is read off its
+distance from it ([`fadeKeyframes.ts`](../../modules/Pagination/basic/fadeKeyframes.ts)).
+React flips the target dot's class immediately; `usePaginationFade` masks the
+flip by painting that offset, in one of three modes:
+
+- **WAAPI step** (any planned motion): one animation per dot the offset comes
+  within a step of, keyframed by `buildDotKeyframes` from the plan's
+  percent-progress stops, over the plan's duration, pinned to its `startedAt`
+  clock — the dot decelerates exactly with the deck. A dot that would stay
+  invisible for the whole step is left to its class styles rather than paying for
+  an animation, scanned on the coarse grid the dot actually rides. A GO_TO
+  teleports the middle, so its dots cross-fade **straight**
+  (`dotKeyframesBetween`) instead of lighting up the pages in between;
+  far-`GO_TO` approach slices (`isContinuation`) are ignored.
+- **Follow** (finger on the deck, or the no-WAAPI fallback): per-frame writes off
+  the `visualPosition` stream, delta-based in the page domain, gated on the dot's
+  own active-strength (a dimensionless 0..1, so the gate keeps its meaning at any
+  declared opacity/scale span). The fallback flavour drops the same Nth frames the
+  track and the widget do — one shared pacing rule, so the three consumers cannot
+  desync.
+- **Rest** (`idle` / `instant`): the class flip + CSS transition own the dots again.
+
+A mode change is a change of **who paints, never of where the strip sits**: each
+mode takes over from the live offset, so a finger landing mid-ride keeps the
+position the strip had reached instead of re-anchoring on the logical target
+while the deck itself sits on a fractional one. Nothing is read back from the
+DOM — a re-plan continues from the value the previous motion's own curve reports
+at that instant, a grab continues from the running curve, a release continues
+from the offset the last follow frame left.
+
+Dot looks are CSS-owned: the binding reads the same three custom properties
 (`--pagination-dot-opacity`, `--pagination-dot-opacity-active`,
-`--pagination-dot-scale-active`) the classes use, so fade and resting styles
-cannot disagree. A mid-fade retarget continues from the **painted** values (read
-before `cancel()` drops the fill); far-`GO_TO` approach slices (`isContinuation`)
-are ignored. Non-planned changes (drag flips, reduced motion, no-WAAPI fallback)
-fall back to the plain CSS transition.
+`--pagination-dot-scale-active`) the classes use, so painted and resting styles
+cannot disagree.
 
 The wrapper is `aria-hidden="true"` — dots are pointer targets, not exposed to
 AT; page indication reaches screen readers via `aria-current="step"` on the
@@ -30,20 +54,24 @@ visible band. The slot renders only when `canSlide` (`shouldRenderPagination`),
 so a single-page deck shows no dots — no internal `pageCount <= 1` guard.
 
 **Transition suppression (a load-bearing trap).** The dot's CSS `transition`
-covers opacity and transform — the very two properties the fade animations drive.
+covers opacity and transform — the very two properties the binding drives.
 Whenever the active-dot class moves, that transition fires, and Blink is left with
 two effects on one property; it cannot composite that, so it drops the animation
 onto the main thread for the rest of the ride, dragging a full paint lifecycle
-through every frame. So `usePaginationFade` sets `transition: none` on each
-animated dot for the ride and restores it after — a large measured main-frame
-reduction on a weak device. The cascade still picks the animation so the picture
-stays correct, which is exactly why the cost is invisible until measured. Do not
-remove it. One motion owns the whole strip, so cancellation is collective and the
-class styles underneath already hold the animations' end values, so restoring
-transitions nothing. Everything is sampled from the plan's own curve, never read
-back from the DOM; a dot that would stay invisible for the whole step is left to
-its class styles rather than paying for an animation, scanned on the coarse grid
-the dot actually rides.
+through every frame. (Per-frame follow writes hit the same transition from the
+other side: each write would be *eased* into over the transition's duration, so
+the strip would smear behind the finger.) So `usePaginationFade` sets
+`transition: none` on every dot it paints, for as long as it paints it — a large
+measured main-frame reduction on a weak device. The cascade still picks the
+animation so the picture stays correct, which is exactly why the cost is
+invisible until measured. Do not remove it.
+
+**Ownership is one thing.** The inline look and the suppressed transition are
+taken together and handed back together, and only at settle — never between two
+motions, so the strip cannot blink back to its classes on a re-plan. A dot
+released with a stale inline `opacity` would keep it (and lose `:hover` with it)
+until the next ride, which is why the zero-length sweep (`from === to`) settles
+rather than returning early.
 
 ## `<PaginationWidget />`
 
