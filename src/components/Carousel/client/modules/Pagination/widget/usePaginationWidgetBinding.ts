@@ -138,6 +138,10 @@ export function usePaginationWidgetBinding({
   const followBaseRef = useRef<{ pageOffset: number; offset: number } | null>(
     null,
   );
+  /** Which follow the live subscription is serving. A drag that releases into the
+   * no-WAAPI path switches flavour WITHOUT a new subscription, and the frame-drop
+   * rule has to switch with it or the strip outruns the track. */
+  const isFallbackFollowRef = useRef(false);
 
   const side = widgetProjectionSide(geometry.visibleCount);
   const dotCount = widgetProjectionSlotCount(geometry.visibleCount) + DOT_COVERAGE_MARGIN;
@@ -454,6 +458,7 @@ export function usePaginationWidgetBinding({
 
   const startFollowing = useCallback(
     (isFallback: boolean) => {
+      isFallbackFollowRef.current = isFallback;
       if (followUnsubRef.current || !visualPosition) return;
       // Take over from the live offset; remember the step this grab tears down.
       const start = currentOffset();
@@ -484,7 +489,7 @@ export function usePaginationWidgetBinding({
           offsetRef.current = next;
 
           // Fallback relief: same shared frame-drop rule as the track.
-          if (isFallback && isDroppedFallbackFrame(frame)) return;
+          if (isFallbackFollowRef.current && isDroppedFallbackFrame(frame)) return;
           writeOffset(next);
         },
         { emitCurrent: true },
