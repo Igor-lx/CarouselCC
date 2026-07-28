@@ -67,8 +67,8 @@ export interface MotionProfileSharesSettings {
 }
 
 export interface MotionSettings {
-  /** Snap-back duration after a no-intent release (ms). @see SNAP_BACK_DURATION */
-  snapBackDuration: number;
+  /** Snap-back duration after a no-intent release. @see SNAP_BACK_DURATION_MS */
+  snapBackDurationMs: number;
   /** Position tolerance for the motion settle. */
   epsilon: number;
   /** Click-step accel/decel shares. */
@@ -103,10 +103,10 @@ export interface RepeatedClickSettings {
 }
 
 export interface InteractionSettings {
-  /** Delay before a desktop hover pauses autoplay (ms). */
-  hoverPauseDelay: number;
-  /** Viewport fraction visible before autoplay resumes. */
-  visibilityThreshold: number;
+  /** How long a desktop hover must hold before autoplay pauses. @see PAUSE_HOVER_DELAY_MS */
+  hoverPauseDelayMs: number;
+  /** Viewport share on screen below which autoplay pauses. @see PAUSE_VISIBILITY_RATIO */
+  visibilityRatio: number;
   /** Quiet window after viewport activity before an autoplay tick (ms). */
   autoplayResettleDelayMs: number;
 }

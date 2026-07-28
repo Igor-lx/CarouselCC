@@ -26,7 +26,7 @@ interface ResolveStepDurationInput {
   segmentStartVirtualIndex: number;
   targetVirtualIndex: number;
   stepSize: number;
-  snapBackDuration: number;
+  snapBackDurationMs: number;
   autoplayDuration: number;
   stepDuration: number;
 }
@@ -40,11 +40,11 @@ export const resolveStepDuration = ({
   segmentStartVirtualIndex,
   targetVirtualIndex,
   stepSize,
-  snapBackDuration,
+  snapBackDurationMs,
   autoplayDuration,
   stepDuration,
 }: ResolveStepDurationInput): number => {
-  if (motionPhase === "step-snap") return snapBackDuration;
+  if (motionPhase === "step-snap") return snapBackDurationMs;
   if (isInstant) return 0;
 
   const clickSegmentDuration = durationByVirtualSpan({

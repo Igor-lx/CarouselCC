@@ -25,8 +25,9 @@ import {
   GO_TO_SPEED_MULTIPLIER,
   GO_TO_TELEPORT_ENABLED,
   GO_TO_TELEPORT_MIN_PAGE_SPAN,
-  HOVER_PAUSE_DELAY,
   IMAGE_RETRY,
+  PAUSE_HOVER_DELAY_MS,
+  PAUSE_VISIBILITY_RATIO,
   SLIDE_REORIENT_VEIL,
 
   REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
@@ -35,10 +36,9 @@ import {
   RENDER_WINDOW_BUFFER_MULTIPLIER,
   SNAP_BACK_ACCELERATION_DISTANCE_SHARE,
   SNAP_BACK_DECELERATION_DISTANCE_SHARE,
-  SNAP_BACK_DURATION,
+  SNAP_BACK_DURATION_MS,
   STEP_ACCELERATION_DISTANCE_SHARE,
   STEP_DECELERATION_DISTANCE_SHARE,
-  VISIBILITY_THRESHOLD,
   AUTOPLAY_RESETTLE_DELAY_MS,
   REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES,
 } from "../../../config";
@@ -78,8 +78,8 @@ const buildNumericRules = (): NumericRule[] => [
   // Motion timings / factors
   {
     layer: "Motion",
-    field: "SNAP_BACK_DURATION",
-    value: SNAP_BACK_DURATION,
+    field: "SNAP_BACK_DURATION_MS",
+    value: SNAP_BACK_DURATION_MS,
     severity: "CRITICAL",
     expected: "Expected a positive finite number of milliseconds",
     consequence: "Snap-back duration of zero or negative causes motion to flash or freeze",
@@ -314,8 +314,8 @@ const buildNumericRules = (): NumericRule[] => [
   // Interaction
   {
     layer: "Interaction",
-    field: "HOVER_PAUSE_DELAY",
-    value: HOVER_PAUSE_DELAY,
+    field: "PAUSE_HOVER_DELAY_MS",
+    value: PAUSE_HOVER_DELAY_MS,
     severity: "LOGICAL",
     expected: "Expected a non-negative finite number of milliseconds",
     consequence: "setTimeout receives an invalid delay; hover-pause debounce becomes unreliable",
@@ -354,8 +354,8 @@ const buildNumericRules = (): NumericRule[] => [
   },
   {
     layer: "Interaction",
-    field: "VISIBILITY_THRESHOLD",
-    value: VISIBILITY_THRESHOLD,
+    field: "PAUSE_VISIBILITY_RATIO",
+    value: PAUSE_VISIBILITY_RATIO,
     severity: "CRITICAL",
     expected: "Expected a finite number in the range (0, 1]",
     consequence: "IntersectionObserver threshold outside (0,1] makes visibility detection break",

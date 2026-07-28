@@ -39,8 +39,8 @@ import {
 const FALLBACK_INACTIVE: DotVisualState = { opacity: 0.2, scale: 1 };
 const FALLBACK_ACTIVE: DotVisualState = { opacity: 0.8, scale: 1.4 };
 
-/** Below this a dot paints nothing for the whole step — pin it, don't animate. */
-const INVISIBLE_STRENGTH = 0.001;
+/** At or below this a dot paints nothing for the whole step — pin it, don't animate. */
+const INVISIBLE_STRENGTH_MAX = 0.001;
 
 const DOT_CURVE_INTERVALS = 32;
 
@@ -442,7 +442,7 @@ export function usePaginationFade({
                       pageCount,
                       isFinite,
                     ),
-                  ) <= INVISIBLE_STRENGTH,
+                  ) <= INVISIBLE_STRENGTH_MAX,
               ) && index !== targetRef.current;
             if (staysInvisible) continue;
 

@@ -22,13 +22,13 @@ import {
   REPEATED_CLICK_SPEED_MULTIPLIER,
   SNAP_BACK_ACCELERATION_DISTANCE_SHARE,
   SNAP_BACK_DECELERATION_DISTANCE_SHARE,
-  SNAP_BACK_DURATION,
+  SNAP_BACK_DURATION_MS,
   STEP_ACCELERATION_DISTANCE_SHARE,
   STEP_DECELERATION_DISTANCE_SHARE,
 } from "../motion";
 import {
-  HOVER_PAUSE_DELAY,
-  VISIBILITY_THRESHOLD,
+  PAUSE_HOVER_DELAY_MS,
+  PAUSE_VISIBILITY_RATIO,
   AUTOPLAY_RESETTLE_DELAY_MS,
 } from "../interaction";
 import type { CarouselRuntimeConfig, RawConfigInput } from "../types";
@@ -61,7 +61,7 @@ export const buildCarouselConfig = ({
     CAROUSEL_DEFAULTS.errAltPlaceholder
   ),
   motion: {
-    snapBackDuration: SNAP_BACK_DURATION,
+    snapBackDurationMs: SNAP_BACK_DURATION_MS,
     epsilon: MOTION_EPSILON,
     stepProfile: {
       accelerationDistanceShare: STEP_ACCELERATION_DISTANCE_SHARE,
@@ -89,8 +89,8 @@ export const buildCarouselConfig = ({
     decelerationDistanceShare: REPEATED_CLICK_DECELERATION_DISTANCE_SHARE,
   },
   interaction: {
-    hoverPauseDelay: HOVER_PAUSE_DELAY,
-    visibilityThreshold: VISIBILITY_THRESHOLD,
+    hoverPauseDelayMs: PAUSE_HOVER_DELAY_MS,
+    visibilityRatio: PAUSE_VISIBILITY_RATIO,
     autoplayResettleDelayMs: AUTOPLAY_RESETTLE_DELAY_MS,
   },
   layout: {

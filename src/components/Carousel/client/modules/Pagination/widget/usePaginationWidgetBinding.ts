@@ -42,13 +42,13 @@ import type {
 // The widget's decoupled one-step motion model. See docs/architecture/modules.md
 
 /** Extra dot elements beyond the resting window (step travel + retarget reach). */
-const DOT_COVERAGE_MARGIN = 2;
+const DOT_COVERAGE_MARGIN_SLOTS = 2;
 
 /** Overlay elements — a retargeted step touches at most this many pages. */
 const ACTIVE_DOT_COUNT = 4;
 
-/** Below this a dot paints nothing: pin it, don't pay for an invisible animation. */
-const INVISIBLE_OPACITY = 0.001;
+/** At or below this a dot paints nothing: pin it, don't pay for an invisible animation. */
+const INVISIBLE_OPACITY_MAX = 0.001;
 
 /** Strip plan-curve density — coarser than the track's (a dot travels ≤ a strip width). */
 const STRIP_CURVE_INTERVALS = 32;
@@ -144,8 +144,8 @@ export function usePaginationWidgetBinding({
   const isFallbackFollowRef = useRef(false);
 
   const side = widgetProjectionSide(geometry.visibleCount);
-  const dotCount = widgetProjectionSlotCount(geometry.visibleCount) + DOT_COVERAGE_MARGIN;
-  const activeSlotIndex = side + DOT_COVERAGE_MARGIN / 2;
+  const dotCount = widgetProjectionSlotCount(geometry.visibleCount) + DOT_COVERAGE_MARGIN_SLOTS;
+  const activeSlotIndex = side + DOT_COVERAGE_MARGIN_SLOTS / 2;
 
   const bindDotRef = useCallback((index: number) => {
     const cached = dotCallbacksRef.current[index];
@@ -249,7 +249,7 @@ export function usePaginationWidgetBinding({
 
   const writeOffset = useCallback(
     (visualOffset: number) => {
-      const firstId = Math.round(visualOffset) - side - DOT_COVERAGE_MARGIN / 2;
+      const firstId = Math.round(visualOffset) - side - DOT_COVERAGE_MARGIN_SLOTS / 2;
       const cache = dotCacheRef.current;
 
       for (let index = 0; index < dotCount; index += 1) {
@@ -353,7 +353,7 @@ export function usePaginationWidgetBinding({
       const animations: Animation[] = [];
       const stripStops = resampleStops(plan.stops, STRIP_CURVE_INTERVALS);
       const lowId =
-        Math.floor(Math.min(from, target)) - side - DOT_COVERAGE_MARGIN / 2;
+        Math.floor(Math.min(from, target)) - side - DOT_COVERAGE_MARGIN_SLOTS / 2;
 
       // Curve + spatial path fold into one keyframe list per dot (no easing fn).
       for (let index = 0; index < dotCount; index += 1) {
@@ -368,7 +368,7 @@ export function usePaginationWidgetBinding({
         );
 
         // A dot invisible all step is pinned (stays mounted), not animated.
-        if (keyframes.every((frame) => frame.opacity <= INVISIBLE_OPACITY)) {
+        if (keyframes.every((frame) => frame.opacity <= INVISIBLE_OPACITY_MAX)) {
           const last = keyframes[keyframes.length - 1]!;
           dot.style.transform = last.transform;
           dot.style.opacity = String(last.opacity);
@@ -400,7 +400,7 @@ export function usePaginationWidgetBinding({
           stripStops,
         );
         // Same invisible-pin rule as the dots.
-        if (keyframes.every((frame) => frame.opacity <= INVISIBLE_OPACITY)) {
+        if (keyframes.every((frame) => frame.opacity <= INVISIBLE_OPACITY_MAX)) {
           overlay.style.opacity = "0";
           continue;
         }

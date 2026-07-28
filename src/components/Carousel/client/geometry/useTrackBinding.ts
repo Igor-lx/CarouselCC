@@ -11,7 +11,8 @@ import { isWaapiSupported } from "../../../../shared";
 import { keyframesAlongStops, startPinnedAnimation } from "../motion";
 import { isDroppedFallbackFrame, type VisualPositionSource } from "../visual-position";
 
-const RESIZE_EPSILON_PX = 0.5;
+/** A viewport inline-size change smaller than this skips the geometry re-sync. */
+const VIEWPORT_RESIZE_EPSILON_PX = 0.5;
 
 interface UseTrackBindingInput {
   trackRef: RefObject<HTMLDivElement | null>;
@@ -257,7 +258,7 @@ export function useTrackBinding({
         const previousWidth = lastMeasuredWidthRef.current;
         if (
           previousWidth !== null &&
-          Math.abs(inlineSize - previousWidth) < RESIZE_EPSILON_PX
+          Math.abs(inlineSize - previousWidth) < VIEWPORT_RESIZE_EPSILON_PX
         ) {
           return;
         }

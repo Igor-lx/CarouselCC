@@ -360,7 +360,7 @@ export function buildCarouselSegment({
     segmentStartVirtualIndex: state.fromVirtualIndex,
     targetVirtualIndex: state.virtualIndex,
     stepSize,
-    snapBackDuration: config.motion.snapBackDuration,
+    snapBackDurationMs: config.motion.snapBackDurationMs,
     autoplayDuration: config.autoplayDuration,
     stepDuration: config.stepDuration,
   });

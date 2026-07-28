@@ -1,9 +1,10 @@
 // See docs/architecture/domain.md
-const TRANSFORM_PRECISION = 10_000;
+/** Rounding scale for the track transform — 10_000 keeps 4 decimal places. */
+const TRANSFORM_ROUNDING_SCALE = 10_000;
 
 const roundedPx = (value: number) =>
   Number.isFinite(value)
-    ? Math.round(value * TRANSFORM_PRECISION) / TRANSFORM_PRECISION
+    ? Math.round(value * TRANSFORM_ROUNDING_SCALE) / TRANSFORM_ROUNDING_SCALE
     : 0;
 
 // `layoutOrigin` is deliberately not the render-window start — it stays stable

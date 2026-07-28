@@ -4,7 +4,9 @@ import { useState, type RefObject } from "react";
 import { measureSlotSize } from "../domain";
 import { useIsomorphicLayoutEffect } from "../../../../shared";
 
-const SIZE_EPSILON_PX = 1;
+/** A re-measure moving the slot less than this keeps the old value — sub-pixel
+ * layout noise must not re-render every low-frequency consumer. */
+const SLOT_SIZE_EPSILON_PX = 1;
 
 interface UseMeasuredSlotSizeInput {
   viewportRef: RefObject<HTMLElement | null>;
@@ -26,7 +28,7 @@ export function useMeasuredSlotSize({
       const slot = measureSlotSize(viewport, visibleSlidesCount);
       if (!(slot > 0)) return;
       setSlotPx((previous) =>
-        previous !== null && Math.abs(previous - slot) < SIZE_EPSILON_PX
+        previous !== null && Math.abs(previous - slot) < SLOT_SIZE_EPSILON_PX
           ? previous
           : Math.round(slot),
       );

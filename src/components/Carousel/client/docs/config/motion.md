@@ -27,4 +27,4 @@ tune under UX review. Behaviour is in
   (front-loaded).
 - **`SNAP_BACK_ACCELERATION_DISTANCE_SHARE`** / **`…DECELERATION…`** — snap-back
   after a no-intent drag release.
-- **`SNAP_BACK_DURATION`** — snap-back duration.
+- **`SNAP_BACK_DURATION_MS`** — how long that snap-back takes.

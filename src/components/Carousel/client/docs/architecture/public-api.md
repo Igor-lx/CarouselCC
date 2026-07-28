@@ -95,7 +95,7 @@ stable object).
 
 | Prop | Effect |
 | --- | --- |
-| `isAutoplayOn` | Master autoplay switch. Auto-pauses when the viewport is under `VISIBILITY_THRESHOLD` on screen, during drag/motion, or (desktop) on hover (`HOVER_PAUSE_DELAY`). Loops to the first page via `GO_TO` at the finite end. |
+| `isAutoplayOn` | Master autoplay switch. Auto-pauses when the viewport is under `PAUSE_VISIBILITY_RATIO` on screen, during drag/motion, or (desktop) on hover (`PAUSE_HOVER_DELAY_MS`). Loops to the first page via `GO_TO` at the finite end. |
 | `isPaginationOn` | Gates the attached `Pagination` / `PaginationWidget` slot. `true` with no slot attached renders nothing — the slot must opt in via `children`. |
 | `isControlsOn` | Same contract, for `Controls`. |
 | `isSwipeOn` | Master gesture switch. Off attaches **no listeners at all**. Flipped off under a live finger, the orphaned drag ends as a passive snap ([gesture.md](./gesture.md)). Not a render gate — gesture has no slot. |

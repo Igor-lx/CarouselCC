@@ -28,7 +28,7 @@ export function useCarouselAutoplay({
 }: UseCarouselAutoplayInput): AutoplayApi {
   const visible = useViewportVisibility({
     elementRef: viewportRef,
-    threshold: config.interaction.visibilityThreshold,
+    threshold: config.interaction.visibilityRatio,
   });
 
   const handleStep = useCallback(
@@ -53,7 +53,7 @@ export function useCarouselAutoplay({
     shouldDeferTick: getIsViewportBusy,
     isAtEnd,
     intervalMs: config.autoplayInterval,
-    hoverPauseDelayMs: config.interaction.hoverPauseDelay,
+    hoverPauseDelayMs: config.interaction.hoverPauseDelayMs,
     ignoreHover: isTouch,
     onStep: handleStep,
     onGoToStart: handleLoopToStart,
