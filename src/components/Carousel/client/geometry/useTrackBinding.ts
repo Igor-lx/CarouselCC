@@ -52,7 +52,12 @@ export function useTrackBinding({
   layoutOriginRef.current = layoutOrigin;
   visibleSlidesCountRef.current = visibleSlidesCount;
 
+  // Both are permanently stable (the source memoises them), so the effects
+  // below key on THEM and not on the source object — a consumer that depends on
+  // the object re-subscribes every render, and a notification emitted during a
+  // commit then arrives after its own listener was torn down.
   const readSlotSize = slotSize.getSlotSize;
+  const subscribeSlotSize = slotSize.subscribe;
 
   const resolveTransform = useCallback(
     (position: number): string => {
@@ -187,24 +192,25 @@ export function useTrackBinding({
     [visualPosition],
   );
 
-  // Re-baseline the track onto the current geometry. Cheap and idempotent when
-  // nothing moved: only a new layout origin gets past the guard, since the slot
-  // source calls this exactly when the slot itself changed.
-  const syncGeometry = useCallback(
-    (force: boolean) => {
-      if (!force && lastSyncedLayoutOriginRef.current === layoutOriginRef.current) {
-        return;
-      }
-      lastSyncedLayoutOriginRef.current = layoutOriginRef.current;
+  /** Re-pin the track onto the geometry as it stands now: any compositor ride
+   * was keyframed against the OLD baseline, so it has to go. */
+  const rebaseTrack = useCallback(() => {
+    lastSyncedLayoutOriginRef.current = layoutOriginRef.current;
 
-      // Read the position BEFORE teardown, else readCurrentPosition answers for
-      // a JS track that never painted these frames.
-      const position = readCurrentPosition();
-      cancelCompositorMotion(position);
-      writePosition(position, "geometry");
-    },
-    [cancelCompositorMotion, readCurrentPosition, writePosition],
-  );
+    // Read the position BEFORE teardown, else readCurrentPosition answers for
+    // a JS track that never painted these frames.
+    const position = readCurrentPosition();
+    cancelCompositorMotion(position);
+    writePosition(position, "geometry");
+  }, [cancelCompositorMotion, readCurrentPosition, writePosition]);
+
+  /** The lane origin the transform is measured from may have moved. Guarded,
+   * because the common case — a settle-time render-window shift that keeps the
+   * same origin — must stay free. */
+  const rebaseForLayoutOrigin = useCallback(() => {
+    if (lastSyncedLayoutOriginRef.current === layoutOriginRef.current) return;
+    rebaseTrack();
+  }, [rebaseTrack]);
 
   // Disable CSS transition once: it would double-animate against the per-tick
   // JS transform write. The track element is stable for the carousel's life.
@@ -214,14 +220,15 @@ export function useTrackBinding({
   }, [trackRef]);
 
   useIsomorphicLayoutEffect(() => {
-    syncGeometry(false);
-  }, [layoutOrigin, syncGeometry, visibleSlidesCount]);
+    rebaseForLayoutOrigin();
+  }, [layoutOrigin, rebaseForLayoutOrigin, visibleSlidesCount]);
 
   // The slot moved (resize, rotation, slot-count change): the compositor's
-  // keyframes were built in the OLD pixel scale, so the ride must be re-based.
+  // keyframes were built in the OLD pixel scale. Subscribed ONCE — see the note
+  // on `subscribeSlotSize` above.
   useIsomorphicLayoutEffect(
-    () => slotSize.subscribe(() => syncGeometry(true)),
-    [slotSize, syncGeometry],
+    () => subscribeSlotSize(rebaseTrack),
+    [rebaseTrack, subscribeSlotSize],
   );
 
   // Per-frame paint (drag + no-WAAPI fallback). Drop the shared Nth running

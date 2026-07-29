@@ -1,5 +1,5 @@
 // See docs/architecture/geometry.md
-import { useCallback, useRef, useState, type RefObject } from "react";
+import { useCallback, useMemo, useRef, useState, type RefObject } from "react";
 
 import { measureSlotSize } from "../domain";
 import { useIsomorphicLayoutEffect } from "../../../../shared";
@@ -135,5 +135,14 @@ export function useSlotSizeSource({
     };
   }, [remeasure, viewportRef]);
 
-  return { getSlotSize, slotPx, subscribe };
+  // Memoised so the source is safe to put in a dependency array: a fresh object
+  // per render made a consumer's subscribe effect re-run on every render, and
+  // React tears down ALL effects of a commit before it runs any of them — so a
+  // notification emitted from inside a commit landed on an empty listener set.
+  // `getSlotSize` and `subscribe` are permanently stable, so only a real slot
+  // move re-identifies this.
+  return useMemo(
+    () => ({ getSlotSize, slotPx, subscribe }),
+    [getSlotSize, slotPx, subscribe],
+  );
 }
