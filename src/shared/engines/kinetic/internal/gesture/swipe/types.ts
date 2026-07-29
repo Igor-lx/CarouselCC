@@ -1,11 +1,11 @@
-﻿import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 
 export type PointerSwipePhase = "idle" | "press" | "dragging" | "cooldown";
 
 export type PointerSwipeDirection = "left" | "right" | "none";
 
-/** How an owned gesture ended вЂ” carries meaning for catch-and-hold consumers.
- * See shared/gesture/README.md В§ End reasons (Android long-press в†’ `external-cancel`). */
+/** How an owned gesture ended — carries meaning for catch-and-hold consumers.
+ * See shared/gesture/README.md § End reasons (Android long-press → `external-cancel`). */
 export type PointerSwipeEndReason = "release" | "vertical-scroll" | "external-cancel";
 
 export interface PointerSwipeConfig {
@@ -15,7 +15,7 @@ export interface PointerSwipeConfig {
   intentThreshold?: number;
   /** Progressive drag resistance in (0, 1): the UI offset lags the raw
    * finger travel more as the pull grows. Applied to the whole offset on
-   * every sample вЂ” the engine has no notion of edges. `0` = 1:1 tracking. */
+   * every sample — the engine has no notion of edges. `0` = 1:1 tracking. */
   resistance?: number;
   /** How quickly the resistance lag ramps up with distance.*/
   resistanceCurvature?: number;
@@ -47,7 +47,7 @@ export interface PointerSwipeConfig {
 export type ResolvedPointerSwipeConfig = Required<PointerSwipeConfig>;
 
 export interface PointerSwipePressPayload {
-  /** Viewport-domain X where the finger landed вЂ” for settling a motionless
+  /** Viewport-domain X where the finger landed — for settling a motionless
    * release back onto the element that was actually pressed. */
   pressClientX: number;
 }
@@ -63,7 +63,7 @@ export interface PointerSwipeReleasePayload extends PointerSwipeMovePayload {
   pointerReleaseVelocity: number;
   uiReleaseVelocity: number;
   /** UI-domain continuity-launch speed, judged over the whole gesture (not the
-   * last frames). See shared/gesture/README.md В§ End reasons. */
+   * last frames). See shared/gesture/README.md § End reasons. */
   launchVelocity: number;
 }
 
@@ -76,7 +76,7 @@ export interface PointerSwipeListeners {
 }
 
 /** Everything the host needs as one spreadable bundle (`<div {...hostProps}>`);
- * the `ref` is what makes an element the host. See shared/gesture/README.md В§ Principle. */
+ * the `ref` is what makes an element the host. See shared/gesture/README.md § Principle. */
 export interface PointerSwipeHostProps extends PointerSwipeListeners {
   ref: (node: HTMLElement | null) => void;
   style?: CSSProperties;
@@ -87,10 +87,10 @@ export type PointerSwipeHostRef =
   | ((node: HTMLElement | null) => void)
   | { current: HTMLElement | null };
 
-/** Turnkey "the finger drags your value". See shared/gesture/README.md В§ Turnkey dragв†’value
- * (anchors at activation; 1:1 pxв†”unit; `read` catches a flying value). */
+/** Turnkey "the finger drags your value". See shared/gesture/README.md § Turnkey drag→value
+ * (anchors at activation; 1:1 px↔unit; `read` catches a flying value). */
 export interface PointerSwipeValueBinding {
-  /** The value's live position at drag activation вЂ” the drag's anchor. */
+  /** The value's live position at drag activation — the drag's anchor. */
   read: () => number;
   /** Receives `anchor + uiOffset` on activation and on every move. */
   write: (value: number) => void;
@@ -104,11 +104,11 @@ export interface PointerSwipeProps {
    * second ref on the DOM). */
   hostRef?: PointerSwipeHostRef | undefined;
   /** Optional draggable SURFACE inside the host; presses outside it are chrome,
-   * handed straight back. See shared/gesture/README.md В§ Principle. */
+   * handed straight back. See shared/gesture/README.md § Principle. */
   surfaceRef?: { readonly current: HTMLElement | null } | undefined;
   enabled?: boolean | undefined;
   config?: PointerSwipeConfig | undefined;
-  /** Optional turnkey dragв†’value binding вЂ” see {@link PointerSwipeValueBinding}. */
+  /** Optional turnkey drag→value binding — see {@link PointerSwipeValueBinding}. */
   value?: PointerSwipeValueBinding | undefined;
   onPressStart?: ((payload: PointerSwipePressPayload) => void) | undefined;
   onDragStart?: ((payload: PointerSwipeMovePayload) => void) | undefined;
@@ -117,7 +117,7 @@ export interface PointerSwipeProps {
 }
 
 export interface PointerSwipeResult {
-  /** Spread onto the host element: `<div {...hostProps}>` вЂ” ref, listeners
+  /** Spread onto the host element: `<div {...hostProps}>` — ref, listeners
    * and required styles in one inseparable bundle. */
   hostProps: PointerSwipeHostProps;
 }

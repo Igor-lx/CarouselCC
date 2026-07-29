@@ -1,4 +1,4 @@
-﻿import { motionNow } from "../runtime/clock";
+import { motionNow } from "../runtime/clock";
 import type { MotionSampleData, MotionSegmentBase } from "../runtime/types";
 import { sampleMotionProfile, type MotionProfile } from "./profile";
 
@@ -43,7 +43,7 @@ export const sampleProfileSegment = <Strategy extends string>(
   };
 };
 
-/** Signed velocity в†’ unsigned along `distance` (0 if it opposes); local copy by design. */
+/** Signed velocity → unsigned along `distance` (0 if it opposes); local copy by design. */
 export const alignSpeed = (velocity: number, distance: number): number => {
   const direction = Math.sign(distance);
   if (

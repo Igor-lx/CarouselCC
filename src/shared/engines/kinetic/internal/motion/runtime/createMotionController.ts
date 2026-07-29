@@ -1,4 +1,4 @@
-﻿// See shared/motion/README.md
+// See shared/motion/README.md
 import type {
   MotionCompletionMode,
   MotionController,
@@ -283,7 +283,7 @@ export function createMotionController<Strategy extends string = string>(
       });
     },
 
-    /** Soft, idempotent teardown вЂ” the controller stays usable (StrictMode-safe). */
+    /** Soft, idempotent teardown — the controller stays usable (StrictMode-safe). */
     destroy() {
       this.cancel();
       subscribers.clear();
