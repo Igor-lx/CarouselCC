@@ -1,6 +1,6 @@
 // Headless app-shell adapter: keeps the mobile browser chrome matching the theme.
 // See ../../README.md
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 import { useIsomorphicLayoutEffect } from "../../hooks/useIsomorphicLayoutEffect";
 import { ON_SCREEN_MODES, THEME_MODES } from "./constants";
@@ -19,17 +19,12 @@ export function BrowserChromeSync(): null {
   // A host with no theme-color meta gets one — created ONCE and removed on
   // unmount, so lifting the box out leaves the document as it found it. Declared
   // before the sync below, which then fills it on the same commit.
-  const ownedMetaRef = useRef<HTMLMetaElement | null>(null);
   useEffect(() => {
     if (document.querySelector('meta[name="theme-color"]')) return;
     const meta = document.createElement("meta");
     meta.setAttribute("name", "theme-color");
     document.head.appendChild(meta);
-    ownedMetaRef.current = meta;
-    return () => {
-      meta.remove();
-      ownedMetaRef.current = null;
-    };
+    return () => meta.remove();
   }, []);
 
   useEffect(() => {
