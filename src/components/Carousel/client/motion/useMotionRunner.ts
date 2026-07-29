@@ -38,6 +38,31 @@ export interface UseMotionRunnerInput {
 const directionOf = (delta: number): MotionPlanDirection =>
   delta > 0 ? 1 : delta < 0 ? -1 : 0;
 
+/**
+ * The fields a re-plan depends on, in ONE place. It feeds both the effect's
+ * dependency array and its dedupe key, so the two can no longer drift: they
+ * were hand-maintained twin lists, and had already diverged
+ * (`layout.visibleSlidesCount` was in the deps and missing from the key). A
+ * field present in one and forgotten in the other is a silently missed — or
+ * silently duplicated — re-plan, with nothing to notice it.
+ */
+const replanInputs = (state: CarouselState, isInstantMode: boolean) =>
+  [
+    state.layout.canSlide,
+    state.layout.visibleSlidesCount,
+    state.motionPhase,
+    state.moveReason,
+    state.virtualIndex,
+    state.fromVirtualIndex,
+    state.teleportVirtualIndex,
+    state.isTeleportApproach,
+    state.isRepeatedClickAdvance,
+    state.gesture.pointerVelocity,
+    state.gesture.uiVelocity,
+    state.gesture.releasedAt,
+    isInstantMode,
+  ] as const;
+
 const buildStartFromGesture = (
   state: CarouselState,
   launchPosition: number,
@@ -76,21 +101,10 @@ export function useMotionRunner({
     [onSettle],
   );
 
+  const inputs = replanInputs(state, isInstantMode);
+
   useIsomorphicLayoutEffect(() => {
-    const key = [
-      state.layout.canSlide,
-      state.motionPhase,
-      state.moveReason,
-      state.virtualIndex,
-      state.fromVirtualIndex,
-      state.teleportVirtualIndex,
-      state.isTeleportApproach,
-      state.isRepeatedClickAdvance,
-      state.gesture.pointerVelocity,
-      state.gesture.uiVelocity,
-      state.gesture.releasedAt,
-      isInstantMode,
-    ].join(":");
+    const key = inputs.join(":");
 
     if (lastKeyRef.current === key) return;
     lastKeyRef.current = key;
@@ -266,26 +280,18 @@ export function useMotionRunner({
     // controller — an intentional split, not a mixed handoff (see motion.md).
     const handoff = controller.captureHandoff(startedAt);
     startResolvedMotion(buildStartFromState(state, handoff.velocity), startedAt);
+    // `state` is read whole inside, but only `replanInputs` may RE-RUN this:
+    // config/controller identity changes must not restart a live segment, and
+    // the key above stops them at the door.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     cancelCompositorMotion,
     config,
     controller,
-    isInstantMode,
     publishPlan,
     settle,
     startCompositorMotion,
-    state.fromVirtualIndex,
-    state.gesture.pointerVelocity,
-    state.gesture.uiVelocity,
-    state.gesture.releasedAt,
-    state.isTeleportApproach,
-    state.isRepeatedClickAdvance,
-    state.layout.canSlide,
-    state.layout.visibleSlidesCount,
-    state.motionPhase,
-    state.moveReason,
-    state.teleportVirtualIndex,
-    state.virtualIndex,
+    ...inputs,
   ]);
 
   useEffect(
