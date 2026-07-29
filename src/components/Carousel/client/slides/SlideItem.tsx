@@ -22,6 +22,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
     isDataSaverEnabled,
     imageResourceStore,
     imageSizes,
+    viewportSignature,
     onSlideClick,
     ...ariaProps
   } = props;
@@ -47,6 +48,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
     imgRef,
     // No ResponsiveImages module → no source to swap → veil inert.
     isBitmapShown: isResponsiveImagesOn && isImageSlide && status === "loaded",
+    viewportSignature,
   });
 
   // Retry an in-band errored image (store owns backoff/cap/dedup; see slides.md).

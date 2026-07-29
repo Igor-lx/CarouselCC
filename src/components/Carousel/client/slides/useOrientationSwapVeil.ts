@@ -3,21 +3,27 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { SLIDE_REORIENT_VEIL } from "../config";
-import { useSlideViewport } from "../viewport/useSlideViewport";
 
 interface UseOrientationSwapVeilInput {
   /** The live `<img>`; stays `null` for text slides and error placeholders. */
   imgRef: RefObject<HTMLImageElement | null>;
   /** Only a shown bitmap can display the stale-crop artefact. */
   isBitmapShown: boolean;
+  /**
+   * The viewport signature, read ONCE at the composition root and handed down.
+   * Any flip that can re-select a `<source media>` crop changes it. Calling the
+   * media facade here instead would put N media subscriptions and one MediaState
+   * rebuild on EVERY mounted slide (a render window is tens of them) to read a
+   * single scalar — see docs/architecture/viewport.md.
+   */
+  viewportSignature: string;
 }
 
 export function useOrientationSwapVeil({
   imgRef,
   isBitmapShown,
+  viewportSignature: signature,
 }: UseOrientationSwapVeilInput): boolean {
-  // Any flip that can re-select a <source media> crop changes this signature.
-  const { signature } = useSlideViewport();
   const [isVeiled, setIsVeiled] = useState(false);
   const previousSignatureRef = useRef(signature);
 

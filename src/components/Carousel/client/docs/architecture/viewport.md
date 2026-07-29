@@ -32,6 +32,14 @@ listener per distinct condition, no matter how many consumers). Its result is
 stamped by the root as **data attributes**: `data-breakpoint`,
 `data-orientation`, and `data-<flag>` for each flag.
 
+**The root is its only caller, and that is a rule, not an accident.** The store
+deduplicates the browser listener, but not the per-consumer work: every extra
+`useMedia` call adds one `useSyncExternalStore` subscription per tracked
+condition plus a `MediaState` rebuild whenever the signature moves. A leaf that
+calls it pays that on every mounted instance — the orientation-swap veil once
+did, across a render window of tens of slides, to read the single `signature`
+scalar. Leaves take what they need from the root as a prop.
+
 The component SCSS styles slide geometry **by those attributes** — the
 stylesheet holds NO media queries and NO numbers. This is the attribute-driven
 SSOT: the numbers live once in `config/viewport.ts`, JS resolves them, CSS keys

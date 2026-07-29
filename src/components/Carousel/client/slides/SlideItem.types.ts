@@ -20,6 +20,9 @@ export interface SlideItemProps extends SlideAriaProps {
   imageResourceStore: ImageResourceStore | null;
   /** Carousel-derived default `sizes`; a slide's own `image.sizes` overrides it. */
   imageSizes: string;
+  /** Viewport signature from the root's single media read — drives the
+   * orientation-swap veil without a per-slide media subscription. */
+  viewportSignature: string;
   /** Host reduced-data signal — off-band images load lazily at low priority. */
   isDataSaverEnabled: boolean;
   onSlideClick?: (slide: Slide) => void;

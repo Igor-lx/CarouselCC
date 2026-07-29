@@ -402,6 +402,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
                     isDataSaverEnabled={isDataSaverEnabled}
                     imageResourceStore={imageResourceStore}
                     imageSizes={imageSizes}
+                    viewportSignature={slideViewport.signature}
                     onSlideClick={navigation.handleSlideClick}
                     {...slide.ariaProps}
                   />
