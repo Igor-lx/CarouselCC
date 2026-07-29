@@ -1,5 +1,13 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type Mock,
+} from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
@@ -27,8 +35,8 @@ interface Options {
 let host: HTMLDivElement;
 let root: Root;
 let api: AutoplayApi;
-let onStep: ReturnType<typeof vi.fn>;
-let onGoToStart: ReturnType<typeof vi.fn>;
+let onStep: Mock<() => void>;
+let onGoToStart: Mock<() => void>;
 
 function Probe(options: Options) {
   api = useAutoplay({
