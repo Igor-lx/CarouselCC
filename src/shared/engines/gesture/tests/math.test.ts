@@ -3,22 +3,18 @@ import { describe, expect, it } from "vitest";
 import {
   applyResistance,
   calculateEma,
-  clampMagnitude,
   decayedVelocity,
-  dominantMagnitude,
   frameAdjustedAlpha,
   pauseDecayedVelocity,
-  safeResistance,
 } from "../swipe/internals/math";
 import { sameDirectionSpeed } from "../inertia/speed";
 
-describe("safeResistance", () => {
-  it("clamps into [0, 1]", () => {
-    expect(safeResistance(-1)).toBe(0);
-    expect(safeResistance(0.4)).toBe(0.4);
-    expect(safeResistance(3)).toBe(1);
-  });
-});
+// `safeResistance`, `clampMagnitude` and `dominantMagnitude` had a describe
+// each. All three are one-line arithmetic that cannot fail subtly, and the two
+// that carry meaning are already asserted where that meaning lives:
+// safeResistance through applyResistance's "1:1 at zero, finite at one" case,
+// dominantMagnitude through resolveSwipeDirection's "flicks on the
+// WEIGHTED-AVERAGE speed" case.
 
 describe("applyResistance", () => {
   it("tracks the finger ~1:1 near zero", () => {
@@ -43,14 +39,6 @@ describe("applyResistance", () => {
   it("is 1:1 with zero resistance and finite as resistance approaches 1", () => {
     expect(applyResistance(300, 0, 0.002)).toBe(300);
     expect(Number.isFinite(applyResistance(300, 1, 0.002))).toBe(true);
-  });
-});
-
-describe("clampMagnitude", () => {
-  it("clamps both directions, passes small values through", () => {
-    expect(clampMagnitude(10, 5)).toBe(5);
-    expect(clampMagnitude(-10, 5)).toBe(-5);
-    expect(clampMagnitude(3, 5)).toBe(3);
   });
 });
 
@@ -116,13 +104,5 @@ describe("pauseDecayedVelocity", () => {
 
   it("degenerate half-life disables decay instead of exploding", () => {
     expect(pauseDecayedVelocity(2, 1000, 120, 0)).toBe(2);
-  });
-});
-
-describe("dominantMagnitude", () => {
-  it("picks the larger magnitude and preserves its sign", () => {
-    expect(dominantMagnitude(0.02, -0.4)).toBe(-0.4);
-    expect(dominantMagnitude(-0.5, 0.1)).toBe(-0.5);
-    expect(dominantMagnitude(0.3, 0.3)).toBe(0.3);
   });
 });

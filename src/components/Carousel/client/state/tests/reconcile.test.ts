@@ -6,19 +6,7 @@ import type { Slide } from "../../public-api/types";
 import { buildInitialState } from "../initial";
 import { reconcileStateToLayout } from "../reconcile";
 import type { CarouselState } from "../types";
-
-const makeLayout = (
-  slideCount: number,
-  visibleSlidesCount: number,
-  isFinite: boolean,
-  idTag = "a",
-): CarouselLayout => {
-  const slides: Slide[] = Array.from({ length: slideCount }, (_, i) => ({
-    id: `${idTag}-${i}`,
-    content: `slide-${idTag}-${i}`,
-  }));
-  return buildCarouselLayout(buildSlideRecords(slides), visibleSlidesCount, isFinite);
-};
+import { makeLayout } from "./layoutBuilder";
 
 /** A non-idle state to prove reconciliation collapses motion to a snap. */
 const movedState = (layout: CarouselLayout, targetPageIndex: number): CarouselState => ({

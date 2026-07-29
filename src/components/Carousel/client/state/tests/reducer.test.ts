@@ -2,12 +2,11 @@
 
 import { buildCarouselConfig } from "../../config";
 import type { CarouselRuntimeConfig } from "../../config";
-import { buildCarouselLayout, buildSlideRecords } from "../../domain";
 import type { CarouselLayout } from "../../domain";
-import type { Slide } from "../../public-api/types";
 import { buildInitialState } from "../initial";
 import { carouselReducer } from "../reducer";
 import type { CarouselCommand, CarouselState } from "../types";
+import { makeLayout } from "./layoutBuilder";
 
 // --- test kit ---------------------------------------------------------------
 
@@ -24,19 +23,6 @@ const config: CarouselRuntimeConfig = {
     goToFinalApproachPageSpan: 1,
     goToTeleportMinPageSpan: 3,
   },
-};
-
-const makeLayout = (
-  slideCount: number,
-  visibleSlidesCount: number,
-  isFinite: boolean,
-  idTag = "a",
-): CarouselLayout => {
-  const slides: Slide[] = Array.from({ length: slideCount }, (_, i) => ({
-    id: `${idTag}-${i}`,
-    content: `slide-${idTag}-${i}`,
-  }));
-  return buildCarouselLayout(buildSlideRecords(slides), visibleSlidesCount, isFinite);
 };
 
 /** Dispatch one command through the reducer with an explicit context. */

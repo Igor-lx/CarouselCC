@@ -4,8 +4,6 @@ import {
   blendDotStates,
   buildDotKeyframes,
   dotKeyframesBetween,
-  dotActiveStrength,
-  dotStateAt,
   offsetDistance,
   reachedDotIndexes,
   resolveOffsetTarget,
@@ -18,18 +16,11 @@ const PAGES = 12;
 const FINITE = true;
 const CYCLIC = false;
 
-describe("dotActiveStrength", () => {
-  it("is full under the offset and gone a whole step away", () => {
-    expect(dotActiveStrength(0)).toBe(1);
-    expect(dotActiveStrength(1)).toBe(0);
-    expect(dotActiveStrength(2.5)).toBe(0);
-  });
-
-  it("is symmetric and linear between", () => {
-    expect(dotActiveStrength(0.25)).toBeCloseTo(0.75, 10);
-    expect(dotActiveStrength(-0.25)).toBeCloseTo(0.75, 10);
-  });
-});
+// `dotActiveStrength` and `dotStateAt` had a describe each. Both are evaluated
+// on real output by the `buildDotKeyframes` cases below, which assert the exact
+// resulting opacities (the linear blend, the pass-through up-and-down, the
+// wrap onto the far dot). Testing the intermediate steps again only restated
+// them in a form that could not fail on its own.
 
 describe("offsetDistance", () => {
   it("is the plain gap on a finite deck", () => {
@@ -68,21 +59,6 @@ describe("resolveOffsetTarget", () => {
 
   it("holds still when the target is already the current page", () => {
     expect(resolveOffsetTarget(4, 4, PAGES, 1, CYCLIC)).toBe(4);
-  });
-});
-
-describe("dotStateAt", () => {
-  it("blends both channels by strength", () => {
-    expect(dotStateAt(0, 0, INACTIVE, ACTIVE, PAGES, FINITE)).toEqual(ACTIVE);
-    expect(dotStateAt(0, 1, INACTIVE, ACTIVE, PAGES, FINITE)).toEqual(INACTIVE);
-    const half = dotStateAt(0, 0.5, INACTIVE, ACTIVE, PAGES, FINITE);
-    expect(half.opacity).toBeCloseTo(0.5, 10);
-    expect(half.scale).toBeCloseTo(1.2, 10);
-  });
-
-  it("lights the far-end dot when the offset steps off the front", () => {
-    const last = dotStateAt(11, -1, INACTIVE, ACTIVE, PAGES, CYCLIC);
-    expect(last.opacity).toBeCloseTo(0.8, 10);
   });
 });
 

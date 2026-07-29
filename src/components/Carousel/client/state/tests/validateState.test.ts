@@ -1,26 +1,12 @@
 ﻿import { describe, expect, it } from "vitest";
 
-import { buildCarouselLayout, buildSlideRecords } from "../../domain";
-import type { CarouselLayout } from "../../domain";
-import type { Slide } from "../../public-api/types";
 import { buildInitialState } from "../initial";
 import type { CarouselState } from "../types";
 import {
   type CarouselStateIssue,
   validateCarouselState,
 } from "../validateState";
-
-const makeLayout = (
-  slideCount: number,
-  visibleSlidesCount: number,
-  isFinite: boolean,
-): CarouselLayout => {
-  const slides: Slide[] = Array.from({ length: slideCount }, (_, i) => ({
-    id: i,
-    content: `slide-${i}`,
-  }));
-  return buildCarouselLayout(buildSlideRecords(slides), visibleSlidesCount, isFinite);
-};
+import { makeLayout, NON_JUMP_PHASES } from "./layoutBuilder";
 
 const layout = makeLayout(12, 3, false); // pageCount 4
 const baseState: CarouselState = buildInitialState(layout);
@@ -91,36 +77,28 @@ describe("validateCarouselState вЂ” out-of-bounds targetPageIndex", () => {
 });
 
 describe("validateCarouselState вЂ” teleportVirtualIndex phase consistency", () => {
-  it("flags teleportVirtualIndex set in the idle phase", () => {
-    const issues = validate({ teleportVirtualIndex: 12 });
-    expect(issues).toHaveLength(1);
-    expect(issues[0]!.kind).toBe("teleport-virtual-index-outside-step-jump");
-  });
-
-  it("flags teleportVirtualIndex set during a step-normal segment", () => {
-    const issues = validate({
-      teleportVirtualIndex: 12,
-      motionPhase: "step-normal",
-    });
-    expect(issues).toHaveLength(1);
-    expect(issues[0]!.kind).toBe("teleport-virtual-index-outside-step-jump");
+  // One table instead of two hand-picked phases: the rule is "any phase that
+  // is not step-jump", so the test says exactly that.
+  it("flags it in every phase that is not step-jump", () => {
+    for (const motionPhase of NON_JUMP_PHASES) {
+      const issues = validate({ teleportVirtualIndex: 12, motionPhase });
+      expect(issues, motionPhase).toHaveLength(1);
+      expect(issues[0]!.kind, motionPhase).toBe(
+        "teleport-virtual-index-outside-step-jump",
+      );
+    }
   });
 });
 
 describe("validateCarouselState вЂ” isTeleportApproach phase consistency", () => {
-  it("flags isTeleportApproach set in the idle phase", () => {
-    const issues = validate({ isTeleportApproach: true });
-    expect(issues).toHaveLength(1);
-    expect(issues[0]!.kind).toBe("teleport-approach-outside-step-jump");
-  });
-
-  it("flags isTeleportApproach set during a step-snap segment", () => {
-    const issues = validate({
-      isTeleportApproach: true,
-      motionPhase: "step-snap",
-    });
-    expect(issues).toHaveLength(1);
-    expect(issues[0]!.kind).toBe("teleport-approach-outside-step-jump");
+  it("flags it in every phase that is not step-jump", () => {
+    for (const motionPhase of NON_JUMP_PHASES) {
+      const issues = validate({ isTeleportApproach: true, motionPhase });
+      expect(issues, motionPhase).toHaveLength(1);
+      expect(issues[0]!.kind, motionPhase).toBe(
+        "teleport-approach-outside-step-jump",
+      );
+    }
   });
 });
 

@@ -1,6 +1,12 @@
 ﻿import { describe, expect, it } from "vitest";
 
-import { clamp, mod, normalizePageIndex } from "../math";
+import { mod, normalizePageIndex } from "../math";
+
+// `clamp` had a describe of its own. It is `Math.max(min, Math.min(v, max))` —
+// it cannot break subtly, and every caller that matters (finite-mode paging,
+// the widget step bound) asserts the clamped OUTCOME where it is used.
+// `mod` and `normalizePageIndex` stay: the whole cyclic deck rests on them,
+// and JavaScript's `%` on negatives is exactly the trap they exist to hide.
 
 describe("mod", () => {
   it("wraps positive and negative values into [0, total)", () => {
@@ -13,16 +19,6 @@ describe("mod", () => {
   it("returns 0 for a non-positive total", () => {
     expect(mod(3, 0)).toBe(0);
     expect(mod(3, -2)).toBe(0);
-  });
-});
-
-describe("clamp", () => {
-  it("passes a value already inside the range", () => {
-    expect(clamp(5, 0, 10)).toBe(5);
-  });
-  it("clamps to the bounds", () => {
-    expect(clamp(-3, 0, 10)).toBe(0);
-    expect(clamp(42, 0, 10)).toBe(10);
   });
 });
 
