@@ -14,9 +14,12 @@
       content="#0d1520"
     />
 
+    <!-- No maximum-scale / user-scalable=no: blocking pinch-zoom fails WCAG
+         1.4.4, and the carousel does not need it — the swipe engine owns
+         horizontal touch through `touch-action: pan-y` on its own host. -->
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <title>CAROUSEL</title>
     <script>

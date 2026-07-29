@@ -87,6 +87,45 @@ describe("BrowserChromeSync (via the ThemeProvider facade)", () => {
     expect(metaContent()).toBe(BROWSER_THEME_COLORS.light);
   });
 
+  it("keeps the created meta in step with the theme", () => {
+    render();
+    act(() => captured!.setTheme("dark"));
+    expect(metaContent()).toBe(BROWSER_THEME_COLORS.dark);
+  });
+
+  it("takes the meta it created back out on unmount", () => {
+    render();
+    expect(document.head.querySelectorAll('meta[name="theme-color"]')).toHaveLength(1);
+
+    act(() => root!.unmount());
+    root = null;
+    expect(document.head.querySelectorAll('meta[name="theme-color"]')).toHaveLength(0);
+  });
+
+  it("leaves a meta the HOST owns alone on unmount", () => {
+    const own = document.createElement("meta");
+    own.setAttribute("name", "theme-color");
+    document.head.append(own);
+
+    render();
+    act(() => root!.unmount());
+    root = null;
+    expect(document.head.querySelectorAll('meta[name="theme-color"]')).toHaveLength(1);
+  });
+
+  it("an unpaired host meta carries the RESOLVED look in auto mode", () => {
+    // No `media` means the meta is unconditional: pinning it to the light
+    // colour would show light chrome to an auto user on a dark OS.
+    const plain = document.createElement("meta");
+    plain.setAttribute("name", "theme-color");
+    document.head.append(plain);
+
+    render(); // auto
+    expect(plain.getAttribute("content")).toBe(BROWSER_THEME_COLORS.light);
+    act(() => captured!.setTheme("dark"));
+    expect(plain.getAttribute("content")).toBe(BROWSER_THEME_COLORS.dark);
+  });
+
   it("overrides both metas to the chosen color in an explicit mode", () => {
     const light = document.createElement("meta");
     light.setAttribute("name", "theme-color");

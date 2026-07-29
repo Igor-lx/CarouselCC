@@ -1,6 +1,6 @@
 // Headless app-shell adapter: keeps the mobile browser chrome matching the theme.
 // See ../../README.md
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { useIsomorphicLayoutEffect } from "../../hooks/useIsomorphicLayoutEffect";
 import { ON_SCREEN_MODES, THEME_MODES } from "./constants";
@@ -16,20 +16,33 @@ export function BrowserChromeSync(): null {
       BROWSER_THEME_COLORS[onScreenTheme];
   }, [onScreenTheme]);
 
+  // A host with no theme-color meta gets one — created ONCE and removed on
+  // unmount, so lifting the box out leaves the document as it found it. Declared
+  // before the sync below, which then fills it on the same commit.
+  const ownedMetaRef = useRef<HTMLMetaElement | null>(null);
+  useEffect(() => {
+    if (document.querySelector('meta[name="theme-color"]')) return;
+    const meta = document.createElement("meta");
+    meta.setAttribute("name", "theme-color");
+    document.head.appendChild(meta);
+    ownedMetaRef.current = meta;
+    return () => {
+      meta.remove();
+      ownedMetaRef.current = null;
+    };
+  }, []);
+
   useEffect(() => {
     const metas = document.querySelectorAll<HTMLMetaElement>(
       'meta[name="theme-color"]',
     );
-    if (metas.length === 0) {
-      const meta = document.createElement("meta");
-      meta.setAttribute("name", "theme-color");
-      meta.setAttribute("content", BROWSER_THEME_COLORS[onScreenTheme]);
-      document.head.appendChild(meta);
-      return;
-    }
     metas.forEach((meta) => {
-      if (theme === THEME_MODES.AUTO) {
-        const scheme = meta.getAttribute("media")?.includes("dark")
+      // Only a scheme-PAIRED meta keeps its own colour in auto mode; that is
+      // what `media` means. An unpaired one is unconditional, so it has to
+      // carry the RESOLVED look — including the one created above.
+      const media = meta.getAttribute("media");
+      if (theme === THEME_MODES.AUTO && media) {
+        const scheme = media.includes("dark")
           ? ON_SCREEN_MODES.DARK
           : ON_SCREEN_MODES.LIGHT;
         meta.setAttribute("content", BROWSER_THEME_COLORS[scheme]);

@@ -58,7 +58,9 @@ const SLIDES_DATA_URL = `${
 }carousel-slides${SLIDES_SET}.json`;
 
 const openSlide = (slide: Slide) => {
-  window.open(String(slide.content), "_blank");
+  // noopener: without it the opened document gets a live `window.opener` handle
+  // back into this one.
+  window.open(String(slide.content), "_blank", "noopener");
 };
 
 export default function App() {
