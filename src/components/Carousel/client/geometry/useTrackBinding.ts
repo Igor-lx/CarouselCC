@@ -1,24 +1,20 @@
 // See docs/architecture/geometry.md
 import { useCallback, useEffect, useRef, type RefObject } from "react";
 
-import {
-  measureSlotSize,
-  trackCssTransform,
-  trackPixelTransform,
-} from "../domain";
+import { trackCssTransform, trackPixelTransform } from "../domain";
 import { useIsomorphicLayoutEffect } from "../../../../shared";
 import { isWaapiSupported } from "../../../../shared";
 import { keyframesAlongStops, startPinnedAnimation } from "../motion";
 import { isDroppedFallbackFrame, type VisualPositionSource } from "../visual-position";
-
-/** A viewport inline-size change smaller than this skips the geometry re-sync. */
-const VIEWPORT_RESIZE_EPSILON_PX = 0.5;
+import type { SlotSizeSource } from "./useSlotSizeSource";
 
 interface UseTrackBindingInput {
   trackRef: RefObject<HTMLDivElement | null>;
   layoutOrigin: number;
   visibleSlidesCount: number;
   visualPosition: VisualPositionSource;
+  /** THE carousel's slot measurement — this hook owns no observer of its own. */
+  slotSize: SlotSizeSource;
 }
 
 export interface TrackCompositorMotionOptions {
@@ -45,47 +41,33 @@ export function useTrackBinding({
   layoutOrigin,
   visibleSlidesCount,
   visualPosition,
+  slotSize,
 }: UseTrackBindingInput): TrackBindingApi {
   const layoutOriginRef = useRef(layoutOrigin);
   const visibleSlidesCountRef = useRef(visibleSlidesCount);
-  const slotSizeRef = useRef<number | null>(null);
   const lastTransformRef = useRef<string | null>(null);
-  const lastMeasuredWidthRef = useRef<number | null>(null);
   const compositorAnimationRef = useRef<Animation | null>(null);
   const lastSyncedLayoutOriginRef = useRef<number | null>(null);
 
   layoutOriginRef.current = layoutOrigin;
   visibleSlidesCountRef.current = visibleSlidesCount;
 
-  const measure = useCallback(
-    (viewportWidth?: number) => {
-      const track = trackRef.current;
-      const viewport = track?.parentElement;
-      if (!viewport) {
-        slotSizeRef.current = null;
-        return null;
-      }
-      const width = viewportWidth ?? viewport.offsetWidth;
-      const slot = measureSlotSize(viewport, visibleSlidesCountRef.current, width);
-      const next = slot > 0 ? slot : null;
-      lastMeasuredWidthRef.current = width;
-      slotSizeRef.current = next;
-      return next;
-    },
-    [trackRef],
-  );
+  const readSlotSize = slotSize.getSlotSize;
 
-  const resolveTransform = useCallback((position: number): string => {
-    const slot = slotSizeRef.current;
-    if (slot !== null) {
-      return trackPixelTransform(position, layoutOriginRef.current, slot);
-    }
-    return trackCssTransform(
-      position,
-      layoutOriginRef.current,
-      visibleSlidesCountRef.current,
-    );
-  }, []);
+  const resolveTransform = useCallback(
+    (position: number): string => {
+      const slot = readSlotSize();
+      if (slot !== null) {
+        return trackPixelTransform(position, layoutOriginRef.current, slot);
+      }
+      return trackCssTransform(
+        position,
+        layoutOriginRef.current,
+        visibleSlidesCountRef.current,
+      );
+    },
+    [readSlotSize],
+  );
 
   const writePosition = useCallback(
     (position: number, source: "frame" | "geometry" = "frame") => {
@@ -140,7 +122,7 @@ export function useTrackBinding({
   const startCompositorMotion = useCallback(
     ({ from, to, duration, stops, startedAt }: TrackCompositorMotionOptions): boolean => {
       const track = trackRef.current;
-      const slot = slotSizeRef.current;
+      const slot = readSlotSize();
       if (
         !track ||
         slot === null ||
@@ -192,7 +174,7 @@ export function useTrackBinding({
 
       return true;
     },
-    [cancelCompositorMotion, trackRef],
+    [cancelCompositorMotion, readSlotSize, trackRef],
   );
 
   // Where the track is actually painted: snapshot for a JS track, reflow-free
@@ -205,18 +187,12 @@ export function useTrackBinding({
     [visualPosition],
   );
 
+  // Re-baseline the track onto the current geometry. Cheap and idempotent when
+  // nothing moved: only a new layout origin gets past the guard, since the slot
+  // source calls this exactly when the slot itself changed.
   const syncGeometry = useCallback(
-    (width?: number) => {
-      const previousSlot = slotSizeRef.current;
-      const nextSlot = measure(width);
-
-      // Judged through the SLOT, not raw px, so a height-only change (URL bar)
-      // never tears down a healthy compositor ride.
-      if (
-        nextSlot !== null &&
-        nextSlot === previousSlot &&
-        lastSyncedLayoutOriginRef.current === layoutOriginRef.current
-      ) {
+    (force: boolean) => {
+      if (!force && lastSyncedLayoutOriginRef.current === layoutOriginRef.current) {
         return;
       }
       lastSyncedLayoutOriginRef.current = layoutOriginRef.current;
@@ -227,7 +203,7 @@ export function useTrackBinding({
       cancelCompositorMotion(position);
       writePosition(position, "geometry");
     },
-    [cancelCompositorMotion, measure, readCurrentPosition, writePosition],
+    [cancelCompositorMotion, readCurrentPosition, writePosition],
   );
 
   // Disable CSS transition once: it would double-animate against the per-tick
@@ -238,41 +214,15 @@ export function useTrackBinding({
   }, [trackRef]);
 
   useIsomorphicLayoutEffect(() => {
-    syncGeometry();
+    syncGeometry(false);
   }, [layoutOrigin, syncGeometry, visibleSlidesCount]);
 
-  useIsomorphicLayoutEffect(() => {
-    const track = trackRef.current;
-    const viewport = track?.parentElement;
-    if (!viewport || typeof window === "undefined") return;
-
-    const onWindowResize = () => syncGeometry();
-    let observer: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== "undefined") {
-      observer = new ResizeObserver(([entry]) => {
-        const inlineSize = entry?.contentRect.width;
-        if (typeof inlineSize !== "number" || !Number.isFinite(inlineSize)) {
-          syncGeometry();
-          return;
-        }
-        const previousWidth = lastMeasuredWidthRef.current;
-        if (
-          previousWidth !== null &&
-          Math.abs(inlineSize - previousWidth) < VIEWPORT_RESIZE_EPSILON_PX
-        ) {
-          return;
-        }
-        syncGeometry(inlineSize);
-      });
-      observer.observe(viewport);
-    }
-
-    window.addEventListener("resize", onWindowResize);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener("resize", onWindowResize);
-    };
-  }, [syncGeometry, trackRef]);
+  // The slot moved (resize, rotation, slot-count change): the compositor's
+  // keyframes were built in the OLD pixel scale, so the ride must be re-based.
+  useIsomorphicLayoutEffect(
+    () => slotSize.subscribe(() => syncGeometry(true)),
+    [slotSize, syncGeometry],
+  );
 
   // Per-frame paint (drag + no-WAAPI fallback). Drop the shared Nth running
   // frame so track and widget shed exactly the same frames; drag frames paint.
@@ -287,7 +237,7 @@ export function useTrackBinding({
     );
   }, [visualPosition, writePosition]);
 
-  const getSlotSize = useCallback(() => slotSizeRef.current ?? 0, []);
+  const getSlotSize = useCallback(() => readSlotSize() ?? 0, [readSlotSize]);
 
   // Self-contained unmount cancel — the animation is tied to a leaving element.
   useEffect(

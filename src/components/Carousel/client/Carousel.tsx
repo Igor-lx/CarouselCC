@@ -16,7 +16,11 @@ import { carouselBoundaryState, deckCarriesImageSets } from "./domain";
 import { useCarouselAutoplay } from "./autoplay/useCarouselAutoplay";
 import { useFocusRecovery } from "./focus/useFocusRecovery";
 import { useCarouselGesture } from "./gesture";
-import { useResponsiveImageSizes, useTrackBinding } from "./geometry";
+import {
+  useResponsiveImageSizes,
+  useSlotSizeSource,
+  useTrackBinding,
+} from "./geometry";
 import {
   createMotionPlanChannel,
   useCarouselMotionExecution,
@@ -144,8 +148,14 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
 
-  const imageSizes = useResponsiveImageSizes({
+  // THE slot measurement: one observer for the track, the gesture and `sizes`.
+  const slotSize = useSlotSizeSource({
     viewportRef,
+    visibleSlidesCount: layout.visibleSlidesCount,
+  });
+
+  const imageSizes = useResponsiveImageSizes({
+    slotPx: slotSize.slotPx,
     visibleSlidesCount: layout.visibleSlidesCount,
   });
 
@@ -197,6 +207,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     layoutOrigin,
     visibleSlidesCount: layout.visibleSlidesCount,
     visualPosition,
+    slotSize,
   });
 
   // --- motion plan channel ---------------------------------------------------
@@ -248,6 +259,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     applyTrackPosition: applyImmediatePosition,
     cancelTrackMotion: cancelCompositorMotion,
     getSlotSize,
+    slotPx: slotSize.slotPx,
     config,
   });
 

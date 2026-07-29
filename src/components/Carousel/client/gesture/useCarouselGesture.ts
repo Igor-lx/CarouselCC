@@ -10,7 +10,6 @@ import {
 } from "../domain";
 import type { CarouselRuntimeConfig } from "../config";
 import { resolveSlotAdaptiveSwipeConfig } from "./slotAdaptiveSwipe";
-import { useMeasuredSlotSize } from "../geometry";
 import type { CarouselDispatch } from "../state";
 import {
   motionNow,
@@ -35,6 +34,9 @@ interface UseCarouselGestureInput {
   /** Synchronously pin the track at `position` so the finger owns it this turn. */
   cancelTrackMotion: (position: number) => void;
   getSlotSize: () => number;
+  /** Published slot px from the carousel's one measurement source; `null` before
+   * the first measure. Content-normalises the engine tuning (see doc). */
+  slotPx: number | null;
   config: CarouselRuntimeConfig;
 }
 
@@ -54,6 +56,7 @@ export function useCarouselGesture({
   applyTrackPosition,
   cancelTrackMotion,
   getSlotSize,
+  slotPx,
   config,
 }: UseCarouselGestureInput): CarouselGestureResult {
   const originPositionRef = useRef<number | null>(null);
@@ -262,10 +265,6 @@ export function useCarouselGesture({
   }, [dispatch, flushPendingStart, isSwipeOn, layout, readCurrentPosition]);
 
   // Content-normalized engine tuning against the measured slot (see doc).
-  const slotPx = useMeasuredSlotSize({
-    viewportRef,
-    visibleSlidesCount: layout.visibleSlidesCount,
-  });
   const swipeConfig = useMemo(
     () => resolveSlotAdaptiveSwipeConfig(config.swipeConfig, slotPx),
     [config.swipeConfig, slotPx],

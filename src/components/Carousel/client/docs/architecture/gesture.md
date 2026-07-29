@@ -25,7 +25,9 @@ fewer are visible — so the tuning is slot-normalized before it reaches the eng
 
 [`gesture/slotAdaptiveSwipe.ts`](../../gesture/slotAdaptiveSwipe.ts)
 (`resolveSlotAdaptiveSwipeConfig`, pure, unit-tested) translates content
-semantics into engine units against the MEASURED slot (`useMeasuredSlotSize`):
+semantics into engine units against the MEASURED slot — the carousel's one
+`useSlotSizeSource`, whose rounded `slotPx` is handed down as a prop (see
+[geometry.md](./geometry.md)):
 
 - commit distance = `clamp(slot × commit.slotShare, commit.minPx, commit.maxPx)`,
   delivered via the engine's `minSwipeDistance` with `swipeThresholdRatio: 0` —

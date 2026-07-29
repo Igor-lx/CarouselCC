@@ -11,15 +11,24 @@ screen lives here.
 The slot width is **measured from the real viewport, never computed.** A slot is
 not a clean fraction of the window — the viewport is capped, padded, and gapped —
 so any JS formula would be a second, drift-prone source of truth beside the CSS.
-`measureSlotSize` (in [domain](./domain.md)) is the one measurement definition;
-both consumers below use it.
+`measureSlotSize` (in [domain](./domain.md)) is the one measurement definition.
 
-- **`useMeasuredSlotSize`** is the low-frequency reactive signal: the live slot
-  px for consumers that are not on the motion hot path (the responsive `sizes`
-  hint, the slot-adaptive swipe config). It recomputes only on mount, resize, or
-  a slide-count change, and re-renders only when the rounded value moves past an
-  epsilon. It is `null` until the first measurement (SSR / pre-mount) so
-  consumers fall back explicitly.
+- **`useSlotSizeSource`** is THE measurement of a carousel: one ResizeObserver,
+  one `resize` listener and one `getComputedStyle` read serving every consumer.
+  It publishes the result two ways, because the two kinds of consumer want
+  different things from the same number:
+  - `getSlotSize()` — the live RAW float, ref-backed. Reading it never
+    re-renders, so the per-frame track write can call it freely. `null` until the
+    first measurement (SSR / pre-mount) so consumers fall back explicitly.
+  - `slotPx` — the same value ROUNDED and epsilon-gated, as state, for consumers
+    off the motion hot path (the responsive `sizes` hint, the slot-adaptive swipe
+    config). Sub-pixel noise must not re-render them.
+  - `subscribe(listener)` — fires synchronously after any measure that MOVED the
+    slot. The track binding re-bases its geometry on it.
+
+  Three independent copies of this measurement used to observe the same element,
+  and two of them rounded while the third did not — the gesture was calibrated
+  against one number and the track painted with another.
 - **`useResponsiveImageSizes`** turns that measured slot into the images' `sizes`
   attribute as a concrete pixel length. A `vw` formula would overstate the real
   (capped, padded) slot and bias the browser toward an oversized candidate — on a
@@ -31,10 +40,10 @@ both consumers below use it.
 ## The track binding
 
 `useTrackBinding` wires the track element to the visual-position source. It owns
-the slot-size measurement (ResizeObserver + window resize) and the transform
-write, and returns a small imperative API — `readCurrentPosition`, `getSlotSize`,
-`startCompositorMotion`, `cancelCompositorMotion` — consumed by the gesture
-adapter and the motion runner.
+the transform write and the compositor animation — but NOT the measurement: it
+takes the `SlotSizeSource` above and subscribes to it. It returns a small
+imperative API — `readCurrentPosition`, `getSlotSize`, `startCompositorMotion`,
+`cancelCompositorMotion` — consumed by the gesture adapter and the motion runner.
 
 ### Writing the transform
 
@@ -103,13 +112,16 @@ never a DOM read:
 
 ### Re-baselining on geometry change
 
-`syncGeometry` re-measures and decides whether the transform math changed. The
-decision is judged through the SLOT, not raw pixels, so a height-only viewport
-change (a mobile URL bar collapsing) does not tear down a healthy compositor
-ride. A real change re-bases the transform math, so any compositor animation on
-the old baseline is torn down and the track re-pinned — and the position is read
-BEFORE the teardown, because afterwards `readCurrentPosition` would answer for a
-JS track that never painted those frames.
+`syncGeometry` re-bases the transform math, tearing down any compositor
+animation built on the old baseline and re-pinning the track — and the position
+is read BEFORE the teardown, because afterwards `readCurrentPosition` would
+answer for a JS track that never painted those frames.
+
+It runs on exactly two triggers: a new `layoutOrigin` (its own layout effect),
+and a slot that actually MOVED (the measurement source's notification). Judging
+the second through the SLOT rather than raw pixels is what keeps a height-only
+viewport change — a mobile URL bar collapsing — from tearing down a healthy
+compositor ride.
 
 ### Fallback frame dropping
 
