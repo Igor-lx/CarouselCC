@@ -89,7 +89,6 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
 
   const slideViewport = useSlideViewport();
 
-
   // --- resolved runtime config (no diagnostic dependency) ------------------
   const config = useCarouselConfig({
     visibleSlidesNr,
@@ -133,7 +132,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     [isContentImg, records]
   );
 
-  const useMemoDeckCarriesImageSets = useMemo(
+  const hasDeckImageSets = useMemo(
     () => deckCarriesImageSets(records),
     [records]
   );
@@ -333,7 +332,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     hasPaginationSlot: renderPolicy.hasPaginationSlot,
     isPaginationInteractiveOn,
     hasResponsiveImagesSlot: renderPolicy.hasResponsiveImagesSlot,
-    deckCarriesImageSets: useMemoDeckCarriesImageSets,
+    deckCarriesImageSets: hasDeckImageSets,
   });
 
   // --- presentation payload (classes, CSS vars, state attributes) ----------

@@ -134,7 +134,6 @@ export function useCarouselGesture({
     flushPendingStart,
     applyTrackPosition,
     cancelTrackMotion,
-    dispatch,
     getSlotSize,
     inFlightTargetPageIndex,
     layout,

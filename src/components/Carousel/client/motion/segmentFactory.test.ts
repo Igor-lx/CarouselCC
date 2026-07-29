@@ -180,7 +180,7 @@ describe("gesture-release continuity launch", () => {
         ),
       ),
     );
-    // Launch is already at (or близко к) the ride's peak — no dip, no kick.
+    // Launch is already at (or close to) the ride's peak — no dip, no kick.
     expect(Math.abs(launch.velocity)).toBeGreaterThan(cruisePeak * 0.55);
   });
 });
