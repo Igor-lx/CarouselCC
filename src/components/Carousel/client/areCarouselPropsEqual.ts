@@ -6,17 +6,27 @@ import { Children, isValidElement, type ReactNode } from "react";
 
 import type { CarouselProps } from "./public-api/types";
 
+/**
+ * Nesting the comparison walks past: deeper than this and a "changed" verdict
+ * is returned instead. Slot modules are flat by design (a module is a leaf that
+ * reads context), so this is a fuse, not a policy — and it fails SAFE: the
+ * worst outcome is one re-render the deck would have skipped, never a skipped
+ * re-render of a real change.
+ */
+const MAX_CHILD_COMPARE_DEPTH = 4;
+
 /** Props compared by identity, except `children` (fresh JSX, compared structurally). */
 function shallowEqualProps(
   a: Readonly<Record<string, unknown>>,
   b: Readonly<Record<string, unknown>>,
+  depth: number,
 ): boolean {
   const aKeys = Object.keys(a);
   if (aKeys.length !== Object.keys(b).length) return false;
   for (const key of aKeys) {
     if (Object.is(a[key], b[key])) continue;
     if (key === "children") {
-      if (!areChildrenEquivalent(a[key] as ReactNode, b[key] as ReactNode)) {
+      if (!areChildrenEquivalent(a[key] as ReactNode, b[key] as ReactNode, depth)) {
         return false;
       }
       continue;
@@ -35,7 +45,13 @@ const toChildList = (children: ReactNode): ReactNode[] => {
   return list;
 };
 
-function areChildrenEquivalent(a: ReactNode, b: ReactNode): boolean {
+function areChildrenEquivalent(
+  a: ReactNode,
+  b: ReactNode,
+  depth = 0,
+): boolean {
+  if (depth >= MAX_CHILD_COMPARE_DEPTH) return false;
+
   const listA = toChildList(a);
   const listB = toChildList(b);
   if (listA.length !== listB.length) return false;
@@ -51,6 +67,7 @@ function areChildrenEquivalent(a: ReactNode, b: ReactNode): boolean {
       !shallowEqualProps(
         prev.props as Record<string, unknown>,
         next.props as Record<string, unknown>,
+        depth + 1,
       )
     ) {
       return false;
