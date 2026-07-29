@@ -79,13 +79,23 @@ Touch dot pagination — a fixed-width odd-count strip with exponentially
 shrinking side dots; `activeDot` overlays carry the moving highlight (dot count
 via internal `PAGINATION_WIDGET_DEFAULTS`).
 
-It is a **decoupled one-step indicator**: it owns an unbounded step counter and
-never mirrors the deck's absolute position — a command is one step forward or
-back, whether the deck travels one page or teleports ten. Each step's landing is
+It is a **decoupled one-step indicator**: it owns its own step counter and never
+mirrors the deck's absolute position — a command is one step forward or back,
+whether the deck travels one page or teleports ten. Each step's landing is
 resolved by one pure rule (`widget/stepTarget.ts`) over TWO memories — the live
 running step (a repeated click retargets mid-animation) and the step a finger
 grab tore down. Same `targetKey` → keep the target; same direction → one step
 beyond; otherwise plain geometry from the live offset.
+
+The counter is **bounded against the live offset** by `WIDGET_STEP_LOOKAHEAD`,
+and that bound is load-bearing. Chained retargets (`memory.target + direction`)
+would otherwise run away under a fast click burst, while the strip's element
+coverage is finite — the dots and the highlight overlays are pooled, sized from
+that same constant (`DOT_COVERAGE_MARGIN_SLOTS`, `ACTIVE_DOT_COUNT` are both
+derived from it, not chosen). A destination past the pool gets no element, so
+its highlight would simply pop into place at settle instead of arriving. The
+value equals the deck's `REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES`: the indicator
+stays exactly as far ahead of what the eye sees as the deck itself does.
 
 - **WAAPI step** (any planned motion): each dot gets a keyframed animation of its
   spatial path (`widget/math/trajectory.ts` samples the projection curve at the

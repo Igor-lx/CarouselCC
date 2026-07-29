@@ -6,6 +6,20 @@ export interface WidgetStepMemory {
   targetKey: number;
 }
 
+/**
+ * How far past the LIVE offset a step may land. A chained retarget
+ * (`memory.target + direction`) is otherwise unbounded: click faster than the
+ * strip animates and the destination runs away from the dots that exist to show
+ * it. The binding's element coverage is sized for exactly this reach
+ * (`DOT_COVERAGE_MARGIN_SLOTS` = `2 * WIDGET_STEP_LOOKAHEAD`), so the two move
+ * together — raising one without the other silently drops the arriving dot's
+ * animation.
+ *
+ * The value matches the deck's own `REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES`: the
+ * indicator stays exactly as far ahead of what the eye sees as the deck does.
+ */
+export const WIDGET_STEP_LOOKAHEAD = 2;
+
 interface ResolveWidgetStepTargetInput {
   direction: number;
   targetKey: number;
@@ -23,11 +37,23 @@ export const resolveWidgetStepTarget = ({
 }: ResolveWidgetStepTargetInput): number => {
   const memory = previous ?? interrupted;
 
-  if (memory && targetKey === memory.targetKey) return memory.target;
-  if (memory && direction !== 0 && direction === memory.direction) {
-    return memory.target + direction;
+  let target: number;
+  if (memory && targetKey === memory.targetKey) {
+    target = memory.target;
+  } else if (memory && direction !== 0 && direction === memory.direction) {
+    target = memory.target + direction;
+  } else if (direction > 0) {
+    target = Math.floor(from) + 1;
+  } else if (direction < 0) {
+    target = Math.ceil(from) - 1;
+  } else {
+    target = Math.round(from);
   }
-  if (direction > 0) return Math.floor(from) + 1;
-  if (direction < 0) return Math.ceil(from) - 1;
-  return Math.round(from);
+
+  // A no-op for every geometric branch (they land one step out by construction);
+  // it bites only on a chained retarget, which is what can run away.
+  return Math.min(
+    Math.floor(from) + WIDGET_STEP_LOOKAHEAD,
+    Math.max(Math.ceil(from) - WIDGET_STEP_LOOKAHEAD, target),
+  );
 };

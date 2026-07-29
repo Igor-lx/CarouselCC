@@ -28,7 +28,11 @@ import {
   widgetProjectionSlotCount,
 } from "./math/spatialField";
 import { writeDotProjection } from "./math/projection";
-import { resolveWidgetStepTarget, type WidgetStepMemory } from "./stepTarget";
+import {
+  resolveWidgetStepTarget,
+  WIDGET_STEP_LOOKAHEAD,
+  type WidgetStepMemory,
+} from "./stepTarget";
 import {
   activeTrajectoryIds,
   sampleActiveDotTrajectory,
@@ -41,11 +45,19 @@ import type {
 
 // The widget's decoupled one-step motion model. See docs/architecture/modules.md
 
-/** Extra dot elements beyond the resting window (step travel + retarget reach). */
-const DOT_COVERAGE_MARGIN_SLOTS = 2;
+/**
+ * Extra dot elements beyond the resting window: `WIDGET_STEP_LOOKAHEAD` spare
+ * slots on EACH side, because a step may land that far out in either direction.
+ * Derived from the step cap, not chosen — the two cannot drift apart.
+ */
+const DOT_COVERAGE_MARGIN_SLOTS = WIDGET_STEP_LOOKAHEAD * 2;
 
-/** Overlay elements — a retargeted step touches at most this many pages. */
-const ACTIVE_DOT_COUNT = 4;
+/**
+ * Overlay elements. A step spans at most `WIDGET_STEP_LOOKAHEAD` from the live
+ * offset, and `activeTrajectoryIds` brackets that span with a floor and a ceil,
+ * so it can name one more id than the span itself.
+ */
+const ACTIVE_DOT_COUNT = WIDGET_STEP_LOOKAHEAD + 2;
 
 /** At or below this a dot paints nothing: pin it, don't pay for an invisible animation. */
 const INVISIBLE_OPACITY_MAX = 0.001;
