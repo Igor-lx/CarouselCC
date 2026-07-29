@@ -252,7 +252,35 @@ M1–M3, N1–N2, R7–R8.
 `D9` (фолбэк `motionNow`) закрыт при урезании — тест переписан с платформы на
 нашу ветку.
 
-Незакрытых намерений не осталось.
+Плюс закрытые после проверки по импортам (моё «закрыто всё» было неверным —
+N2 висел незакрытым в этом же реестре):
+
+| Что | Намерение | Коммит |
+|---|---|---|
+| `useFocusRecovery` | **N2** | `1dc66a8` |
+| `useCarouselAutoplay` — композиция гейтов | — | `1dc66a8` |
+| `useModuleContextValue` — каденция ре-рендеров | уровень 3 | `1dc66a8` |
+| `ResponsiveImages` — предекод | уровень 3 | `1dc66a8` |
+| `PaginationWidget` — выбор режима | уровень 3 | `1dc66a8` |
+| Diagnostic: layout/slot checks, formatter | уровень 3 | `c898f25` |
+| Diagnostic: константы проекта, widget checks | уровень 3 | этот коммит |
+
+## Что осталось непокрытым — и почему
+
+Проверено по фактическому графу импортов, а не по утверждению.
+
+| Файл | Почему не покрыт |
+|---|---|
+| `Diagnostic/checks/viewportChecks.ts` | сканирует реальный CSSOM страницы; проверяет стили СТЕНДА, а не компонента |
+| `Diagnostic/Diagnostic.tsx` | сборка: `useMemo`-конвейер над коллекторами, каждый из которых покрыт отдельно |
+| `Diagnostic/useWidgetDiagnostic.ts` | обёртка на 24 строки над покрытым `collectWidgetWarnings` |
+| `data-gen/runDataGen.ts`, `cli.ts` | fs-драйвер и argv-обёртка одноразового генератора; его чистое ядро (`buildSlide`, `generateSlides`) покрыто |
+
+Всё остальное из «нет прямого импорта» ассертится через тест потребителя:
+`Controls`/`NavigationZone`, `Pagination`, навигация, политика рендера,
+репортер статуса, `transitions`, `imageResource/**`, `useCarouselSlideDeck`,
+внутренности темы и медиа, `releaseLaunch`, `interactiveTarget`, `clamp`,
+`useMotionController`.
 
 ## Проверка «умеет ли тест падать»
 
