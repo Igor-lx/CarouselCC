@@ -127,6 +127,14 @@ parts:
   still reads as a flick, and a committed swipe rides at the speed it was flicked
   with.
 
+  **Each way reads its own quantity for the DIRECTION**: a flick commits where
+  the finger was going (the sign of the judged speed), a distance swipe commits
+  where the content ended up (the sign of the offset). They differ exactly when
+  a gesture reverses late — pull right, then flick back left without crossing
+  the origin. Taking the offset there would commit RIGHT while handing back a
+  negative `pointerReleaseVelocity`: one call, two contradictory answers, and a
+  consumer aligning speed to travel would zero it and launch from a standstill.
+
 - **`launchVelocity` on the slow law — the ride-crawl fix.** The continuity
   launch must NOT read the per-frame UI-velocity EMA: that zeroes after a ~2-frame
   stick, and a deliberate slow swipe ends with exactly such a terminal micro-hold.

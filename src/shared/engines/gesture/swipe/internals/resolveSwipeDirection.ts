@@ -41,8 +41,15 @@ export const resolveSwipeDirection = ({
   const adapted = Math.max(config.minSwipeDistance, distanceThreshold * resistanceFactor);
 
   if (flicked) {
+    // A FLICK commits where the finger was GOING, not where it happened to be.
+    // Reading the displacement here let a "pull right, then flick back left
+    // without crossing the origin" release commit RIGHT while carrying a
+    // negative release velocity — two contradictory answers from one call, and
+    // downstream `sameDirectionSpeed` then zeroed the speed, so the ride
+    // launched from a standstill after a fast gesture. The distance branch
+    // below still reads displacement: there it IS the criterion.
     return {
-      direction: rawOffset < 0 ? ("left" as const) : ("right" as const),
+      direction: gestureVelocity < 0 ? ("left" as const) : ("right" as const),
       pointerReleaseVelocity: gestureVelocity,
     };
   }
