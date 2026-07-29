@@ -29,6 +29,7 @@ export function useOrientationSwapVeil({
     if (!isBitmapShown || !img) return;
 
     let cancelled = false;
+    let detachReveal: (() => void) | null = null;
     const clear = () => {
       if (!cancelled) setIsVeiled(false);
     };
@@ -49,6 +50,10 @@ export function useOrientationSwapVeil({
       } else {
         element.addEventListener("load", clear, { once: true });
         element.addEventListener("error", clear, { once: true });
+        detachReveal = () => {
+          element.removeEventListener("load", clear);
+          element.removeEventListener("error", clear);
+        };
       }
     });
 
@@ -56,6 +61,11 @@ export function useOrientationSwapVeil({
       cancelled = true;
       cancelAnimationFrame(frame);
       window.clearTimeout(failOpen);
+      detachReveal?.();
+      // Teardown takes the fail-open timer with it, so the veil has to come
+      // down HERE or it never does: the guard above returns on an unchanged
+      // signature, and a re-run would leave the slide masked for good.
+      setIsVeiled(false);
     };
   }, [imgRef, isBitmapShown, signature]);
 
