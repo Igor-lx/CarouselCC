@@ -83,6 +83,13 @@ export const collectLayoutWarnings = (
 ): CarouselDiagnosticWarning[] => {
   const out: CarouselDiagnosticWarning[] = [];
 
+  // An empty deck is not a misconfiguration — it is a host whose data has not
+  // arrived yet. Reporting "visibleSlidesNr 3 exceeds deck length 0" on every
+  // render until it does trains the reader to ignore the channel, and the real
+  // warnings go with it. The `canSlide` check below already guarded this; the
+  // other two did not.
+  if (layout.rawLength === 0) return out;
+
   // A too-large visibleSlidesNr is coerced to the deck length — correct but silent.
   if (layout.requestedVisibleSlidesCount > layout.rawLength) {
     out.push({
