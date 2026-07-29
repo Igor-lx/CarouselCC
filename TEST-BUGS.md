@@ -45,3 +45,39 @@
 (`usePaginationFade.test.tsx`, `usePaginationWidgetBinding.test.tsx` — оба
 ассертят против `isDroppedFallbackFrame` напрямую). У трека такого теста нет.
 Тесты здесь не избыточны, а НЕДОстаточны — см. TEST-PLAN, пункт 17.
+
+---
+
+## B-2 · `useViewportVisibility` конструирует `IntersectionObserver` без защиты
+
+**Серьёзность: medium. Уверенность: высокая (воспроизведено — компонент падает).**
+
+`shared/viewportObservation/useViewportVisibility.ts:27` делает
+`new IntersectionObserver(...)` безусловно. Если API нет — layout-эффект
+бросает, и падает не хук, а **всё дерево целиком**: карусель не монтируется.
+
+Это внутренняя несогласованность полки. Соседний код в том же проекте
+защищается:
+
+| Место | API | Защита |
+|---|---|---|
+| `geometry/useSlotSizeSource.ts:110` | ResizeObserver | `typeof ResizeObserver !== "undefined"` |
+| `slides/useOrientationSwapVeil.ts:52` | `img.decode` | `typeof element.decode === "function"` |
+| `motion/compositor/pinnedAnimation.ts:16` | WAAPI | `isWaapiSupported()` |
+| `viewportObservation/useViewportVisibility.ts:27` | IntersectionObserver | **нет** |
+
+**Как обнаружено.** Первым же интеграционным тестом: компонент не монтируется
+под jsdom вообще. То есть любой хост, у которого есть тесты на своих страницах,
+упрётся в это сразу — и не в деградацию, а в исключение.
+
+В браузерах IntersectionObserver есть везде с 2019 года, так что на проде это
+не горит. Но полка заявлена переносимой, а «переносимая» и «падает без
+опционального браузерного API» — несовместимы.
+
+**Предложение.** Тот же guard, что у соседей: без API считать элемент видимым
+(`setVisible(true)`) и не подписываться — автоплей тогда работает, а не
+блокируется навсегда, что честнее для деградации. В production-код не лез.
+
+**Обход в тестах.** `client/tests/browserEnv.ts` стаблит API — это внешняя
+граница, стаблить её законно. Но стаб маскирует дыру, поэтому она записана
+здесь, а не молча обойдена.
