@@ -8,7 +8,7 @@ interface UseCarouselNavigationInput {
   enabled: boolean;
   dispatch: CarouselDispatch;
   readCurrentPosition: () => number;
-  onSlideClick?: (slide: Slide) => void;
+  onSlideClick?: ((slide: Slide) => void) | undefined;
 }
 
 export interface CarouselNavigation {

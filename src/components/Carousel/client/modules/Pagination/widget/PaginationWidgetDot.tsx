@@ -2,8 +2,8 @@
 import { memo, type Ref } from "react";
 
 interface PaginationWidgetDotProps {
-  className?: string;
-  ref?: Ref<HTMLDivElement>;
+  className?: string | undefined;
+  ref?: Ref<HTMLDivElement> | undefined;
 }
 
 export const PaginationWidgetDot = memo(function PaginationWidgetDot({

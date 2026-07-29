@@ -43,7 +43,7 @@ export type CarouselNavigationView = Pick<
 /** Per-slide art-direction descriptor (image slides only); consumed only by the
  * dev Diagnostic slot to audit each `<source media>` string. */
 export interface CarouselSlideMediaView {
-  sources?: readonly SlideImageSource[];
+  sources?: readonly SlideImageSource[] | undefined;
 }
 
 /** The stable / low-frequency context half (see doc). */

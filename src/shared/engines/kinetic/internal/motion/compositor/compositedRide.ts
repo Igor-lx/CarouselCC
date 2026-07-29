@@ -16,7 +16,7 @@ export interface CompositedRideStart<Strategy extends string> {
   /** `value` → a style-property keyframe; one fn serves keyframes and pins. */
   toKeyframe: (value: number) => Keyframe;
   /** Forwarded to the controller — fires when the segment settles. */
-  onSettle?: (sample: MotionSample<Strategy>) => void;
+  onSettle?: ((sample: MotionSample<Strategy>) => void) | undefined;
 }
 
 export interface CompositedRide<Strategy extends string> {

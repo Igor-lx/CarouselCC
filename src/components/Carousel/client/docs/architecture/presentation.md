@@ -46,8 +46,13 @@ in what units" has exactly one place to look.
 
 ## The lane-style cache (a real trap)
 
-`slideStyles` is not merely memoised as an array — each per-lane style object is
-**cached by virtual index**. This matters because `virtualSlides` is rebuilt
+The lane styles are exposed as `slideStyleFor(virtualIndex)`, and each style
+object behind it is **cached by virtual index**. The getter shape is deliberate:
+a parallel array made "positionally aligned with `virtualSlides`" an invariant
+only a comment could state, and left the caller indexing into it. Keying on the
+virtual index the caller already holds removes the alignment question entirely.
+
+The caching matters because `virtualSlides` is rebuilt
 whenever `isMoving` flips (the visibility flags hang off it), i.e. at both the
 start AND the end of every ride. But a slide's lane depends only on its own
 `virtualIndex` and the layout origin, neither of which moved. Rebuilding the

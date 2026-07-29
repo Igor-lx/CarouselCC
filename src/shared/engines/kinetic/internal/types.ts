@@ -25,24 +25,24 @@ export interface KineticConfig {
   /** Below this release speed the value simply rests where it was dropped. */
   minGlideSpeed: number;
   /** Pass-through tuning for the embedded gesture engine. */
-  swipe?: PointerSwipeConfig;
+  swipe?: PointerSwipeConfig | undefined;
 }
 
 export interface UseKineticValueInput {
   /** THE domain function: value → style-property keyframe (`transform`,
    * `opacity`, …); serves paint, WAAPI keyframes and pins alike. */
   keyframe: (value: number) => Keyframe;
-  initialValue?: number;
-  enabled?: boolean;
-  config?: Partial<KineticConfig>;
+  initialValue?: number | undefined;
+  enabled?: boolean | undefined;
+  config?: Partial<KineticConfig> | undefined;
   /** Optional landing policy; absent = built-in momentum glide. Returns the
    * target, or `null` to rest where released. See README.md § Quick start. */
-  resolveTarget?: (release: KineticRelease) => number | null;
+  resolveTarget?: ((release: KineticRelease) => number | null) | undefined;
   /** Optional draggable SURFACE inside the host; everything else becomes chrome
    * (no brake, no drag, click still fires). See README.md § Chrome inside the host. */
-  surfaceRef?: { readonly current: HTMLElement | null };
+  surfaceRef?: { readonly current: HTMLElement | null } | undefined;
   /** Fires when any ride (glide, flyTo, snap) settles. */
-  onSettle?: (value: number) => void;
+  onSettle?: ((value: number) => void) | undefined;
 }
 
 export interface KineticValue {

@@ -1,4 +1,4 @@
-// See shared/motion/README.md
+﻿// See shared/motion/README.md
 import type {
   MotionCompletionMode,
   MotionController,
@@ -38,7 +38,7 @@ const createIdleSample = <Strategy extends string>(
 interface ActiveSegment<Strategy extends string> {
   segment: MotionSegmentBase<Strategy>;
   sampler: MotionSegmentSampler<MotionSegmentBase<Strategy>, Strategy>;
-  onComplete?: (sample: MotionSample<Strategy>) => void;
+  onComplete?: ((sample: MotionSample<Strategy>) => void) | undefined;
   completion: MotionCompletionMode;
 }
 
@@ -283,7 +283,7 @@ export function createMotionController<Strategy extends string = string>(
       });
     },
 
-    /** Soft, idempotent teardown — the controller stays usable (StrictMode-safe). */
+    /** Soft, idempotent teardown вЂ” the controller stays usable (StrictMode-safe). */
     destroy() {
       this.cancel();
       subscribers.clear();

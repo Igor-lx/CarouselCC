@@ -33,9 +33,9 @@ export interface GenerateSlidesInput {
   /** Stable slide order (slugs), e.g. sorted by slide number. */
   slugs: string[];
   /** Previous document, for id/alt preservation. */
-  previous?: readonly GeneratedSlide[];
+  previous?: readonly GeneratedSlide[] | undefined;
   /** Mints an id for a genuinely new slide. Defaults to the slug itself. */
-  newId?: (slug: string) => string;
+  newId?: ((slug: string) => string) | undefined;
 }
 
 /** `".../carousel7.webp"` (or a bare filename) -> `"carousel7"`. */
@@ -44,7 +44,7 @@ export const slugFromUrl = (url: string): string =>
 
 interface PreservedFields {
   id: string;
-  alt?: string;
+  alt?: string | undefined;
 }
 
 const candidatesAt = (

@@ -1,4 +1,4 @@
-import { motionNow } from "../runtime/clock";
+﻿import { motionNow } from "../runtime/clock";
 import type { MotionSampleData, MotionSegmentBase } from "../runtime/types";
 import { sampleMotionProfile, type MotionProfile } from "./profile";
 
@@ -43,7 +43,7 @@ export const sampleProfileSegment = <Strategy extends string>(
   };
 };
 
-/** Signed velocity → unsigned along `distance` (0 if it opposes); local copy by design. */
+/** Signed velocity в†’ unsigned along `distance` (0 if it opposes); local copy by design. */
 export const alignSpeed = (velocity: number, distance: number): number => {
   const direction = Math.sign(distance);
   if (
@@ -62,7 +62,7 @@ export interface CreateProfileSegmentInput<Strategy extends string> {
   to: number;
   profile: MotionProfile;
   /** Segment clock origin; pass the handoff timestamp when continuing a curve. */
-  startedAt?: number;
+  startedAt?: number | undefined;
 }
 
 /** Assemble a {@link ProfileSegment}; duration is always the profile's own. */

@@ -38,7 +38,7 @@ const createIdleSample = <Strategy extends string>(
 interface ActiveSegment<Strategy extends string> {
   segment: MotionSegmentBase<Strategy>;
   sampler: MotionSegmentSampler<MotionSegmentBase<Strategy>, Strategy>;
-  onComplete?: (sample: MotionSample<Strategy>) => void;
+  onComplete?: ((sample: MotionSample<Strategy>) => void) | undefined;
   completion: MotionCompletionMode;
 }
 

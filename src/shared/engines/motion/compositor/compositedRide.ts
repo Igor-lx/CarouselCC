@@ -25,17 +25,17 @@ export const DEFAULT_RIDE_SHARES = {
 
 /** Rider-level defaults (the element + the caller's `value → keyframe`). */
 export interface CompositedRideDefaults {
-  element?: { current: Element | null };
-  toKeyframe?: (value: number) => Keyframe;
+  element?: { current: Element | null } | undefined;
+  toKeyframe?: ((value: number) => Keyframe) | undefined;
 }
 
 export interface CompositedRideStart<Strategy extends string> {
-  element?: Element | null;
+  element?: Element | null | undefined;
   segment: ProfileSegment<Strategy>;
   /** `value` → a keyframe (style props); one fn serves both keyframes and pins. */
-  toKeyframe?: (value: number) => Keyframe;
+  toKeyframe?: ((value: number) => Keyframe) | undefined;
   /** Forwarded to the controller — fires when the segment settles. */
-  onSettle?: (sample: MotionSample<Strategy>) => void;
+  onSettle?: ((sample: MotionSample<Strategy>) => void) | undefined;
 }
 
 /** One high-level ride: everything beyond `to` and the cruise is optional
@@ -45,17 +45,17 @@ export interface CompositedRideFlight<Strategy extends string> {
   /** Peak speed of the ride, units per ms. */
   cruiseSpeed: number;
   /** Defaults to the live handoff position — a mid-flight call retargets. */
-  from?: number;
+  from?: number | undefined;
   /** Defaults to the handoff velocity aligned with the travel (`alignSpeed`)
    * — velocity-continuous pickup; pass explicitly for release kinetics. */
-  startSpeed?: number;
-  startedAt?: number;
-  strategy?: Strategy;
-  accelerationDistanceShare?: number;
-  decelerationDistanceShare?: number;
-  element?: Element | null;
-  toKeyframe?: (value: number) => Keyframe;
-  onSettle?: (sample: MotionSample<Strategy>) => void;
+  startSpeed?: number | undefined;
+  startedAt?: number | undefined;
+  strategy?: Strategy | undefined;
+  accelerationDistanceShare?: number | undefined;
+  decelerationDistanceShare?: number | undefined;
+  element?: Element | null | undefined;
+  toKeyframe?: ((value: number) => Keyframe) | undefined;
+  onSettle?: ((sample: MotionSample<Strategy>) => void) | undefined;
 }
 
 /** The finger↔value glue in the shape the gesture library's `value` prop

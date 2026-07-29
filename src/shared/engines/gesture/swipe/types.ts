@@ -96,21 +96,24 @@ export interface PointerSwipeValueBinding {
   write: (value: number) => void;
 }
 
+// Optionals read `?: T | undefined` on purpose: a consumer forwarding its own
+// optional straight through (`surfaceRef: props.surfaceRef`) is the normal
+// shape, and a bare `?:` rejects it under `exactOptionalPropertyTypes`.
 export interface PointerSwipeProps {
   /** Optional consumer ref the engine forwards the owned host node into (no
    * second ref on the DOM). */
-  hostRef?: PointerSwipeHostRef;
+  hostRef?: PointerSwipeHostRef | undefined;
   /** Optional draggable SURFACE inside the host; presses outside it are chrome,
    * handed straight back. See ../README.md § Principle. */
-  surfaceRef?: { readonly current: HTMLElement | null };
-  enabled?: boolean;
-  config?: PointerSwipeConfig;
+  surfaceRef?: { readonly current: HTMLElement | null } | undefined;
+  enabled?: boolean | undefined;
+  config?: PointerSwipeConfig | undefined;
   /** Optional turnkey drag→value binding — see {@link PointerSwipeValueBinding}. */
-  value?: PointerSwipeValueBinding;
-  onPressStart?: (payload: PointerSwipePressPayload) => void;
-  onDragStart?: (payload: PointerSwipeMovePayload) => void;
-  onDragMove?: (payload: PointerSwipeMovePayload) => void;
-  onRelease?: (payload: PointerSwipeReleasePayload) => void;
+  value?: PointerSwipeValueBinding | undefined;
+  onPressStart?: ((payload: PointerSwipePressPayload) => void) | undefined;
+  onDragStart?: ((payload: PointerSwipeMovePayload) => void) | undefined;
+  onDragMove?: ((payload: PointerSwipeMovePayload) => void) | undefined;
+  onRelease?: ((payload: PointerSwipeReleasePayload) => void) | undefined;
 }
 
 export interface PointerSwipeResult {

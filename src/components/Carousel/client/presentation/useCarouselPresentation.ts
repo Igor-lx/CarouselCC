@@ -14,7 +14,7 @@ import {
 import { buildFlagAttributes, buildSlideClassMap } from "./domPayload";
 
 interface UseCarouselPresentationInput {
-  className?: ClassNameMap;
+  className?: ClassNameMap | undefined;
   visibleSlidesCount: number;
   virtualSlides: VirtualSlide[];
   layoutOrigin: number;
@@ -25,8 +25,10 @@ export interface CarouselPresentation {
   classNames: ClassNameMap;
   slideClassMap: SlideClassMap;
   rootStyle: CarouselRootCssVars;
-  /** One style object per slide, positionally aligned with `virtualSlides`. */
-  slideStyles: CarouselSlideCssVars[];
+  /** The lane style of one virtual index. A getter rather than a parallel
+   * array: positional alignment with `virtualSlides` was an invariant only a
+   * comment could state, and the caller had to index into it. */
+  slideStyleFor: (virtualIndex: number) => CarouselSlideCssVars;
   flagAttributes: Record<string, string>;
 }
 
@@ -59,7 +61,7 @@ export const useCarouselPresentation = ({
     byIndex: new Map<number, CarouselSlideCssVars>(),
   });
 
-  const slideStyles = useMemo(() => {
+  const slideStyleFor = useMemo(() => {
     const cache = laneCacheRef.current;
     if (cache.origin !== layoutOrigin) {
       cache.origin = layoutOrigin; // recenter re-bases every lane
@@ -71,16 +73,16 @@ export const useCarouselPresentation = ({
       }
     }
 
-    return virtualSlides.map((slide) => {
-      const cached = cache.byIndex.get(slide.virtualIndex);
+    return (virtualIndex: number): CarouselSlideCssVars => {
+      const cached = cache.byIndex.get(virtualIndex);
       if (cached) return cached;
-      const style = buildSlideCssVars(slide.virtualIndex, layoutOrigin);
-      cache.byIndex.set(slide.virtualIndex, style);
+      const style = buildSlideCssVars(virtualIndex, layoutOrigin);
+      cache.byIndex.set(virtualIndex, style);
       return style;
-    });
+    };
   }, [layoutOrigin, virtualSlides]);
 
   const flagAttributes = useMemo(() => buildFlagAttributes(flags), [flags]);
 
-  return { classNames, slideClassMap, rootStyle, slideStyles, flagAttributes };
+  return { classNames, slideClassMap, rootStyle, slideStyleFor, flagAttributes };
 };

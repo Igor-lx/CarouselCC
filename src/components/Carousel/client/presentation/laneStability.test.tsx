@@ -73,40 +73,40 @@ afterEach(() => {
 describe("slide lane styles are identity-stable", () => {
   it("a rebuilt slide list with unchanged lanes reuses the SAME style objects", () => {
     const first = render([slide(0, false), slide(1, true), slide(2, false)]);
-    const before = [...first.slideStyles];
+    const before = [0, 1, 2].map((index) => first.slideStyleFor(index));
 
     // A fresh array of fresh slide objects — exactly what an isMoving flip
     // produces — with the same lanes.
     const second = render([slide(0, true), slide(1, true), slide(2, false)]);
 
-    expect(second.slideStyles[0]).toBe(before[0]);
-    expect(second.slideStyles[1]).toBe(before[1]);
-    expect(second.slideStyles[2]).toBe(before[2]);
+    expect(second.slideStyleFor(0)).toBe(before[0]);
+    expect(second.slideStyleFor(1)).toBe(before[1]);
+    expect(second.slideStyleFor(2)).toBe(before[2]);
   });
 
   it("a slide entering the window gets its own object, neighbours keep theirs", () => {
     const first = render([slide(0, false), slide(1, false)]);
-    const before = [...first.slideStyles];
+    const before = [0, 1].map((index) => first.slideStyleFor(index));
 
     const second = render([slide(0, false), slide(1, false), slide(2, false)]);
 
-    expect(second.slideStyles[0]).toBe(before[0]);
-    expect(second.slideStyles[1]).toBe(before[1]);
-    expect(second.slideStyles[2]).not.toBe(before[1]);
-    expect(second.slideStyles[2]!["--slide-lane"]).not.toBe(
+    expect(second.slideStyleFor(0)).toBe(before[0]);
+    expect(second.slideStyleFor(1)).toBe(before[1]);
+    expect(second.slideStyleFor(2)).not.toBe(before[1]);
+    expect(second.slideStyleFor(2)["--slide-lane"]).not.toBe(
       before[1]!["--slide-lane"],
     );
   });
 
   it("a layout-origin recenter re-bases every lane (cache dropped)", () => {
     const first = render([slide(5, false), slide(6, false)], 0);
-    const before = [...first.slideStyles];
+    const before = first.slideStyleFor(5);
 
     const second = render([slide(5, false), slide(6, false)], 4);
 
-    expect(second.slideStyles[0]).not.toBe(before[0]);
-    expect(second.slideStyles[0]!["--slide-lane"]).not.toBe(
-      before[0]!["--slide-lane"],
+    expect(second.slideStyleFor(5)).not.toBe(before);
+    expect(second.slideStyleFor(5)["--slide-lane"]).not.toBe(
+      before["--slide-lane"],
     );
   });
 
@@ -115,8 +115,8 @@ describe("slide lane styles are identity-stable", () => {
     render([slide(2, false)]); // window shrank — 0 and 1 pruned
     const back = render([slide(0, false), slide(1, false), slide(2, false)]);
 
-    expect(back.slideStyles.map((style) => style["--slide-lane"])).toEqual([
-      0, 1, 2,
-    ]);
+    expect(
+      [0, 1, 2].map((index) => back.slideStyleFor(index)["--slide-lane"]),
+    ).toEqual([0, 1, 2]);
   });
 });

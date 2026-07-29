@@ -62,7 +62,7 @@ export interface CreateProfileSegmentInput<Strategy extends string> {
   to: number;
   profile: MotionProfile;
   /** Segment clock origin; pass the handoff timestamp when continuing a curve. */
-  startedAt?: number;
+  startedAt?: number | undefined;
 }
 
 /** Assemble a {@link ProfileSegment}; duration is always the profile's own. */

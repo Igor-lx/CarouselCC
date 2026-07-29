@@ -340,7 +340,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     classNames,
     slideClassMap,
     rootStyle,
-    slideStyles,
+    slideStyleFor,
     flagAttributes,
   } = useCarouselPresentation({
     className,
@@ -385,12 +385,12 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
                 data-carousel-track=""
               >
                 <div aria-hidden="true" className={styles.slideSizer} />
-                {virtualSlides.map((slide, index) => (
+                {virtualSlides.map((slide) => (
                   <SlideItem
                     key={slide.slideKey}
                     slideData={slide.slideData}
                     className={slideClassMap}
-                    style={slideStyles[index]}
+                    style={slideStyleFor(slide.virtualIndex)}
                     isContentImg={isContentImg}
                     isResponsiveImagesOn={isResponsiveImagesOn}
                     errAltPlaceholder={config.errorAltPlaceholder}

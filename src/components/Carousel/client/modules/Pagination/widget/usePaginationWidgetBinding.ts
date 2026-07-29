@@ -86,19 +86,24 @@ interface DotWriteCache {
   opacity: number;
 }
 
+/** No cache entry yet — a slot never written, or one the caches were dropped
+ * for. `undefined` reads the same as `null`: an index past a pool that has not
+ * been sized yet is exactly "nothing was written here". */
+type DotWriteCacheEntry = DotWriteCache | null | undefined;
+
 const shouldWriteTransform = (
-  last: DotWriteCache | null,
+  last: DotWriteCacheEntry,
   x: number,
   scale: number,
 ): boolean =>
-  last === null ||
+  !last ||
   Math.abs(last.x - x) >= DOT_POSITION_EPSILON_PX ||
   Math.abs(last.scale - scale) >= DOT_SCALE_EPSILON;
 
 const shouldWriteOpacity = (
-  last: DotWriteCache | null,
+  last: DotWriteCacheEntry,
   opacity: number,
-): boolean => last === null || Math.abs(last.opacity - opacity) >= DOT_OPACITY_EPSILON;
+): boolean => !last || Math.abs(last.opacity - opacity) >= DOT_OPACITY_EPSILON;
 
 /** An in-flight WAAPI step: the plan span plus the widget's direction/key/animations. */
 interface ActiveStep extends InFlightSpan {
@@ -111,7 +116,7 @@ interface UseBindingInput {
   visualPosition: VisualPositionSource | null;
   motionPlan: MotionPlanSource | null;
   geometry: PaginationWidgetGeometry;
-  activeClassName?: string;
+  activeClassName?: string | undefined;
 }
 
 export interface PaginationWidgetBinding {
@@ -234,7 +239,8 @@ export function usePaginationWidgetBinding({
         const scale = state?.scale ?? 0;
         const opacity = state?.activeStrength ?? 0;
         const last = cache[index];
-        if (opacity === 0 && last !== null && last.opacity === 0) continue;
+        // Already hidden and staying hidden: nothing to write.
+        if (opacity === 0 && last && last.opacity === 0) continue;
 
         const transformChanged = shouldWriteTransform(last, x, scale);
         const opacityChanged = shouldWriteOpacity(last, opacity);
@@ -246,7 +252,7 @@ export function usePaginationWidgetBinding({
           dot.style.opacity = String(opacity);
         }
 
-        if (last === null) cache[index] = { x, scale, opacity };
+        if (!last) cache[index] = { x, scale, opacity };
         else {
           if (transformChanged) {
             last.x = x;
@@ -272,7 +278,8 @@ export function usePaginationWidgetBinding({
         const state = writeDotProjection(projectionRef.current, id, visualOffset, geometry);
         const last = cache[index];
 
-        if (state.opacity === 0 && last !== null && last.opacity === 0) continue;
+        // Already hidden and staying hidden: nothing to write.
+        if (state.opacity === 0 && last && last.opacity === 0) continue;
 
         const transformChanged = shouldWriteTransform(last, state.x, state.scale);
         const opacityChanged = shouldWriteOpacity(last, state.opacity);
@@ -283,7 +290,7 @@ export function usePaginationWidgetBinding({
         if (opacityChanged) {
           dot.style.opacity = String(state.opacity);
         }
-        if (last === null) {
+        if (!last) {
           cache[index] = { x: state.x, scale: state.scale, opacity: state.opacity };
         } else {
           if (transformChanged) {

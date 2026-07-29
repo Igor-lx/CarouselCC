@@ -41,31 +41,34 @@ export type MotionSegmentSampler<
 
 export type MotionCompletionMode = "immediate" | "next-frame";
 
+// Optionals here read `?: T | undefined` on purpose: a caller forwarding its own
+// optional straight through (`onComplete: props.onSettle`) is the normal shape,
+// and under `exactOptionalPropertyTypes` a bare `?:` would reject it.
 export interface MotionStartOptions<
   Segment extends MotionSegmentBase<Strategy>,
   Strategy extends string = string,
 > {
   segment: Segment;
   sampler: MotionSegmentSampler<Segment, Strategy>;
-  onComplete?: (sample: MotionSample<Strategy>) => void;
-  completion?: MotionCompletionMode;
+  onComplete?: ((sample: MotionSample<Strategy>) => void) | undefined;
+  completion?: MotionCompletionMode | undefined;
   /** Paint owned elsewhere (a compositor animation): run with NO frame loop,
    * still the position SSOT. See ../README.md § Passive segments. */
-  isPassive?: boolean;
+  isPassive?: boolean | undefined;
 }
 
 export interface MotionSetOptions<Strategy extends string = string> {
-  velocity?: number;
-  target?: number;
-  strategy?: Strategy;
-  progress?: number;
-  phase?: MotionPhase;
+  velocity?: number | undefined;
+  target?: number | undefined;
+  strategy?: Strategy | undefined;
+  progress?: number | undefined;
+  phase?: MotionPhase | undefined;
 }
 
 export interface MotionSnapOptions<Strategy extends string = string>
   extends MotionSetOptions<Strategy> {
-  onComplete?: (sample: MotionSample<Strategy>) => void;
-  completion?: MotionCompletionMode;
+  onComplete?: ((sample: MotionSample<Strategy>) => void) | undefined;
+  completion?: MotionCompletionMode | undefined;
 }
 
 export type MotionSubscriber<Strategy extends string = string> = (
