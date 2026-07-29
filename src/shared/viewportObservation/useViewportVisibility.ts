@@ -24,20 +24,29 @@ export function useViewportVisibility({
       setVisible((prev) => (prev === next ? prev : next));
     };
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        intersectingRef.current = entry?.isIntersecting ?? false;
-        update();
-      },
-      { threshold },
-    );
+    // No IntersectionObserver: assume the element IS on screen and fall back to
+    // the tab signal alone. Degrading to "always visible" costs a consumer some
+    // off-screen work; degrading to "never visible" would silently disable it
+    // for good, and throwing here would take the whole host tree down with it.
+    const canObserve = typeof IntersectionObserver !== "undefined";
+    intersectingRef.current = !canObserve;
 
-    observer.observe(target);
+    const observer = canObserve
+      ? new IntersectionObserver(
+          ([entry]) => {
+            intersectingRef.current = entry?.isIntersecting ?? false;
+            update();
+          },
+          { threshold },
+        )
+      : null;
+
+    observer?.observe(target);
     document.addEventListener("visibilitychange", update);
     update();
 
     return () => {
-      observer.disconnect();
+      observer?.disconnect();
       document.removeEventListener("visibilitychange", update);
     };
   }, [elementRef, threshold]);

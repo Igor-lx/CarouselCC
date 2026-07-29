@@ -195,6 +195,14 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     imageResourceStore,
   });
 
+  // --- motion plan channel ---------------------------------------------------
+  // Created before the track binding, which subscribes to it (see below).
+  const planChannelRef = useRef<MotionPlanChannel | null>(null);
+  if (planChannelRef.current === null) {
+    planChannelRef.current = createMotionPlanChannel();
+  }
+  const planChannel = planChannelRef.current;
+
   // --- track DOM bridge -----------------------------------------------------
   const {
     readCurrentPosition,
@@ -207,14 +215,8 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     visibleSlidesCount: layout.visibleSlidesCount,
     visualPosition,
     slotSize,
+    motionPlan: planChannel.source,
   });
-
-  // --- motion plan channel ---------------------------------------------------
-  const planChannelRef = useRef<MotionPlanChannel | null>(null);
-  if (planChannelRef.current === null) {
-    planChannelRef.current = createMotionPlanChannel();
-  }
-  const planChannel = planChannelRef.current;
 
   // --- motion execution: state -> controller --------------------------------
   useCarouselMotionExecution({

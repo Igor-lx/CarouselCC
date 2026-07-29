@@ -3,8 +3,11 @@ import { useCallback, useEffect, useRef, type RefObject } from "react";
 
 import { trackCssTransform, trackPixelTransform } from "../domain";
 import { useIsomorphicLayoutEffect } from "../../../../shared";
-import { isWaapiSupported } from "../../../../shared";
-import { keyframesAlongStops, startPinnedAnimation } from "../motion";
+import {
+  keyframesAlongStops,
+  startPinnedAnimation,
+  type MotionPlanSource,
+} from "../motion";
 import { isDroppedFallbackFrame, type VisualPositionSource } from "../visual-position";
 import type { SlotSizeSource } from "./useSlotSizeSource";
 
@@ -15,6 +18,10 @@ interface UseTrackBindingInput {
   visualPosition: VisualPositionSource;
   /** THE carousel's slot measurement — this hook owns no observer of its own. */
   slotSize: SlotSizeSource;
+  /** The plan stream, read for ONE thing: whether the current per-frame ride is
+   * the no-compositor fallback. The dots and the widget read the same flag from
+   * the same place, which is what keeps the three of them in step. */
+  motionPlan: MotionPlanSource;
 }
 
 export interface TrackCompositorMotionOptions {
@@ -42,12 +49,16 @@ export function useTrackBinding({
   visibleSlidesCount,
   visualPosition,
   slotSize,
+  motionPlan,
 }: UseTrackBindingInput): TrackBindingApi {
   const layoutOriginRef = useRef(layoutOrigin);
   const visibleSlidesCountRef = useRef(visibleSlidesCount);
   const lastTransformRef = useRef<string | null>(null);
   const compositorAnimationRef = useRef<Animation | null>(null);
   const lastSyncedLayoutOriginRef = useRef<number | null>(null);
+  /** Which per-frame ride is running: a finger (paint every frame) or the
+   * no-compositor fallback (shed the shared Nth frame). */
+  const isFallbackFollowRef = useRef(false);
 
   layoutOriginRef.current = layoutOrigin;
   visibleSlidesCountRef.current = visibleSlidesCount;
@@ -231,18 +242,36 @@ export function useTrackBinding({
     [rebaseTrack, subscribeSlotSize],
   );
 
-  // Per-frame paint (drag + no-WAAPI fallback). Drop the shared Nth running
-  // frame so track and widget shed exactly the same frames; drag frames paint.
-  useIsomorphicLayoutEffect(() => {
-    const applyFallbackSkip = !isWaapiSupported();
-    return visualPosition.subscribe(
-      (frame) => {
-        if (applyFallbackSkip && isDroppedFallbackFrame(frame)) return;
-        writePosition(frame.position);
-      },
-      { emitCurrent: true },
-    );
-  }, [visualPosition, writePosition]);
+  // Which flavour of per-frame ride is running. Judged by the PLAN, exactly as
+  // the dots and the widget judge it — `isWaapiSupported()` is a different
+  // question and the two answers diverge whenever the compositor declines a
+  // ride for any other reason (an unmeasurable slot, an `animate()` that
+  // throws). One rule, three consumers, one signal.
+  useIsomorphicLayoutEffect(
+    () =>
+      motionPlan.subscribe((plan) => {
+        isFallbackFollowRef.current =
+          plan.kind === "follow" ? plan.isFallback : false;
+      }),
+    [motionPlan],
+  );
+
+  // Per-frame paint (drag + no-compositor fallback). Drop the shared Nth
+  // running frame so track, dots and widget shed exactly the same frames;
+  // drag frames always paint.
+  useIsomorphicLayoutEffect(
+    () =>
+      visualPosition.subscribe(
+        (frame) => {
+          if (isFallbackFollowRef.current && isDroppedFallbackFrame(frame)) {
+            return;
+          }
+          writePosition(frame.position);
+        },
+        { emitCurrent: true },
+      ),
+    [visualPosition, writePosition],
+  );
 
   const getSlotSize = useCallback(() => readSlotSize() ?? 0, [readSlotSize]);
 
