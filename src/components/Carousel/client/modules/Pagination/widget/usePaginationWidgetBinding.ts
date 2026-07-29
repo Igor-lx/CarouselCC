@@ -1,4 +1,4 @@
-// See docs/architecture/modules.md
+﻿// See docs/architecture/modules.md
 import { useCallback, useEffect, useRef } from "react";
 
 import {
@@ -48,21 +48,21 @@ import type {
 /**
  * Extra dot elements beyond the resting window: `WIDGET_STEP_LOOKAHEAD` spare
  * slots on EACH side, because a step may land that far out in either direction.
- * Derived from the step cap, not chosen — the two cannot drift apart.
+ * Derived from the step cap, not chosen вЂ” the two cannot drift apart.
  */
-const DOT_COVERAGE_MARGIN_SLOTS = WIDGET_STEP_LOOKAHEAD * 2;
+export const DOT_COVERAGE_MARGIN_SLOTS = WIDGET_STEP_LOOKAHEAD * 2;
 
 /**
  * Overlay elements. A step spans at most `WIDGET_STEP_LOOKAHEAD` from the live
  * offset, and `activeTrajectoryIds` brackets that span with a floor and a ceil,
  * so it can name one more id than the span itself.
  */
-const ACTIVE_DOT_COUNT = WIDGET_STEP_LOOKAHEAD + 2;
+export const ACTIVE_DOT_COUNT = WIDGET_STEP_LOOKAHEAD + 2;
 
 /** At or below this a dot paints nothing: pin it, don't pay for an invisible animation. */
 const INVISIBLE_OPACITY_MAX = 0.001;
 
-/** Strip plan-curve density — coarser than the track's (a dot travels ≤ a strip width). */
+/** Strip plan-curve density вЂ” coarser than the track's (a dot travels в‰¤ a strip width). */
 const STRIP_CURVE_INTERVALS = 32;
 
 const emptyDotState = (): PaginationWidgetDotState => ({
@@ -141,10 +141,10 @@ export function usePaginationWidgetBinding({
   const activeProjectionRef = useRef<PaginationWidgetDotState>(emptyDotState());
   const appliedActiveClassNameRef = useRef<string | null>(null);
 
-  /** The widget's own step counter — where the strip logically sits. */
+  /** The widget's own step counter вЂ” where the strip logically sits. */
   const offsetRef = useRef(0);
   const stepRef = useRef<ActiveStep | null>(null);
-  /** The step a finger grab tore down — so a repeat swipe advances one step BEYOND. */
+  /** The step a finger grab tore down вЂ” so a repeat swipe advances one step BEYOND. */
   const interruptedStepRef = useRef<WidgetStepMemory | null>(null);
   const followUnsubRef = useRef<(() => void) | null>(null);
   const followBaseRef = useRef<{ pageOffset: number; offset: number } | null>(

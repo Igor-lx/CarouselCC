@@ -101,3 +101,55 @@ describe("resolveSwipeDirection", () => {
     expect(right.direction).toBe("right");
   });
 });
+
+/**
+ * The two commit ways read DIFFERENT quantities for the direction: a flick goes
+ * where the finger was going, a distance swipe goes where the content ended up.
+ * They only disagree on a late reversal — pull one way, flick back the other
+ * without crossing the origin — and taking the offset there returned a direction
+ * that contradicted the release velocity handed back with it. A consumer
+ * aligning speed to travel (`sameDirectionSpeed`) then zeroed it, so a visibly
+ * fast gesture launched its ride from a standstill.
+ */
+describe("resolveSwipeDirection — a late reversal", () => {
+  const reversal = (offsetSign: 1 | -1) =>
+    resolveSwipeDirection({
+      ...base,
+      // Content still displaced one way...
+      rawOffset: offsetSign * (config.quickFlickMinOffset + 20),
+      // ...while the finger left fast the OTHER way.
+      rawVelocity: -offsetSign * config.quickFlickVelocity * 2,
+    });
+
+  it("commits along the flick, not along the leftover displacement", () => {
+    expect(reversal(1).direction).toBe("left");
+    expect(reversal(-1).direction).toBe("right");
+  });
+
+  it("the reported direction and release velocity agree in sign", () => {
+    for (const sign of [1, -1] as const) {
+      const { direction, pointerReleaseVelocity } = reversal(sign);
+      expect(direction).toBe(pointerReleaseVelocity < 0 ? "left" : "right");
+    }
+  });
+
+  it("an unreversed flick is unaffected — both readings already agree", () => {
+    const forward = resolveSwipeDirection({
+      ...base,
+      rawOffset: -(config.quickFlickMinOffset + 20),
+      rawVelocity: -config.quickFlickVelocity * 2,
+    });
+    expect(forward.direction).toBe("left");
+  });
+
+  it("a slow reversal stays on the distance rule (offset decides)", () => {
+    // Below the flick speed: this is a distance swipe, and displacement IS the
+    // criterion there — the deck follows where the content actually sits.
+    const slow = resolveSwipeDirection({
+      ...base,
+      rawOffset: 300,
+      rawVelocity: -config.quickFlickVelocity / 10,
+    });
+    expect(slow.direction).toBe("right");
+  });
+});
