@@ -17,7 +17,7 @@ import { useCarouselAutoplay } from "./autoplay/useCarouselAutoplay";
 import { useFocusRecovery } from "./focus/useFocusRecovery";
 import { useCarouselGesture } from "./gesture";
 import {
-  useResponsiveImageSizes,
+  resolveImageSizes,
   useSlotSizeSource,
   useTrackBinding,
 } from "./geometry";
@@ -153,7 +153,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     visibleSlidesCount: layout.visibleSlidesCount,
   });
 
-  const imageSizes = useResponsiveImageSizes({
+  const imageSizes = resolveImageSizes({
     slotPx: slotSize.slotPx,
     visibleSlidesCount: layout.visibleSlidesCount,
   });

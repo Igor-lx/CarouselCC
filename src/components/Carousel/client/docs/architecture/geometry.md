@@ -29,7 +29,7 @@ so any JS formula would be a second, drift-prone source of truth beside the CSS.
   Three independent copies of this measurement used to observe the same element,
   and two of them rounded while the third did not — the gesture was calibrated
   against one number and the track painted with another.
-- **`useResponsiveImageSizes`** turns that measured slot into the images' `sizes`
+- **`resolveImageSizes`** turns that measured slot into the images' `sizes`
   attribute as a concrete pixel length. A `vw` formula would overstate the real
   (capped, padded) slot and bias the browser toward an oversized candidate — on a
   high-DPR phone, fetching and rasterising a needlessly large tile. With a true
