@@ -36,8 +36,11 @@ import {
 // follow, rest) writes the SAME function of that offset, so a mode change is a
 // change of who paints, never a change of where the strip sits.
 
+// Substitutes for an unreadable CSS variable, so they MUST mirror the class's
+// own values (Pagination.module.scss) — the whole point of the fade is to end
+// exactly where the class picks the dot up.
 const FALLBACK_INACTIVE: DotVisualState = { opacity: 0.2, scale: 1 };
-const FALLBACK_ACTIVE: DotVisualState = { opacity: 0.8, scale: 1.4 };
+const FALLBACK_ACTIVE: DotVisualState = { opacity: 0.8, scale: 1.5 };
 
 /** At or below this a dot paints nothing for the whole step — pin it, don't animate. */
 const INVISIBLE_STRENGTH_MAX = 0.001;

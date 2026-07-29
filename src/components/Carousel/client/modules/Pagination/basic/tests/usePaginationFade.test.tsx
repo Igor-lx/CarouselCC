@@ -41,7 +41,7 @@ const PAGE_COUNT = 4;
 type PublishablePlan = Parameters<MotionPlanChannel["publish"]>[0];
 
 // jsdom resolves no custom properties, so the binding reads its documented
-// fallback look: opacity 0.2 -> 0.8, scale 1 -> 1.4.
+// fallback look: opacity 0.2 -> 0.8, scale 1 -> 1.5.
 const opacityAt = (strength: number) => 0.2 + 0.6 * strength;
 const strengthOf = (pageIndex: number, offset: number) =>
   Math.max(0, 1 - Math.abs(pageIndex - offset));
