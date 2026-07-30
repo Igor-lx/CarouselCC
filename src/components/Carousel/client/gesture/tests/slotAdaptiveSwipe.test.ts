@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { CAROUSEL_SWIPE_CONFIG } from "../../config";
 import {
@@ -16,7 +16,7 @@ describe("resolveSlotAdaptiveSwipeConfig", () => {
   it("before the first measurement, yields a valid engine config at the floor", () => {
     // No slot to scale to: engine fields pass through, the host-relative path
     // is off, and the commit distance sits at its ergonomic floor. (The base
-    // is a CarouselSwipeConfig вЂ” it has no minSwipeDistance to hand back.)
+    // is a CarouselSwipeConfig — it has no minSwipeDistance to hand back.)
     for (const slot of [null, 0] as const) {
       const resolved = resolveSlotAdaptiveSwipeConfig(CAROUSEL_SWIPE_CONFIG, slot);
       expect(resolved.swipeThresholdRatio).toBe(0);
@@ -125,7 +125,7 @@ describe("resolveSlotAdaptiveSwipeConfig", () => {
     const resolved = resolveSlotAdaptiveSwipeConfig(CAROUSEL_SWIPE_CONFIG, 500);
     // Strip the fields the resolver OWNS (computed) or RESCALES from the
     // resolved config, and the `commit` group from the base; what remains must
-    // be identical вЂ” the passthrough set.
+    // be identical — the passthrough set.
     const {
       swipeThresholdRatio: _r,
       minSwipeDistance: _m,

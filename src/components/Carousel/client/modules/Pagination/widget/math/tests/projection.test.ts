@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { EDGE_DOT_RESTING_OPACITY } from "../../defaults";
 import { buildPaginationWidgetGeometry } from "../spatialField";
@@ -7,7 +7,7 @@ import { dotOpacityAt, projectDot } from "../projection";
 /**
  * Invariants of the widget's opacity field (see dotOpacityAt). The pivotal
  * one is handover symmetry: the leaving and arriving edge dots must be
- * mirror images at every instant of a step вЂ” the serialized handover (one
+ * mirror images at every instant of a step — the serialized handover (one
  * dies, THEN the other is born) was a reported, measured bug.
  */
 
@@ -72,12 +72,12 @@ describe("projectDot opacity wiring", () => {
       10,
     );
     expect(projectDot(3, 0, geometry).opacity).toBe(0);
-    // Mid-handover: the leaving edge dot (distance 2.5) is exactly half-goneвЂ¦
+    // Mid-handover: the leaving edge dot (distance 2.5) is exactly half-gone…
     expect(projectDot(-2, 0.5, geometry).opacity).toBeCloseTo(
       EDGE_DOT_RESTING_OPACITY / 2,
       10,
     );
-    // вЂ¦and the arriving one (distance 2.5 from the other side) half-born.
+    // …and the arriving one (distance 2.5 from the other side) half-born.
     expect(projectDot(3, 0.5, geometry).opacity).toBeCloseTo(
       EDGE_DOT_RESTING_OPACITY / 2,
       10,

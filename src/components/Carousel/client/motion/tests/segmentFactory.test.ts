@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { buildCarouselConfig } from "../../config";
 import { buildCarouselLayout, buildSlideRecords } from "../../domain";
@@ -17,12 +17,12 @@ import { sampleCarouselSegment } from "../sampler";
 /**
  * Continuity-launch contract of the gesture-release segment: the ride starts
  * at the VISUAL velocity the eye saw at lift-off and accelerates to the
- * intent speed вЂ” it never jumps above the visible speed instantly.
+ * intent speed — it never jumps above the visible speed instantly.
  */
 
 // MECHANISM tests, not tuning tests: the release knobs are PINNED here.
-// The project's live values are feel tunables вЂ” e.g. accelerationDistanceShare
-// of 0 legally switches the continuity ramp off вЂ” and hand-tuning must never
+// The project's live values are feel tunables — e.g. accelerationDistanceShare
+// of 0 legally switches the continuity ramp off — and hand-tuning must never
 // fail these assertions. The pinned values are the documented reference shape
 // (ramp present, cruise zone present, floor active).
 const RELEASE_KNOBS = {
@@ -74,7 +74,7 @@ const releasedState = (
     isSnap: false,
     pointerReleaseVelocity: pointerVelocity,
     uiReleaseVelocity: uiVelocity,
-    // The continuity launch reads `launchVelocity` вЂ” the visible speed judged
+    // The continuity launch reads `launchVelocity` — the visible speed judged
     // over the gesture, not the last-two-frames reading that a micro-hold before
     // lift-off zeroes. These cases model the visible finish, so it is that.
     launchVelocity: uiVelocity,
@@ -102,7 +102,7 @@ describe("ride-duration floor", () => {
 
   it("a launch speed that alone beats the floor is never slowed (continuity wins)", () => {
     // the EYE saw 0.05 u/ms at lift-off: a ~10ms ride is continuous with the
-    // finger, not a teleport вЂ” the floor must not brake the visible speed
+    // finger, not a teleport — the floor must not brake the visible speed
     const state = releasedState(0.05, 0.05, 2.6);
     const { segment } = buildCarouselSegment({
       state,
@@ -148,10 +148,10 @@ describe("gesture-release continuity launch", () => {
     });
 
     const launch = sampleCarouselSegment(segment, 1);
-    // Launch speed matches what the eye saw (small numeric drift allowed)вЂ¦
+    // Launch speed matches what the eye saw (small numeric drift allowed)…
     expect(Math.abs(launch.velocity)).toBeLessThan(uiVelocity * 1.5);
 
-    // вЂ¦and the ride then ACCELERATES toward the intent cruise: somewhere
+    // …and the ride then ACCELERATES toward the intent cruise: somewhere
     // mid-segment the speed clearly exceeds the launch speed.
     const samples = Array.from({ length: 40 }, (_, i) =>
       Math.abs(
@@ -180,7 +180,7 @@ describe("gesture-release continuity launch", () => {
         ),
       ),
     );
-    // Launch is already at (or close to) the ride's peak вЂ” no dip, no kick.
+    // Launch is already at (or close to) the ride's peak — no dip, no kick.
     expect(Math.abs(launch.velocity)).toBeGreaterThan(cruisePeak * 0.55);
   });
 });
@@ -190,12 +190,12 @@ describe("a micro-hold before lift-off must not launch the ride from a standstil
    * The defect this guards against, measured on a Redmi Note 11S: finishing a
    * slow, deliberate swipe, the finger holds still for ~2 frames before lifting.
    * The launch velocity used to be read off the fast per-frame EMA, which such a
-   * hold zeroes вЂ” so the ride launched from rest and crawled through its whole
+   * hold zeroes — so the ride launched from rest and crawled through its whole
    * acceleration ramp (~300 ms at 3 px/frame) before picking up speed. Every
    * frame was delivered on time and no counter saw a thing: the CURVE stalled.
    *
    * `launchVelocity` carries the visible speed on the flick's pause-protected
-   * law, and the segment must launch from THAT вЂ” not from the zeroed reading.
+   * law, and the segment must launch from THAT — not from the zeroed reading.
    */
   it("launches at the pause-protected visible speed, not at the zeroed instant reading", () => {
     const held = 0.0000001; // the instant reading a 2-frame hold leaves behind
@@ -221,7 +221,7 @@ describe("a micro-hold before lift-off must not launch the ride from a standstil
   });
 
   it("still starts from rest when the strip really was at rest", () => {
-    // A long, deliberate stop decays launchVelocity too вЂ” and then a ride that
+    // A long, deliberate stop decays launchVelocity too — and then a ride that
     // begins at rest is CORRECT. The fix must not paper over that.
     const state = releasedState(0, 0.01);
     const stopped = {
@@ -247,7 +247,7 @@ describe("a micro-hold before lift-off must not launch the ride from a standstil
  * MECHANISM tests with PINNED GO_TO knobs (the live values are feel
  * tunables): the contract is that with the teleport enabled no continuous
  * ride ever takes LONGER than a flight, so ride and flight durations meet
- * seamlessly at the gate вЂ” for ANY preflight/approach/gate ratio. With the
+ * seamlessly at the gate — for ANY preflight/approach/gate ratio. With the
  * teleport disabled the ceiling must NOT apply: one shared cruise speed,
  * duration grows with distance.
  */
@@ -345,7 +345,7 @@ describe("GO_TO flight-envelope time ceiling", () => {
       goToFinalApproachPageSpan: 1,
       goToTeleportMinPageSpan: 6,
     });
-    // spans 4..6 all ride (intermediates 3..5 < gate 6) вЂ” every one capped
+    // spans 4..6 all ride (intermediates 3..5 < gate 6) — every one capped
     const d4 = jumpFrom0(cfg, 4).segment.duration;
     const d6 = jumpFrom0(cfg, 6).segment.duration;
     expect(jumpFrom0(cfg, 6).state.teleportVirtualIndex).toBeNull();

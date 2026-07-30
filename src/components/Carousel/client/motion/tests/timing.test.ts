@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { buildCarouselConfig } from "../../config/resolve/buildConfig";
 import type { MotionSettings } from "../../config";
@@ -49,7 +49,7 @@ describe("resolveGoToProfileZones", () => {
 });
 
 describe("resolveGoToApproachDistance", () => {
-  it("is span-independent вЂ” always the final approach page budget", () => {
+  it("is span-independent — always the final approach page budget", () => {
     const stepSize = 4;
     expect(resolveGoToApproachDistance(stepSize, motion)).toBe(
       resolveGoToProfileZones(stepSize, motion).approachDistance,
@@ -59,7 +59,7 @@ describe("resolveGoToApproachDistance", () => {
 
 describe("resolveGoToPlan", () => {
   const stepSize = 3;
-  // Defaults: preflight 1, approach 1, min intermediates 3 вЂ” the structural
+  // Defaults: preflight 1, approach 1, min intermediates 3 — the structural
   // floor (preflight + approach + 1) coincides with the knob.
   const preflight = motion.goToPreflightPageSpan;
   const approach = motion.goToFinalApproachPageSpan;
@@ -68,7 +68,7 @@ describe("resolveGoToPlan", () => {
 
   it("rides continuously while there is nothing to skip (the 1->4 case)", () => {
     // span 3 = two intermediates; preflight shows one, approach shows the
-    // other вЂ” teleporting between two pages that are both shown anyway is a
+    // other — teleporting between two pages that are both shown anyway is a
     // pointless blink, so the deck just rides.
     for (let pageSpan = 1; pageSpan < smallestFlyingSpan; pageSpan += 1) {
       const plan = resolveGoToPlan(pageSpan, stepSize, motion);
@@ -90,8 +90,8 @@ describe("resolveGoToPlan", () => {
       expect(plan.leadDistance + plan.teleportDistance + plan.approachDistance).toBe(
         realDistance,
       );
-      // вЂ¦and the teleported width always spans at least one full skipped
-      // page plus the boundary step вЂ” never a between-neighbours blink.
+      // …and the teleported width always spans at least one full skipped
+      // page plus the boundary step — never a between-neighbours blink.
       expect(plan.teleportDistance).toBeGreaterThanOrEqual(2 * stepSize);
     }
   });
@@ -109,7 +109,7 @@ describe("resolveGoToPlan", () => {
     expect(resolveGoToPlan(7, stepSize, raised).isTeleport).toBe(true); // 6 intermediates
   });
 
-  it("a knob below the structural floor never breaks вЂ” every such jump rides", () => {
+  it("a knob below the structural floor never breaks — every such jump rides", () => {
     // With min=2 (or even 1) and preflight+approach=2 no page can be skipped
     // at intermediates=2, so the structural gate dominates: span 3 rides;
     // span 4 (one skippable page) still flies. Diagnostics reports the idle
@@ -176,7 +176,7 @@ describe("resolveGoToFlightDuration (the ride time ceiling)", () => {
     ).toBeCloseTo(standing - resolveGoToPreflightDuration(stepSize, motion, peak), 9);
   });
 
-  it("degenerate tunings yield 0 вЂ” consumers read that as 'no ceiling'", () => {
+  it("degenerate tunings yield 0 — consumers read that as 'no ceiling'", () => {
     expect(resolveGoToFlightDuration(stepSize, motion, 0)).toBe(0);
     const zeroSpans: MotionSettings = {
       ...motion,

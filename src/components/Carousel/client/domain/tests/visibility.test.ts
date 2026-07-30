@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { slideVisibilityFlags } from "../visibility";
 
@@ -12,10 +12,10 @@ describe("slideVisibilityFlags", () => {
    * The catch-and-hold regression this guards: a press brakes the strip at a
    * FRACTIONAL position (say 0.3) and the reducer sits in "dragging" with
    * current = previous = 0.3. When the transition flag was false there, the
-   * active band collapsed to [0.3, 1.3) вЂ” the on-screen LEFT slide (0) fell
+   * active band collapsed to [0.3, 1.3) — the on-screen LEFT slide (0) fell
    * out and went inert under the user's finger: hit-testing died, and the
    * browser's long-press menu gave its haptic but refused to open. Always the
-   * left slide, in both scroll directions, one and two slides visible вЂ”
+   * left slide, in both scroll directions, one and two slides visible —
    * measured on device.
    *
    * With the flag true, `wasVisible` floors/ceils the fractional band, so
@@ -26,7 +26,7 @@ describe("slideVisibilityFlags", () => {
     const right = slideVisibilityFlags(1, 0.3, 0.3, 1, true);
     expect(left.isActive).toBe(true);
     expect(right.isActive).toBe(true);
-    // aria-current still names the dominant page вЂ” only ONE slide is actual.
+    // aria-current still names the dominant page — only ONE slide is actual.
     expect(left.isActual).toBe(false);
     expect(right.isActual).toBe(true);
   });
@@ -48,7 +48,7 @@ describe("slideVisibilityFlags", () => {
   });
 });
 
-describe("slideVisibilityFlags вЂ” any visible-slide count", () => {
+describe("slideVisibilityFlags — any visible-slide count", () => {
   /**
    * The inert-left-slide fix must hold for EVERY layout, not just the 1- and
    * 2-visible decks it was found on. For any N and any fractional hold

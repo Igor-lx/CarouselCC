@@ -1,4 +1,4 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -13,9 +13,9 @@ import { useActiveBandGate } from "../useActiveBandGate";
  * for bandwidth with the slide the user is looking at. Two properties carry
  * the whole design and both are easy to regress:
  *
- *  - it opens on any first outcome, error included вЂ” a broken visible image
+ *  - it opens on any first outcome, error included — a broken visible image
  *    must not hold the buffer hostage;
- *  - the outcome LATCHES вЂ” a retry cycles the status back to `loading`, and a
+ *  - the outcome LATCHES — a retry cycles the status back to `loading`, and a
  *    gate that reopened on `loaded` alone would slam shut mid-cycle and
  *    abandon the buffer's in-flight fetches.
  */
@@ -89,7 +89,7 @@ describe("useActiveBandGate", () => {
     expect(observed).toBe(true);
   });
 
-  it("opens on error too вЂ” a broken image is not a hostage taker", () => {
+  it("opens on error too — a broken image is not a hostage taker", () => {
     render([slide("a.webp", true), slide("b.webp", false)]);
 
     act(() => store.reportError("a.webp"));
@@ -109,7 +109,7 @@ describe("useActiveBandGate", () => {
   });
 
   it("does not re-subscribe when the band's URLs are unchanged", () => {
-    // `virtualSlides` is a fresh array on every dispatch вЂ” twice per ride вЂ”
+    // `virtualSlides` is a fresh array on every dispatch — twice per ride —
     // but the band's URLs change at most once. A gate keyed on array identity
     // tore down and rebuilt N store subscriptions in the click frame.
     let subscriptions = 0;
@@ -125,7 +125,7 @@ describe("useActiveBandGate", () => {
 
     render([slide("a.webp", true), slide("b.webp", false)]);
     const afterFirst = subscriptions;
-    // A new array, same content вЂ” exactly what a dispatch produces.
+    // A new array, same content — exactly what a dispatch produces.
     render([slide("a.webp", true), slide("b.webp", false)]);
     expect(subscriptions).toBe(afterFirst);
 

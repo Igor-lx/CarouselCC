@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   generateSlides,
@@ -7,7 +7,7 @@ import {
 } from "../generateSlides";
 import type { GeneratedSlide } from "../types";
 
-// URL basenames match the slug keys вЂ” exactly as the runner produces them
+// URL basenames match the slug keys — exactly as the runner produces them
 // (both derive from the same filename), so the slug-based merge lines up.
 const widths: GenerateSlidesInput["widths"] = [
   {

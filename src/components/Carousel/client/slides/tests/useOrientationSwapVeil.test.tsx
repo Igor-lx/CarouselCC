@@ -1,4 +1,4 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -17,7 +17,7 @@ import { useOrientationSwapVeil } from "../useOrientationSwapVeil";
  * renders its alt text instead), teardown killed the fail-open timer and the
  * re-run returned immediately on the unchanged signature. `isVeiled` stayed
  * true for good, and once the retry succeeded the remounted `<img>` came back
- * under `data-reorienting="true"` вЂ” opacity: 0, an empty card until the user
+ * under `data-reorienting="true"` — opacity: 0, an empty card until the user
  * rotated the device again.
  */
 
@@ -86,7 +86,7 @@ describe("useOrientationSwapVeil", () => {
     render(false, "1010");
     expect(veiled).toBe(false);
 
-    // вЂ¦and the retry that brings the image back must not find it hidden.
+    // …and the retry that brings the image back must not find it hidden.
     render(true, "1010");
     expect(veiled).toBe(false);
   });

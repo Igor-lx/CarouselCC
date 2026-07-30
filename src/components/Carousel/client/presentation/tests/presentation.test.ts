@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { SLIDE_REORIENT_VEIL } from "../../config";
 import { SLIDE_CLASS_KEYS } from "../../public-api/types";
@@ -6,7 +6,7 @@ import { buildRootCssVars, buildSlideCssVars } from "../cssVars";
 import { buildFlagAttributes, buildSlideClassMap } from "../domPayload";
 
 /**
- * The JSв†’DOM presentation contract, tested where it now lives: pure builders
+ * The JS→DOM presentation contract, tested where it now lives: pure builders
  * instead of memos buried in the composition root.
  */
 
@@ -35,7 +35,7 @@ describe("buildRootCssVars", () => {
 });
 
 describe("buildSlideCssVars", () => {
-  it("carries the lane only вЂ” the one per-slide datum", () => {
+  it("carries the lane only — the one per-slide datum", () => {
     expect(Object.keys(buildSlideCssVars(5, 2))).toEqual(["--slide-lane"]);
   });
 

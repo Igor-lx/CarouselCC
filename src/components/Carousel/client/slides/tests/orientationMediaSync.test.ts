@@ -1,4 +1,4 @@
-﻿import { readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -17,7 +17,7 @@ import {
  * NUMBERS, art-directed slide data must use ONLY those strings, and the
  * component stylesheet must carry no media conditions at all (geometry keys
  * on the root's data attributes instead). Which crop family sits behind
- * which condition is the dataset's tuning вЂ” this guard pins only the
+ * which condition is the dataset's tuning — this guard pins only the
  * CONDITIONS. Diagnostics repeats the data audit at runtime for arbitrary
  * hosts; this test covers the repo's own generator configs in CI.
  */

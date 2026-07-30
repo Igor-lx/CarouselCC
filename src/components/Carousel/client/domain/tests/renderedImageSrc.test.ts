@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   deckCarriesImageSets,
@@ -42,7 +42,7 @@ describe("resolveLargestImageCandidate", () => {
     ).toBe("/img/tall-1080.webp");
   });
 
-  it("width is the whole rule вЂ” no height/orientation guessing", () => {
+  it("width is the whole rule — no height/orientation guessing", () => {
     expect(
       resolveLargestImageCandidate({
         srcSet: "/img/wide-1280.webp 1280w",

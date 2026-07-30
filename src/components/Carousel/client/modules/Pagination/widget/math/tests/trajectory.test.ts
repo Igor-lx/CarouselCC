@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { buildPaginationWidgetGeometry } from "../spatialField";
 import { projectDot } from "../projection";
@@ -17,7 +17,7 @@ const geometry = buildPaginationWidgetGeometry(5, {
 const toTransform = (x: number, scale: number) =>
   `translate3d(${x}px, 0, 0) scale(${scale})`;
 
-/** Uniform (linear-time) stops вЂ” the identity temporal curve. */
+/** Uniform (linear-time) stops — the identity temporal curve. */
 const LINEAR_STOPS = [0, 0.25, 0.5, 0.75, 1];
 
 describe("sampleDotTrajectory", () => {

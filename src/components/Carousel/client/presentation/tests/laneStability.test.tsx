@@ -1,4 +1,4 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -7,13 +7,13 @@ import type { VirtualSlide } from "../../domain";
 import { useCarouselPresentation } from "../useCarouselPresentation";
 
 /**
- * Why this exists: `virtualSlides` is rebuilt whenever `isMoving` flips вЂ” at
- * the START and the END of every ride вЂ” because the visibility flags depend
+ * Why this exists: `virtualSlides` is rebuilt whenever `isMoving` flips — at
+ * the START and the END of every ride — because the visibility flags depend
  * on it. A slide's LANE does not: it is a function of its own virtualIndex
  * and the layout origin. If the style objects were rebuilt along with the
  * array, every mounted SlideItem would receive a fresh `style` prop and
  * re-render in exactly the two frames where the animation starts and settles
- * вЂ” the click-time stutter this guards against.
+ * — the click-time stutter this guards against.
  */
 
 let host: HTMLDivElement;
@@ -31,7 +31,7 @@ const slide = (virtualIndex: number, isActual: boolean): VirtualSlide =>
   }) as unknown as VirtualSlide;
 
 /** Defined ONCE: a component declared per render would be a new type, so
- * React would remount it and reset the hook's cache вЂ” the very thing under
+ * React would remount it and reset the hook's cache — the very thing under
  * test. */
 const Probe = ({
   virtualSlides,
@@ -75,8 +75,8 @@ describe("slide lane styles are identity-stable", () => {
     const first = render([slide(0, false), slide(1, true), slide(2, false)]);
     const before = [0, 1, 2].map((index) => first.slideStyleFor(index));
 
-    // A fresh array of fresh slide objects вЂ” exactly what an isMoving flip
-    // produces вЂ” with the same lanes.
+    // A fresh array of fresh slide objects — exactly what an isMoving flip
+    // produces — with the same lanes.
     const second = render([slide(0, true), slide(1, true), slide(2, false)]);
 
     expect(second.slideStyleFor(0)).toBe(before[0]);
@@ -112,7 +112,7 @@ describe("slide lane styles are identity-stable", () => {
 
   it("lanes stay correct after slides leave and re-enter the window", () => {
     render([slide(0, false), slide(1, false), slide(2, false)]);
-    render([slide(2, false)]); // window shrank вЂ” 0 and 1 pruned
+    render([slide(2, false)]); // window shrank — 0 and 1 pruned
     const back = render([slide(0, false), slide(1, false), slide(2, false)]);
 
     expect(

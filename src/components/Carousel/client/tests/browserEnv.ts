@@ -26,8 +26,8 @@ export const installMatchMedia = (matches = false): void => {
 
 /**
  * `useViewportVisibility` constructs one unconditionally, so without this the
- * component cannot mount at all under jsdom (see TEST-BUGS B-2 — its sibling
- * guards `ResizeObserver` and this one does not).
+ * component cannot mount at all under jsdom — its sibling guards
+ * `ResizeObserver` and this one does not.
  *
  * Reports the element as intersecting straight away, which is what a viewport
  * observer would say for a carousel that is on screen.

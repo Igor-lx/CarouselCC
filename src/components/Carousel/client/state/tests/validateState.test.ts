@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { buildInitialState } from "../initial";
 import type { CarouselState } from "../types";
@@ -19,7 +19,7 @@ const validate = (
 const kinds = (issues: CarouselStateIssue[]): string[] =>
   issues.map((issue) => issue.kind).sort();
 
-describe("validateCarouselState вЂ” valid states", () => {
+describe("validateCarouselState — valid states", () => {
   it("returns no issues for a freshly built initial state", () => {
     expect(validate()).toEqual([]);
   });
@@ -46,7 +46,7 @@ describe("validateCarouselState вЂ” valid states", () => {
   });
 });
 
-describe("validateCarouselState вЂ” out-of-bounds targetPageIndex", () => {
+describe("validateCarouselState — out-of-bounds targetPageIndex", () => {
   it("flags a negative targetPageIndex", () => {
     const issues = validate({ targetPageIndex: -1 });
     expect(issues).toHaveLength(1);
@@ -76,7 +76,7 @@ describe("validateCarouselState вЂ” out-of-bounds targetPageIndex", () => {
   });
 });
 
-describe("validateCarouselState вЂ” teleportVirtualIndex phase consistency", () => {
+describe("validateCarouselState — teleportVirtualIndex phase consistency", () => {
   // One table instead of two hand-picked phases: the rule is "any phase that
   // is not step-jump", so the test says exactly that.
   it("flags it in every phase that is not step-jump", () => {
@@ -90,7 +90,7 @@ describe("validateCarouselState вЂ” teleportVirtualIndex phase consistency",
   });
 });
 
-describe("validateCarouselState вЂ” isTeleportApproach phase consistency", () => {
+describe("validateCarouselState — isTeleportApproach phase consistency", () => {
   it("flags it in every phase that is not step-jump", () => {
     for (const motionPhase of NON_JUMP_PHASES) {
       const issues = validate({ isTeleportApproach: true, motionPhase });
@@ -102,7 +102,7 @@ describe("validateCarouselState вЂ” isTeleportApproach phase consistency", (
   });
 });
 
-describe("validateCarouselState вЂ” multiple issues", () => {
+describe("validateCarouselState — multiple issues", () => {
   it("collects every independent violation", () => {
     const issues = validate({
       targetPageIndex: -1,

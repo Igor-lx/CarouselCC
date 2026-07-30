@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   ACTIVE_DOT_COUNT,
@@ -16,7 +16,7 @@ import { activeTrajectoryIds } from "../math/trajectory";
  * a step that lands past the pool simply gets no element, and the arriving
  * page's highlight pops into place at settle instead of animating. So the pool
  * size and the step reach are one decision, and this file is where they have to
- * agree вЂ” arithmetically, for every window size, at the constants' current
+ * agree — arithmetically, for every window size, at the constants' current
  * values whatever they are.
  *
  * Everything below re-derives the binding's own index math (`writeOffset`,

@@ -1,4 +1,4 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { IMAGE_RETRY } from "../../../config";
@@ -137,13 +137,13 @@ describe("prune", () => {
 });
 
 describe("soft lifecycle / reuse after dispose", () => {
-  it("stays usable after dispose() вЂ” render status still records", () => {
+  it("stays usable after dispose() — render status still records", () => {
     store.dispose();
     store.reportLoaded("u");
     expect(store.getSnapshot("u").status).toBe("loaded");
   });
 
-  it("stays usable after dispose() вЂ” retry is still scheduled", () => {
+  it("stays usable after dispose() — retry is still scheduled", () => {
     vi.useFakeTimers();
     store.dispose();
     store.reportError("u");

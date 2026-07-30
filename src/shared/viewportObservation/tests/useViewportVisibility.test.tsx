@@ -13,7 +13,7 @@ import { useViewportVisibility } from "../useViewportVisibility";
  *
  * The degradation matters as much as the happy path. This hook once built its
  * IntersectionObserver unconditionally, so on a platform without the API the
- * layout effect threw and took the whole host tree with it (TEST-BUGS B-2).
+ * layout effect threw and took the whole host tree down with it.
  */
 
 let host: HTMLDivElement;
@@ -149,7 +149,7 @@ describe("useViewportVisibility — with an observer", () => {
   });
 });
 
-describe("useViewportVisibility — without an observer (B-2)", () => {
+describe("useViewportVisibility — without an observer", () => {
   beforeEach(() => {
     vi.stubGlobal("IntersectionObserver", undefined);
   });

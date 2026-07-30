@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   resolveWidgetStepTarget,
@@ -113,14 +113,14 @@ describe("resolveWidgetStepTarget", () => {
  * The chain is bounded against the LIVE offset, and that bound is what the
  * strip's pooled dots and highlight overlays are sized from. Without it a click
  * burst walked the destination past every element that exists to show it, and
- * `activeTrajectoryIds` then named more ids than there were overlays вЂ” the
+ * `activeTrajectoryIds` then named more ids than there were overlays — the
  * extras were dropped from the front of the list, so a forward burst lost the
  * ARRIVING page's highlight and it popped into place at settle.
  *
  * Written against the constant, not against the number: retuning the reach must
  * not fail these, only move them.
  */
-describe("resolveWidgetStepTarget вЂ” the lookahead bound", () => {
+describe("resolveWidgetStepTarget — the lookahead bound", () => {
   const chain = (from: number, memory: WidgetStepMemory, direction: 1 | -1) =>
     resolveWidgetStepTarget({
       direction,
@@ -154,7 +154,7 @@ describe("resolveWidgetStepTarget вЂ” the lookahead bound", () => {
     }
   });
 
-  it("still advances as the strip catches up вЂ” the bound tracks the offset", () => {
+  it("still advances as the strip catches up — the bound tracks the offset", () => {
     // Same burst, but the strip is moving: each step lands one beyond the last,
     // because the reach travels with `from`.
     let memory: WidgetStepMemory = { target: 1, direction: 1, targetKey: 0 };

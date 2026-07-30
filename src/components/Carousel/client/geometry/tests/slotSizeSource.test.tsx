@@ -1,4 +1,4 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, useLayoutEffect, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -8,13 +8,13 @@ import { useSlotSizeSource, type SlotSizeSource } from "../useSlotSizeSource";
 /**
  * The seam between THE slot measurement and the track binding.
  *
- * It carries a real obligation вЂ” "a compositor ride was keyframed in the old
- * pixel scale, tear it down" вЂ” and it is invisible: nothing about the deck
+ * It carries a real obligation — "a compositor ride was keyframed in the old
+ * pixel scale, tear it down" — and it is invisible: nothing about the deck
  * looks wrong in a unit test if the notification is silently dropped. It was
  * dropped, for a while: the source returned a fresh object each render, the
  * track kept that object in a dependency array and so re-subscribed on every
  * render, and React tears down ALL effects of a commit before running any of
- * them вЂ” so a notification emitted from inside a commit arrived after its own
+ * them — so a notification emitted from inside a commit arrived after its own
  * listener had gone.
  *
  * These two cases pin both halves: the source stays referentially stable
@@ -110,7 +110,7 @@ describe("useSlotSizeSource", () => {
   it("notifies a subscriber when the slot count moves the slot", () => {
     const onSlotMove = vi.fn();
     render(3, onSlotMove);
-    // The mount measurement lands before any consumer can subscribe вЂ” the track
+    // The mount measurement lands before any consumer can subscribe — the track
     // covers mount through its own layout-origin path, not through this one.
     expect(onSlotMove).not.toHaveBeenCalled();
 

@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { buildCarouselLayout, buildSlideRecords } from "..";
 import type { Slide } from "../../public-api/types";
@@ -12,8 +12,8 @@ const makeLayout = (slideCount = 12, visible = 1) => {
   return buildCarouselLayout(buildSlideRecords(slides), visible, false);
 };
 
-describe("resolveDragRelease вЂ” directionless release", () => {
-  it("from rest: geometry decides вЂ” snap to the page nearest the release position", () => {
+describe("resolveDragRelease — directionless release", () => {
+  it("from rest: geometry decides — snap to the page nearest the release position", () => {
     const layout = makeLayout();
     const early = resolveDragRelease({
       direction: "none",
@@ -39,9 +39,9 @@ describe("resolveDragRelease вЂ” directionless release", () => {
 
   /**
    * The catch-and-hold contract: pressing a moving strip brakes it, and a
-   * hold that expressed no direction settles onto the PRESSED page вЂ” the
+   * hold that expressed no direction settles onto the PRESSED page — the
    * slide in front of the eyes, the one the browser's long-press menu
-   * describes вЂ” riding the normal step curve (isSnap false), like a button.
+   * describes — riding the normal step curve (isSnap false), like a button.
    *
    * The geometry judgment this replaces threw a barely-started ride away:
    * grabbed at 30%, "nearest page" returned the strip to the origin and the

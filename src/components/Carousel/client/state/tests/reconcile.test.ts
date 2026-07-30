@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { buildCarouselLayout, buildSlideRecords } from "../../domain";
 import type { CarouselLayout } from "../../domain";
@@ -18,7 +18,7 @@ const movedState = (layout: CarouselLayout, targetPageIndex: number): CarouselSt
   moveReason: "click",
 });
 
-describe("reconcileStateToLayout вЂ” equivalence fast path", () => {
+describe("reconcileStateToLayout — equivalence fast path", () => {
   it("returns the same state instance when the layout reference is unchanged", () => {
     const layout = makeLayout(12, 3, false);
     const state = buildInitialState(layout);
@@ -37,7 +37,7 @@ describe("reconcileStateToLayout вЂ” equivalence fast path", () => {
   });
 });
 
-describe("reconcileStateToLayout вЂ” hard reset", () => {
+describe("reconcileStateToLayout — hard reset", () => {
   it("resets to the initial state on a dataKey change", () => {
     const layout = makeLayout(12, 3, false, "a");
     const replaced = makeLayout(8, 3, false, "b");
@@ -56,7 +56,7 @@ describe("reconcileStateToLayout вЂ” hard reset", () => {
   });
 });
 
-describe("reconcileStateToLayout вЂ” proportional remap", () => {
+describe("reconcileStateToLayout — proportional remap", () => {
   it("maps the page proportionally and collapses motion to an instant snap", () => {
     const before = makeLayout(12, 3, false); // pageCount 4
     const after = makeLayout(12, 4, false); // same deck, pageCount 3
@@ -69,7 +69,7 @@ describe("reconcileStateToLayout вЂ” proportional remap", () => {
   });
 });
 
-describe("reconcileStateToLayout вЂ” idempotency (ADR-001 contract)", () => {
+describe("reconcileStateToLayout — idempotency (ADR-001 contract)", () => {
   const cases: Array<[string, CarouselState, CarouselLayout]> = [
     ["same shape", movedState(makeLayout(12, 3, false), 2), makeLayout(12, 4, false)],
     ["hard reset", movedState(makeLayout(12, 3, false), 2), makeLayout(9, 3, true)],
@@ -87,7 +87,7 @@ describe("reconcileStateToLayout вЂ” idempotency (ADR-001 contract)", () => 
   }
 });
 
-describe("reconcileStateToLayout вЂ” render-only image variants do not affect identity", () => {
+describe("reconcileStateToLayout — render-only image variants do not affect identity", () => {
   // The position-preservation guarantee for orientation changes: a slide's
   // `image` (responsive srcSet / sources) is render-only and must never enter
   // `dataKey`, so swapping it on slides with the same id/content keeps the same
@@ -126,7 +126,7 @@ describe("reconcileStateToLayout вЂ” render-only image variants do not affec
   });
 });
 
-describe("reconcileStateToLayout вЂ” recovery from a stuck phase", () => {
+describe("reconcileStateToLayout — recovery from a stuck phase", () => {
   it("lifts a dragging state out of the dragging phase when the deck collapses", () => {
     const slidable = makeLayout(12, 3, false); // canSlide
     const collapsed = makeLayout(12, 20, false); // visible >= length -> !canSlide

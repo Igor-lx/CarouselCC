@@ -1,4 +1,4 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -19,7 +19,7 @@ import { usePaginationFade } from "../usePaginationFade";
 
 /**
  * The binding's whole job is that ONE offset owns the strip across every mode.
- * The regressions this guards are all the same shape вЂ” a mode change that
+ * The regressions this guards are all the same shape — a mode change that
  * re-anchors the strip on the logical target instead of continuing from where
  * it actually is:
  *
@@ -37,7 +37,7 @@ import { usePaginationFade } from "../usePaginationFade";
 
 const PAGE_COUNT = 4;
 
-/** The channel's own input type вЂ” a plain `Omit` would collapse the plan union. */
+/** The channel's own input type — a plain `Omit` would collapse the plan union. */
 type PublishablePlan = Parameters<MotionPlanChannel["publish"]>[0];
 
 // jsdom resolves no custom properties, so the binding reads its documented
@@ -131,7 +131,7 @@ const createVisualPosition = () => {
 /**
  * A step towards page 1. The stops carry a deliberate PLATEAU across the middle
  * third of the duration, so a sample taken anywhere in that third reads exactly
- * 0.5 вЂ” mid-flight assertions stay independent of how long the test itself
+ * 0.5 — mid-flight assertions stay independent of how long the test itself
  * takes, without anyone having to fake the motion clock.
  */
 const sweepStartedAt = (startedAt: number): Extract<PublishablePlan, { kind: "waapi" }> => ({
@@ -145,7 +145,7 @@ const sweepStartedAt = (startedAt: number): Extract<PublishablePlan, { kind: "wa
   isJump: false,
 });
 
-/** A ride caught halfway вЂ” the plateau makes the catch point exactly 0.5. */
+/** A ride caught halfway — the plateau makes the catch point exactly 0.5. */
 const midFlightSweep = () => sweepStartedAt(motionNow() - 50_000);
 const releaseSweep = () => sweepStartedAt(motionNow());
 
@@ -194,7 +194,7 @@ const animationOf = (pageIndex: number) =>
 
 /**
  * Walks a fallback ride and asserts the painted strip against the rule itself
- * rather than against a frame count вЂ” a dropped frame must leave the paint
+ * rather than against a frame count — a dropped frame must leave the paint
  * untouched, a kept one must land on its offset, at ANY tuning of the rule.
  */
 const expectTheSharedDropRule = () => {
@@ -264,14 +264,14 @@ afterEach(() => {
   host.remove();
 });
 
-describe("usePaginationFade вЂ” a finger landing mid-ride", () => {
+describe("usePaginationFade — a finger landing mid-ride", () => {
   it("keeps the position the strip had reached instead of snapping to the target", () => {
     render(0);
     render(1);
     plan.publish(midFlightSweep());
     plan.publish({ kind: "follow", isFallback: false });
 
-    // Halfway between page 0 and page 1 вЂ” the deck freezes there, so must the dots.
+    // Halfway between page 0 and page 1 — the deck freezes there, so must the dots.
     expect(paintedOpacity(0)).toBeCloseTo(opacityAt(0.5), 6);
     expect(paintedOpacity(1)).toBeCloseTo(opacityAt(0.5), 6);
     // The regression: page 1 used to arrive at its full active look at once.
@@ -301,7 +301,7 @@ describe("usePaginationFade вЂ” a finger landing mid-ride", () => {
   });
 });
 
-describe("usePaginationFade вЂ” following the finger", () => {
+describe("usePaginationFade — following the finger", () => {
   it("moves the strip with every frame, in both directions", () => {
     grabMidRideAndDragTo(0.75);
     expect(paintedOpacity(0)).toBeCloseTo(opacityAt(strengthOf(0, 0.75)), 6);
@@ -333,7 +333,7 @@ describe("usePaginationFade вЂ” following the finger", () => {
 
   /** On a no-WAAPI device a drag releases into a fallback ride: the plan flips
    * flavour but the subscription does not restart, so the drop rule has to flip
-   * with it вЂ” otherwise the strip keeps painting frames the track skips. */
+   * with it — otherwise the strip keeps painting frames the track skips. */
   it("switches to the dropping rule when a drag releases into the fallback ride", () => {
     render(0);
     plan.publish({ kind: "follow", isFallback: false }); // finger down
@@ -342,7 +342,7 @@ describe("usePaginationFade вЂ” following the finger", () => {
   });
 });
 
-describe("usePaginationFade вЂ” the release", () => {
+describe("usePaginationFade — the release", () => {
   it("starts the sweep where the finger left the dots", () => {
     grabMidRideAndDragTo(0.75);
     recorded = [];
@@ -377,7 +377,7 @@ describe("usePaginationFade вЂ” the release", () => {
   });
 });
 
-describe("usePaginationFade вЂ” handing the strip back", () => {
+describe("usePaginationFade — handing the strip back", () => {
   it("clears the inline layer and the transition suppression at rest", () => {
     grabMidRideAndDragTo(0.75);
     plan.publish({ kind: "idle" });

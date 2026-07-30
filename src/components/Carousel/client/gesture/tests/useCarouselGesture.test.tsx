@@ -1,4 +1,4 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -15,7 +15,7 @@ import { useCarouselGesture } from "../useCarouselGesture";
  *
  * The trap: `START_DRAG` is deliberately deferred to its own task, and every
  * dependent path has to flush it by hand first. Miss one flush and the reducer
- * receives an `END_DRAG` for a drag it never started вЂ” the state machine then
+ * receives an `END_DRAG` for a drag it never started — the state machine then
  * settles from the wrong origin and the deck jumps. Nothing throws.
  */
 
@@ -130,7 +130,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("useCarouselGesture вЂ” command ordering", () => {
+describe("useCarouselGesture — command ordering", () => {
   it("START_DRAG always reaches the reducer before END_DRAG", () => {
     render();
     press(400);
@@ -170,7 +170,7 @@ describe("useCarouselGesture вЂ” command ordering", () => {
   });
 });
 
-describe("useCarouselGesture вЂ” the surface going away mid-drag", () => {
+describe("useCarouselGesture — the surface going away mid-drag", () => {
   it("ends an orphaned drag instead of leaving the reducer mid-gesture", () => {
     render();
     press(400);
@@ -215,7 +215,7 @@ describe("useCarouselGesture вЂ” the surface going away mid-drag", () => {
   });
 });
 
-describe("useCarouselGesture вЂ” teardown", () => {
+describe("useCarouselGesture — teardown", () => {
   it("drops the pending START_DRAG when the carousel unmounts first", () => {
     render();
     press(400);

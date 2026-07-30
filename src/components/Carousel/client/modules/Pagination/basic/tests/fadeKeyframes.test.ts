@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   blendDotStates,
@@ -29,7 +29,7 @@ describe("offsetDistance", () => {
 
   /** The bug this guards: on a cyclic deck the last page is ONE step back
    * from the first, so a wrap must not read as a trip across the strip. */
-  it("wraps on a cyclic deck вЂ” the ends are neighbours", () => {
+  it("wraps on a cyclic deck — the ends are neighbours", () => {
     expect(offsetDistance(11, 12, PAGES, CYCLIC)).toBe(1);
     expect(offsetDistance(0, -1, PAGES, CYCLIC)).toBe(1);
     expect(offsetDistance(11, -1, PAGES, CYCLIC)).toBe(0);
@@ -43,12 +43,12 @@ describe("resolveOffsetTarget", () => {
   });
 
   it("steps off the front end backwards, not across the strip", () => {
-    // Page 0, "prev" in cyclic mode lands on page 11 вЂ” one step BACK.
+    // Page 0, "prev" in cyclic mode lands on page 11 — one step BACK.
     expect(resolveOffsetTarget(0, 11, PAGES, -1, CYCLIC)).toBe(-1);
   });
 
   it("steps off the back end forwards, not across the strip", () => {
-    // Page 11, "next" lands on page 0 вЂ” one step FORWARD.
+    // Page 11, "next" lands on page 0 — one step FORWARD.
     expect(resolveOffsetTarget(11, 0, PAGES, 1, CYCLIC)).toBe(12);
   });
 
@@ -88,7 +88,7 @@ describe("buildDotKeyframes", () => {
   });
 
   /** The wrap: stepping 0 -> -1 must light ONLY the last dot, and must leave
-   * every dot in between untouched вЂ” that was the reported bug. */
+   * every dot in between untouched — that was the reported bug. */
   it("wrapping backwards lights the last dot and nothing in between", () => {
     const stops = [0, 0.5, 1];
     const last = buildDotKeyframes(11, 0, -1, stops, INACTIVE, ACTIVE, PAGES, CYCLIC);
@@ -142,13 +142,13 @@ describe("reachedDotIndexes", () => {
     expect(reachedDotIndexes(7, 8, 9, FINITE)).toEqual([6, 7, 8]);
   });
 
-  it("folds past the ends when cyclic вЂ” a wrap touches the far dots", () => {
+  it("folds past the ends when cyclic — a wrap touches the far dots", () => {
     // 0 -> -1 sweeps positions -2..1, i.e. dots 10, 11, 0, 1.
     expect(reachedDotIndexes(0, -1, PAGES, CYCLIC)).toEqual([0, 1, 10, 11]);
   });
 
   /** A release after a drag starts the sweep from a FRACTIONAL offset, so the
-   * reached set must be taken from where the strip actually is вЂ” a set computed
+   * reached set must be taken from where the strip actually is — a set computed
    * off a rounded origin would leave the dot the finger was passing unanimated. */
   it("covers the dots around a fractional origin", () => {
     expect(reachedDotIndexes(0.4, 1, 9, FINITE)).toEqual([0, 1, 2]);
@@ -173,7 +173,7 @@ describe("dotKeyframesBetween (the GO_TO direct fade)", () => {
     expect(frames[2]!.transform).toBe("scaleX(1.4)");
   });
 
-  /** The point of the direct fade: it is MONOTONIC вЂ” a dot never rises on the
+  /** The point of the direct fade: it is MONOTONIC — a dot never rises on the
    * way down (or vice versa), so nothing "hops" no matter how far the jump. */
   it("never overshoots or reverses between its endpoints", () => {
     const stops = [0, 0.2, 0.4, 0.6, 0.8, 1];

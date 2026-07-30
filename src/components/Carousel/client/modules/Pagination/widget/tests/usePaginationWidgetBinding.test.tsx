@@ -1,4 +1,4 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, useMemo } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -20,7 +20,7 @@ import { usePaginationWidgetBinding } from "../usePaginationWidgetBinding";
 
 /**
  * Follow mode's pacing contract. The runner publishes `follow` twice on a
- * no-WAAPI device вЂ” once for the finger, once for the ride it releases into вЂ”
+ * no-WAAPI device — once for the finger, once for the ride it releases into —
  * and the second plan does NOT restart the subscription. A binding that read
  * its flavour from the first plan's closure would keep painting every frame
  * while the track skips every Nth, which is exactly the desync the shared rule
@@ -127,7 +127,7 @@ function Probe() {
   );
 }
 
-/** The whole strip's painted state вЂ” a frame either moves it or it does not. */
+/** The whole strip's painted state — a frame either moves it or it does not. */
 const paintedStrip = () =>
   [...host.querySelectorAll<HTMLElement>("[data-slot]")]
     .map((dot) => `${dot.style.transform}@${dot.style.opacity}`)
@@ -152,7 +152,7 @@ afterEach(() => {
 /**
  * Walks a fallback ride and asserts the strip against the rule itself rather
  * than against a frame count: a dropped frame must leave the paint untouched, a
- * kept one must move it вЂ” at ANY tuning of the rule.
+ * kept one must move it — at ANY tuning of the rule.
  */
 const expectTheSharedDropRule = () => {
   let painted = paintedStrip();
@@ -169,7 +169,7 @@ const expectTheSharedDropRule = () => {
   }
 };
 
-describe("usePaginationWidgetBinding вЂ” follow pacing", () => {
+describe("usePaginationWidgetBinding — follow pacing", () => {
   it("drops exactly the frames the track drops on a fallback ride", () => {
     plan.publish({ kind: "follow", isFallback: true });
     expectTheSharedDropRule();

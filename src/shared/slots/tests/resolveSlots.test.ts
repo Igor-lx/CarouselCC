@@ -1,4 +1,4 @@
-﻿import { createElement, type FunctionComponent } from "react";
+import { createElement, type FunctionComponent } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { resolveSlots } from "../resolveSlots";

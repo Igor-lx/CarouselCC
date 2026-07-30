@@ -1,11 +1,11 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { CarouselDiagnosticContextValue } from "../../../../context";
 import { collectPropWarnings } from "../propChecks";
 
 type DiagnosticProps = CarouselDiagnosticContextValue["props"];
 
-/** All public props undefined вЂ” the public-default contract, no warnings. */
+/** All public props undefined — the public-default contract, no warnings. */
 const baseProps = (overrides: Partial<DiagnosticProps> = {}): DiagnosticProps => ({
   visibleSlidesNr: undefined,
   durationAutoplay: undefined,
@@ -19,7 +19,7 @@ const baseProps = (overrides: Partial<DiagnosticProps> = {}): DiagnosticProps =>
 const environmentWarnings = (props: DiagnosticProps) =>
   collectPropWarnings(props).filter((w) => w.layer === "Environment");
 
-describe("collectPropWarnings вЂ” value props", () => {
+describe("collectPropWarnings — value props", () => {
   it("emits nothing when every prop is undefined except a complete environment", () => {
     const warnings = collectPropWarnings(
       baseProps({
@@ -40,7 +40,7 @@ describe("collectPropWarnings вЂ” value props", () => {
   });
 });
 
-describe("collectPropWarnings вЂ” environment wiring", () => {
+describe("collectPropWarnings — environment wiring", () => {
   it("reports all three signals when userEnvironment is absent", () => {
     const warnings = environmentWarnings(baseProps());
     expect(warnings.map((w) => w.field).sort()).toEqual([

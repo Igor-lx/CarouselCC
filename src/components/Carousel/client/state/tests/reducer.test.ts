@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { buildCarouselConfig } from "../../config";
 import type { CarouselRuntimeConfig } from "../../config";
@@ -11,7 +11,7 @@ import { makeLayout } from "./layoutBuilder";
 // --- test kit ---------------------------------------------------------------
 
 // MECHANISM tests, not tuning tests: the GO_TO teleport geometry knobs are
-// PINNED here вЂ” the project's live spans are feel tunables and hand-tuning
+// PINNED here — the project's live spans are feel tunables and hand-tuning
 // them must never fail these assertions.
 const builtConfig = buildCarouselConfig({});
 const config: CarouselRuntimeConfig = {
@@ -46,7 +46,7 @@ describe("buildInitialState", () => {
     expect(state.teleportVirtualIndex).toBeNull();
   });
 });
-describe("MOVE вЂ” cyclic", () => {
+describe("MOVE — cyclic", () => {
   const layout = makeLayout(12, 3, false); // pageCount 4
 
   it("advances one page on MOVE(+1)", () => {
@@ -83,7 +83,7 @@ describe("MOVE вЂ” cyclic", () => {
     expect(next.moveReason).toBe("autoplay");
   });
 });
-describe("MOVE вЂ” finite", () => {
+describe("MOVE — finite", () => {
   const layout = makeLayout(12, 3, true); // pageCount 4, finite
 
   it("clamps and no-ops at the start boundary", () => {
@@ -362,7 +362,7 @@ describe("repeated vs. opposite click", () => {
     });
     expect(first.targetPageIndex).toBe(1);
 
-    // Visual is at 0.2 вЂ” still inside page 0. A repeat click does not just
+    // Visual is at 0.2 — still inside page 0. A repeat click does not just
     // accelerate motion toward page 1; it skips page 1 and retargets to
     // "two pages ahead of the visual page" === page 2. The motion runner
     // sees the new target and rebuilds the active segment with the
@@ -395,7 +395,7 @@ describe("repeated vs. opposite click", () => {
     });
     expect(next.targetPageIndex).toBe(2);
 
-    // Two more clicks while visual creeps inside page 0 вЂ” target stays at 2,
+    // Two more clicks while visual creeps inside page 0 — target stays at 2,
     // each click only refreshes fromVirtualIndex and keeps the fast-repeat
     // flag on for the motion runner.
     next = reduce(next, {
@@ -427,7 +427,7 @@ describe("repeated vs. opposite click", () => {
     });
     expect(next.targetPageIndex).toBe(1);
 
-    // Click 2 with visual still inside page 0 вЂ” retarget to page 2 (skip 1).
+    // Click 2 with visual still inside page 0 — retarget to page 2 (skip 1).
     next = reduce(next, {
       type: "MOVE",
       step: 1,
@@ -437,7 +437,7 @@ describe("repeated vs. opposite click", () => {
     expect(next.targetPageIndex).toBe(2);
     expect(next.isRepeatedClickAdvance).toBe(true);
 
-    // Click 3 after visual crossed into page 1 вЂ” retarget to page 3.
+    // Click 3 after visual crossed into page 1 — retarget to page 3.
     next = reduce(next, {
       type: "MOVE",
       step: 1,
@@ -562,7 +562,7 @@ describe("repeated vs. opposite click", () => {
     });
     expect(settled.motionPhase).toBe("idle");
 
-    // From idle the click is no longer a same-direction repeat вЂ” the cursor
+    // From idle the click is no longer a same-direction repeat — the cursor
     // is the now-settled `targetPageIndex` (2), so a fresh forward click
     // advances by one to page 3.
     const afterSettle = reduce(settled, {

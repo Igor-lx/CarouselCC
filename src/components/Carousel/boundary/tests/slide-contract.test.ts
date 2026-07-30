@@ -1,10 +1,10 @@
-﻿// See ./README.md
+// See ./README.md
 import { describe, expect, it } from "vitest";
 
 import type { Slide } from "../../client/public-api/types";
 import type { GeneratedSlide } from "../../data-gen/types";
 
-describe("Slide contract (data-gen в†’ client)", () => {
+describe("Slide contract (data-gen → client)", () => {
   it("a generated slide is assignable to the component Slide", () => {
     const generated: GeneratedSlide = {
       id: "carousel1",
