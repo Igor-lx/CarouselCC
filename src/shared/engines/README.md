@@ -1,8 +1,7 @@
 # engines
 
 Three self-contained blanks for animating a value and turning a finger into
-intent. Each imports nothing but React and itself (a
-`tests/portability.test.ts` guards it) — copy one folder and go.
+intent. Each imports nothing but React and itself — copy one folder and go.
 
 | Folder | What it does |
 | --- | --- |

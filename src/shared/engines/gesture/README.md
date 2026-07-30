@@ -11,10 +11,10 @@ is exported from `index.ts`.
 | --- | --- |
 | `swipe/` | Gesture registration: the hook, host props, recognition (`internals/` is private). |
 | `inertia/` | The kinetic MEANING of a release: `resolveReleaseKinetics` (flick judgment + continuity launch) and `projectMomentum` (default landing); low-level `resolveInertialRelease`/`resolveReleaseLaunch` stay exported. |
-| `tests/` | The blank's own suite, incl. `portability.test.ts`. |
+| `tests/` | The blank's own behavioural suite. |
 
-Self-contained: imports only React and itself (guarded by
-`tests/portability.test.ts`).
+Self-contained: imports only React and itself. Not machine-enforced — a stray
+import simply fails to resolve in the project the folder was copied into.
 
 ## Principle
 

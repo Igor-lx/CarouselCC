@@ -34,8 +34,8 @@ forks under `internal/` mirror them (and may drift by design).
 
 ## Self-sufficient by DUPLICATION
 
-Imports **only React and itself** (guarded by `tests/portability.test.ts`) —
-copy the one folder into any React project and it works. It carries its own
+Imports **only React and itself** — copy the one folder into any React project
+and it works. It carries its own
 **forks** of the gesture and motion engines (`./internal/gesture`,
 `./internal/motion`), deliberately duplicated rather than imported. The forks
 may drift from the standalone originals — by design.

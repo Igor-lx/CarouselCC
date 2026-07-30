@@ -11,10 +11,10 @@ clicks, programmatic motion). The whole surface is exported from `index.ts`.
 | `profile/` | Curve maths: accel/cruise/decel profiles from speeds + distance shares; WAAPI percent-stops; the peak-speed-for-duration solver. |
 | `runtime/` | Execution: the RAF controller, the motion clock (`motionNow`), the paint subscription (`useMotionPaint`). |
 | `compositor/` | Delivery to the browser compositor: the pinned-animation primitive and the turnkey one-element rider (`useCompositedRide`). |
-| `tests/` | The blank's own suite, incl. `portability.test.ts`. |
+| `tests/` | The blank's own behavioural suite. |
 
-Self-contained: imports only React and itself (guarded by
-`tests/portability.test.ts`), so it copies into any project as-is.
+Self-contained: imports only React and itself, so it copies into any project
+as-is. Not machine-enforced — a stray import simply fails to resolve there.
 
 ## Principle
 

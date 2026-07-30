@@ -39,5 +39,4 @@ The folder ships its own copy of the helper so it can be lifted into an empty
 project standalone. In a repo that already provides the helper it must import
 THAT one instead (this repo does — `useViewportVisibility` imports
 `../hooks/useIsomorphicLayoutEffect`), so the local copy stays dormant.
-`tests/singleSource.test.ts` enforces the single source; when lifting the folder
-out, point the import back at the local file.
+When lifting the folder out, point the import back at the local file.
