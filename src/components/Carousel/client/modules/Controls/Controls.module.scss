@@ -3,6 +3,20 @@
   // Sizing tokens read by both the non-touch button and the touch zone; each
   // tier overrides only the tokens.
   .navZone {
+    // The zone IS the <button>, sized by percentage. NO host reset is assumed:
+    // the UA's own 1px 6px padding plus content-box sizing would widen it past
+    // the 8% it declares. Repeated verbatim wherever a control is rendered, so
+    // each stylesheet stands alone.
+    appearance: none;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+
     --nav-button-w: 45px;
     --nav-button-h: 45px;
     --nav-button-radius: 50%;

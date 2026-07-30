@@ -79,6 +79,21 @@
   }
 
   .slide {
+    // A clickable slide renders as <button>. NO host reset is assumed — the
+    // browser's own control defaults are neutralised here, or the UA padding
+    // and content-box sizing make the element wider than the slot maths
+    // believes. Repeated verbatim in every stylesheet that renders a control,
+    // so each file stands alone.
+    appearance: none;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+
     position: absolute;
     top: 0;
     left: 0;
@@ -89,20 +104,12 @@
     transform: translateX(
       calc(var(--slide-lane, 0) * (100% + var(--slides-gap, 0px)))
     );
-    padding: 0;
-    margin: 0;
-    border: none;
     border-radius: var(--slide-radius);
-    background: none;
-    font: inherit;
-    color: inherit;
-    text-align: inherit;
     // Inset outline, not a border — clip-immune at the overflow edge (styling.md).
     outline: var(--slide-outline-width) solid transparent;
     outline-offset: calc(var(--slide-outline-width) * -1);
     transition: outline-color 0.6s ease;
     overflow: hidden;
-    box-sizing: border-box;
     contain: paint;
     cursor: default;
 
