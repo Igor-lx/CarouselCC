@@ -20,7 +20,6 @@ const read = (relative: string) =>
 
 const scss = read("../Carousel.module.scss");
 const cssVars = read("../presentation/cssVars.ts");
-const carousel = read("../Carousel.tsx");
 
 describe("layout CSS custom properties SSOT", () => {
   it("JS publishes --visible-slides on the root", () => {
@@ -41,17 +40,15 @@ describe("layout CSS custom properties SSOT", () => {
     expect(scss).toMatch(/transform:\s*translateX\(\s*calc\(var\(--slide-lane/);
   });
 
-  // Dropped: a `not.toContain("calc(")` / `not.toContain("translateX(")` grep
-  // over the whole view and vars module. It read as an invariant but was an
-  // arbitrary spot-check — `domain/track.ts` builds exactly such a string in JS
-  // by design (the pre-measurement fallback transform), so "JS ships no layout
-  // rules" is not true of the codebase, only of two hand-picked files. Meanwhile
-  // any `calc(` in a comment would have failed it. The ownership check below is
-  // the part that carries real meaning, and it names the actual variables.
-
-  it("the composition root no longer declares custom properties itself", () => {
-    // The root composes; the presentation module owns the JS->CSS contract.
-    expect(carousel).not.toContain('"--slide-lane"');
-    expect(carousel).not.toContain('"--visible-slides"');
-  });
+  // Two greps used to live here and both were dropped for the same reason:
+  // they asserted where code SITS rather than what it DOES.
+  //
+  //  - `not.toContain("calc(")` over the view and vars module: an arbitrary
+  //    spot-check, since `domain/track.ts` builds exactly such a string in JS
+  //    by design (the pre-measurement fallback transform);
+  //  - `Carousel.tsx` does not contain the variable names: green with the
+  //    contract fully broken, red on a harmless move of the declaration.
+  //
+  // The four cases above name the actual variables on both sides, which is
+  // the part that can catch a real rename.
 });
