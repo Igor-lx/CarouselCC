@@ -134,6 +134,70 @@ describe("ride-duration floor", () => {
   });
 });
 
+/**
+ * Everything that is NOT speed-authored — no flick, no jump, no snap — lands
+ * in the shared step-duration resolver, and there `moveReason` alone picks the
+ * tempo. Two of its arms carry a promise:
+ *
+ *  - a committed but unhurried swipe (slower than the base tempo, so no
+ *    inertial profile) rides at the CLICK tempo. The `gesture` arm returns the
+ *    same value as `click` while the neighbouring `default` returns the
+ *    AUTOPLAY one, so a tidy-up that collapses or drops it makes an ordinary
+ *    slow swipe crawl at autoplay pace;
+ *  - an autoplay step rides at `durationAutoplay`, the public prop that exists
+ *    for exactly that. Nothing else in the suite follows that prop all the way
+ *    into a segment, so a host setting it could be ignored in silence.
+ *
+ * Both failures move the deck to the right page at the wrong speed: no error,
+ * no wrong state, just the wrong feel.
+ */
+describe("step tempo by move reason", () => {
+  const span = (state: CarouselState) =>
+    Math.abs(state.virtualIndex - state.fromVirtualIndex) /
+    state.layout.visibleSlidesCount;
+
+  it("a committed but unhurried release rides at the click tempo", () => {
+    // Release speed well under the base tempo => not a flick.
+    const state = releasedState(0.0001, 0.0001);
+    const { segment } = buildCarouselSegment({
+      state,
+      config,
+      isInstantMode: false,
+      start: { position: state.fromVirtualIndex, velocity: 0, strategy: "idle" },
+      startedAt: 0,
+    });
+
+    // Derived from the config, not written as a number: retuning the step
+    // duration must move this expectation rather than break it.
+    expect(segment.duration).toBeCloseTo(config.stepDuration * span(state), 6);
+    expect(segment.duration).not.toBeCloseTo(config.autoplayDuration, 0);
+  });
+
+  it("an autoplay step rides at durationAutoplay, whatever the distance", () => {
+    const layout = makeLayout(12, 3);
+    const state = reduce(buildInitialState(layout), {
+      type: "MOVE",
+      step: 1,
+      moveReason: "autoplay",
+      fromVirtualIndex: 0,
+    });
+    const { segment } = buildCarouselSegment({
+      state,
+      config,
+      isInstantMode: false,
+      start: { position: state.fromVirtualIndex, velocity: 0, strategy: "idle" },
+      startedAt: 0,
+    });
+
+    expect(segment.duration).toBeCloseTo(config.autoplayDuration, 6);
+    // The distinguishing half: the click tempo is a different number here.
+    expect(config.stepDuration * span(state)).not.toBeCloseTo(
+      config.autoplayDuration,
+      0,
+    );
+  });
+});
+
 describe("gesture-release continuity launch", () => {
   it("starts at the visual (ui) velocity, not the faster gesture memory", () => {
     const uiVelocity = 0.001; // calm visible finish (virtual units / ms)
