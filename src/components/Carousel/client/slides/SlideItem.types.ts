@@ -15,8 +15,9 @@ export interface SlideItemProps extends SlideAriaProps {
   isInteractiveOn: boolean;
   isActive: boolean;
   isActual: boolean;
-  /** Bandwidth gate: `false` withholds an off-band slide's sources (see useActiveBandGate). */
-  isOffBandFetchOn: boolean;
+  /** Bandwidth gate: `false` withholds this slide's sources entirely — the
+   * `<img>` is not mounted at all (see `useSlideFetchReach`). */
+  isFetchOn: boolean;
   imageResourceStore: ImageResourceStore | null;
   /** Carousel-derived default `sizes`; a slide's own `image.sizes` overrides it. */
   imageSizes: string;

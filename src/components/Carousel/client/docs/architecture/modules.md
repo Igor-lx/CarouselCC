@@ -132,7 +132,7 @@ Headless (renders `null`). Two effects in one slot:
 2. **Predecode manager** (its body). **There is deliberately no preload here.**
    The render window already mounts the buffered slides as real `<img>`s, and
    those elements ARE the preload — they fetch ahead by existing; ordering
-   (visible band first) belongs to `useActiveBandGate` ([slides.md](./slides.md)).
+   (visible band first) belongs to `useSlideFetchReach` ([slides.md](./slides.md)).
    The one thing the markup does not do is DECODE. With `isPredecodeOn`, buffered
    off-band bitmaps (`[data-active-zone="false"] img`) are decoded one at a time
    in idle callbacks, **only while the deck rests**, so the mid-ride

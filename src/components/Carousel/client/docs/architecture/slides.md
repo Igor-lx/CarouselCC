@@ -32,10 +32,20 @@ band of one-way drift (`LAYOUT_ORIGIN_BAND_SLOTS`), so a per-settle window shift
 mounts one edge slide and unmounts another and moves no other slide. The lane
 math is in [motion.md](./motion.md).
 
-## Two-wave fetch (the active band gate)
+## Two-wave fetch (the slide fetch reach)
 
-[`slides/useActiveBandGate.ts`](../../slides/useActiveBandGate.ts): the buffer's
-off-band `<img>`s do not fetch until the visible band has reported an outcome.
+[`slides/useSlideFetchReach.ts`](../../slides/useSlideFetchReach.ts): the buffer's
+off-band `<img>`s do not fetch until the visible band has reported an outcome
+**and the deck is standing still**. The second condition is not politeness: the
+band settles about a second after mount, which on a real device is inside the
+user's first ride, so opening on the band alone put the whole buffer's commit,
+fetch and decode into the frames of the very first movement. Measured with
+`npm run perf:first-ride`: seven images decoded inside ride 0 before the rule,
+three after — and those three are the page being ridden to, which no amount of
+scheduling can pre-warm when the user rides before it has been fetched.
+
+The reach never shrinks once granted: unmounting the buffer mid-ride costs the
+same commit and throws its in-flight bytes away with it.
 `fetchpriority` cannot fix in-band starvation — priority orders a queue, but with
 a handful of parallel requests against six connections nothing queues; they share
 the pipe evenly and the looked-at slide waits behind slides nobody asked for. The

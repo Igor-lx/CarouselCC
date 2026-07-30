@@ -18,7 +18,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
     isInteractiveOn,
     isActive,
     isActual,
-    isOffBandFetchOn,
+    isFetchOn,
     isDataSaverEnabled,
     imageResourceStore,
     imageSizes,
@@ -38,9 +38,6 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
 
   const isImageSlide = imageSource !== null;
   const hasImageError = isImageSlide && status === "error";
-
-  // The visible band always fetches; the buffer waits for the gate.
-  const isFetchOn = isActual || isOffBandFetchOn;
 
   // Orientation-swap veil — only while a bitmap is on screen.
   const imgRef = useRef<HTMLImageElement | null>(null);
@@ -118,8 +115,8 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
       {imageSource !== null ? (
         hasImageError ? (
           slideData.alt || errAltPlaceholder
-        ) : !isFetchOn ? // Bandwidth gate: the buffer waits out the visible band (see
-        // `useActiveBandGate`). The sources are withheld by NOT MOUNTING the
+        ) : !isFetchOn ? // Bandwidth gate: the buffer waits out the visible band and the
+        // ride (see `useSlideFetchReach`). Sources are withheld by NOT MOUNTING the
         // element — a mounted `<img>` with no `src` inside a `<picture>` would
         // still resolve a candidate from the `<source>`s and fetch it, and a
         // src-less `<img>` renders its `alt` text as visible content.

@@ -48,7 +48,7 @@ const base = (): SlideItemProps => ({
   isInteractiveOn: false,
   isActive: true,
   isActual: true,
-  isOffBandFetchOn: true,
+  isFetchOn: true,
   isDataSaverEnabled: false,
   imageResourceStore: store,
   imageSizes: "400px",
@@ -77,23 +77,20 @@ afterEach(() => {
 });
 
 describe("SlideItem — the bandwidth gate", () => {
-  it("mounts the image for a slide in the visible band", () => {
-    render({ isActual: true, isOffBandFetchOn: false });
-    expect(img()).not.toBeNull();
-  });
-
-  it("mounts nothing for a buffered slide while the gate is shut", () => {
-    render({ isActual: false, isOffBandFetchOn: false });
+  // Which slides may fetch is the composition root's decision (band always,
+  // buffer by reach); SlideItem only honours the verdict it is handed.
+  it("mounts nothing for a slide that may not fetch", () => {
+    render({ isActual: false, isFetchOn: false });
     // Not "mounted without a src" — absent. A src-less <img> inside <picture>
     // would still fetch a <source> candidate, which is the whole point.
     expect(img()).toBeNull();
     expect(picture()).toBeNull();
   });
 
-  it("mounts the buffered image once the gate opens", () => {
-    render({ isActual: false, isOffBandFetchOn: false });
+  it("mounts the image once it is allowed to fetch", () => {
+    render({ isActual: false, isFetchOn: false });
     expect(img()).toBeNull();
-    render({ isActual: false, isOffBandFetchOn: true });
+    render({ isActual: false, isFetchOn: true });
     expect(img()).not.toBeNull();
   });
 });

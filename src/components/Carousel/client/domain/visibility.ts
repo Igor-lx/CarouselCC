@@ -23,6 +23,18 @@ export const slideVisibilityFlags = (
   return { isActual, isActive: isActual || wasVisible };
 };
 
+/** How many lanes a slide sits outside the visible band; 0 while inside it. */
+export const laneDistanceFromBand = (
+  virtualIndex: number,
+  bandStart: number,
+  visibleSlidesCount: number,
+): number => {
+  const bandEnd = bandStart + visibleSlidesCount - 1;
+  if (virtualIndex < bandStart) return Math.ceil(bandStart - virtualIndex);
+  if (virtualIndex > bandEnd) return Math.ceil(virtualIndex - bandEnd);
+  return 0;
+};
+
 export const buildSlideAriaProps = (
   layoutIndex: number,
   isActual: boolean,

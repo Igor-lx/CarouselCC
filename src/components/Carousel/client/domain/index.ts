@@ -26,7 +26,11 @@ export {
   windowContains,
   expandWindow,
 } from "./renderWindow";
-export { slideVisibilityFlags, buildSlideAriaProps } from "./visibility";
+export {
+  slideVisibilityFlags,
+  buildSlideAriaProps,
+  laneDistanceFromBand,
+} from "./visibility";
 export {
   trackPixelTransform,
   trackCssTransform,

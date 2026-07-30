@@ -56,7 +56,7 @@ export interface CarouselStableContextValue {
   slides: readonly CarouselSlideMediaView[];
   /** The track element — modules read the deck's actually-rendered DOM from it. */
   trackRef: RefObject<HTMLDivElement | null>;
-  /** Bandwidth gate: `true` once buffered slides may fetch (see useActiveBandGate). */
+  /** Bandwidth gate: `true` once buffered slides may fetch (see useSlideFetchReach). */
   isOffBandFetchOn: boolean;
   /** Whether the dots accept clicks (isPaginationInteractiveOn). */
   isPaginationInteractiveOn: boolean;

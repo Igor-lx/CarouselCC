@@ -48,8 +48,8 @@ modules that actually track motion.
   never silently flip on a threshold the slide box does not. Built only in
   development; there is no production consumer.
 - **`isOffBandFetchOn`** — the bandwidth gate (see [slides](./slides.md)): `true`
-  once the visible band has reported back and the buffered slides may fetch.
-  Before it flips, the buffer's images are not mounted at all.
+  once the visible band has reported back, the deck is at rest, and the buffered
+  slides may fetch. Before it flips, the buffer's images are not mounted at all.
 - **`isPaginationInteractiveOn`** — a behaviour flag that reaches the dots the
   only way it can (through context, not props); off renders them as inert.
 

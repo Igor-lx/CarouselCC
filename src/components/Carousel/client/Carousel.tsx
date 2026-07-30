@@ -12,7 +12,11 @@ import {
   useModuleContextValue,
   type CarouselSlideMediaView,
 } from "./context";
-import { carouselBoundaryState, deckCarriesImageSets } from "./domain";
+import {
+  carouselBoundaryState,
+  deckCarriesImageSets,
+  laneDistanceFromBand,
+} from "./domain";
 import { useCarouselAutoplay } from "./autoplay/useCarouselAutoplay";
 import { useFocusRecovery } from "./focus/useFocusRecovery";
 import { useCarouselGesture } from "./gesture";
@@ -34,9 +38,9 @@ import { useCarouselPresentation } from "./presentation";
 import { useSlideViewport } from "./viewport/useSlideViewport";
 import {
   SlideItem,
-  useActiveBandGate,
   useCarouselSlideDeck,
   useImageResourceStore,
+  useSlideFetchReach,
   useSlideRenderModel,
 } from "./slides";
 import { CAROUSEL_SLOTS } from "./slots";
@@ -188,12 +192,16 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
     renderWindowBufferMultiplier: config.layout.renderWindowBufferMultiplier,
   });
 
-  const isOffBandFetchOn = useActiveBandGate({
+  // How far outside the band a slide may fetch: the band only, then the whole
+  // buffer once the deck is both loaded and still (see the hook).
+  const slideFetchReach = useSlideFetchReach({
     virtualSlides,
     isContentImg,
     isResponsiveImagesOn,
     imageResourceStore,
+    isIdle: status.isIdle,
   });
+  const isOffBandFetchOn = Number.isFinite(slideFetchReach) === false;
 
   // --- motion plan channel ---------------------------------------------------
   // Created before the track binding, which subscribes to it (see below).
@@ -399,7 +407,14 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
                     isInteractiveOn={isSlideInteractiveOn}
                     isActive={slide.isActive}
                     isActual={slide.isActual}
-                    isOffBandFetchOn={isOffBandFetchOn}
+                    isFetchOn={
+                      slide.isActual ||
+                      laneDistanceFromBand(
+                        slide.virtualIndex,
+                        state.virtualIndex,
+                        layout.visibleSlidesCount,
+                      ) <= slideFetchReach
+                    }
                     isDataSaverEnabled={isDataSaverEnabled}
                     imageResourceStore={imageResourceStore}
                     imageSizes={imageSizes}
