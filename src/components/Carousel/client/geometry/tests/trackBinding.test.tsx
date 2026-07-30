@@ -12,15 +12,19 @@ import type { SlotSizeSource } from "../useSlotSizeSource";
 /**
  * Who is allowed to write the track's transform, and when.
  *
- * Two rules live here and both are silent when broken:
+ * Three rules live here and all are silent when broken:
  *  - while a compositor animation owns the track, a per-frame write would
  *    fight the keyframes, so only a `geometry` re-baseline may pass;
  *  - during a no-compositor ride the track must shed EXACTLY the frames the
- *    dots and the widget shed, or the indicator drifts away from the deck.
+ *    dots and the widget shed, or the indicator drifts away from the deck;
+ *  - a running compositor ride was keyframed against ONE baseline — the lane
+ *    origin and the slot pixel scale. If either moves under it (a recenter, a
+ *    rotation, a resize) the keyframes describe the wrong geometry, so the
+ *    ride has to be torn down and the track re-pinned.
  *
- * The second rule was gated on `isWaapiSupported()` here and on the plan's
- * flavour in the other two consumers — different questions with different
- * answers (TEST-BUGS B-1). This file pins the corrected signal.
+ * The frame-drop rule was once gated on `isWaapiSupported()` here and on the
+ * plan's flavour in the other two consumers — different questions with
+ * different answers. This file pins the corrected signal.
  */
 
 const SLOT = 120;
@@ -31,6 +35,7 @@ let api: TrackBindingApi;
 let plan: MotionPlanChannel;
 let emit: (frame: VisualPositionFrame) => void;
 let wakes: number;
+let visualPosition: VisualPositionSource;
 
 const frameAt = (
   position: number,
@@ -70,11 +75,29 @@ const makeVisualPosition = (): VisualPositionSource => {
   };
 };
 
+/**
+ * THE slot measurement, driven by hand. `getSlotSize` and `subscribe` are
+ * permanently stable exactly as the real source memoises them — the binding
+ * keys its effects on them, and a fresh identity per render is the defect that
+ * loses the notification in the first place.
+ */
+let slotValue: number | null = SLOT;
+const slotListeners = new Set<() => void>();
 const slotSource: SlotSizeSource = {
-  getSlotSize: () => SLOT,
+  getSlotSize: () => slotValue,
   slotPx: SLOT,
-  subscribe: () => () => {},
+  subscribe: (listener) => {
+    slotListeners.add(listener);
+    return () => slotListeners.delete(listener);
+  },
 };
+
+/** The slot moved (resize / rotation / slot-count change). */
+const moveSlot = (next: number) =>
+  act(() => {
+    slotValue = next;
+    slotListeners.forEach((listener) => listener());
+  });
 
 /**
  * jsdom ships no Web Animations API — the external boundary, and the only
@@ -111,11 +134,11 @@ const startRide = (overrides: Record<string, unknown> = {}) =>
     ...overrides,
   } as Parameters<TrackBindingApi["startCompositorMotion"]>[0]);
 
-function Probe({ visualPosition }: { visualPosition: VisualPositionSource }) {
+function Probe({ layoutOrigin = 0 }: { layoutOrigin?: number }) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   api = useTrackBinding({
     trackRef,
-    layoutOrigin: 0,
+    layoutOrigin,
     visibleSlidesCount: 3,
     visualPosition,
     slotSize: slotSource,
@@ -124,18 +147,26 @@ function Probe({ visualPosition }: { visualPosition: VisualPositionSource }) {
   return <div ref={trackRef} data-track="" />;
 }
 
+const renderAt = (layoutOrigin: number) =>
+  act(() => {
+    root.render(<Probe layoutOrigin={layoutOrigin} />);
+  });
+
 const track = () => host.querySelector<HTMLElement>("[data-track]")!;
 const transform = () => track().style.transform;
 
 beforeEach(() => {
   wakes = 0;
+  lastAnimation = null;
+  slotValue = SLOT;
+  slotListeners.clear();
   plan = createMotionPlanChannel();
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
-  const visualPosition = makeVisualPosition();
+  visualPosition = makeVisualPosition();
   act(() => {
-    root.render(<Probe visualPosition={visualPosition} />);
+    root.render(<Probe />);
   });
 });
 
@@ -290,5 +321,54 @@ describe("useTrackBinding — compositor ownership", () => {
     act(() => api.cancelCompositorMotion(2));
     act(() => emit(frameAt(4, 0)));
     expect(transform()).toBe(`translate3d(${-4 * SLOT}px, 0, 0)`);
+  });
+});
+
+/**
+ * A compositor ride is a list of pixel keyframes, computed ONCE from two
+ * things: the lane origin the transform is measured from, and the slot's pixel
+ * width. Both can move while the ride is still running — a render-window
+ * recenter moves the first, a rotation or resize moves the second — and the
+ * keyframes then describe geometry that no longer exists.
+ *
+ * Nothing throws when this is missed. The ride simply finishes somewhere else:
+ * a jump of the origin delta, or a whole ride played at the wrong scale.
+ */
+describe("useTrackBinding — the ride's baseline moving under it", () => {
+  /** Put a ride in flight and leave the live position at 2 slots. */
+  const rideInFlight = () => {
+    act(() => {
+      startRide();
+    });
+    act(() => emit(frameAt(2, 0)));
+    return lastAnimation!;
+  };
+
+  it("tears the ride down and re-pins the track when the lane origin moves", () => {
+    const animation = rideInFlight();
+
+    renderAt(1); // the render window recentred: lanes are measured from 1 now
+
+    expect(animation.cancel).toHaveBeenCalled();
+    // Same visual position (2), one slot closer to the new origin.
+    expect(transform()).toBe(`translate3d(${-(2 - 1) * SLOT}px, 0, 0)`);
+  });
+
+  it("leaves a ride alone when the origin did not actually move", () => {
+    // The common case: a settle-time window shift that keeps the same origin.
+    // Tearing the ride down here would be a visible hitch on every settle.
+    const animation = rideInFlight();
+    renderAt(0);
+    expect(animation.cancel).not.toHaveBeenCalled();
+  });
+
+  it("tears the ride down and re-pins the track when the SLOT moves", () => {
+    // A rotation mid-ride: the keyframes were built in the old pixel scale.
+    const animation = rideInFlight();
+
+    moveSlot(200);
+
+    expect(animation.cancel).toHaveBeenCalled();
+    expect(transform()).toBe(`translate3d(${-2 * 200}px, 0, 0)`);
   });
 });

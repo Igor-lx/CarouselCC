@@ -239,6 +239,53 @@ describe("useMotionRunner — what it publishes", () => {
     expect(plan.isContinuation).toBe(true);
   });
 
+  /**
+   * The plan and the compositor ride are two deliveries of ONE segment, and
+   * the only thing holding the three paint consumers in phase is that both are
+   * pinned to the SAME clock. Let the plan carry its own `startedAt` and the
+   * dots and the widget run a few frames off the deck — a drift nobody can
+   * point at, on a deck where every individual part looks correct.
+   *
+   * The curve may legitimately differ between the two (a preflight re-authors
+   * it over a unit step for one-step consumers). The clock may not.
+   */
+  it("publishes the plan on the same clock the compositor was given", () => {
+    render(stationary);
+    render(moving());
+
+    const ride = startCompositorMotion.mock.calls[0]![0];
+    const plan = lastPlan();
+    expect(plan.kind).toBe("waapi");
+    if (plan.kind !== "waapi") return;
+
+    expect(plan.startedAt).toBe(ride.startedAt);
+    // An ordinary ride hands over the very same curve as well.
+    expect(plan.duration).toBe(ride.duration);
+    expect(plan.stops).toEqual(ride.stops);
+  });
+
+  it("keeps that clock on a far GO_TO, where the curve deliberately differs", () => {
+    render(stationary);
+    render(
+      moving({
+        motionPhase: "step-jump",
+        virtualIndex: 3,
+        teleportVirtualIndex: 27,
+        targetPageIndex: 9,
+      }),
+    );
+
+    const ride = startCompositorMotion.mock.calls[0]![0];
+    const plan = lastPlan();
+    if (plan.kind !== "waapi") return;
+
+    expect(plan.startedAt).toBe(ride.startedAt);
+    // The compositor got the preflight leg; the plan spans the whole command,
+    // so the durations differ ON PURPOSE — which is what makes the shared
+    // clock the load-bearing half rather than an accident of equal objects.
+    expect(plan.duration).toBeGreaterThan(ride.duration);
+  });
+
   it("returns to rest when the deck settles back to idle", () => {
     render(stationary);
     render(moving());
