@@ -3,8 +3,11 @@
  * first interaction?
  *
  * It clicks "next" with NO settling pause, because that is what a person does,
- * and compares ride 0 against ride 4 (same page, second circle, everything
- * already warm). The two should be indistinguishable. See ./README.md.
+ * and compares the FIRST circle against the second, which is the shape the
+ * report had: "the first pass stutters, after that it is smooth". Judging one
+ * ride misses half of it — the warm-up spills across the opening rides, and
+ * which of them it lands in depends on how the load races the click.
+ * See ./README.md.
  *
  * Not a unit test and not run by `vitest`: it measures the BROWSER (commit,
  * layout, raster, image decode), so it needs a real Chrome and its own command.
@@ -17,10 +20,7 @@ const URL_ = `http://localhost:${PORT}/CarouselCC/`;
 const CPU_THROTTLE = Number(process.env.PERF_CPU ?? 6);
 const CLICKS = Number(process.env.PERF_CLICKS ?? 8);
 const RIDE_MS = Number(process.env.PERF_RIDE_MS ?? 3200);
-const BASELINE_RIDE = 4; // second circle at visibleSlides=3 / pageCount=4
 
-/** Ride 0 may cost no more than this multiple of the warm baseline. */
-const TOLERANCE = 2;
 
 const startPreview = async () => {
   const server = spawn(
@@ -63,7 +63,7 @@ await cdp.send("Emulation.setDeviceMetricsOverride", {
   mobile: false,
 });
 await cdp.send("Emulation.setCPUThrottlingRate", { rate: CPU_THROTTLE });
-// A weak tablet's link, which is where this was reported.
+/** A weak tablet's link, which is where this was reported. */
 await cdp.send("Network.emulateNetworkConditions", {
   offline: false,
   latency: 150,
@@ -86,9 +86,11 @@ await cdp.send("Tracing.start", {
 });
 
 await cdp.send("Page.navigate", { url: URL_ });
-for (let attempt = 0; attempt < 300; attempt += 1) {
+// Poll tightly: a person clicks the moment the deck appears, and the defect
+// needs the click to beat the band finishing its load.
+for (let attempt = 0; attempt < 900; attempt += 1) {
   if (await cdp.evaluate("!!document.querySelector('[data-carousel-track]')")) break;
-  await sleep(100);
+  await sleep(20);
 }
 
 /**
@@ -113,6 +115,31 @@ await cdp.evaluate(`(() => {
   const root = document.querySelector('[data-carousel-root]');
   const isMoving = () => root.getAttribute('data-moving') === 'true';
   let wasMoving = isMoving();
+
+  // The defect, measured directly rather than through its symptoms: mounting
+  // the buffer is an <img> per buffered slide in one commit, and it must never
+  // happen while the deck is animating.
+  window.__perf.mounted = [];
+  const track = document.querySelector('[data-carousel-track]');
+  new MutationObserver((records) => {
+    let added = 0;
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (node.nodeName === 'IMG') added += 1;
+        else if (node.querySelectorAll) added += node.querySelectorAll('img').length;
+      }
+    }
+    if (added > 0) {
+      // Ride and phase are stamped ON the event. The buffer's mount lands in
+      // the same commit that flips the moving attribute, so resolving it
+      // against a ride WINDOW built from that attribute misses it by a hair.
+      window.__perf.mounted.push({
+        added,
+        moving: isMoving(),
+        ride: window.__ride,
+      });
+    }
+  }).observe(track, { childList: true, subtree: true });
 
   new MutationObserver(() => {
     const moving = isMoving();
@@ -147,15 +174,15 @@ for (let ride = 0; ride < CLICKS; ride += 1) {
   await sleep(RIDE_MS);
 }
 
-/** One page of slides — the most a single ride can newly put on screen. */
-const visibleSlides = await cdp.evaluate(
-  `Number(getComputedStyle(document.querySelector('[data-carousel-root]'))
-     .getPropertyValue('--visible-slides')) || 1`,
-);
 
 const probe = await cdp
   .evaluate(
-    "JSON.stringify({ frames: window.__perf.frames, spans: window.__perf.spans, lcp: window.__perf.lcp })",
+    `JSON.stringify({
+       frames: window.__perf.frames,
+       spans: window.__perf.spans,
+       mounted: window.__perf.mounted,
+       lcp: window.__perf.lcp,
+     })`,
   )
   .then(JSON.parse);
 await cdp.send("Tracing.end");
@@ -204,7 +231,14 @@ const BUCKETS = {
 const perRide = new Map();
 const of = (ride) => {
   if (!perRide.has(ride)) {
-    perRide.set(ride, { layout: 0, commit: 0, decode: 0, droppedFrames: 0, worstGapMs: 0 });
+    perRide.set(ride, {
+      layout: 0,
+      commit: 0,
+      decode: 0,
+      mountedWhileMoving: 0,
+      droppedFrames: 0,
+      worstGapMs: 0,
+    });
   }
   return perRide.get(ride);
 };
@@ -226,72 +260,93 @@ for (const frame of probe.frames) {
   stats.worstGapMs = Math.max(stats.worstGapMs, Math.round(frame.gap));
 }
 
+for (const mount of probe.mounted) {
+  if (!mount.moving || mount.ride < 0) continue;
+  of(mount.ride).mountedWhileMoving += mount.added;
+}
+
 // ---- report -----------------------------------------------------------------
 const rides = [...perRide.keys()].filter((ride) => ride >= 0).sort((a, b) => a - b);
 const pad = (value, width) => String(value).padStart(width);
 
 console.log(`\nfirst-ride probe — CPU x${CPU_THROTTLE}, Fast-3G, no warm-up pause\n`);
-console.log("ride | dropped | worst gap |  layout |  commit |  decode");
+console.log("ride | dropped | worst gap | <img> mid-ride |  decode |  layout |  commit");
 for (const ride of rides) {
   const s = perRide.get(ride);
   console.log(
     `${pad(ride, 4)} | ${pad(s.droppedFrames, 7)} | ${pad(`${s.worstGapMs}ms`, 9)} | ` +
-      `${pad(s.layout, 7)} | ${pad(s.commit, 7)} | ${pad(s.decode, 7)}`,
+      `${pad(s.mountedWhileMoving, 14)} | ${pad(s.decode, 7)} | ` +
+      `${pad(s.layout, 7)} | ${pad(s.commit, 7)}`,
   );
 }
 
-const first = perRide.get(0);
-const baseline = perRide.get(BASELINE_RIDE);
-const failures = [];
+/**
+ * First circle against second, not ride 0 against ride 4.
+ *
+ * The report was "the first pass stutters, after that it is smooth", and the
+ * measurements bear that shape out: the warm-up does not sit in one ride, it
+ * spills across the opening ones — its mount may land in a settle gap while
+ * its fetches and decodes still run through the next ride. Judging ride 0
+ * alone misses half of it, and which half depends on how the load races the
+ * click.
+ */
+const CIRCLE = Math.floor(CLICKS / 2);
+const sumOver = (from, to, metric) => {
+  let total = 0;
+  for (let ride = from; ride < to; ride += 1) total += perRide.get(ride)?.[metric] ?? 0;
+  return total;
+};
 
-if (!baseline) {
-  failures.push(`no baseline ride ${BASELINE_RIDE} — run more clicks`);
-} else {
-  // Gated on what a person actually experiences, and on the one signal that
-  // says warm-up work ran inside the ride. `layout` and `commit` are printed
-  // for context but NOT gated: at this bucketing they are per-frame compositor
-  // work (~150/190 on every ride alike), so they discriminate nothing.
-  const limit = Math.max(TOLERANCE * baseline.droppedFrames, baseline.droppedFrames + 2);
-  if (first.droppedFrames > limit) {
-    failures.push(
-      `droppedFrames: ride 0 = ${first.droppedFrames}, ` +
-        `baseline ride ${BASELINE_RIDE} = ${baseline.droppedFrames}, limit ${limit}`,
-    );
-  }
-  /**
-   * The first ride may pay for the page it is RIDING TO and nothing else.
-   *
-   * Those images are fetched at click time, because the buffer deliberately
-   * waits for the deck to be still before mounting itself — and on a weak link
-   * the user clicks before it ever gets the chance. Demanding zero here would
-   * be demanding that the buffer race the user, which was measured and is
-   * worse: granting reach earlier pushes the band's own images past the click.
-   *
-   * Anything above one page means the BUFFER decoded inside the ride, which is
-   * the defect.
-   */
-  if (first.decode > visibleSlides) {
-    failures.push(
-      `decode: ride 0 decoded ${first.decode} images, at most ${visibleSlides} ` +
-        `(one page — what the ride puts on screen) may land inside the ride`,
-    );
-  }
+const firstCircle = {
+  droppedFrames: sumOver(0, CIRCLE, "droppedFrames"),
+  decode: sumOver(0, CIRCLE, "decode"),
+};
+const secondCircle = {
+  droppedFrames: sumOver(CIRCLE, 2 * CIRCLE, "droppedFrames"),
+  decode: sumOver(CIRCLE, 2 * CIRCLE, "decode"),
+};
+
+
+/**
+ * This REPORTS; it deliberately does not pass or fail.
+ *
+ * The defect is a race. The buffer used to mount as soon as the band finished
+ * loading, and whether that lands inside a ride depends on how the load times
+ * against the click. Both outcomes were observed on unfixed code: on a fast
+ * link the band finishes about 250ms in, squarely inside the 2.5s ride; on the
+ * slow link configured above it finishes after the ride is already over. A gate
+ * that green-lights unfixed code half the time is worse than no gate, so there
+ * is no gate here.
+ *
+ * What a run gives you is the timeline — WHEN the buffer mounted relative to the
+ * rides, and what the opening circle cost against a warm one. The invariant
+ * itself, that the buffer may only open while the deck is still, is asserted
+ * where it can be asserted deterministically:
+ * slides/tests/useSlideFetchReach.test.tsx.
+ */
+const mountedWhileMoving = probe.mounted
+  .filter((mount) => mount.moving)
+  .reduce((sum, mount) => sum + mount.added, 0);
+
+console.log("\nwhen images were mounted into the track:");
+for (const mount of probe.mounted) {
+  const where = mount.ride < 0 ? "before the first click" : `ride ${mount.ride}`;
+  const phase = mount.moving ? "WHILE MOVING" : "at rest";
+  console.log(`  +${String(mount.added).padStart(2)} <img>  ${where.padEnd(22)} ${phase}`);
 }
 
-console.log(`\nLCP ${probe.lcp}ms — warming earlier must not push this out`);
 console.log(
-  `baseline = ride ${BASELINE_RIDE} (second circle, everything already warm)\n` +
-    `tolerance = ${TOLERANCE}x baseline; decode allowance = ${visibleSlides} ` +
-    `(one page, the slides this ride puts on screen)\n`,
+  `\nfirst circle : ${firstCircle.droppedFrames} dropped, ${firstCircle.decode} decodes` +
+    `\nsecond circle: ${secondCircle.droppedFrames} dropped, ${secondCircle.decode} decodes` +
+    `\n<img> mounted while moving: ${mountedWhileMoving}` +
+    `\nLCP ${probe.lcp}ms`,
 );
-if (failures.length === 0) {
-  console.log("PASS — the first ride costs no more than a warm one.");
-} else {
-  console.log("FAIL — the warm-up is still landing inside the first ride:");
-  for (const failure of failures) console.log(`  - ${failure}`);
-}
+console.log(
+  "\nA healthy run mounts the buffer once, at rest, and the two circles cost the\n" +
+    "same but for the deck's one-time decodes in the first.\n",
+);
 
 cdp.close();
 chrome.kill();
 server.kill();
-process.exit(failures.length === 0 ? 0 : 1);
+process.exit(0);

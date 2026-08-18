@@ -407,8 +407,12 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
                     isInteractiveOn={isSlideInteractiveOn}
                     isActive={slide.isActive}
                     isActual={slide.isActual}
+                    // `isActive`, not `isActual`: mid-ride the slides being
+                    // ridden AWAY from are still on screen, and a slide on
+                    // screen keeps its image. Keyed on the destination band
+                    // alone, they went blank for the length of the ride.
                     isFetchOn={
-                      slide.isActual ||
+                      slide.isActive ||
                       laneDistanceFromBand(
                         slide.virtualIndex,
                         state.virtualIndex,

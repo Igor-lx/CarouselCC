@@ -1,8 +1,8 @@
 # perf
 
-Browser-level probes. Not part of `npm test`: these measure what Chrome does
-(commit, layout, raster, image decode, frame pacing), so they need a real
-browser and their own command.
+Browser-level observation. Not part of `npm test`: it measures what Chrome does
+(commit, layout, raster, image decode, frame pacing), so it needs a real browser
+and its own command.
 
 ```
 npm run perf:first-ride
@@ -10,26 +10,39 @@ npm run perf:first-ride
 
 Builds, serves `dist` through `vite preview`, drives a headless Chrome over the
 DevTools Protocol at CPU ×6 on a Fast-3G link, and clicks "next" eight times —
-two full circles at the demo's desktop layout.
+two full circles at the demo's desktop layout, with NO settling pause before the
+first click, because a person does not pause.
 
-## What `first-ride` asks
+## It reports; it does not pass or fail
 
-**Does the deck's one-time warm-up land inside the user's first interaction?**
+Deliberately. The thing worth catching is a race: the image buffer must not
+mount into a deck that is animating. Whether it *would* depends on how the
+band's load times against the click, and both outcomes were observed on unfixed
+code —
 
-There is NO settling pause before the first click, because a person does not
-pause. Ride 0 is compared against ride 4 — the same page one circle later, with
-everything already fetched and decoded. The two should be indistinguishable.
+* on a fast link the band finishes ~250ms in, squarely inside the 2.5s ride, and
+  the buffer lands in moving frames;
+* on the slow link this script uses it finishes after the ride is already over,
+  and the same unfixed code looks clean.
 
-Gated on two numbers:
+A gate that green-lights unfixed code half the time is worse than no gate. The
+invariant itself is asserted where it can be asserted deterministically, in
+`slides/tests/useSlideFetchReach.test.tsx`.
 
-| Metric | Rule | Why |
-|---|---|---|
-| `dropped` | ride 0 ≤ 2× ride 4 | frames longer than 34 ms are what a person calls a freeze |
-| `decode` | ride 0 must be **0** | a warm ride decodes nothing; a decode here means warm-up work ran inside the ride |
+## Reading a run
 
-`layout` and `commit` are printed for context but not gated — at this bucketing
-they are per-frame compositor work and sit at roughly the same count on every
-ride, so they discriminate nothing.
+```
+when images were mounted into the track:
+  + 3 <img>  ride 0                 WHILE MOVING     <- the page being ridden to
+  +24 <img>  before the first click at rest          <- the buffer, healthy
+```
+
+The buffer is the big one — every buffered slide in a single commit. `WHILE
+MOVING` next to it is the defect: that commit, its fetches and its decodes all
+land in frames being animated.
+
+The two circles should cost the same but for the deck's one-time decodes, which
+belong to the first.
 
 ## Knobs
 
@@ -39,9 +52,3 @@ ride, so they discriminate nothing.
 | `PERF_CLICKS` | `8` | two circles at `visibleSlides: 3` |
 | `PERF_RIDE_MS` | `3200` | wait per ride: `durationStep` plus settle |
 | `CHROME_PATH` | — | set when Chrome is somewhere unusual |
-
-## Reading a failure
-
-`decode: ride 0 = 24` means twenty-four images were decoded while the deck was
-moving. They are the buffer's, and they should have been decoded before the
-deck could move at all.
