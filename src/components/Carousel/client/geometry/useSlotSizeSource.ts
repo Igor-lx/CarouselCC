@@ -48,7 +48,11 @@ export function useSlotSizeSource({
   const listenersRef = useRef<Set<() => void>>(new Set());
   const [slotPx, setSlotPx] = useState<number | null>(null);
 
-  visibleSlidesCountRef.current = visibleSlidesCount;
+  // Mirrored in a layout effect declared ahead of every reader below, so the
+  // effects and subscriptions of this same commit still see the current value.
+  useIsomorphicLayoutEffect(() => {
+    visibleSlidesCountRef.current = visibleSlidesCount;
+  });
 
   const getSlotSize = useCallback(() => slotSizeRef.current, []);
 

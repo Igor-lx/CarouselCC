@@ -15,8 +15,13 @@ export function useViewportBusy({
   const lastSignalRef = useRef(-Infinity);
   const enabledRef = useRef(enabled);
   const quietDelayRef = useRef(quietDelayMs);
-  enabledRef.current = enabled;
-  quietDelayRef.current = quietDelayMs;
+
+  // Mirrored after the commit: the getter below is polled from the autoplay
+  // timer, which cannot fire before effects have flushed.
+  useEffect(() => {
+    enabledRef.current = enabled;
+    quietDelayRef.current = quietDelayMs;
+  });
 
   useEffect(() => {
     if (!enabled || typeof window === "undefined") return;

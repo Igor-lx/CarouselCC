@@ -63,8 +63,12 @@ export function useTrackBinding({
    * no-compositor fallback (shed the shared Nth frame). */
   const isFallbackFollowRef = useRef(false);
 
-  layoutOriginRef.current = layoutOrigin;
-  visibleSlidesCountRef.current = visibleSlidesCount;
+  // Mirrored in a layout effect declared ahead of every reader below, so the
+  // effects and subscriptions of this same commit still see the current value.
+  useIsomorphicLayoutEffect(() => {
+    layoutOriginRef.current = layoutOrigin;
+    visibleSlidesCountRef.current = visibleSlidesCount;
+  });
 
   // CONSTRAINT — key the effects below on THESE, never on the source object.
   // Both are permanently stable (the source memoises them); depending on the

@@ -64,20 +64,38 @@ export default tseslint.config(
     rules: { "react-refresh/only-export-components": "off" },
   },
 
-  // PENDING — the React Compiler rules that ship with eslint-plugin-react-hooks
-  // v7. They report 110 sites here: refs written during render, module state
-  // reassigned from tests, locals mutated after render, setState inside an
-  // effect. Several are deliberate patterns in this codebase and each needs its
-  // own verdict, so they are switched off until that pass is done — not because
-  // the rules are wrong.
+  // The React Compiler rules from eslint-plugin-react-hooks v7 are on, with
+  // two scoped exemptions below.
+
+  // Tests: fixtures live at module scope and are reassigned between cases, and
+  // a test reads and stubs refs on purpose. Both rules describe component code.
   {
-    files: ["**/*.{ts,tsx}"],
+    files: ["**/tests/**/*.{ts,tsx}"],
     rules: {
-      "react-hooks/refs": "off",
       "react-hooks/globals": "off",
-      "react-hooks/immutability": "off",
-      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/refs": "off",
     },
+  },
+
+  // PENDING — five nodes keep state in a ref that is written during render, and
+  // that is load-bearing rather than sloppy: the render window and the layout
+  // origin persist across renders inside a memo (useSlideRenderModel,
+  // useCarouselPresentation, useSlideFetchReach), the compositor keeps its live
+  // animation handle (compositedRide, both forks), and useCarouselState
+  // refreshes the reducer envelope during render so `dispatch` can stay stable
+  // for a same-commit dispatch from a child. Rewriting them changes the
+  // architecture, so it gets its own plan and its own ADR — the rule is parked
+  // for these files only, and stays on everywhere else.
+  {
+    files: [
+      "src/components/Carousel/client/slides/useSlideRenderModel.ts",
+      "src/components/Carousel/client/slides/useSlideFetchReach.ts",
+      "src/components/Carousel/client/presentation/useCarouselPresentation.ts",
+      "src/components/Carousel/client/state/useCarouselState.ts",
+      "src/shared/engines/motion/compositor/compositedRide.ts",
+      "src/shared/engines/kinetic/internal/motion/compositor/compositedRide.ts",
+    ],
+    rules: { "react-hooks/refs": "off" },
   },
 
   prettier,

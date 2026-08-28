@@ -10,7 +10,9 @@ export function useMotionPaint<Strategy extends string = string>(
   paint: (sample: MotionSample<Strategy>) => void,
 ): void {
   const paintRef = useRef(paint);
-  paintRef.current = paint;
+  useEffect(() => {
+    paintRef.current = paint;
+  });
 
   useEffect(
     () => controller.subscribe((sample) => paintRef.current(sample)),

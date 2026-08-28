@@ -22,6 +22,7 @@ import type {
   PointerSwipeConfig,
   PointerSwipeEndReason,
   PointerSwipeHostProps,
+  PointerSwipeHostRef,
   PointerSwipeMovePayload,
   PointerSwipePhase,
   PointerSwipeProps,
@@ -98,6 +99,15 @@ const resolveConfig = (
 const eventTime = (event: { timeStamp: number }): number =>
   event.timeStamp > 0 ? event.timeStamp : performance.now();
 
+/** Write the host node into whichever shape of ref the consumer passed. */
+const assignHostRef = (
+  ref: PointerSwipeHostRef | undefined,
+  node: HTMLElement | null,
+): void => {
+  if (typeof ref === "function") ref(node);
+  else if (ref) ref.current = node;
+};
+
 export function usePointerSwipe({
   hostRef: externalHostRef,
   surfaceRef,
@@ -111,11 +121,16 @@ export function usePointerSwipe({
 }: PointerSwipeProps): PointerSwipeResult {
   const settings = useMemo(() => resolveConfig(config), [config]);
   const settingsRef = useRef(settings);
-  settingsRef.current = settings;
 
   // Ref-held drag→value binding: anchor captured at activation, writes anchor-relative.
   const valueRef = useRef(value);
-  valueRef.current = value;
+
+  // Mirrored in an effect rather than during render: every reader is a pointer
+  // handler, and those cannot run before the commit that changed these.
+  useEffect(() => {
+    settingsRef.current = settings;
+    valueRef.current = value;
+  });
   const valueAnchorRef = useRef(0);
 
   // Pointer phase is internal + synchronous — never re-renders by itself.
@@ -154,8 +169,7 @@ export function usePointerSwipe({
       hostElementRef.current = node;
       setHostElement(node);
       // Forward to the consumer's optional ref.
-      if (typeof externalHostRef === "function") externalHostRef(node);
-      else if (externalHostRef) externalHostRef.current = node;
+      assignHostRef(externalHostRef, node);
     },
     [externalHostRef],
   );

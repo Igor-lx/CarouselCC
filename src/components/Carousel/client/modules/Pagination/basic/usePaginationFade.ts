@@ -155,7 +155,11 @@ export function usePaginationFade({
     if (anyDot) dotStatesRef.current = readDotStates(anyDot);
   }, []);
   const targetRef = useRef(targetPageIndex);
-  targetRef.current = targetPageIndex;
+  // Mirrored in a layout effect declared ahead of every reader below, so the
+  // effects and subscriptions of this same commit still see the current value.
+  useIsomorphicLayoutEffect(() => {
+    targetRef.current = targetPageIndex;
+  });
 
   const bindDotRef = useCallback((pageIndex: number) => {
     const cached = callbacksRef.current[pageIndex];

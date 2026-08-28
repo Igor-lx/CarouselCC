@@ -1,21 +1,20 @@
 // See ../README.md
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { createMotionController } from "./createMotionController";
 import type { MotionController } from "./types";
 
-// Lazy-ref: one controller per instance; cleanup soft-destroys (StrictMode-safe),
-// so a remount reuses it rather than swapping in a fresh one.
+// One controller per instance, built by a state initialiser (so it is never
+// created twice); cleanup soft-destroys (StrictMode-safe), so a remount reuses
+// it rather than swapping in a fresh one.
 export function useMotionController<Strategy extends string = string>(
   initialValue = 0,
   initialStrategy: Strategy = "idle" as Strategy,
 ): MotionController<Strategy> {
-  const ref = useRef<MotionController<Strategy> | null>(null);
+  const [controller] = useState(() =>
+    createMotionController<Strategy>(initialValue, initialStrategy),
+  );
 
-  if (!ref.current) {
-    ref.current = createMotionController(initialValue, initialStrategy);
-  }
+  useEffect(() => () => controller.destroy(), [controller]);
 
-  useEffect(() => () => ref.current?.destroy(), []);
-
-  return ref.current;
+  return controller;
 }

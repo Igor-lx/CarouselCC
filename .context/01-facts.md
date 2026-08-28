@@ -93,14 +93,28 @@ solution-style, `files: []`. `tsc --noEmit` в корне проверяет **�
 2. `react-refresh/only-export-components` выключен в `client/modules/**`:
    слот-компоненты собираются как `Object.assign(Component, { slot })`, Fast
    Refresh такую форму не отслеживает, а форма — это контракт модуля.
-3. **PENDING** — четыре правила React Compiler из `react-hooks` v7
-   (`refs`, `globals`, `immutability`, `set-state-in-effect`) выключены
-   целиком. Они дают **110 срабатываний**: 79 `refs` (запись в ref во время
-   рендера — системный приём этого кода, например `useViewportBusy.ts:19`),
-   24 `globals` (переприсваивание модульных переменных из тестов), 4
-   `immutability`, 3 `set-state-in-effect`. Каждое требует отдельного
-   вердикта; разбор — назначенная следующая задача, правила выключены до неё,
-   а не потому, что неверны.
+3. `react-hooks/globals` и `react-hooks/refs` выключены в `**/tests/**`:
+   фикстуры живут на модульном уровне и переприсваиваются между кейсами, а ref
+   тест читает и подменяет намеренно. Оба правила описывают код компонентов.
+4. **PENDING** — `react-hooks/refs` выключено для **шести файлов** (список в
+   `eslint.config.js`). Везде остальное правило включено.
+
+**Разбор группы React Compiler (выполнен, кроме PENDING).** Было 110
+срабатываний, осталось 59, и все они — в шести названных файлах:
+
+| Правило | Было | Стало | Чем закрыто |
+| --- | --- | --- | --- |
+| `immutability` | 4 | **0** | проброс потребительского ref вынесен в `assignHostRef` на уровень модуля (`usePointerSwipe`, оба форка) |
+| `set-state-in-effect` | 3 | **0** | «нечего ждать» считается в рендере (`useSlideFetchReach`), защёлка буфера — правкой состояния во время рендера, сброс hover-паузы — тем же приёмом (`useAutoplay`) |
+| `refs` (зеркала значений) | 20 | **0** | запись перенесена в эффект: `useMotionPaint`, `useKineticValue`, `usePointerSwipe`, `useViewportBusy` (все — оба форка, где есть) и в layout-эффект: `useTrackBinding`, `useSlotSizeSource`, `useVisualPosition`, `usePaginationFade` |
+| `refs` (ленивый синглтон) | 6 | **2** | `useMotionController` переведён на инициализатор `useState` (оба форка); `useImageResourceStoreInstance` оставлен с точечным `eslint-disable` и обоснованием — условное создание нельзя выразить через `useState` |
+| `refs` (состояние в ref из рендера) | 53 | 53 | **PENDING**, это задача 3(b) |
+| `globals` | 24 | 24 | все в тестах, правило там выключено |
+
+Ключевой факт для 3(b): **React Compiler в проекте не включён** (React 19,
+`@vitejs/plugin-react` без `babel-plugin-react-compiler`). Правила группы —
+готовность к компилятору и гигиена конкурентного рендера, а не сегодняшние
+падения.
 
 ---
 

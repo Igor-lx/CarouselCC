@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { resolveReleaseLaunch, usePointerSwipe } from "./internal/gesture";
 import {
@@ -30,14 +30,26 @@ export function useKineticValue({
   resolveTarget,
   onSettle,
 }: UseKineticValueInput): KineticValue {
-  const cfgRef = useRef<KineticConfig>(KINETIC_DEFAULTS);
-  cfgRef.current = { ...KINETIC_DEFAULTS, ...config };
+  // Merged once per config object instead of on every render.
+  const resolvedConfig = useMemo<KineticConfig>(
+    () => ({ ...KINETIC_DEFAULTS, ...config }),
+    [config],
+  );
+
+  const cfgRef = useRef(resolvedConfig);
   const keyframeRef = useRef(keyframe);
-  keyframeRef.current = keyframe;
   const resolveTargetRef = useRef(resolveTarget);
-  resolveTargetRef.current = resolveTarget;
   const onSettleRef = useRef(onSettle);
-  onSettleRef.current = onSettle;
+
+  // Mirrored after the commit, never during render: every reader is a paint, a
+  // settle or a pointer handler, and none of those can run before effects have
+  // flushed.
+  useEffect(() => {
+    cfgRef.current = resolvedConfig;
+    keyframeRef.current = keyframe;
+    resolveTargetRef.current = resolveTarget;
+    onSettleRef.current = onSettle;
+  });
 
   const controller = useMotionController(initialValue);
   const ride = useCompositedRide(controller);

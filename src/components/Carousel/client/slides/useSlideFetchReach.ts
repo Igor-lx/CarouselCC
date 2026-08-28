@@ -68,14 +68,18 @@ export function useSlideFetchReach({
 
   // URLs that reported an outcome at least once — a write-once latch per URL.
   const settledRef = useRef(new Set<string>());
-  const [isBandSettled, setIsBandSettled] = useState(false);
+  const [isBandReported, setIsBandReported] = useState(false);
+
+  // Nothing to wait for is answered during render, not by a state write from an
+  // effect: with no store or no URLs the band is settled by definition, and
+  // routing that through setState only bought an extra render.
+  const hasNothingToWaitFor =
+    imageResourceStore === null || bandUrls.length === 0;
+  const isBandSettled = hasNothingToWaitFor || isBandReported;
 
   useEffect(() => {
     const store = imageResourceStore;
-    if (store === null || bandUrls.length === 0) {
-      setIsBandSettled(true);
-      return;
-    }
+    if (store === null || bandUrls.length === 0) return;
 
     const settled = settledRef.current;
     const evaluate = (): void => {
@@ -83,7 +87,7 @@ export function useSlideFetchReach({
         if (settled.has(url)) continue;
         if (store.getSnapshot(url).status !== "loading") settled.add(url);
       }
-      setIsBandSettled(bandUrls.every((url) => settled.has(url)));
+      setIsBandReported(bandUrls.every((url) => settled.has(url)));
     };
 
     const unsubscribes = bandUrls.map((url) => store.subscribe(url, evaluate));
@@ -93,11 +97,12 @@ export function useSlideFetchReach({
     };
   }, [bandUrls, imageResourceStore]);
 
+  // A latch, not a mirror: once the band has settled while the deck stands
+  // still, the buffer stays open. Adjusted during render — React re-runs this
+  // component before committing, so the buffer is open in the very render that
+  // earned it, instead of one commit later.
   const [isBufferOpen, setIsBufferOpen] = useState(false);
-  useEffect(() => {
-    if (isBufferOpen || !isBandSettled || !isIdle) return;
-    setIsBufferOpen(true);
-  }, [isBandSettled, isBufferOpen, isIdle]);
+  if (!isBufferOpen && isBandSettled && isIdle) setIsBufferOpen(true);
 
   // 0 = the band only: `laneDistanceFromBand` is 0 inside it and >= 1 outside.
   return isBufferOpen ? WHOLE_BUFFER : 0;

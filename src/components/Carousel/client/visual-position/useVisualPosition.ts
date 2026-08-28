@@ -47,7 +47,11 @@ export function useVisualPosition({
   const controller = useMotionController<CarouselMotionStrategy>(0, "idle");
 
   const stepSizeRef = useRef(visibleSlidesCount);
-  stepSizeRef.current = visibleSlidesCount;
+  // Mirrored in a layout effect declared ahead of every reader below, so the
+  // effects and subscriptions of this same commit still see the current value.
+  useIsomorphicLayoutEffect(() => {
+    stepSizeRef.current = visibleSlidesCount;
+  });
 
   // Streak counter behind runningFrameIndex, stamped once at the single source.
   const runningStreakRef = useRef(0);

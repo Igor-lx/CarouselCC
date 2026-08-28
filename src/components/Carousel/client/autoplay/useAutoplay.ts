@@ -32,6 +32,12 @@ export function useAutoplay({
   const [internalPaused, setInternalPaused] = useState(false);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // A hover pause only means anything while hover is being watched. When it
+  // stops being watched the flag is dropped here, during render, so autoplay
+  // resumes in the same pass instead of one commit later.
+  const isHoverWatched = enabled && !ignoreHover;
+  if (internalPaused && !isHoverWatched) setInternalPaused(false);
+
   const clearHoverTimer = useCallback(() => {
     if (hoverTimerRef.current) {
       clearTimeout(hoverTimerRef.current);
@@ -63,10 +69,9 @@ export function useAutoplay({
   );
 
   useEffect(() => {
-    if (enabled && !ignoreHover) return;
+    if (isHoverWatched) return;
     clearHoverTimer();
-    setInternalPaused(false);
-  }, [clearHoverTimer, enabled, ignoreHover]);
+  }, [clearHoverTimer, isHoverWatched]);
 
   useEffect(() => {
     if (!enabled || isPaused || internalPaused) return;

@@ -11,6 +11,7 @@ export function useImageResourceStoreInstance(
 ): ImageResourceStore | null {
   const storeRef = useRef<ImageResourceStore | null>(null);
 
+  // eslint-disable-next-line react-hooks/refs -- React's documented lazy ref init: a state initialiser cannot be conditional, and creating the store from an effect would hand consumers null for one render
   if (enabled && storeRef.current === null) {
     storeRef.current = createImageResourceStore();
   }
@@ -27,5 +28,6 @@ export function useImageResourceStoreInstance(
     [],
   );
 
+  // eslint-disable-next-line react-hooks/refs -- same lazy-init contract: the store must be available in the render that turned content on
   return enabled ? storeRef.current : null;
 }
