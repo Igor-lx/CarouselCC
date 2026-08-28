@@ -29,7 +29,7 @@ afterEach(() => {
 
 describe("motionNow", () => {
   it("reads the high-resolution clock when the platform has one", () => {
-    vi.stubGlobal("performance", { now: () => 1234.5 } as Performance);
+    vi.stubGlobal("performance", { now: () => 1234.5 });
     expect(motionNow()).toBe(1234.5);
   });
 

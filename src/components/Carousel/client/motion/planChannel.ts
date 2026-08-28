@@ -67,7 +67,7 @@ export type PublishableMotionPlan = DistributiveOmit<CarouselMotionPlan, "planId
 
 export interface MotionPlanChannel {
   source: MotionPlanSource;
-  publish(plan: PublishableMotionPlan): void;
+  publish: (plan: PublishableMotionPlan) => void;
 }
 
 export function createMotionPlanChannel(): MotionPlanChannel {
@@ -85,7 +85,7 @@ export function createMotionPlanChannel(): MotionPlanChannel {
         };
       },
     },
-    publish(plan) {
+    publish: (plan) => {
       // Steady-state dedupe: repeat idle / same-flavour follow are no-ops.
       if (plan.kind === "idle" && current.kind === "idle") return;
       if (
@@ -95,7 +95,7 @@ export function createMotionPlanChannel(): MotionPlanChannel {
       ) {
         return;
       }
-      current = { ...plan, planId: nextId } as CarouselMotionPlan;
+      current = { ...plan, planId: nextId };
       nextId += 1;
       listeners.forEach((listener) => listener(current));
     },

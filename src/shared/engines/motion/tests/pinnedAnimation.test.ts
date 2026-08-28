@@ -16,7 +16,7 @@ import { startPinnedAnimation } from "../compositor/pinnedAnimation";
 const animateMock = vi.fn();
 
 beforeAll(() => {
-  Element.prototype.animate = animateMock as unknown as typeof Element.prototype.animate;
+  Element.prototype.animate = animateMock;
 });
 
 afterEach(() => {

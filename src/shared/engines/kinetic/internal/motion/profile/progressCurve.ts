@@ -49,7 +49,7 @@ export const profileProgressStops = (
     return [0, 1];
   }
 
-  const stops: number[] = new Array(intervals + 1);
+  const stops: number[] = new Array<number>(intervals + 1);
   stops[0] = 0;
   for (let i = 1; i < intervals; i += 1) {
     const elapsed = (profile.duration * i) / intervals;
@@ -82,7 +82,7 @@ export const resampleStops = (
   intervals: number,
 ): number[] => {
   if (!(intervals >= 1) || stops.length <= intervals + 1) return [...stops];
-  const out: number[] = new Array(intervals + 1);
+  const out: number[] = new Array<number>(intervals + 1);
   for (let i = 0; i <= intervals; i += 1) {
     out[i] = sampleProgressStops(stops, i / intervals);
   }
@@ -149,7 +149,7 @@ export const keyframesAlongStops = <T>(
   evaluate: (position: number) => T,
 ): T[] => {
   const span = to - from;
-  const frames: T[] = new Array(stops.length);
+  const frames: T[] = new Array<T>(stops.length);
   for (let i = 0; i < stops.length; i += 1) {
     frames[i] = evaluate(from + span * stops[i]!);
   }

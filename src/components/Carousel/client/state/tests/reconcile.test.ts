@@ -92,18 +92,19 @@ describe("reconcileStateToLayout — render-only image variants do not affect id
   // `image` (responsive srcSet / sources) is render-only and must never enter
   // `dataKey`, so swapping it on slides with the same id/content keeps the same
   // layout identity and never hard-resets the viewing position.
+  const contentOf = (index: number) => `slide-${index}`;
   const baseSlides: Slide[] = Array.from({ length: 12 }, (_, i) => ({
     id: `s-${i}`,
-    content: `slide-${i}`,
+    content: contentOf(i),
   }));
-  const withVariants: Slide[] = baseSlides.map((slide) => ({
+  const withVariants: Slide[] = baseSlides.map((slide, i) => ({
     ...slide,
     image: {
-      srcSet: `${String(slide.content)}-480 480w, ${String(slide.content)}-720 720w`,
+      srcSet: `${contentOf(i)}-480 480w, ${contentOf(i)}-720 720w`,
       sources: [
         {
           media: "(orientation: landscape)",
-          srcSet: `${String(slide.content)}-l-480 480w`,
+          srcSet: `${contentOf(i)}-l-480 480w`,
           sizes: "50vw",
         },
       ],

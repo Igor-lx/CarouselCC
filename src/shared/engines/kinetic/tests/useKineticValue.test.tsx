@@ -17,7 +17,7 @@ import type { KineticValue } from "../internal/types";
 const animateMock = vi.fn();
 
 beforeAll(() => {
-  Element.prototype.animate = animateMock as unknown as typeof Element.prototype.animate;
+  Element.prototype.animate = animateMock;
 });
 
 interface FakeAnimation {

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { act, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
@@ -22,9 +22,10 @@ import type { SlotSizeSource } from "../useSlotSizeSource";
  *    rotation, a resize) the keyframes describe the wrong geometry, so the
  *    ride has to be torn down and the track re-pinned.
  *
- * The frame-drop rule was once gated on `isWaapiSupported()` here and on the
- * plan's flavour in the other two consumers — different questions with
- * different answers. This file pins the corrected signal.
+ * The frame-drop rule must be gated on the PLAN's flavour, never on
+ * `isWaapiSupported()`: those are different questions with different answers,
+ * and the three consumers would then shed different frames. This file pins the
+ * signal.
  */
 
 const SLOT = 120;
@@ -104,7 +105,19 @@ const moveSlot = (next: number) =>
  * thing stubbed here. Defined ONCE at module load, before anything can call
  * `isWaapiSupported()`, because that check caches its answer for the process.
  */
-let lastAnimation: Animation | null = null;
+interface AnimationStub {
+  cancel: Mock<() => void>;
+  finish: Mock<() => void>;
+  play: Mock<() => void>;
+  pause: Mock<() => void>;
+  currentTime: number;
+  startTime: number;
+  onfinish: (() => void) | null;
+  oncancel: (() => void) | null;
+  playState: string;
+}
+
+let lastAnimation: AnimationStub | null = null;
 Object.defineProperty(Element.prototype, "animate", {
   configurable: true,
   writable: true,
@@ -119,8 +132,8 @@ Object.defineProperty(Element.prototype, "animate", {
       onfinish: null,
       oncancel: null,
       playState: "running",
-    } as unknown as Animation;
-    return lastAnimation;
+    };
+    return lastAnimation as unknown as Animation;
   },
 });
 
@@ -132,7 +145,7 @@ const startRide = (overrides: Record<string, unknown> = {}) =>
     stops: [0, 0.5, 1],
     startedAt: 0,
     ...overrides,
-  } as Parameters<TrackBindingApi["startCompositorMotion"]>[0]);
+  });
 
 function Probe({ layoutOrigin = 0 }: { layoutOrigin?: number }) {
   const trackRef = useRef<HTMLDivElement | null>(null);

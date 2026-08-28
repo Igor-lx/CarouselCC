@@ -93,7 +93,7 @@ export const applyKeyframe = (element: Element, keyframe: Keyframe) => {
   if (!style) return;
   for (const [property, value] of Object.entries(keyframe)) {
     if (KEYFRAME_META.has(property) || value == null) continue;
-    style[property as never] = String(value) as never;
+    style[property as never] = String(value);
   }
 };
 
@@ -143,7 +143,7 @@ export const createCompositedRide = <Strategy extends string>(
         segment.to,
         stops,
         toKeyframe,
-      ) as Keyframe[];
+      );
 
       // Paint the origin synchronously so the first compositor frame and the
       // segment's `from` plateau agree.
@@ -266,7 +266,7 @@ export function useCompositedRide<Strategy extends string>(
             ? (value: number) => defaultsRef.current!.toKeyframe!(value)
             : undefined;
         },
-      } as CompositedRideDefaults),
+      }),
     };
   }
 

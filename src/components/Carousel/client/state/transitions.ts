@@ -60,6 +60,44 @@ interface StepResolution {
   phase: MotionPhase;
 }
 
+interface PageTarget {
+  nextTargetPageIndex: number;
+  pageDelta: number;
+}
+
+/** MOVE: step from the origin page. Cyclic mode keeps the signed step as delta. */
+const resolveMoveTarget = (
+  layout: CarouselState["layout"],
+  currentPageIndex: number,
+  moveStep: number,
+): PageTarget => {
+  const raw = currentPageIndex + moveStep;
+  const nextTargetPageIndex = layout.isFinite
+    ? clamp(raw, 0, layout.pageCount - 1)
+    : normalizePageIndex(raw, layout.pageCount);
+  return {
+    nextTargetPageIndex,
+    pageDelta: layout.isFinite
+      ? nextTargetPageIndex - currentPageIndex
+      : moveStep,
+  };
+};
+
+/** GO_TO: dot-scale direction, not the shortest cyclic path (see doc). */
+const resolveGoToTarget = (
+  layout: CarouselState["layout"],
+  currentPageIndex: number,
+  targetPageIndex: number,
+): PageTarget => {
+  const nextTargetPageIndex = layout.isFinite
+    ? clamp(targetPageIndex, 0, layout.pageCount - 1)
+    : normalizePageIndex(targetPageIndex, layout.pageCount);
+  return {
+    nextTargetPageIndex,
+    pageDelta: nextTargetPageIndex - currentPageIndex,
+  };
+};
+
 const stepPhase = (
   command: MoveCommand | GoToCommand,
   isInstantMode: boolean,
@@ -89,25 +127,10 @@ export const resolveStepTransition = (
     isSameDirectionRepeat,
   );
 
-  let nextTargetPageIndex = currentPageIndex;
-  let pageDelta = 0;
-
-  if (command.type === "MOVE") {
-    const raw = currentPageIndex + effectiveMoveStep;
-    nextTargetPageIndex = layout.isFinite
-      ? clamp(raw, 0, layout.pageCount - 1)
-      : normalizePageIndex(raw, layout.pageCount);
-    pageDelta = layout.isFinite
-      ? nextTargetPageIndex - currentPageIndex
-      : effectiveMoveStep;
-  } else {
-    const resolved = layout.isFinite
-      ? clamp(command.targetPageIndex, 0, layout.pageCount - 1)
-      : normalizePageIndex(command.targetPageIndex, layout.pageCount);
-    // Dot-scale direction, not shortest cyclic path (see doc).
-    pageDelta = resolved - currentPageIndex;
-    nextTargetPageIndex = resolved;
-  }
+  const { nextTargetPageIndex, pageDelta } =
+    command.type === "MOVE"
+      ? resolveMoveTarget(layout, currentPageIndex, effectiveMoveStep)
+      : resolveGoToTarget(layout, currentPageIndex, command.targetPageIndex);
 
   const canonicalVirtualIndex = layout.isFinite
     ? pageStart(nextTargetPageIndex, stepSize)

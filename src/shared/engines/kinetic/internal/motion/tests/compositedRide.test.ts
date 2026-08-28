@@ -19,7 +19,7 @@ import { createCompositedRide } from "../compositor/compositedRide";
 const animateMock = vi.fn();
 
 beforeAll(() => {
-  Element.prototype.animate = animateMock as unknown as typeof Element.prototype.animate;
+  Element.prototype.animate = animateMock;
 });
 
 afterEach(() => {

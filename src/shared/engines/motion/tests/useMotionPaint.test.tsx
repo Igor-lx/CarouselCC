@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 
 import { createMotionController } from "../runtime/createMotionController";
 import { useMotionPaint } from "../runtime/useMotionPaint";
+import type { MotionSample } from "../runtime/types";
 
 let host: HTMLDivElement;
 let root: Root;
@@ -23,7 +24,7 @@ afterEach(() => {
 describe("useMotionPaint", () => {
   it("paints the resting sample immediately and every set() after", () => {
     const controller = createMotionController(7);
-    const paint = vi.fn();
+    const paint = vi.fn<(sample: MotionSample) => void>();
     const Probe = () => {
       useMotionPaint(controller, paint);
       return null;
@@ -54,7 +55,7 @@ describe("useMotionPaint", () => {
 
   it("unsubscribes on unmount", () => {
     const controller = createMotionController(0);
-    const paint = vi.fn();
+    const paint = vi.fn<(sample: MotionSample) => void>();
     const Probe = () => {
       useMotionPaint(controller, paint);
       return null;

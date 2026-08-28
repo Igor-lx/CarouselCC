@@ -120,7 +120,7 @@ beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
     x: 0, y: 0, width: 600, height: 200, top: 0, left: 0, right: 600,
     bottom: 200, toJSON: () => ({}),
-  } as DOMRect);
+  });
 });
 
 afterEach(() => {

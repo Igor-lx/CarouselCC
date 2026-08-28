@@ -67,7 +67,7 @@ for (const f of files) {
   // exports declared in this file
   const ex = new Set();
   for (const mm of src.matchAll(/export\s+(?:const|function|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g)) ex.add(mm[1]);
-  for (const mm of src.matchAll(/export\s+default\s/g)) ex.add("default");
+  if (/export\s+default\s/.test(src)) ex.add("default");
   for (const mm of src.matchAll(/export\s*\{([^}]*)\}/g)) {
     for (let part of mm[1].split(",")) {
       part = part.trim().replace(/^type\s+/, "");

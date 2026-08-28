@@ -40,7 +40,7 @@ describe("areStatusSnapshotsEqual", () => {
       const changed = {
         ...BASE,
         [key]: differentValue(BASE[key]),
-      } as CarouselStatusSnapshot;
+      };
       expect(
         areStatusSnapshotsEqual(BASE, changed),
         `"${key}" changed but the comparator reported equal — the host would never hear about it`,

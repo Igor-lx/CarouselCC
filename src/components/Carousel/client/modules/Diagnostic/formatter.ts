@@ -5,6 +5,15 @@ const BANNER = "Carousel Diagnostic";
 const TRAILER =
   "Diagnostics is observe-only and does not apply runtime changes.";
 
+// Reached only for what `formatActual` has not already named: objects,
+// functions, symbols, bigints. `String()` on an object yields "[object Object]"
+// and hides what it was, so objects get their built-in tag instead.
+const describeOpaque = (value: unknown): string => {
+  if (typeof value === "symbol") return value.toString();
+  if (typeof value === "bigint") return `${value}n`;
+  return Object.prototype.toString.call(value);
+};
+
 const formatActual = (value: unknown): string => {
   if (typeof value === "string") return `"${value}"`;
   if (typeof value === "number") {
@@ -17,9 +26,9 @@ const formatActual = (value: unknown): string => {
   if (typeof value === "undefined") return "undefined";
   if (typeof value === "boolean") return String(value);
   try {
-    return JSON.stringify(value) ?? String(value);
+    return JSON.stringify(value) ?? describeOpaque(value);
   } catch {
-    return String(value);
+    return describeOpaque(value);
   }
 };
 

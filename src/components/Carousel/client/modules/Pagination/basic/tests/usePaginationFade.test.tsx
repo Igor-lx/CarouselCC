@@ -19,16 +19,16 @@ import { usePaginationFade } from "../usePaginationFade";
 
 /**
  * The binding's whole job is that ONE offset owns the strip across every mode.
- * The regressions this guards are all the same shape — a mode change that
+ * The failures this guards are all the same shape — a mode change that
  * re-anchors the strip on the logical target instead of continuing from where
  * it actually is:
  *
- *  - a finger landing mid-ride used to `settle()`, snapping the dots onto the
- *    oncoming page while the deck itself froze on a fractional position;
- *  - the drag then painted nothing at all, and the release sweep started from
- *    that snapped integer;
- *  - the no-WAAPI fallback (one long `follow` plan) parked the dots on the
- *    destination for the whole ride.
+ *  - a finger landing mid-ride must not `settle()`, or the dots snap onto the
+ *    oncoming page while the deck itself sits on a fractional position;
+ *  - the drag must then keep painting, and the release sweep must start from
+ *    the offset the finger left, not from a snapped integer;
+ *  - the no-WAAPI fallback (one long `follow` plan) must not park the dots on
+ *    the destination for the whole ride.
  *
  * Ownership is the other half: while the binding paints, it owns each dot's
  * inline layer AND suppresses its CSS transition; at rest it must hand both
@@ -74,7 +74,7 @@ const createPlanChannel = () => {
   return {
     source,
     publish(plan: PublishablePlan) {
-      current = { ...plan, planId: nextId } as CarouselMotionPlan;
+      current = { ...plan, planId: nextId };
       nextId += 1;
       const published = current;
       act(() => {
@@ -223,6 +223,7 @@ const grabMidRideAndDragTo = (offset: number) => {
 };
 
 beforeAll(() => {
+  // eslint-disable-next-line @typescript-eslint/unbound-method -- saved to be re-attached in afterAll; jsdom has no Element.animate, so vi.spyOn cannot stand in
   originalAnimate = Element.prototype.animate;
   Element.prototype.animate = function (this: Element, keyframes) {
     const entry: RecordedAnimation = {
@@ -241,7 +242,7 @@ beforeAll(() => {
     entry.finish = () => animation.onfinish?.();
     recorded.push(entry);
     return animation as unknown as Animation;
-  } as Element["animate"];
+  };
 });
 
 afterAll(() => {
@@ -274,7 +275,7 @@ describe("usePaginationFade — a finger landing mid-ride", () => {
     // Halfway between page 0 and page 1 — the deck freezes there, so must the dots.
     expect(paintedOpacity(0)).toBeCloseTo(opacityAt(0.5), 6);
     expect(paintedOpacity(1)).toBeCloseTo(opacityAt(0.5), 6);
-    // The regression: page 1 used to arrive at its full active look at once.
+    // The failure mode: page 1 arriving at its full active look at once.
     expect(paintedOpacity(1)).not.toBeCloseTo(opacityAt(1), 2);
   });
 
@@ -351,8 +352,8 @@ describe("usePaginationFade — the release", () => {
 
     const incoming = animationOf(1);
     expect(incoming).toBeDefined();
-    // The regression: the sweep used to start from the settled integer target,
-    // which made this a zero-length step with no animation at all.
+    // The failure mode: a sweep starting from the settled integer target makes
+    // this a zero-length step with no animation at all.
     expect(incoming!.keyframes[0]!.opacity).toBeCloseTo(
       opacityAt(strengthOf(1, 0.75)),
       3,

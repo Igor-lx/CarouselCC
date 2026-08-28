@@ -33,7 +33,7 @@ import {
 } from "../interaction";
 import type { CarouselRuntimeConfig, RawConfigInput } from "../types";
 
-const useDefault = <T>(value: unknown, fallback: T): T =>
+const withDefault = <T>(value: unknown, fallback: T): T =>
   typeof value === "undefined" ? fallback : (value as T);
 
 export const buildCarouselConfig = ({
@@ -43,20 +43,20 @@ export const buildCarouselConfig = ({
   intervalAutoplay,
   errAltPlaceholder,
 }: RawConfigInput): CarouselRuntimeConfig => ({
-  visibleSlidesCount: useDefault(
+  visibleSlidesCount: withDefault(
     visibleSlidesNr,
     CAROUSEL_DEFAULTS.visibleSlidesNr
   ),
-  autoplayDuration: useDefault(
+  autoplayDuration: withDefault(
     durationAutoplay,
     CAROUSEL_DEFAULTS.durationAutoplay
   ),
-  stepDuration: useDefault(durationStep, CAROUSEL_DEFAULTS.durationStep),
-  autoplayInterval: useDefault(
+  stepDuration: withDefault(durationStep, CAROUSEL_DEFAULTS.durationStep),
+  autoplayInterval: withDefault(
     intervalAutoplay,
     CAROUSEL_DEFAULTS.intervalAutoplay
   ),
-  errorAltPlaceholder: useDefault(
+  errorAltPlaceholder: withDefault(
     errAltPlaceholder,
     CAROUSEL_DEFAULTS.errAltPlaceholder
   ),

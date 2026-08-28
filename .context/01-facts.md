@@ -34,6 +34,8 @@
 | Типы | `npm run typecheck` | **exit 0** |
 | Тесты | `npm test` | **110 файлов / 957 тестов — все зелёные**, ~39 c |
 | Сборка | `npm run build` | **exit 0**, 227 модулей, 943 мс |
+| Линт | `npm run lint` | **exit 0** (заведён после базовой линии) |
+| Формат | `npm run format:check` | **красный: 213 файлов** — сплошной прогон `npm run format` запланирован отдельным заходом |
 
 **Размеры прод-бандла (эталон для сравнения после правок):**
 
@@ -42,6 +44,10 @@
 | `dist/assets/index-*.js` | 282.56 кБ | **88.70 кБ** |
 | `dist/assets/index-*.css` | 13.48 кБ | 3.28 кБ |
 | `dist/index.html` | 1.80 кБ | 0.85 кБ |
+
+После прохода линта: `index-*.js` — 282.74 кБ / gzip **88.75 кБ** (+0.18 / +0.05
+кБ). Рост объясним: страж `openSlide` в `App.tsx`, два хелпера цели страницы в
+`transitions.ts`, `describeOpaque` в форматтере диагностики.
 
 **Демо-данные (`public/carousel-slides1.json`):** 12 слайдов, `id` — UUID,
 `content` уникальны, у каждого `image.srcSet` (480/720) + `defaultSrc` (720) +
@@ -67,6 +73,34 @@ solution-style, `files: []`. `tsc --noEmit` в корне проверяет **�
 `?: T | undefined` вместо `?: T`), `noUnusedLocals`/`noUnusedParameters`
 (отсюда `void x` в тестах), `erasableSyntaxOnly`, `noFallthroughCasesInSwitch`,
 `verbatimModuleSyntax` (отсюда `import type` везде).
+
+---
+
+## A2. Инструменты проверки (заведены после базовой линии)
+
+| Файл | Что задаёт |
+| --- | --- |
+| `eslint.config.js` | flat config: `typescript-eslint` с типовой проверкой (`projectService`), `react-hooks`, `react-refresh`; форматирование целиком отдано Prettier через `eslint-config-prettier` |
+| `.prettierrc.json` | `printWidth: 80`, двойные кавычки, `trailingComma: "all"`, `endOfLine: "auto"` |
+| `.prettierignore` | `dist`, `coverage`, `node_modules`, `public`, `package-lock.json` |
+| `.gitattributes` | `* text=auto eol=lf` — концы строк перестали зависеть от `core.autocrlf` машины (на этой он `true`, файлы в рабочем дереве были CRLF) |
+
+**Три обоснованных исключения в конфиге линта, все с комментарием на месте:**
+
+1. `@typescript-eslint/require-await` выключен в `**/tests/**`: React-`act`
+   возвращает thenable только при async-скоупе, поэтому `async` без `await`
+   внутри — требование API, а не оплошность.
+2. `react-refresh/only-export-components` выключен в `client/modules/**`:
+   слот-компоненты собираются как `Object.assign(Component, { slot })`, Fast
+   Refresh такую форму не отслеживает, а форма — это контракт модуля.
+3. **PENDING** — четыре правила React Compiler из `react-hooks` v7
+   (`refs`, `globals`, `immutability`, `set-state-in-effect`) выключены
+   целиком. Они дают **110 срабатываний**: 79 `refs` (запись в ref во время
+   рендера — системный приём этого кода, например `useViewportBusy.ts:19`),
+   24 `globals` (переприсваивание модульных переменных из тестов), 4
+   `immutability`, 3 `set-state-in-effect`. Каждое требует отдельного
+   вердикта; разбор — назначенная следующая задача, правила выключены до неё,
+   а не потому, что неверны.
 
 ---
 

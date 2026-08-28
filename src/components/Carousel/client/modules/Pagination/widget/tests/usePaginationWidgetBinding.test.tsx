@@ -45,7 +45,7 @@ const createPlanChannel = () => {
   return {
     source,
     publish(plan: PublishablePlan) {
-      current = { ...plan, planId: nextId } as CarouselMotionPlan;
+      current = { ...plan, planId: nextId };
       nextId += 1;
       const published = current;
       act(() => {

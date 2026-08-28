@@ -76,7 +76,7 @@ const stableWith = (
     trackRef,
     isOffBandFetchOn: true,
     isPaginationInteractiveOn: true,
-  }) as CarouselStableContextValue;
+  });
 
 const motion = {
   status: {

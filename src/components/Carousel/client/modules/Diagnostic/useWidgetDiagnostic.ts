@@ -15,15 +15,16 @@ export function useWidgetDiagnostic(input: WidgetDiagnosticInput): void {
   const { layout } = useCarouselStable();
   const isActive = IS_DEV && layout.isDiagnosticActive;
 
+  // Keyed on the values, never on the input object: the caller rebuilds it on
+  // every render, and these four fields are the whole of the input type.
+  const { dotGap, dotSize, scaleFactor, visibleDots } = input;
+
   const warnings = useMemo(
-    () => (isActive ? collectWidgetWarnings(input) : EMPTY_WARNINGS),
-    [
-      input.dotGap,
-      input.dotSize,
-      input.scaleFactor,
-      input.visibleDots,
-      isActive,
-    ],
+    () =>
+      isActive
+        ? collectWidgetWarnings({ dotGap, dotSize, scaleFactor, visibleDots })
+        : EMPTY_WARNINGS,
+    [dotGap, dotSize, scaleFactor, visibleDots, isActive],
   );
 
   useGroupedWarnings(warnings);

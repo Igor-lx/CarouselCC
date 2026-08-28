@@ -182,7 +182,7 @@ describe("SlideItem — interactivity", () => {
     expect(rootEl().tagName).toBe("BUTTON");
     expect(rootEl().getAttribute("type")).toBe("button");
 
-    (rootEl() as HTMLElement).click();
+    (rootEl()).click();
     expect(onSlideClick).toHaveBeenCalledWith(IMAGE);
   });
 
@@ -190,7 +190,7 @@ describe("SlideItem — interactivity", () => {
     const onSlideClick = vi.fn();
     render({ slideData: TEXT, isContentImg: false, isInteractiveOn: true, onSlideClick });
     expect(rootEl().tagName).toBe("BUTTON");
-    (rootEl() as HTMLElement).click();
+    (rootEl()).click();
     expect(onSlideClick).toHaveBeenCalledWith(TEXT);
   });
 });

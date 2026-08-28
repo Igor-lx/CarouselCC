@@ -58,6 +58,11 @@ const SLIDES_DATA_URL = `${
 }carousel-slides${SLIDES_SET}.json`;
 
 const openSlide = (slide: Slide) => {
+  // `content` doubles as the destination on this stand, and the public schema
+  // also admits a React element — which is not a URL and must not be opened.
+  if (typeof slide.content !== "string" && typeof slide.content !== "number") {
+    return;
+  }
   // noopener: without it the opened document gets a live `window.opener` handle
   // back into this one.
   window.open(String(slide.content), "_blank", "noopener");
@@ -85,13 +90,13 @@ export default function App() {
   // is a manual override from the control bar, so both can be compared on one
   // device without a redeploy.
   //
-  // Derived, NOT seeded via `useState(isTouch)`: that latches whatever `isTouch`
-  // happened to be on the first render and can never resync — which is exactly
-  // how a phone ended up with the dots. Even with the signal now correct on the
-  // first frame, `isTouch` can still flip later (the pointerdown fallback on a
-  // hybrid device), and this form follows it.
+  // Derived, NOT seeded via `useState(isTouch)`: seeding latches whatever
+  // `isTouch` happened to be on the first render and can never resync, so a
+  // touch device would be stuck with the wrong pagination module. `isTouch` can
+  // also flip later (the pointerdown fallback on a hybrid device); this form
+  // follows it.
   const [paginationOverride, setPaginationOverride] = useState<boolean | null>(
-    null
+    null,
   );
   const isWidgetPagination = paginationOverride ?? isTouch;
 

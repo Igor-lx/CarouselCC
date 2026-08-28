@@ -97,7 +97,7 @@ Zod-схемы. `ReactElementSchema` (`:7`) проверяет `$$typeof` про
 
 ### `client/config/resolve/buildConfig.ts` (104) — pure
 Собирает `CarouselRuntimeConfig` из констант + 5 пропов.
-- `:36-37` `useDefault = (value: unknown, fallback: T) => typeof value === "undefined" ? fallback : (value as T)`
+- `:36-37` `withDefault = (value: unknown, fallback: T) => typeof value === "undefined" ? fallback : (value as T)`
   `?` **Слепой каст.** Валидации нет: `visibleSlidesNr: -1 | 0 | NaN | "3"`
   проходит насквозь. Дальше `clampedVisibleSlidesCount` = `Math.min(v, length)`,
   т.е. отрицательное/NaN не отсекается. Кандидат в RISK.
@@ -215,15 +215,19 @@ Zod-схемы. `ReactElementSchema` (`:7`) проверяет `$$typeof` про
 - `:187-189` `Math.sign(teleportVirtualIndex - settledPosition)`; ветка
   `direction === 0` (`:209-219`) названа «вырожденной» и садится в `idle`.
 
-### `client/state/transitions.ts` (139) — pure
+### `client/state/transitions.ts` (160) — pure
 `resolveStepTransition` — вся арифметика шага. `stepOrigin` (`:21`) выбирает
 опорную страницу: при повторном клике в ту же сторону — от **визуальной**
 позиции (floor/ceil по направлению), иначе — от `targetPageIndex`.
 `repeatedClickStep` (`:18-19`) = `sign(step) * 2` — повторный клик прыгает на 2
 страницы, не на 1.
-- `:107` комментарий: GO_TO идёт по направлению шкалы точек, **не** кратчайшим
+- Цель страницы считают два чистых хелпера, по одному на команду:
+  `resolveMoveTarget` (`:69`) и `resolveGoToTarget` (`:87`); оба возвращают
+  `PageTarget` = `{ nextTargetPageIndex, pageDelta }`. Раньше обе ветки писали
+  в общие `let`.
+- `:86` комментарий: GO_TO идёт по направлению шкалы точек, **не** кратчайшим
   цикличным путём. Осознанный выбор.
-- `isSameDirectionRepeat` (`:137`) — только вне `idle`/`dragging`.
+- `isSameDirectionRepeat` (`:160`) — только вне `idle`/`dragging`.
 
 ### `client/state/reconcile.ts` (47) — pure
 `sameLayout` — 4 поля (`:11-15`), комментарий утверждает полноту проверки
@@ -293,8 +297,11 @@ segmentFactory, чтобы посадки и профиль не разъеха�
 4 варианта плана (`idle`/`follow`/`instant`/`waapi`), монотонный `planId`.
 Дедуп в `publish` (`:89-97`) только для `idle` и одинакового `follow`.
 `DistributiveOmit` (`:60-66`) — корректное решение схлопывания юниона.
-- `:98` `as CarouselMotionPlan` — каст после спреда; типобезопасность держится
-  на честности `DistributiveOmit`, не на компиляторе.
+- `:70` `publish` объявлен **свойством-функцией**, а не методом: его отцепляют
+  от объекта и передают дальше (`Carousel.tsx` → `useCarouselMotionExecution`),
+  и контракт теперь это разрешает явно.
+- `:98` каст `as CarouselMotionPlan` снят как избыточный: тип выводится из
+  спреда, честность `DistributiveOmit` проверяет компилятор.
 - `?` `listeners.forEach` без защиты от отписки во время нотификации: `Set`
   переживает удаление на итерации, но добавление нового слушателя внутри
   колбэка — нет. Слабое место, вряд ли достижимое.
@@ -674,13 +681,13 @@ SCSS: зона = 8% ширины на десктопе, на touch зона **с
 canonical-медиа, живых `<source media>` слайдов и **имён состояний в CSS**
 (обход `document.styleSheets` в обе стороны). Самая амбициозная проверка.
 `checks/layoutChecks.ts` (140), `propChecks.ts` (139), `stateChecks.ts` (25),
-`widgetChecks.ts` (79), `formatter.ts` (49), `useGroupedWarnings.ts` (26),
-`useWidgetDiagnostic.ts` (30), `types.ts` (12).
+`widgetChecks.ts` (79), `formatter.ts` (54), `useGroupedWarnings.ts` (26),
+`useWidgetDiagnostic.ts` (24), `types.ts` (12).
 - `layoutChecks.ts:86-91` — явный отказ ругаться на пустую колоду, с
   объяснением «иначе читатель приучается игнорировать канал».
-- `useWidgetDiagnostic.ts:18-27` `?` массив зависимостей перечисляет поля
-  `input.*`, а колбэк замыкает объект `input` — намеренно, но это ложь
-  зависимостям.
+- `useWidgetDiagnostic.ts:20-28` поля входа деструктурируются до `useMemo`, и
+  колбэк собирает объект из них же: список зависимостей больше не расходится с
+  тем, что реально читает колбэк (эти четыре поля — весь тип входа).
 
 ---
 
@@ -703,9 +710,12 @@ canonical-медиа, живых `<source media>` слайдов и **имён �
 ## N. App / входная точка
 
 ### `src/main.tsx` (16) — `StrictMode` + `ThemeProvider` + `App`.
-### `src/app/App.tsx` (215) — демо-стенд
+### `src/app/App.tsx` (202) — демо-стенд
 - `:35-40` чтение `?slides=` **на модульном уровне** (`window.location`) —
   SSR-враждебно; для стенда приемлемо.
+- `:60-69` `openSlide` открывает `content` как URL и отсекает React-элемент:
+  публичная схема допускает его третьим вариантом, и `String()` открыл бы
+  «[object Object]».
 - `:113` `slidesData` живёт в `useState` → ссылка стабильна. **Это и есть то,
   что спасает мемо-контракт** (`areCarouselPropsEqual`); нигде не выражено как
   требование к хосту.

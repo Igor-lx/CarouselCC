@@ -55,11 +55,11 @@ describe("buildSlideClassMap", () => {
   it("substitutes an empty string for a missing key", () => {
     // `className={undefined}` would drop the attribute and break a host's
     // override chain, so absence must become "".
-    expect(buildSlideClassMap({})[SLIDE_CLASS_KEYS[0]!]).toBe("");
+    expect(buildSlideClassMap({})[SLIDE_CLASS_KEYS[0]]).toBe("");
   });
 
   it("passes provided classes through", () => {
-    const key = SLIDE_CLASS_KEYS[0]!;
+    const key = SLIDE_CLASS_KEYS[0];
     expect(buildSlideClassMap({ [key]: "x" })[key]).toBe("x");
   });
 });

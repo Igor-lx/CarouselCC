@@ -15,11 +15,10 @@ import { useSlideFetchReach } from "../useSlideFetchReach";
  *  - the buffer waits for the band, so the slide being looked at gets the
  *    bandwidth first;
  *  - it also waits for the deck to be STILL. Opening mounts an `<img>` into
- *    every buffered slide at once, and on a real link the band settles about a
- *    second after mount — inside the user's first ride. That is the entire
- *    "first pass stutters" report: the first-ride probe measured seven images
- *    decoded inside ride 0, three after this rule, where three is the page
- *    being ridden to and cannot be avoided;
+ *    every buffered slide at once, and the band settles about a second after
+ *    mount — inside the user's first ride — so without this condition that
+ *    whole commit, fetch and decode lands in the frames of the first movement.
+ *    What remains unavoidable is the page being ridden to;
  *  - the reach LATCHES open. A retry cycles a status back to `loading`, and a
  *    reach that reopened on `loaded` alone would slam shut mid-cycle, unmount
  *    the buffer and throw its in-flight fetches away.
@@ -39,7 +38,7 @@ const slide = (src: string, isActual: boolean): VirtualSlide =>
     isActive: isActual,
     isActual,
     ariaProps: {},
-  }) as unknown as VirtualSlide;
+  });
 
 let observed = BAND_ONLY;
 
