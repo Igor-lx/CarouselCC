@@ -77,24 +77,14 @@ export default tseslint.config(
     },
   },
 
-  // PENDING — five nodes keep state in a ref that is written during render, and
-  // that is load-bearing rather than sloppy: the render window and the layout
-  // origin persist across renders inside a memo (useSlideRenderModel,
-  // useCarouselPresentation, useSlideFetchReach), the compositor keeps its live
-  // animation handle (compositedRide, both forks), and useCarouselState
-  // refreshes the reducer envelope during render so `dispatch` can stay stable
-  // for a same-commit dispatch from a child. Rewriting them changes the
-  // architecture, so it gets its own plan and its own ADR — the rule is parked
-  // for these files only, and stays on everywhere else.
+  // PENDING — one node left. useCarouselState refreshes the reducer envelope
+  // from a ref during render so that `dispatch` can stay stable and still serve
+  // a same-commit dispatch from a child. The agreed fix is to give the reducer
+  // its own context — config and isInstantMode move into the state, the way
+  // layout already lives there, and the envelope goes away — which is an
+  // architecture change with its own ADR. Parked for this file only.
   {
-    files: [
-      "src/components/Carousel/client/slides/useSlideRenderModel.ts",
-      "src/components/Carousel/client/slides/useSlideFetchReach.ts",
-      "src/components/Carousel/client/presentation/useCarouselPresentation.ts",
-      "src/components/Carousel/client/state/useCarouselState.ts",
-      "src/shared/engines/motion/compositor/compositedRide.ts",
-      "src/shared/engines/kinetic/internal/motion/compositor/compositedRide.ts",
-    ],
+    files: ["src/components/Carousel/client/state/useCarouselState.ts"],
     rules: { "react-hooks/refs": "off" },
   },
 

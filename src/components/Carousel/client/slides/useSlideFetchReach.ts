@@ -33,6 +33,9 @@ interface UseSlideFetchReachInput {
  * Bandwidth, not reach, is the scarce resource early: opening wider ahead of
  * the band puts more concurrent fetches against the slides being looked at.
  */
+const sameUrls = (a: readonly string[], b: readonly string[]): boolean =>
+  a.length === b.length && a.every((url, index) => url === b[index]);
+
 export function useSlideFetchReach({
   virtualSlides,
   isContentImg,
@@ -40,10 +43,9 @@ export function useSlideFetchReach({
   imageResourceStore,
   isIdle,
 }: UseSlideFetchReachInput): number {
-  // Band URLs stabilised on CONTENT — virtualSlides is a fresh array per
-  // dispatch, so keying the effect on it alone would churn subscriptions.
-  const bandUrlsRef = useRef<string[]>([]);
-  const bandUrls = useMemo(() => {
+  // virtualSlides is a fresh array per dispatch, so the list is rebuilt every
+  // time; what the effect below keys on has to be the CONTENT, not that array.
+  const computedBandUrls = useMemo(() => {
     const next: string[] = [];
     if (isContentImg && imageResourceStore !== null) {
       for (const slide of virtualSlides) {
@@ -55,16 +57,15 @@ export function useSlideFetchReach({
         if (url !== null && !next.includes(url)) next.push(url);
       }
     }
-    const previous = bandUrlsRef.current;
-    if (
-      previous.length === next.length &&
-      previous.every((url, index) => url === next[index])
-    ) {
-      return previous;
-    }
-    bandUrlsRef.current = next;
     return next;
   }, [imageResourceStore, isContentImg, isResponsiveImagesOn, virtualSlides]);
+
+  // The identity that survives a rebuild is state, adjusted during render —
+  // never a ref written from inside the memo, which React is free to discard.
+  const [bandUrls, setBandUrls] = useState(computedBandUrls);
+  if (bandUrls !== computedBandUrls && !sameUrls(bandUrls, computedBandUrls)) {
+    setBandUrls(computedBandUrls);
+  }
 
   // URLs that reported an outcome at least once — a write-once latch per URL.
   const settledRef = useRef(new Set<string>());

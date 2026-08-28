@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useState } from "react";
 
 import {
   profileProgressStops,
@@ -142,12 +142,15 @@ export const createCompositedRide = <Strategy extends string>(
 export function useCompositedRide<Strategy extends string>(
   controller: MotionController<Strategy>,
 ): CompositedRide<Strategy> {
-  const ref = useRef<{
-    controller: MotionController<Strategy>;
-    ride: CompositedRide<Strategy>;
-  } | null>(null);
-  if (!ref.current || ref.current.controller !== controller) {
-    ref.current = { controller, ride: createCompositedRide(controller) };
+  // One rider per controller. It owns a live animation handle, so it is state,
+  // not a memo React may drop: a new controller replaces it during render, the
+  // way React documents adjusting state on a prop change.
+  const [rider, setRider] = useState(() => ({
+    controller,
+    ride: createCompositedRide(controller),
+  }));
+  if (rider.controller !== controller) {
+    setRider({ controller, ride: createCompositedRide(controller) });
   }
-  return ref.current.ride;
+  return rider.ride;
 }

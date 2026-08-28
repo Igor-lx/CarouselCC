@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useState } from "react";
 
 import {
   buildRenderWindow,
@@ -33,6 +33,9 @@ interface UseSlideRenderModelResult {
  * See docs/architecture/motion.md. */
 const LAYOUT_ORIGIN_BAND_SLOTS = 512;
 
+const sameWindow = (a: RenderWindow, b: RenderWindow): boolean =>
+  a.start === b.start && a.end === b.end;
+
 export function useSlideRenderModel({
   current,
   previous,
@@ -41,48 +44,46 @@ export function useSlideRenderModel({
   records,
   renderWindowBufferMultiplier,
 }: UseSlideRenderModelInput): UseSlideRenderModelResult {
-  // Persists across renders so a slide is never unmounted mid-flight (shrinks
-  // on settle); seeded lazily by the idle branch below (the carousel mounts idle).
-  const persistedWindowRef = useRef<RenderWindow | null>(null);
-  const layoutOriginRef = useRef<number | null>(null);
+  const freshWindow = useMemo(
+    () =>
+      buildRenderWindow(
+        previous,
+        current,
+        layout,
+        renderWindowBufferMultiplier,
+      ),
+    [current, layout, previous, renderWindowBufferMultiplier],
+  );
 
-  const renderWindow = useMemo(() => {
-    const next = buildRenderWindow(
-      previous,
-      current,
-      layout,
-      renderWindowBufferMultiplier,
-    );
+  // The window persists across renders so a slide is never unmounted mid-flight
+  // (it shrinks on settle). CONSTRAINT — it is state, not a ref written from a
+  // memo: React may discard a memo's cache whenever it likes, and this value has
+  // to outlive that. Holding it in state also keeps its identity across renders
+  // that change nothing, which the caches below depend on.
+  const [renderWindow, setRenderWindow] = useState(freshWindow);
 
-    if (!layout.canSlide || !isMoving) {
-      persistedWindowRef.current = next;
-      return next;
-    }
+  const targetWindow = useMemo(() => {
+    if (!layout.canSlide || !isMoving) return freshWindow;
 
-    const previousWindow = persistedWindowRef.current ?? next; // ?? is a defensive fallback
     const segmentWindow = buildSegmentWindow(previous, current, layout);
+    if (windowContains(renderWindow, segmentWindow)) return renderWindow;
 
-    if (windowContains(previousWindow, segmentWindow)) return previousWindow;
+    return expandWindow(renderWindow, freshWindow);
+  }, [current, freshWindow, isMoving, layout, previous, renderWindow]);
 
-    const expanded = expandWindow(previousWindow, next);
-    persistedWindowRef.current = expanded;
-    return expanded;
-  }, [current, isMoving, layout, previous, renderWindowBufferMultiplier]);
+  if (!sameWindow(renderWindow, targetWindow)) setRenderWindow(targetWindow);
 
   // Stable coordinate base; recenters only on a whole-band drift, so a settle
   // window shift changes no slide's lane (the no-re-raster win; see motion.md).
-  const layoutOrigin = useMemo(() => {
-    const origin = layoutOriginRef.current;
-    if (
-      origin === null ||
-      renderWindow.start < origin - LAYOUT_ORIGIN_BAND_SLOTS ||
-      renderWindow.end > origin + LAYOUT_ORIGIN_BAND_SLOTS
-    ) {
-      layoutOriginRef.current = renderWindow.start;
-      return renderWindow.start;
-    }
-    return origin;
-  }, [renderWindow]);
+  const [committedOrigin, setCommittedOrigin] = useState<number | null>(null);
+  const layoutOrigin =
+    committedOrigin === null ||
+    renderWindow.start < committedOrigin - LAYOUT_ORIGIN_BAND_SLOTS ||
+    renderWindow.end > committedOrigin + LAYOUT_ORIGIN_BAND_SLOTS
+      ? renderWindow.start
+      : committedOrigin;
+
+  if (layoutOrigin !== committedOrigin) setCommittedOrigin(layoutOrigin);
 
   // One VirtualSlide object per virtual index, reused while nothing about it
   // changed. `virtualSlides` is rebuilt on EVERY dispatch — twice per ride,
@@ -94,13 +95,15 @@ export function useSlideRenderModel({
   // SlideItem a fresh `ariaProps` to shallow-compare: the whole deck then
   // re-renders in the two frames a ride starts and settles in. The lane styles
   // (`laneCacheRef` in presentation) are cached for the same reason.
-  const slideCacheRef = useRef(new Map<number, VirtualSlide>());
+  // Owned by a memo with no inputs, so it lives as long as the hook does and
+  // no render writes a ref to keep it.
+  const slideCache = useMemo(() => new Map<number, VirtualSlide>(), []);
 
   const virtualSlides = useMemo<VirtualSlide[]>(() => {
     const totalSlides = records.length;
     if (totalSlides === 0) return [];
 
-    const cache = slideCacheRef.current;
+    const cache = slideCache;
     const live = new Set<number>();
 
     const length = Math.max(0, renderWindow.end - renderWindow.start + 1);
@@ -153,6 +156,7 @@ export function useSlideRenderModel({
           totalSlides,
         ),
       };
+      // eslint-disable-next-line react-hooks/immutability -- a per-instance identity cache: the rule wants no mutation of a value from an outer scope, but losing this cache re-renders the whole deck on every dispatch (see the CONSTRAINT above)
       cache.set(virtualIndex, next);
       return next;
     });
@@ -160,11 +164,12 @@ export function useSlideRenderModel({
     // Bounded memory: an index that left the render window will be rebuilt if
     // it ever comes back, and its lane/record may differ by then anyway.
     for (const virtualIndex of cache.keys()) {
+      // eslint-disable-next-line react-hooks/immutability -- same cache, its bounded-memory half
       if (!live.has(virtualIndex)) cache.delete(virtualIndex);
     }
 
     return slides;
-  }, [current, isMoving, layout, previous, records, renderWindow]);
+  }, [current, isMoving, layout, previous, records, renderWindow, slideCache]);
 
   return {
     virtualSlides,

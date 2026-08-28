@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   profileProgressStops,
@@ -254,27 +254,35 @@ export function useCompositedRide<Strategy extends string>(
   defaults?: CompositedRideDefaults,
 ): CompositedRide<Strategy> {
   const defaultsRef = useRef(defaults);
-  defaultsRef.current = defaults;
 
-  const ref = useRef<{
-    controller: MotionController<Strategy>;
-    ride: CompositedRide<Strategy>;
-  } | null>(null);
-  if (!ref.current || ref.current.controller !== controller) {
-    ref.current = {
-      controller,
-      ride: createCompositedRide(controller, {
-        get element() {
-          return defaultsRef.current?.element;
-        },
-        get toKeyframe() {
-          // Presence-aware, latest-read: absent stays absent (JS path).
-          return defaultsRef.current?.toKeyframe
-            ? (value: number) => defaultsRef.current!.toKeyframe!(value)
-            : undefined;
-        },
-      }),
-    };
+  // Mirrored after the commit: the accessors below are read when a ride starts,
+  // and a ride can only start once effects have flushed.
+  useEffect(() => {
+    defaultsRef.current = defaults;
+  });
+
+  const buildRide = (owner: MotionController<Strategy>) =>
+    createCompositedRide(owner, {
+      get element() {
+        return defaultsRef.current?.element;
+      },
+      get toKeyframe() {
+        // Presence-aware, latest-read: absent stays absent (JS path).
+        return defaultsRef.current?.toKeyframe
+          ? (value: number) => defaultsRef.current!.toKeyframe!(value)
+          : undefined;
+      },
+    });
+
+  // One rider per controller. It owns a live animation handle, so it is state,
+  // not a memo React may drop: a new controller replaces it during render, the
+  // way React documents adjusting state on a prop change.
+  const [rider, setRider] = useState(() => ({
+    controller,
+    ride: buildRide(controller),
+  }));
+  if (rider.controller !== controller) {
+    setRider({ controller, ride: buildRide(controller) });
   }
 
   useMotionPaint(controller, ({ value }) => {
@@ -283,5 +291,5 @@ export function useCompositedRide<Strategy extends string>(
     if (element && toKeyframe) applyKeyframe(element, toKeyframe(value));
   });
 
-  return ref.current.ride;
+  return rider.ride;
 }

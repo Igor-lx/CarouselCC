@@ -1,5 +1,5 @@
 // See docs/architecture/presentation.md
-import { useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import styles from "../Carousel.module.scss";
 import { mergeStyleMaps } from "../../../../shared";
@@ -55,31 +55,38 @@ export const useCarouselPresentation = ({
   );
 
   // Per-lane styles CACHED by virtual index to keep SlideItem's `style` prop
-  // `===` across the twice-per-ride virtualSlides rebuild — see the doc.
-  const laneCacheRef = useRef({
-    origin: Number.NaN,
-    byIndex: new Map<number, CarouselSlideCssVars>(),
-  });
+  // `===` across the twice-per-ride virtualSlides rebuild — see the doc. The
+  // cache is owned by a memo keyed on the origin, which IS its invalidation
+  // rule: a recenter re-bases every lane, so it gets a new map and the old one
+  // goes with it. No hand-written `origin` field, and no ref written in render.
+  const laneCacheRef = useRef(new Map<string, CarouselSlideCssVars>());
 
-  const slideStyleFor = useMemo(() => {
-    const cache = laneCacheRef.current;
-    if (cache.origin !== layoutOrigin) {
-      cache.origin = layoutOrigin; // recenter re-bases every lane
-      cache.byIndex.clear();
-    } else {
-      const live = new Set(virtualSlides.map((slide) => slide.virtualIndex));
-      for (const index of cache.byIndex.keys()) {
-        if (!live.has(index)) cache.byIndex.delete(index);
-      }
-    }
-
-    return (virtualIndex: number): CarouselSlideCssVars => {
-      const cached = cache.byIndex.get(virtualIndex);
+  const slideStyleFor = useCallback(
+    (virtualIndex: number): CarouselSlideCssVars => {
+      const cache = laneCacheRef.current;
+      // The origin is part of the key, so a recenter cannot serve a stale lane
+      // and nothing has to be invalidated synchronously — the old entries are
+      // simply never hit again, and the effect below drops them.
+      const key = `${layoutOrigin}:${virtualIndex}`;
+      const cached = cache.get(key);
       if (cached) return cached;
       const style = buildSlideCssVars(virtualIndex, layoutOrigin);
-      cache.byIndex.set(virtualIndex, style);
+      cache.set(key, style);
       return style;
-    };
+    },
+    [layoutOrigin],
+  );
+
+  // Bounded memory, after the commit: everything that is not a live lane at the
+  // current origin goes, which covers a window shift and a recenter alike.
+  useEffect(() => {
+    const live = new Set(
+      virtualSlides.map((slide) => `${layoutOrigin}:${slide.virtualIndex}`),
+    );
+    const cache = laneCacheRef.current;
+    for (const key of cache.keys()) {
+      if (!live.has(key)) cache.delete(key);
+    }
   }, [layoutOrigin, virtualSlides]);
 
   const flagAttributes = useMemo(() => buildFlagAttributes(flags), [flags]);
