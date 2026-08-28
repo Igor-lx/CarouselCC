@@ -96,6 +96,13 @@ runtime changes.
 and its consequence — it never claims a runtime repair, because the runtime
 performs none. There is deliberately no "normalized to" clause in the shape.
 
+`actual` is rendered by `formatActual`: a string in quotes, `NaN` and the two
+infinities by name, anything JSON can serialise as JSON. What JSON cannot
+represent is described rather than coerced — a symbol as `Symbol(name)`, a
+bigint as `1n`, a function as `[object Function]` — because `String()` on any
+of them says nothing about what was passed. A circular object is the one case
+that still prints as `[object Object]`: the tag is all that survives it.
+
 ## Observe-only in practice
 
 There is no runtime normalization anywhere for Diagnostic to describe, so every
