@@ -77,16 +77,5 @@ export default tseslint.config(
     },
   },
 
-  // PENDING — one node left. useCarouselState refreshes the reducer envelope
-  // from a ref during render so that `dispatch` can stay stable and still serve
-  // a same-commit dispatch from a child. The agreed fix is to give the reducer
-  // its own context — config and isInstantMode move into the state, the way
-  // layout already lives there, and the envelope goes away — which is an
-  // architecture change with its own ADR. Parked for this file only.
-  {
-    files: ["src/components/Carousel/client/state/useCarouselState.ts"],
-    rules: { "react-hooks/refs": "off" },
-  },
-
   prettier,
 );

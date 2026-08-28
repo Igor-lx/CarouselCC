@@ -1,15 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { buildInitialState } from "../initial";
 import type { CarouselState } from "../types";
 import {
   type CarouselStateIssue,
   validateCarouselState,
 } from "../validateState";
-import { makeLayout, NON_JUMP_PHASES } from "./layoutBuilder";
+import { makeLayout, makeState, NON_JUMP_PHASES } from "./layoutBuilder";
 
 const layout = makeLayout(12, 3, false); // pageCount 4
-const baseState: CarouselState = buildInitialState(layout);
+const baseState: CarouselState = makeState(layout);
 
 const validate = (
   overrides: Partial<CarouselState> = {},
@@ -70,7 +69,7 @@ describe("validateCarouselState — out-of-bounds targetPageIndex", () => {
   it("does not flag a state reconciled against an empty deck (vacuously valid)", () => {
     const emptyLayout = makeLayout(0, 3, false);
     expect(emptyLayout.pageCount).toBe(0);
-    const emptyState = buildInitialState(emptyLayout);
+    const emptyState = makeState(emptyLayout);
     expect(emptyState.layout).toBe(emptyLayout);
     expect(validateCarouselState(emptyState)).toEqual([]);
   });

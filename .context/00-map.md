@@ -188,22 +188,25 @@ Zod-схемы. `ReactElementSchema` (`:7`) проверяет `$$typeof` про
 
 ## D. State
 
-### `client/state/types.ts` (105) — pure, SSOT формы состояния
-`CarouselState`: 10 полей. `MotionPhase` — 6 значений. 5 команд.
-`ReducerEnvelope` = команда + `context` (layout/config/isInstantMode) — контекст
-**едет в команде**, а не замыкается в редьюсере. Это и делает `dispatch`
-стабильным.
+### `client/state/types.ts` (114) — pure, SSOT формы состояния
+`CarouselState`: 12 полей — включая **сам контекст** (`layout`, `config`,
+`isInstantMode`). `MotionPhase` — 6 значений. 5 публичных команд плюс
+`SYNC_CONTEXT`, который карусель себе не выдаёт: им хост фиксирует контекст в
+состоянии (ADR-004). Конверта `ReducerEnvelope` больше нет; `dispatch` стабилен
+потому, что это диспатч самого `useReducer`.
 - `GestureRelease.launchVelocity` (`:20-23`) — отдельная от `uiVelocity`
   скорость, защищённая от терминального микро-удержания. Тонкий инвариант.
 - `:44-46` `teleportVirtualIndex`: пока не `null`, `virtualIndex` держится на
   посадке преflight'а, «чтобы дальняя цель не протекла в окно рендера».
 
-### `client/state/initial.ts` (21) — pure
+### `client/state/initial.ts` (28) — pure
 `buildInitialState` + `motionStatus` (4 булевых из фазы).
 
-### `client/state/reducer.ts` (215) — pure
-5 кейсов. Каждый начинается с `reconcileStateToLayout` на границе команды
-(`:32`) — раскладка синхронизируется до обработки, не после.
+### `client/state/reducer.ts` (230) — pure
+5 кейсов плюс `SYNC_CONTEXT` первым: он и согласует раскладку
+(`reconcileStateToLayout`), и кладёт `config`/`isInstantMode` в состояние.
+Граница контекста и есть граница согласования — остальные ветки читают всё с
+самого состояния (ADR-004, он же поправляет ADR-001).
 - `END_DRAG` (`:52`) — если цель уже достигнута (`hasReachedDragTarget`), сразу
   `idle` без поездки.
 - `MOVE`/`GO_TO` (`:103`) — ветка `isNoop` (`:129-147`) сохраняет
@@ -229,20 +232,19 @@ Zod-схемы. `ReactElementSchema` (`:7`) проверяет `$$typeof` про
   цикличным путём. Осознанный выбор.
 - `isSameDirectionRepeat` (`:160`) — только вне `idle`/`dragging`.
 
-### `client/state/reconcile.ts` (46) — pure
+### `client/state/reconcile.ts` (47) — pure
 `sameLayout` — 4 поля (`:11-15`), комментарий утверждает полноту проверки
 (`dataKey` держит остальное). `hardReset` при смене `dataKey` или `isFinite` →
 полный `buildInitialState`. Иначе — пропорциональный перенос страницы и
 `motionPhase: "step-instant"` (мгновенная досадка).
 
-### `client/state/useCarouselState.ts` (56) — fx (useReducer + рефы)
-`committedState` из редьюсера, `effectiveState` = ещё один `reconcile` в
-`useMemo` (`:32-35`) — т.е. **согласование раскладки происходит дважды**: в
-рендере и на границе команды.
-- `:39-45` `?` **Запись в рефы прямо в теле рендера.** Комментарий `:37-38`
-  объясняет зачем (диспатч в том же коммите должен видеть свежие значения), но
-  при конкурентном рендеринге прерванный рендер оставляет в рефе значение
-  выброшенной попытки. Кандидат в RISK (concurrent-safety).
+### `client/state/useCarouselState.ts` (36) — fx (useReducer)
+Одно состояние из редьюсера, никакой проекции поверх: контекст фиксируется
+`SYNC_CONTEXT` во время рендера, под защитой сверки идентичностей (`layout` и
+`config` мемоизированы выше по дереву, поэтому проход один).
+- Рефов нет вовсе. Прежнее замечание «запись в рефы в теле рендера, кандидат в
+  RISK по concurrent-safety» снято: прерванный рендер теперь не может оставить
+  за собой значение выброшенной попытки, потому что значений вне состояния нет.
 
 ### `client/state/validateState.ts` (69) — pure, dev-only
 3 структурных инварианта состояния. Явно сказано (`:1-2`), что редьюсер его
@@ -450,7 +452,7 @@ reflow, комментарий `:92-93` объясняет, почему не `g
 
 ## I. Presentation / context / policy / report
 
-### `client/presentation/useCarouselPresentation.ts` (91) — fx (кэш в рефе)
+### `client/presentation/useCarouselPresentation.ts` (90) — fx (кэш в рефе)
 `laneCacheRef` — кэш стилей полосы, чтобы проп `style` у `SlideItem` оставался
 `===` между двумя перестроениями `virtualSlides` за поездку. Ключ кэша —
 `origin:virtualIndex`, поэтому смена `layoutOrigin` не требует синхронного
@@ -905,8 +907,8 @@ try/catch, синхронизация между вкладками через `
 честно говорит, что именно этого не видел никто из остальных.
 
 ### Крупнейшие
-`reducer.test.ts` (548), `segmentFactory.test.ts` (435),
-`usePaginationFade.test.tsx` (395), `useMotionRunner.test.tsx` (301),
+`reducer.test.ts` (556), `segmentFactory.test.ts` (436),
+`usePaginationFade.test.tsx` (395), `useMotionRunner.test.tsx` (304),
 `trackBinding.test.tsx` (353), `createMotionController.test.ts` (345 в
 `kinetic/internal/motion`, 337 в `engines/motion`).
 

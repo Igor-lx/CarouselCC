@@ -1,6 +1,8 @@
 # ADR-001 — One pure reconcile rule, two boundaries
 
-**Status:** Accepted
+**Status:** Accepted; the two-boundary part is superseded by
+[ADR-004](./0004-reducer-owns-its-context.md), which reconciles and commits at a
+single boundary. The reconcile rule itself, and its idempotence contract, stand.
 
 ## Context
 
@@ -23,6 +25,11 @@ The same pure reconciler runs at the top of every reducer command, so a
 physical transition also starts from the live layout. The rule is applied at
 exactly two boundaries — render projection and command entry — and nowhere
 else.
+
+> **Amended by [ADR-004](./0004-reducer-owns-its-context.md).** The context now
+> lives in the state and is committed by a `SYNC_CONTEXT` command issued during
+> render, which is where the reconcile happens. There is no separate render-time
+> projection and no per-command entry reconcile: one boundary does both.
 
 ## Consequences
 

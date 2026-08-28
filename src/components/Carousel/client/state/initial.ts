@@ -1,9 +1,16 @@
 // See docs/architecture/state.md
 import type { CarouselLayout } from "../domain";
+import type { CarouselRuntimeConfig } from "../config";
 import { ZERO_GESTURE_RELEASE, type CarouselState } from "./types";
 
-export const buildInitialState = (layout: CarouselLayout): CarouselState => ({
+export const buildInitialState = (
+  layout: CarouselLayout,
+  config: CarouselRuntimeConfig,
+  isInstantMode = false,
+): CarouselState => ({
   layout,
+  config,
+  isInstantMode,
   targetPageIndex: 0,
   fromVirtualIndex: 0,
   virtualIndex: 0,

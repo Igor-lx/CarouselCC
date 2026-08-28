@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
+/** The reducer owns its context, so a state fixture carries the defaults. */
+const initialStateFor = (layout: Parameters<typeof buildInitialState>[0]) =>
+  buildInitialState(layout, buildCarouselConfig({}));
+
 import { buildCarouselConfig } from "../../config";
 import { buildCarouselLayout, buildSlideRecords } from "../../domain";
 import type { CarouselLayout } from "../../domain";
@@ -43,7 +47,7 @@ const TOO_SHORT = layoutOf(2, 3);
 const stateWith = (
   layout: CarouselLayout,
   motionPhase: CarouselState["motionPhase"] = "idle",
-): CarouselState => ({ ...buildInitialState(layout), motionPhase });
+): CarouselState => ({ ...initialStateFor(layout), motionPhase });
 
 interface Props {
   state?: CarouselState;

@@ -34,7 +34,12 @@ export const ZERO_GESTURE_RELEASE: GestureRelease = {
 };
 
 export interface CarouselState {
+  /** The context the reducer decides with — see adr/0004-reducer-owns-its-context.md.
+   * It is state, not something handed in per command: whatever reads the state
+   * reads the same layout, config and mode the reducer used. */
   layout: CarouselLayout;
+  config: CarouselRuntimeConfig;
+  isInstantMode: boolean;
   targetPageIndex: number;
   fromVirtualIndex: number;
   virtualIndex: number;
@@ -115,6 +120,11 @@ export interface ReducerContext {
   isInstantMode: boolean;
 }
 
-export type ReducerEnvelope<C extends CarouselCommand = CarouselCommand> = C & {
-  context: ReducerContext;
-};
+/** The one command the carousel never issues itself: the host's context,
+ * committed into the state before anything can act on it. */
+export interface SyncContextCommand extends ReducerContext {
+  type: "SYNC_CONTEXT";
+}
+
+/** What the reducer accepts: every public command, plus the context sync. */
+export type ReducerCommand = CarouselCommand | SyncContextCommand;

@@ -1,15 +1,9 @@
 // See docs/architecture/state.md
-import { useCallback, useMemo, useReducer, useRef } from "react";
+import { useMemo, useReducer } from "react";
 
 import { buildInitialState, motionStatus } from "./initial";
-import { reconcileStateToLayout } from "./reconcile";
 import { carouselReducer } from "./reducer";
-import type {
-  CarouselCommand,
-  CarouselState,
-  ReducerContext,
-  ReducerEnvelope,
-} from "./types";
+import type { CarouselCommand, CarouselState, ReducerContext } from "./types";
 
 export type CarouselDispatch = (command: CarouselCommand) => void;
 
@@ -19,47 +13,32 @@ interface UseCarouselStateResult {
   dispatch: CarouselDispatch;
 }
 
-export function useCarouselState({
-  layout,
-  config,
-  isInstantMode,
-}: ReducerContext): UseCarouselStateResult {
-  const [committedState, dispatchRaw] = useReducer(
-    carouselReducer,
-    layout,
-    buildInitialState,
-  );
-  const effectiveState = useMemo(
-    () => reconcileStateToLayout(committedState, layout),
-    [committedState, layout],
-  );
+const initialise = ({ layout, config, isInstantMode }: ReducerContext) =>
+  buildInitialState(layout, config, isInstantMode);
 
-  // Refs so `dispatch` stays stable; refreshed during render so a same-commit
-  // dispatch still sees the latest values (the reducer reads them via envelope).
-  const layoutRef = useRef(layout);
-  const configRef = useRef(config);
-  const instantRef = useRef(isInstantMode);
+export function useCarouselState(
+  context: ReducerContext,
+): UseCarouselStateResult {
+  const [state, dispatch] = useReducer(carouselReducer, context, initialise);
+  const { layout, config, isInstantMode } = context;
 
-  layoutRef.current = layout;
-  configRef.current = config;
-  instantRef.current = isInstantMode;
-
-  const dispatch = useCallback<CarouselDispatch>((command) => {
-    const envelope: ReducerEnvelope = {
-      ...command,
-      context: {
-        layout: layoutRef.current,
-        config: configRef.current,
-        isInstantMode: instantRef.current,
-      },
-    };
-    dispatchRaw(envelope);
-  }, []);
+  // The reducer owns its context, so it is committed here — during render, and
+  // therefore before any child can dispatch — instead of riding along on every
+  // command. `dispatch` needs no refs to stay stable, and nothing can read a
+  // layout the state was not reconciled against.
+  // See adr/0004-reducer-owns-its-context.md.
+  if (
+    state.layout !== layout ||
+    state.config !== config ||
+    state.isInstantMode !== isInstantMode
+  ) {
+    dispatch({ type: "SYNC_CONTEXT", layout, config, isInstantMode });
+  }
 
   const status = useMemo(
-    () => motionStatus(effectiveState.motionPhase),
-    [effectiveState.motionPhase],
+    () => motionStatus(state.motionPhase),
+    [state.motionPhase],
   );
 
-  return { state: effectiveState, status, dispatch };
+  return { state, status, dispatch };
 }

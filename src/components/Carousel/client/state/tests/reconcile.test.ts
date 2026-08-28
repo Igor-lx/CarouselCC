@@ -3,17 +3,16 @@ import { describe, expect, it } from "vitest";
 import { buildCarouselLayout, buildSlideRecords } from "../../domain";
 import type { CarouselLayout } from "../../domain";
 import type { Slide } from "../../public-api/types";
-import { buildInitialState } from "../initial";
 import { reconcileStateToLayout } from "../reconcile";
 import type { CarouselState } from "../types";
-import { makeLayout } from "./layoutBuilder";
+import { makeLayout, makeState } from "./layoutBuilder";
 
 /** A non-idle state to prove reconciliation collapses motion to a snap. */
 const movedState = (
   layout: CarouselLayout,
   targetPageIndex: number,
 ): CarouselState => ({
-  ...buildInitialState(layout),
+  ...makeState(layout),
   targetPageIndex,
   fromVirtualIndex: 0,
   virtualIndex: targetPageIndex * layout.visibleSlidesCount,
@@ -24,7 +23,7 @@ const movedState = (
 describe("reconcileStateToLayout — equivalence fast path", () => {
   it("returns the same state instance when the layout reference is unchanged", () => {
     const layout = makeLayout(12, 3, false);
-    const state = buildInitialState(layout);
+    const state = makeState(layout);
     expect(reconcileStateToLayout(state, layout)).toBe(state);
   });
 
@@ -45,7 +44,7 @@ describe("reconcileStateToLayout — hard reset", () => {
     const layout = makeLayout(12, 3, false, "a");
     const replaced = makeLayout(8, 3, false, "b");
     const next = reconcileStateToLayout(movedState(layout, 3), replaced);
-    expect(next).toEqual(buildInitialState(replaced));
+    expect(next).toEqual(makeState(replaced));
     expect(next.motionPhase).toBe("idle");
     expect(next.targetPageIndex).toBe(0);
   });
@@ -155,7 +154,7 @@ describe("reconcileStateToLayout — recovery from a stuck phase", () => {
     expect(collapsed.canSlide).toBe(false);
 
     const dragging: CarouselState = {
-      ...buildInitialState(slidable),
+      ...makeState(slidable),
       motionPhase: "dragging",
       moveReason: "gesture",
     };
@@ -168,7 +167,7 @@ describe("reconcileStateToLayout — recovery from a stuck phase", () => {
     const layout = makeLayout(12, 3, false, "a");
     const replaced = makeLayout(10, 3, false, "b");
     const dragging: CarouselState = {
-      ...buildInitialState(layout),
+      ...makeState(layout),
       motionPhase: "dragging",
       moveReason: "gesture",
     };

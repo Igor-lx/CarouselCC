@@ -3,7 +3,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, createRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
+/** The reducer owns its context, so a state fixture carries the defaults. */
+const initialStateFor = (layout: Parameters<typeof buildInitialState>[0]) =>
+  buildInitialState(layout, buildCarouselConfig({}));
+
 import { buildCarouselLayout, buildSlideRecords } from "../../domain";
+import { buildCarouselConfig } from "../../config";
 import { buildInitialState } from "../../state/initial";
 import type { CarouselState } from "../../state";
 import type { CarouselNavigation } from "../../navigation";
@@ -59,7 +64,7 @@ let root: Root;
 let stable: CarouselStableContextValue;
 let motion: CarouselMotionContextValue;
 
-const base = buildInitialState(layout);
+const base = initialStateFor(layout);
 
 function Probe({
   state = base,

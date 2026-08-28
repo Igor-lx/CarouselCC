@@ -1,9 +1,12 @@
 // Shared fixtures for the state tests. `makeLayout` lives here once: duplicating
 // it per test file would be duplication inside ONE unit of code, which is a
 // defect — unlike the deliberate forking between self-sufficient shelf packages.
+import { buildCarouselConfig } from "../../config";
+import type { CarouselRuntimeConfig } from "../../config";
 import { buildCarouselLayout, buildSlideRecords } from "../../domain";
 import type { CarouselLayout } from "../../domain";
-import type { MotionPhase } from "../types";
+import { buildInitialState } from "../initial";
+import type { CarouselState, MotionPhase } from "../types";
 import type { Slide } from "../../public-api/types";
 
 /**
@@ -36,3 +39,11 @@ export const NON_JUMP_PHASES: readonly MotionPhase[] = [
   "step-instant",
   "dragging",
 ];
+
+/** The reducer owns its context now, so a state fixture carries one. Defaults
+ * unless a test needs its own numbers. */
+export const makeState = (
+  layout: CarouselLayout,
+  config: CarouselRuntimeConfig = buildCarouselConfig({}),
+  isInstantMode = false,
+): CarouselState => buildInitialState(layout, config, isInstantMode);

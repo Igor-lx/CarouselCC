@@ -12,7 +12,7 @@ import {
   type CarouselState,
   type EndDragCommand,
   type MotionPhase,
-  type ReducerEnvelope,
+  type ReducerCommand,
 } from "./types";
 
 const dragReleasePhase = (
@@ -25,18 +25,33 @@ const dragReleasePhase = (
 
 export function carouselReducer(
   state: CarouselState,
-  envelope: ReducerEnvelope,
+  command: ReducerCommand,
 ): CarouselState {
-  const { context } = envelope;
-  // Command-boundary reconcile — see adr/0001-layout-reconciliation.md.
-  const synced = reconcileStateToLayout(state, context.layout);
+  // The context boundary is the reconcile boundary: the host's layout, config
+  // and mode land here before any command can act on them, so every branch
+  // below reads them off the state it was given.
+  // See adr/0001-layout-reconciliation.md and adr/0004-reducer-owns-its-context.md.
+  if (command.type === "SYNC_CONTEXT") {
+    const synced = reconcileStateToLayout(state, command.layout);
+    if (
+      synced.config === command.config &&
+      synced.isInstantMode === command.isInstantMode
+    ) {
+      return synced;
+    }
+    return {
+      ...synced,
+      config: command.config,
+      isInstantMode: command.isInstantMode,
+    };
+  }
 
-  switch (envelope.type) {
+  switch (command.type) {
     case "START_DRAG": {
-      const dragOrigin = envelope.fromVirtualIndex ?? synced.virtualIndex;
-      const dragPageIndex = envelope.targetPageIndex ?? synced.targetPageIndex;
+      const dragOrigin = command.fromVirtualIndex ?? state.virtualIndex;
+      const dragPageIndex = command.targetPageIndex ?? state.targetPageIndex;
       return {
-        ...synced,
+        ...state,
         targetPageIndex: dragPageIndex,
         fromVirtualIndex: dragOrigin,
         virtualIndex: dragOrigin,
@@ -50,23 +65,23 @@ export function carouselReducer(
     }
 
     case "END_DRAG": {
-      const dragOrigin = envelope.fromVirtualIndex ?? synced.virtualIndex;
-      const targetPageIndex = synced.layout.isFinite
-        ? clamp(envelope.targetPageIndex, 0, synced.layout.pageCount - 1)
-        : normalizePageIndex(envelope.targetPageIndex, synced.layout.pageCount);
+      const dragOrigin = command.fromVirtualIndex ?? state.virtualIndex;
+      const targetPageIndex = state.layout.isFinite
+        ? clamp(command.targetPageIndex, 0, state.layout.pageCount - 1)
+        : normalizePageIndex(command.targetPageIndex, state.layout.pageCount);
 
       if (
         hasReachedDragTarget(
           dragOrigin,
-          envelope.targetVirtualIndex,
-          context.config.dragReleaseEpsilon,
+          command.targetVirtualIndex,
+          state.config.dragReleaseEpsilon,
         )
       ) {
         return {
-          ...synced,
+          ...state,
           targetPageIndex,
-          fromVirtualIndex: envelope.targetVirtualIndex,
-          virtualIndex: envelope.targetVirtualIndex,
+          fromVirtualIndex: command.targetVirtualIndex,
+          virtualIndex: command.targetVirtualIndex,
           teleportVirtualIndex: null,
           isTeleportApproach: false,
           isRepeatedClickAdvance: false,
@@ -77,24 +92,24 @@ export function carouselReducer(
       }
 
       const releaseGesture =
-        envelope.isInstant || context.isInstantMode
+        command.isInstant || state.isInstantMode
           ? ZERO_GESTURE_RELEASE
           : {
-              pointerVelocity: envelope.pointerReleaseVelocity,
-              uiVelocity: envelope.uiReleaseVelocity,
-              launchVelocity: envelope.launchVelocity,
-              releasedAt: envelope.releasedAt,
+              pointerVelocity: command.pointerReleaseVelocity,
+              uiVelocity: command.uiReleaseVelocity,
+              launchVelocity: command.launchVelocity,
+              releasedAt: command.releasedAt,
             };
 
       return {
-        ...synced,
+        ...state,
         targetPageIndex,
         fromVirtualIndex: dragOrigin,
-        virtualIndex: envelope.targetVirtualIndex,
+        virtualIndex: command.targetVirtualIndex,
         teleportVirtualIndex: null,
         isTeleportApproach: false,
         isRepeatedClickAdvance: false,
-        motionPhase: dragReleasePhase(envelope, context.isInstantMode),
+        motionPhase: dragReleasePhase(command, state.isInstantMode),
         moveReason: "gesture",
         gesture: releaseGesture,
       };
@@ -102,15 +117,15 @@ export function carouselReducer(
 
     case "MOVE":
     case "GO_TO": {
-      const isInstant = Boolean(envelope.isInstant || context.isInstantMode);
-      const command = { ...envelope, isInstant };
+      const isInstant = Boolean(command.isInstant || state.isInstantMode);
+      const stepCommand = { ...command, isInstant };
 
       // Repeated same-direction click during motion (see doc: step resolution).
       const isRepeatedClickAdvance =
-        command.type === "MOVE" &&
-        command.moveReason === "click" &&
+        stepCommand.type === "MOVE" &&
+        stepCommand.moveReason === "click" &&
         !isInstant &&
-        isSameDirectionRepeat(synced, command.step);
+        isSameDirectionRepeat(state, stepCommand.step);
 
       const {
         nextFromVirtualIndex,
@@ -119,35 +134,35 @@ export function carouselReducer(
         nextTeleportVirtualIndex,
         phase,
       } = resolveStepTransition(
-        synced,
-        command,
-        context.isInstantMode,
-        context.config.motion,
+        state,
+        stepCommand,
+        state.isInstantMode,
+        state.config.motion,
         isRepeatedClickAdvance,
       );
 
       const isNoop =
-        nextTargetPageIndex === synced.targetPageIndex &&
-        nextVirtualIndex === synced.virtualIndex;
+        nextTargetPageIndex === state.targetPageIndex &&
+        nextVirtualIndex === state.virtualIndex;
 
       if (isNoop) {
         // Boundary press, or a repeat click still inside the current page: keep
         // the fast-profile flag so the runner rebuilds the active segment.
         return {
-          ...synced,
+          ...state,
           fromVirtualIndex: nextFromVirtualIndex,
           virtualIndex: nextVirtualIndex,
           teleportVirtualIndex: null,
           isTeleportApproach: false,
           isRepeatedClickAdvance,
-          motionPhase: isInstant ? "step-instant" : synced.motionPhase,
-          moveReason: command.moveReason,
+          motionPhase: isInstant ? "step-instant" : state.motionPhase,
+          moveReason: stepCommand.moveReason,
           gesture: ZERO_GESTURE_RELEASE,
         };
       }
 
       return {
-        ...synced,
+        ...state,
         targetPageIndex: nextTargetPageIndex,
         fromVirtualIndex: nextFromVirtualIndex,
         virtualIndex: nextVirtualIndex,
@@ -155,25 +170,25 @@ export function carouselReducer(
         isTeleportApproach: false,
         isRepeatedClickAdvance,
         motionPhase: phase,
-        moveReason: command.moveReason,
+        moveReason: stepCommand.moveReason,
         gesture: ZERO_GESTURE_RELEASE,
       };
     }
 
     case "MOTION_SETTLED": {
-      if (synced.motionPhase === "idle" || synced.motionPhase === "dragging") {
-        return synced;
+      if (state.motionPhase === "idle" || state.motionPhase === "dragging") {
+        return state;
       }
 
-      const settledPosition = envelope.settledPosition;
+      const settledPosition = command.settledPosition;
       const targetChanged =
-        Math.abs(settledPosition - synced.virtualIndex) >
-        context.config.motion.epsilon;
+        Math.abs(settledPosition - state.virtualIndex) >
+        state.config.motion.epsilon;
 
       if (targetChanged) {
         // A newer target replaced this one mid-settle: re-anchor, keep motion.
         return {
-          ...synced,
+          ...state,
           fromVirtualIndex: settledPosition,
           teleportVirtualIndex: null,
           isTeleportApproach: false,
@@ -182,22 +197,22 @@ export function carouselReducer(
         };
       }
 
-      if (synced.teleportVirtualIndex !== null) {
+      if (state.teleportVirtualIndex !== null) {
         // Preflight settled: cut across the middle, start the bounded approach.
         const direction = Math.sign(
-          synced.teleportVirtualIndex - settledPosition,
+          state.teleportVirtualIndex - settledPosition,
         );
 
         if (direction !== 0) {
           const approachDistance = resolveGoToApproachDistance(
-            synced.layout.visibleSlidesCount,
-            context.config.motion,
+            state.layout.visibleSlidesCount,
+            state.config.motion,
           );
           return {
-            ...synced,
+            ...state,
             fromVirtualIndex:
-              synced.teleportVirtualIndex - direction * approachDistance,
-            virtualIndex: synced.teleportVirtualIndex,
+              state.teleportVirtualIndex - direction * approachDistance,
+            virtualIndex: state.teleportVirtualIndex,
             teleportVirtualIndex: null,
             isTeleportApproach: true,
             isRepeatedClickAdvance: false,
@@ -208,9 +223,9 @@ export function carouselReducer(
 
         // Degenerate: the final target coincides with the preflight landing.
         return {
-          ...synced,
-          fromVirtualIndex: synced.teleportVirtualIndex,
-          virtualIndex: synced.teleportVirtualIndex,
+          ...state,
+          fromVirtualIndex: state.teleportVirtualIndex,
+          virtualIndex: state.teleportVirtualIndex,
           teleportVirtualIndex: null,
           isTeleportApproach: false,
           isRepeatedClickAdvance: false,
@@ -220,7 +235,7 @@ export function carouselReducer(
       }
 
       return {
-        ...synced,
+        ...state,
         fromVirtualIndex: settledPosition,
         teleportVirtualIndex: null,
         isTeleportApproach: false,
@@ -231,6 +246,6 @@ export function carouselReducer(
     }
 
     default:
-      return synced;
+      return state;
   }
 }

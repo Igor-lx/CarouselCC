@@ -48,14 +48,16 @@ const makeLayout = (slideCount: number, visible: number) => {
   return buildCarouselLayout(buildSlideRecords(slides), visible, false);
 };
 
+/** A state fixture carrying the context this suite decides with. */
+const initialState = (
+  layout: Parameters<typeof buildInitialState>[0],
+  suiteConfig = config,
+): CarouselState => buildInitialState(layout, suiteConfig);
+
 const reduce = (
   state: CarouselState,
   command: CarouselCommand,
-): CarouselState =>
-  carouselReducer(state, {
-    ...command,
-    context: { layout: state.layout, config, isInstantMode: false },
-  });
+): CarouselState => carouselReducer(state, command);
 
 /** Release a drag with a calm visual finish but a fast gesture memory. */
 const releasedState = (
@@ -64,7 +66,7 @@ const releasedState = (
   fromVirtualIndex = -0.4,
 ) => {
   const layout = makeLayout(12, 3);
-  const dragging = reduce(buildInitialState(layout), {
+  const dragging = reduce(initialState(layout), {
     type: "START_DRAG",
     fromVirtualIndex: 0,
     targetPageIndex: 0,
@@ -192,7 +194,7 @@ describe("step tempo by move reason", () => {
 
   it("an autoplay step rides at durationAutoplay, whatever the distance", () => {
     const layout = makeLayout(12, 3);
-    const state = reduce(buildInitialState(layout), {
+    const state = reduce(initialState(layout), {
       type: "MOVE",
       step: 1,
       moveReason: "autoplay",
@@ -380,12 +382,12 @@ describe("GO_TO flight-envelope time ceiling", () => {
     targetPageIndex: number,
   ) => {
     const layout = makeLayout(30, 3); // pageCount 10, stepSize 3
-    const state = carouselReducer(buildInitialState(layout), {
+    // The GO_TO config under test is the one the state carries.
+    const state = carouselReducer(initialState(layout, cfg), {
       type: "GO_TO",
       targetPageIndex,
       moveReason: "click",
       fromVirtualIndex: 0,
-      context: { layout, config: cfg, isInstantMode: false },
     });
     const { segment } = buildCarouselSegment({
       state,

@@ -1,9 +1,13 @@
 # State machine
 
 A reducer-backed state machine in [`state/`](../../state). The reducer is
-**pure**: layout, config and instant-mode flow in as a `context` envelope on
-every dispatch ([`state/useCarouselState.ts`](../../state/useCarouselState.ts)),
-never captured from closure.
+**pure**, and it owns the context it decides with: layout, config and
+instant-mode are fields of the state, not something handed in per command. The
+host's values are committed by a single `SYNC_CONTEXT` command that
+[`state/useCarouselState.ts`](../../state/useCarouselState.ts) issues during
+render, before anything can dispatch — so nothing is captured from closure, and
+whatever reads the state reads the same context the reducer used. See
+[ADR-004](../adr/0004-reducer-owns-its-context.md).
 
 ## Commands
 

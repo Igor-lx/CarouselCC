@@ -26,7 +26,8 @@ export const reconcileStateToLayout = (
     nextLayout.dataKey !== currentLayout.dataKey ||
     nextLayout.isFinite !== currentLayout.isFinite;
 
-  if (hardReset) return buildInitialState(nextLayout);
+  if (hardReset)
+    return buildInitialState(nextLayout, state.config, state.isInstantMode);
 
   const targetPageIndex = reconciledPageIndex(
     state.targetPageIndex,

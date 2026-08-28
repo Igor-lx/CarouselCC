@@ -25,23 +25,32 @@ const config: CarouselRuntimeConfig = {
   },
 };
 
-/** Dispatch one command through the reducer with an explicit context. */
+/** A state fixture carrying the context this suite decides with. */
+const initialState = (layout: CarouselLayout): CarouselState =>
+  buildInitialState(layout, config);
+
+/** Sync the context the way the hook does, then run one command through it. */
 const reduce = (
   state: CarouselState,
   command: CarouselCommand,
   layout: CarouselLayout = state.layout,
   isInstantMode = false,
 ): CarouselState =>
-  carouselReducer(state, {
-    ...command,
-    context: { layout, config, isInstantMode },
-  });
+  carouselReducer(
+    carouselReducer(state, {
+      type: "SYNC_CONTEXT",
+      layout,
+      config,
+      isInstantMode,
+    }),
+    command,
+  );
 
 // --- tests ------------------------------------------------------------------
 
 describe("buildInitialState", () => {
   it("starts on page 0, idle, with no move reason", () => {
-    const state = buildInitialState(makeLayout(12, 3, false));
+    const state = initialState(makeLayout(12, 3, false));
     expect(state.targetPageIndex).toBe(0);
     expect(state.virtualIndex).toBe(0);
     expect(state.motionPhase).toBe("idle");
@@ -53,7 +62,7 @@ describe("MOVE — cyclic", () => {
   const layout = makeLayout(12, 3, false); // pageCount 4
 
   it("advances one page on MOVE(+1)", () => {
-    const next = reduce(buildInitialState(layout), {
+    const next = reduce(initialState(layout), {
       type: "MOVE",
       step: 1,
       moveReason: "click",
@@ -66,7 +75,7 @@ describe("MOVE — cyclic", () => {
   });
 
   it("wraps backwards on MOVE(-1) from page 0", () => {
-    const next = reduce(buildInitialState(layout), {
+    const next = reduce(initialState(layout), {
       type: "MOVE",
       step: -1,
       moveReason: "click",
@@ -77,7 +86,7 @@ describe("MOVE — cyclic", () => {
   });
 
   it("marks an autoplay step with the autoplay reason", () => {
-    const next = reduce(buildInitialState(layout), {
+    const next = reduce(initialState(layout), {
       type: "MOVE",
       step: 1,
       moveReason: "autoplay",
@@ -90,7 +99,7 @@ describe("MOVE — finite", () => {
   const layout = makeLayout(12, 3, true); // pageCount 4, finite
 
   it("clamps and no-ops at the start boundary", () => {
-    const next = reduce(buildInitialState(layout), {
+    const next = reduce(initialState(layout), {
       type: "MOVE",
       step: -1,
       moveReason: "click",
@@ -102,7 +111,7 @@ describe("MOVE — finite", () => {
 
   it("clamps at the end boundary", () => {
     const atEnd: CarouselState = {
-      ...buildInitialState(layout),
+      ...initialState(layout),
       targetPageIndex: 3,
       virtualIndex: 9,
     };
@@ -120,7 +129,7 @@ describe("MOVE — finite", () => {
 describe("GO_TO", () => {
   it("jumps directly for a short span (no teleport)", () => {
     const layout = makeLayout(12, 3, false); // pageCount 4
-    const next = reduce(buildInitialState(layout), {
+    const next = reduce(initialState(layout), {
       type: "GO_TO",
       targetPageIndex: 2,
       moveReason: "click",
@@ -134,7 +143,7 @@ describe("GO_TO", () => {
 
   it("splits a far span into a bounded preflight + pending teleport", () => {
     const layout = makeLayout(30, 3, false); // pageCount 10
-    const next = reduce(buildInitialState(layout), {
+    const next = reduce(initialState(layout), {
       type: "GO_TO",
       targetPageIndex: 5,
       moveReason: "click",
@@ -152,7 +161,7 @@ describe("GO_TO", () => {
   // wrap remains the business of ±1 MOVE steps.
   it("rides backward to an earlier dot even when both directions are equidistant", () => {
     const layout = makeLayout(12, 3, false); // pageCount 4: 2 -> 0 is 2 either way
-    const there = reduce(buildInitialState(layout), {
+    const there = reduce(initialState(layout), {
       type: "GO_TO",
       targetPageIndex: 2,
       moveReason: "click",
@@ -174,7 +183,7 @@ describe("GO_TO", () => {
 
   it("rides backward to an earlier dot even when the cyclic wrap would be shorter", () => {
     const layout = makeLayout(9, 3, false); // pageCount 3: 2 -> 0 wrap is 1 forward
-    const there = reduce(buildInitialState(layout), {
+    const there = reduce(initialState(layout), {
       type: "GO_TO",
       targetPageIndex: 2,
       moveReason: "click",
@@ -199,14 +208,14 @@ describe("MOTION_SETTLED", () => {
   const layout = makeLayout(30, 3, false);
 
   it("is a no-op while idle", () => {
-    const idle = buildInitialState(layout);
+    const idle = initialState(layout);
     expect(reduce(idle, { type: "MOTION_SETTLED", settledPosition: 0 })).toBe(
       idle,
     );
   });
 
   it("settles a normal step into idle", () => {
-    const moving = reduce(buildInitialState(layout), {
+    const moving = reduce(initialState(layout), {
       type: "MOVE",
       step: 1,
       moveReason: "click",
@@ -221,7 +230,7 @@ describe("MOTION_SETTLED", () => {
   });
 
   it("teleports across the middle after a far-GO_TO preflight settles", () => {
-    const preflight = reduce(buildInitialState(layout), {
+    const preflight = reduce(initialState(layout), {
       type: "GO_TO",
       targetPageIndex: 5,
       moveReason: "click",
@@ -239,7 +248,7 @@ describe("MOTION_SETTLED", () => {
   });
 
   it("settles the post-teleport approach into idle", () => {
-    const preflight = reduce(buildInitialState(layout), {
+    const preflight = reduce(initialState(layout), {
       type: "GO_TO",
       targetPageIndex: 5,
       moveReason: "click",
@@ -259,7 +268,7 @@ describe("MOTION_SETTLED", () => {
   });
 
   it("re-anchors instead of stopping when a newer target replaced the old one", () => {
-    const moving = reduce(buildInitialState(layout), {
+    const moving = reduce(initialState(layout), {
       type: "MOVE",
       step: 1,
       moveReason: "click",
@@ -279,7 +288,7 @@ describe("START_DRAG / END_DRAG", () => {
   const layout = makeLayout(12, 3, false);
 
   it("enters the dragging phase on START_DRAG", () => {
-    const next = reduce(buildInitialState(layout), {
+    const next = reduce(initialState(layout), {
       type: "START_DRAG",
       fromVirtualIndex: 3,
       targetPageIndex: 1,
@@ -291,7 +300,7 @@ describe("START_DRAG / END_DRAG", () => {
   });
 
   it("resolves a committed drag into a normal step", () => {
-    const dragging = reduce(buildInitialState(layout), {
+    const dragging = reduce(initialState(layout), {
       type: "START_DRAG",
       fromVirtualIndex: 0,
       targetPageIndex: 0,
@@ -315,7 +324,7 @@ describe("START_DRAG / END_DRAG", () => {
   });
 
   it("resolves a no-intent release into a snap-back", () => {
-    const dragging = reduce(buildInitialState(layout), {
+    const dragging = reduce(initialState(layout), {
       type: "START_DRAG",
       fromVirtualIndex: 0,
       targetPageIndex: 0,
@@ -335,7 +344,7 @@ describe("START_DRAG / END_DRAG", () => {
   });
 
   it("settles instantly when the release is already on target", () => {
-    const dragging = reduce(buildInitialState(layout), {
+    const dragging = reduce(initialState(layout), {
       type: "START_DRAG",
       fromVirtualIndex: 3,
       targetPageIndex: 1,
@@ -359,7 +368,7 @@ describe("repeated vs. opposite click", () => {
   const layout = makeLayout(12, 3, false);
 
   it("retargets one page past the in-flight destination on a same-direction repeat click", () => {
-    const first = reduce(buildInitialState(layout), {
+    const first = reduce(initialState(layout), {
       type: "MOVE",
       step: 1,
       moveReason: "click",
@@ -384,7 +393,7 @@ describe("repeated vs. opposite click", () => {
   });
 
   it("holds the +2 target while visual stays inside the same page during a burst", () => {
-    let next = reduce(buildInitialState(layout), {
+    let next = reduce(initialState(layout), {
       type: "MOVE",
       step: 1,
       moveReason: "click",
@@ -424,7 +433,7 @@ describe("repeated vs. opposite click", () => {
 
   it("retargets two pages ahead as visual progresses past a page boundary mid-burst", () => {
     // Click 1 from idle: start motion toward page 1.
-    let next = reduce(buildInitialState(layout), {
+    let next = reduce(initialState(layout), {
       type: "MOVE",
       step: 1,
       moveReason: "click",
@@ -455,7 +464,7 @@ describe("repeated vs. opposite click", () => {
 
   it("retargets backwards two pages ahead of visual in reverse", () => {
     // From idle, click backwards: cyclic wrap, target=3.
-    let next = reduce(buildInitialState(layout), {
+    let next = reduce(initialState(layout), {
       type: "MOVE",
       step: -1,
       moveReason: "click",
@@ -490,7 +499,7 @@ describe("repeated vs. opposite click", () => {
     // 50 spam clicks while visual creeps forward but stays inside page 0:
     // the destination is page 2 from click 2 onwards, regardless of how many
     // more clicks follow.
-    let next = reduce(buildInitialState(layout), {
+    let next = reduce(initialState(layout), {
       type: "MOVE",
       step: 1,
       moveReason: "click",
@@ -510,7 +519,7 @@ describe("repeated vs. opposite click", () => {
   });
 
   it("does not flag an opposite-direction click as a repeated advance and routes through the normal advance path", () => {
-    const first = reduce(buildInitialState(layout), {
+    const first = reduce(initialState(layout), {
       type: "MOVE",
       step: 1,
       moveReason: "click",
@@ -527,7 +536,7 @@ describe("repeated vs. opposite click", () => {
   });
 
   it("does not short-circuit autoplay MOVEs during in-flight motion", () => {
-    const first = reduce(buildInitialState(layout), {
+    const first = reduce(initialState(layout), {
       type: "MOVE",
       step: 1,
       moveReason: "autoplay",
@@ -546,7 +555,7 @@ describe("repeated vs. opposite click", () => {
   });
 
   it("lets the first click after settle resume normal advancement", () => {
-    const first = reduce(buildInitialState(layout), {
+    const first = reduce(initialState(layout), {
       type: "MOVE",
       step: 1,
       moveReason: "click",
@@ -584,7 +593,7 @@ describe("instant mode", () => {
   it("collapses a MOVE to the step-instant phase", () => {
     const layout = makeLayout(12, 3, false);
     const next = reduce(
-      buildInitialState(layout),
+      initialState(layout),
       { type: "MOVE", step: 1, moveReason: "click", fromVirtualIndex: 0 },
       layout,
       true,

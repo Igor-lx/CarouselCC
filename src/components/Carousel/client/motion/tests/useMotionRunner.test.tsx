@@ -11,6 +11,10 @@ import {
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
+/** The reducer owns its context, so a state fixture carries the defaults. */
+const initialStateFor = (layout: Parameters<typeof buildInitialState>[0]) =>
+  buildInitialState(layout, buildCarouselConfig({}));
+
 import type { TrackBindingApi } from "../../geometry";
 
 import { buildCarouselConfig } from "../../config";
@@ -53,7 +57,7 @@ const layout = buildCarouselLayout(
   false,
 );
 
-const stationary = buildInitialState(layout);
+const stationary = initialStateFor(layout);
 
 const moving = (overrides: Partial<CarouselState> = {}): CarouselState => ({
   ...stationary,
@@ -168,7 +172,7 @@ describe("useMotionRunner — when it re-plans", () => {
       3,
       false,
     );
-    render({ ...buildInitialState(tiny), virtualIndex: 1 });
+    render({ ...initialStateFor(tiny), virtualIndex: 1 });
     expect(startCompositorMotion).not.toHaveBeenCalled();
     expect(cancelCompositorMotion).toHaveBeenCalled();
   });
