@@ -2,7 +2,11 @@
 import type { Slide } from "../public-api/types";
 import { clamp, mod, normalizePageIndex } from "./math";
 import { clampedVisibleSlidesCount } from "./slides";
-import type { CarouselLayout, CarouselSlideRecord, PageBoundaryState } from "./types";
+import type {
+  CarouselLayout,
+  CarouselSlideRecord,
+  PageBoundaryState,
+} from "./types";
 
 const slideContentKey = (slide: Slide): string => {
   const { content } = slide;
@@ -31,10 +35,15 @@ export const buildCarouselLayout = (
   isFinite: boolean,
 ): CarouselLayout => {
   const length = records.length;
-  const effectiveVisible = clampedVisibleSlidesCount(length, visibleSlidesCount);
+  const effectiveVisible = clampedVisibleSlidesCount(
+    length,
+    visibleSlidesCount,
+  );
   const canSlide = length > effectiveVisible;
-  const pageCount = effectiveVisible > 0 ? Math.ceil(length / effectiveVisible) : 0;
-  const virtualLength = canSlide && !isFinite ? pageCount * effectiveVisible : length;
+  const pageCount =
+    effectiveVisible > 0 ? Math.ceil(length / effectiveVisible) : 0;
+  const virtualLength =
+    canSlide && !isFinite ? pageCount * effectiveVisible : length;
   const dataKey = buildDataKey(records);
 
   return {
@@ -57,13 +66,18 @@ export const alignedVirtualIndex = (
   const normalized = normalizePageIndex(pageIndex, layout.pageCount);
   const start = pageStart(normalized, layout.visibleSlidesCount);
   if (layout.isFinite || layout.virtualLength <= 0) return start;
-  const lane = Math.round((referenceVirtualIndex - start) / layout.virtualLength);
+  const lane = Math.round(
+    (referenceVirtualIndex - start) / layout.virtualLength,
+  );
   return start + lane * layout.virtualLength;
 };
 
 /** The page a virtual index belongs to — floor-based (contrast
  * `nearestPageIndex`, which rounds a fractional position to the nearest page). */
-export const pageContaining = (virtualIndex: number, layout: CarouselLayout) => {
+export const pageContaining = (
+  virtualIndex: number,
+  layout: CarouselLayout,
+) => {
   if (layout.pageCount <= 0 || layout.visibleSlidesCount <= 0) return 0;
   const raw = Math.floor(Math.floor(virtualIndex) / layout.visibleSlidesCount);
   return layout.isFinite
@@ -71,7 +85,10 @@ export const pageContaining = (virtualIndex: number, layout: CarouselLayout) => 
     : normalizePageIndex(raw, layout.pageCount);
 };
 
-export const nearestPageIndex = (virtualIndex: number, layout: CarouselLayout) => {
+export const nearestPageIndex = (
+  virtualIndex: number,
+  layout: CarouselLayout,
+) => {
   if (layout.pageCount <= 0 || layout.visibleSlidesCount <= 0) return 0;
   const raw = Math.round(virtualIndex / layout.visibleSlidesCount);
   return layout.isFinite

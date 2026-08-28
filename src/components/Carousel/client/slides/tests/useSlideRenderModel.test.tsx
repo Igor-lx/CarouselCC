@@ -4,7 +4,11 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import { buildCarouselLayout, buildSlideRecords } from "../../domain";
-import type { CarouselLayout, CarouselSlideRecord, VirtualSlide } from "../../domain";
+import type {
+  CarouselLayout,
+  CarouselSlideRecord,
+  VirtualSlide,
+} from "../../domain";
 import type { Slide } from "../../public-api/types";
 import { useSlideRenderModel } from "../useSlideRenderModel";
 

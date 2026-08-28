@@ -23,7 +23,9 @@ describe("index.html theme boot stays in sync with the theme box", () => {
     expect(attr(/light:\s*"(#[0-9a-fA-F]{3,8})"/)).toBe(
       BROWSER_THEME_COLORS.light,
     );
-    expect(attr(/dark:\s*"(#[0-9a-fA-F]{3,8})"/)).toBe(BROWSER_THEME_COLORS.dark);
+    expect(attr(/dark:\s*"(#[0-9a-fA-F]{3,8})"/)).toBe(
+      BROWSER_THEME_COLORS.dark,
+    );
   });
 
   it("the boot script's STORAGE_KEY matches the canonical key", () => {

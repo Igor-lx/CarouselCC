@@ -57,7 +57,9 @@ const asRgb = (hex: string) => {
 
 beforeEach(() => {
   localStorage.clear();
-  document.head.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.remove());
+  document.head
+    .querySelectorAll('meta[name="theme-color"]')
+    .forEach((m) => m.remove());
   document.documentElement.removeAttribute("style");
   document.documentElement.removeAttribute("data-theme");
   installMatchMedia();
@@ -95,11 +97,15 @@ describe("BrowserChromeSync (via the ThemeProvider facade)", () => {
 
   it("takes the meta it created back out on unmount", () => {
     render();
-    expect(document.head.querySelectorAll('meta[name="theme-color"]')).toHaveLength(1);
+    expect(
+      document.head.querySelectorAll('meta[name="theme-color"]'),
+    ).toHaveLength(1);
 
     act(() => root!.unmount());
     root = null;
-    expect(document.head.querySelectorAll('meta[name="theme-color"]')).toHaveLength(0);
+    expect(
+      document.head.querySelectorAll('meta[name="theme-color"]'),
+    ).toHaveLength(0);
   });
 
   it("leaves a meta the HOST owns alone on unmount", () => {
@@ -110,7 +116,9 @@ describe("BrowserChromeSync (via the ThemeProvider facade)", () => {
     render();
     act(() => root!.unmount());
     root = null;
-    expect(document.head.querySelectorAll('meta[name="theme-color"]')).toHaveLength(1);
+    expect(
+      document.head.querySelectorAll('meta[name="theme-color"]'),
+    ).toHaveLength(1);
   });
 
   it("an unpaired host meta carries the RESOLVED look in auto mode", () => {

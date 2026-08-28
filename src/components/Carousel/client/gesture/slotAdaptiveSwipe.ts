@@ -23,7 +23,11 @@ export const resolveSlotAdaptiveSwipeConfig = (
   // Pre-measure: no slot to scale to, so deliver the commit distance at its
   // floor. A real gesture always outlives the first measurement.
   if (slotPx === null || !(slotPx > 0)) {
-    return { ...engine, swipeThresholdRatio: 0, minSwipeDistance: commit.minPx };
+    return {
+      ...engine,
+      swipeThresholdRatio: 0,
+      minSwipeDistance: commit.minPx,
+    };
   }
 
   const slotScale = slotPx / SWIPE_REFERENCE_SLOT_PX;

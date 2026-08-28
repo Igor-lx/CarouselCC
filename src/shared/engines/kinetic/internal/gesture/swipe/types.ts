@@ -6,7 +6,8 @@ export type PointerSwipeDirection = "left" | "right" | "none";
 
 /** How an owned gesture ended — carries meaning for catch-and-hold consumers.
  * See shared/gesture/README.md § End reasons (Android long-press → `external-cancel`). */
-export type PointerSwipeEndReason = "release" | "vertical-scroll" | "external-cancel";
+export type PointerSwipeEndReason =
+  "release" | "vertical-scroll" | "external-cancel";
 
 export interface PointerSwipeConfig {
   /** Quiet period after a release before new gestures are accepted. */
@@ -84,8 +85,7 @@ export interface PointerSwipeHostProps extends PointerSwipeListeners {
 
 /** A consumer-side ref the engine forwards the host element into. */
 export type PointerSwipeHostRef =
-  | ((node: HTMLElement | null) => void)
-  | { current: HTMLElement | null };
+  ((node: HTMLElement | null) => void) | { current: HTMLElement | null };
 
 /** Turnkey "the finger drags your value". See shared/gesture/README.md § Turnkey drag→value
  * (anchors at activation; 1:1 px↔unit; `read` catches a flying value). */

@@ -84,6 +84,8 @@ describe("collectWidgetWarnings", () => {
   });
 
   it("reports every bad prop, not just the first", () => {
-    expect(fieldsFor({ visibleDots: 2, dotSize: -1 }).length).toBeGreaterThan(1);
+    expect(fieldsFor({ visibleDots: 2, dotSize: -1 }).length).toBeGreaterThan(
+      1,
+    );
   });
 });

@@ -4,7 +4,4 @@ export { Pagination } from "./basic";
 export type { PaginationProps, PaginationClassMap } from "./basic";
 
 export { PaginationWidget } from "./widget";
-export type {
-  PaginationWidgetProps,
-  PaginationWidgetClassMap,
-} from "./widget";
+export type { PaginationWidgetProps, PaginationWidgetClassMap } from "./widget";

@@ -1,11 +1,22 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type Mock,
+} from "vitest";
 import { act, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import { createMotionPlanChannel, type MotionPlanChannel } from "../../motion";
 import { FALLBACK_DROP_EVERY_NTH_FRAME } from "../../config";
-import type { VisualPositionFrame, VisualPositionSource } from "../../visual-position";
+import type {
+  VisualPositionFrame,
+  VisualPositionSource,
+} from "../../visual-position";
 import { useTrackBinding, type TrackBindingApi } from "../useTrackBinding";
 import type { SlotSizeSource } from "../useSlotSizeSource";
 

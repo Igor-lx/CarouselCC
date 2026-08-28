@@ -45,7 +45,13 @@ describe("sampleDotTrajectory", () => {
 
   it("keeps opacity within [0, 1] along the whole path", () => {
     for (const id of [-1, 0, 1, 2, 3, 4, 5]) {
-      for (const frame of sampleDotTrajectory(id, 1.4, 3, geometry, LINEAR_STOPS)) {
+      for (const frame of sampleDotTrajectory(
+        id,
+        1.4,
+        3,
+        geometry,
+        LINEAR_STOPS,
+      )) {
         expect(frame.opacity).toBeGreaterThanOrEqual(0);
         expect(frame.opacity).toBeLessThanOrEqual(1);
       }

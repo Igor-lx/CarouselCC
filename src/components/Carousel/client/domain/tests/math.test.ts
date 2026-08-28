@@ -31,4 +31,3 @@ describe("normalizePageIndex", () => {
     expect(normalizePageIndex(3, 0)).toBe(0);
   });
 });
-

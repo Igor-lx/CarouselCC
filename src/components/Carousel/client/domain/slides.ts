@@ -2,10 +2,16 @@
 import type { Slide } from "../public-api/types";
 import type { CarouselSlideRecord } from "./types";
 
-const clampedVisibleSlidesCount = (length: number, visibleSlidesCount: number) =>
-  Math.min(visibleSlidesCount, length);
+const clampedVisibleSlidesCount = (
+  length: number,
+  visibleSlidesCount: number,
+) => Math.min(visibleSlidesCount, length);
 
-const buildKey = (slide: Slide, layoutIndex: number, isClone: boolean): string =>
+const buildKey = (
+  slide: Slide,
+  layoutIndex: number,
+  isClone: boolean,
+): string =>
   isClone
     ? `slide:${String(slide.id)}:layout-clone:${layoutIndex}`
     : `slide:${String(slide.id)}`;
@@ -17,7 +23,10 @@ export const buildSlideRecords = (slidesData: Slide[]): CarouselSlideRecord[] =>
     slideKey: buildKey(slide, index, false),
   }));
 
-export const hasPartialPageLayout = (length: number, visibleSlidesCount: number) => {
+export const hasPartialPageLayout = (
+  length: number,
+  visibleSlidesCount: number,
+) => {
   if (length === 0) return false;
   const effective = clampedVisibleSlidesCount(length, visibleSlidesCount);
   return length % effective !== 0;
@@ -62,12 +71,15 @@ export const resolveLargestSrcSetCandidate = (
   return best;
 };
 
-export const resolveLargestImageCandidate = (image: Slide["image"]): string | null => {
+export const resolveLargestImageCandidate = (
+  image: Slide["image"],
+): string | null => {
   let best: { url: string; width: number } | null = null;
   const consider = (srcSet: string | undefined) => {
     const largest = resolveLargestSrcSetCandidate(srcSet);
     // Strictly-greater keeps the earliest (default srcSet first) on ties.
-    if (largest && (best === null || largest.width > best.width)) best = largest;
+    if (largest && (best === null || largest.width > best.width))
+      best = largest;
   };
   consider(image?.srcSet);
   for (const source of image?.sources ?? []) consider(source.srcSet);

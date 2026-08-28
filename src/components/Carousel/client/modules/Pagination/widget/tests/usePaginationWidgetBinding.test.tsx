@@ -156,7 +156,11 @@ afterEach(() => {
  */
 const expectTheSharedDropRule = () => {
   let painted = paintedStrip();
-  for (let index = 0; index < FALLBACK_DROP_EVERY_NTH_FRAME * 2 + 1; index += 1) {
+  for (
+    let index = 0;
+    index < FALLBACK_DROP_EVERY_NTH_FRAME * 2 + 1;
+    index += 1
+  ) {
     const frame = frameAt(0.1 * (index + 1), {
       phase: "running",
       runningFrameIndex: index,
@@ -185,9 +189,16 @@ describe("usePaginationWidgetBinding — follow pacing", () => {
     plan.publish({ kind: "follow", isFallback: false });
 
     let painted = paintedStrip();
-    for (let index = 0; index < FALLBACK_DROP_EVERY_NTH_FRAME * 2 + 1; index += 1) {
+    for (
+      let index = 0;
+      index < FALLBACK_DROP_EVERY_NTH_FRAME * 2 + 1;
+      index += 1
+    ) {
       visual.emit(
-        frameAt(0.1 * (index + 1), { phase: "running", runningFrameIndex: index }),
+        frameAt(0.1 * (index + 1), {
+          phase: "running",
+          runningFrameIndex: index,
+        }),
       );
       expect(paintedStrip()).not.toBe(painted);
       painted = paintedStrip();

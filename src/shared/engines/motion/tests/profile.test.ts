@@ -20,7 +20,9 @@ describe("createMotionProfile", () => {
     expect(profile.zones.length).toBe(3);
     // zones are laid out contiguously in distance-progress space.
     expect(profile.zones[0]!.startDistanceProgress).toBeCloseTo(0);
-    expect(profile.zones[profile.zones.length - 1]!.endDistanceProgress).toBeCloseTo(1);
+    expect(
+      profile.zones[profile.zones.length - 1]!.endDistanceProgress,
+    ).toBeCloseTo(1);
   });
 
   it("drops zero-share zones (pure deceleration profile keeps one zone)", () => {

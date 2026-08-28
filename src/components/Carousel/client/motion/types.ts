@@ -3,11 +3,7 @@ import type { ProfileSegment } from "../../../../shared";
 
 /** What initiated the segment (see motion.md for the full mapping). */
 export type CarouselMotionStrategy =
-  | "step"
-  | "gesture"
-  | "repeated"
-  | "jump"
-  | "idle";
+  "step" | "gesture" | "repeated" | "jump" | "idle";
 
 export type CarouselMotionIntent =
   | "instant"

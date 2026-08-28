@@ -8,9 +8,7 @@ export type CarouselStateIssueKind =
   | "teleport-approach-outside-step-jump";
 
 export type CarouselStateIssueField =
-  | "targetPageIndex"
-  | "teleportVirtualIndex"
-  | "isTeleportApproach";
+  "targetPageIndex" | "teleportVirtualIndex" | "isTeleportApproach";
 
 export interface CarouselStateIssue {
   readonly kind: CarouselStateIssueKind;
@@ -42,7 +40,10 @@ export const validateCarouselState = (
     });
   }
 
-  if (state.teleportVirtualIndex !== null && state.motionPhase !== "step-jump") {
+  if (
+    state.teleportVirtualIndex !== null &&
+    state.motionPhase !== "step-jump"
+  ) {
     issues.push({
       kind: "teleport-virtual-index-outside-step-jump",
       field: "teleportVirtualIndex",

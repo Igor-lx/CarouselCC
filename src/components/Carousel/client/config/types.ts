@@ -39,7 +39,6 @@ export interface SwipeCommitConfig {
   maxPx: number;
 }
 
-
 export type CarouselSwipeConfig = Omit<
   Required<PointerSwipeConfig>,
   "minSwipeDistance" | "swipeThresholdRatio"
@@ -57,7 +56,6 @@ export interface PropDerivedSettings {
   /** Resolved image-error placeholder text. */
   errorAltPlaceholder: string;
 }
-
 
 export interface MotionProfileSharesSettings {
   /** Ramp-up fraction of the travel. */

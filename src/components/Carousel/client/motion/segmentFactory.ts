@@ -28,7 +28,10 @@ import type {
   MotionStart,
 } from "./types";
 
-const intentFromState = (state: CarouselState, isInstant: boolean): CarouselMotionIntent => {
+const intentFromState = (
+  state: CarouselState,
+  isInstant: boolean,
+): CarouselMotionIntent => {
   if (isInstant || state.motionPhase === "step-instant") return "instant";
   if (state.teleportVirtualIndex !== null) return "teleport-preflight";
   if (state.isTeleportApproach) return "teleport-approach";
@@ -336,7 +339,11 @@ export function buildCarouselSegment({
       startedAt,
       config.motion,
       stepSize,
-      resolveJumpPeakSpeed(stepSize, config.stepDuration, config.motion.goToSpeedMultiplier),
+      resolveJumpPeakSpeed(
+        stepSize,
+        config.stepDuration,
+        config.motion.goToSpeedMultiplier,
+      ),
       goToProfilePhase(intent),
     );
     return { segment, duration: segment.duration };

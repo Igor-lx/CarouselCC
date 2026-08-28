@@ -25,7 +25,11 @@ const rule = (selector: string): string => {
   const names = new RegExp(`(^|[\\s,])${escaped}(\\s|,|$)`);
   const bodies: string[] = [];
 
-  for (let open = scss.indexOf("{"); open !== -1; open = scss.indexOf("{", open + 1)) {
+  for (
+    let open = scss.indexOf("{");
+    open !== -1;
+    open = scss.indexOf("{", open + 1)
+  ) {
     // The selector list runs back to the previous block boundary.
     let start = open - 1;
     while (start >= 0 && !"{};".includes(scss[start]!)) start -= 1;

@@ -9,7 +9,9 @@ const MIN_PROGRESS_STOP_INTERVALS = 32;
 const MAX_PROGRESS_STOP_INTERVALS = 256;
 
 /** Stop count for one profile (see the density note above). */
-export const resolveProgressStopIntervals = (profile: MotionProfile): number => {
+export const resolveProgressStopIntervals = (
+  profile: MotionProfile,
+): number => {
   if (!(profile.duration > 0) || profile.zones.length === 0) {
     return MIN_PROGRESS_STOP_INTERVALS;
   }
@@ -137,8 +139,12 @@ export interface InFlightSpan {
 
 /** Where the span has reached at `now`, sampled from the curve (never the DOM). */
 export const positionAtNow = (span: InFlightSpan, now: number): number => {
-  const fraction = span.duration > 0 ? (now - span.startedAt) / span.duration : 1;
-  return span.from + (span.to - span.from) * sampleProgressStops(span.stops, fraction);
+  const fraction =
+    span.duration > 0 ? (now - span.startedAt) / span.duration : 1;
+  return (
+    span.from +
+    (span.to - span.from) * sampleProgressStops(span.stops, fraction)
+  );
 };
 
 /** One keyframe per stop; the consumer supplies only position → its own paint value. */

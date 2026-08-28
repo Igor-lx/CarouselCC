@@ -118,8 +118,15 @@ beforeEach(() => {
   root = createRoot(host);
   // jsdom has no layout; the engine reads the host box to size its thresholds.
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-    x: 0, y: 0, width: 600, height: 200, top: 0, left: 0, right: 600,
-    bottom: 200, toJSON: () => ({}),
+    x: 0,
+    y: 0,
+    width: 600,
+    height: 200,
+    top: 0,
+    left: 0,
+    right: 600,
+    bottom: 200,
+    toJSON: () => ({}),
   });
 });
 
@@ -140,9 +147,7 @@ describe("useCarouselGesture — command ordering", () => {
     const order = typesOf();
     expect(order).toContain("START_DRAG");
     expect(order).toContain("END_DRAG");
-    expect(order.indexOf("START_DRAG")).toBeLessThan(
-      order.indexOf("END_DRAG"),
-    );
+    expect(order.indexOf("START_DRAG")).toBeLessThan(order.indexOf("END_DRAG"));
   });
 
   it("holds the START_DRAG back one task, then delivers it", () => {

@@ -4,8 +4,9 @@ import { sampleMotionProfile, type MotionProfile } from "./profile";
 
 // See ../README.md
 /** The canonical segment shape for profile-backed motion (built + read here). */
-export interface ProfileSegment<Strategy extends string = string>
-  extends MotionSegmentBase<Strategy> {
+export interface ProfileSegment<
+  Strategy extends string = string,
+> extends MotionSegmentBase<Strategy> {
   profile: MotionProfile;
 }
 
@@ -15,7 +16,8 @@ export const sampleProfileSegment = <Strategy extends string>(
   timestamp: number,
 ): MotionSampleData<Strategy> => {
   const elapsed = Math.max(0, timestamp - segment.startedAt);
-  const progress = segment.duration > 0 ? Math.min(1, elapsed / segment.duration) : 1;
+  const progress =
+    segment.duration > 0 ? Math.min(1, elapsed / segment.duration) : 1;
   const distance = segment.to - segment.from;
 
   if (progress >= 1) {
@@ -33,7 +35,11 @@ export const sampleProfileSegment = <Strategy extends string>(
     };
   }
 
-  const sampled = sampleMotionProfile(segment.profile, elapsed, Math.abs(distance));
+  const sampled = sampleMotionProfile(
+    segment.profile,
+    elapsed,
+    Math.abs(distance),
+  );
   return {
     progress,
     value: segment.from + distance * sampled.distanceProgress,

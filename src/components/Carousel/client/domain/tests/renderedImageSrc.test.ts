@@ -37,7 +37,12 @@ describe("resolveLargestImageCandidate", () => {
     expect(
       resolveLargestImageCandidate({
         srcSet: "/img/wide-720.webp 720w",
-        sources: [{ media: "(orientation: portrait)", srcSet: "/img/tall-1080.webp 1080w" }],
+        sources: [
+          {
+            media: "(orientation: portrait)",
+            srcSet: "/img/tall-1080.webp 1080w",
+          },
+        ],
       }),
     ).toBe("/img/tall-1080.webp");
   });
@@ -46,7 +51,12 @@ describe("resolveLargestImageCandidate", () => {
     expect(
       resolveLargestImageCandidate({
         srcSet: "/img/wide-1280.webp 1280w",
-        sources: [{ media: "(orientation: portrait)", srcSet: "/img/tall-720.webp 720w" }],
+        sources: [
+          {
+            media: "(orientation: portrait)",
+            srcSet: "/img/tall-720.webp 720w",
+          },
+        ],
       }),
     ).toBe("/img/wide-1280.webp");
   });
@@ -55,7 +65,9 @@ describe("resolveLargestImageCandidate", () => {
     expect(
       resolveLargestImageCandidate({
         srcSet: "/img/wide-720.webp 720w",
-        sources: [{ media: "(min-width: 800px)", srcSet: "/img/alt-720.webp 720w" }],
+        sources: [
+          { media: "(min-width: 800px)", srcSet: "/img/alt-720.webp 720w" },
+        ],
       }),
     ).toBe("/img/wide-720.webp");
   });
@@ -70,7 +82,9 @@ describe("resolveRenderedImageSrc", () => {
   const image = {
     srcSet: SRCSET,
     defaultSrc: "/img/designated.webp",
-    sources: [{ media: "(orientation: portrait)", srcSet: "/img/tall-1280.webp 1280w" }],
+    sources: [
+      { media: "(orientation: portrait)", srcSet: "/img/tall-1280.webp 1280w" },
+    ],
   };
   const slide: Slide = { id: "s1", content: "/img/a-480.webp", image };
 
@@ -88,10 +102,17 @@ describe("resolveRenderedImageSrc", () => {
       content: "/img/a-480.webp",
       image: {
         srcSet: SRCSET, // widest here is 1280w
-        sources: [{ media: "(orientation: portrait)", srcSet: "/img/tall-1600.webp 1600w" }],
+        sources: [
+          {
+            media: "(orientation: portrait)",
+            srcSet: "/img/tall-1600.webp 1600w",
+          },
+        ],
       },
     };
-    expect(resolveRenderedImageSrc(noDefault, false)).toBe("/img/tall-1600.webp");
+    expect(resolveRenderedImageSrc(noDefault, false)).toBe(
+      "/img/tall-1600.webp",
+    );
   });
 
   it("falls back to content when there is no image data at all", () => {

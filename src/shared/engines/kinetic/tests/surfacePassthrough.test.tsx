@@ -1,5 +1,13 @@
 // @vitest-environment jsdom
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { act, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
@@ -30,7 +38,10 @@ beforeAll(() => {
 let host: HTMLDivElement;
 let root: Root;
 
-const pointerEvent = (type: string, { x, y, t }: { x: number; y: number; t?: number }) => {
+const pointerEvent = (
+  type: string,
+  { x, y, t }: { x: number; y: number; t?: number },
+) => {
   const event = new MouseEvent(type, {
     bubbles: true,
     cancelable: true,
@@ -45,7 +56,11 @@ const pointerEvent = (type: string, { x, y, t }: { x: number; y: number; t?: num
   return event;
 };
 
-const send = (el: Element, type: string, point: { x: number; y: number; t?: number }) =>
+const send = (
+  el: Element,
+  type: string,
+  point: { x: number; y: number; t?: number },
+) =>
   act(() => {
     el.dispatchEvent(pointerEvent(type, point));
   });
@@ -75,7 +90,8 @@ const Probe = ({ withSurface }: { withSurface: boolean }) => {
   );
 };
 
-const el = (attr: string): HTMLElement => host.querySelector(`[${attr}]`) as HTMLElement;
+const el = (attr: string): HTMLElement =>
+  host.querySelector(`[${attr}]`) as HTMLElement;
 
 beforeEach(() => {
   vi.useFakeTimers();

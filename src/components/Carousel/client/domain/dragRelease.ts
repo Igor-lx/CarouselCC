@@ -34,7 +34,7 @@ export const resolveDragRelease = ({
   layout,
 }: ResolveDragReleaseInput): DragReleaseTarget => {
   const snapTarget = isInFlightGrab
-    ? pressedPageIndex ?? dragOriginPageIndex
+    ? (pressedPageIndex ?? dragOriginPageIndex)
     : nearestPageIndex(releasePosition, layout);
   let targetPageIndex = snapTarget;
   let isSnap = !isInFlightGrab; // in-flight settle is a real nav, not a snap-back

@@ -69,8 +69,26 @@ describe("buildDotKeyframes", () => {
    */
   it("reproduces the plain cross-fade across a single step", () => {
     const stops = [0, 0.25, 0.6, 1];
-    const incoming = buildDotKeyframes(1, 0, 1, stops, INACTIVE, ACTIVE, PAGES, FINITE);
-    const outgoing = buildDotKeyframes(0, 0, 1, stops, INACTIVE, ACTIVE, PAGES, FINITE);
+    const incoming = buildDotKeyframes(
+      1,
+      0,
+      1,
+      stops,
+      INACTIVE,
+      ACTIVE,
+      PAGES,
+      FINITE,
+    );
+    const outgoing = buildDotKeyframes(
+      0,
+      0,
+      1,
+      stops,
+      INACTIVE,
+      ACTIVE,
+      PAGES,
+      FINITE,
+    );
 
     stops.forEach((p, i) => {
       expect(incoming[i]!.opacity).toBeCloseTo(0.2 + 0.6 * p, 10);
@@ -81,7 +99,16 @@ describe("buildDotKeyframes", () => {
   /** The repeated click: the middle dot is PASSED THROUGH on this one curve. */
   it("carries a passed-through dot up to active and back down", () => {
     const stops = [0, 0.25, 0.5, 0.75, 1];
-    const middle = buildDotKeyframes(1, 0, 2, stops, INACTIVE, ACTIVE, PAGES, FINITE);
+    const middle = buildDotKeyframes(
+      1,
+      0,
+      2,
+      stops,
+      INACTIVE,
+      ACTIVE,
+      PAGES,
+      FINITE,
+    );
     expect(middle[0]!.opacity).toBeCloseTo(0.2, 10);
     expect(middle[2]!.opacity).toBeCloseTo(0.8, 10);
     expect(middle[4]!.opacity).toBeCloseTo(0.2, 10);
@@ -91,7 +118,16 @@ describe("buildDotKeyframes", () => {
    * every dot in between untouched. */
   it("wrapping backwards lights the last dot and nothing in between", () => {
     const stops = [0, 0.5, 1];
-    const last = buildDotKeyframes(11, 0, -1, stops, INACTIVE, ACTIVE, PAGES, CYCLIC);
+    const last = buildDotKeyframes(
+      11,
+      0,
+      -1,
+      stops,
+      INACTIVE,
+      ACTIVE,
+      PAGES,
+      CYCLIC,
+    );
     expect(last[0]!.opacity).toBeCloseTo(0.2, 10);
     expect(last[2]!.opacity).toBeCloseTo(0.8, 10);
 
@@ -179,7 +215,9 @@ describe("dotKeyframesBetween (the GO_TO direct fade)", () => {
     const stops = [0, 0.2, 0.4, 0.6, 0.8, 1];
     const frames = dotKeyframesBetween(ACTIVE, INACTIVE, stops);
     for (let i = 1; i < frames.length; i += 1) {
-      expect(frames[i]!.opacity).toBeLessThanOrEqual(frames[i - 1]!.opacity + 1e-12);
+      expect(frames[i]!.opacity).toBeLessThanOrEqual(
+        frames[i - 1]!.opacity + 1e-12,
+      );
     }
   });
 

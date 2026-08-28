@@ -47,9 +47,9 @@ const baseInput: GenerateSlidesInput = {
 
 describe("slugFromUrl", () => {
   it("extracts the filename slug from a URL", () => {
-    expect(slugFromUrl("/CarouselCC/carousel/portrait/480/carousel7.webp")).toBe(
-      "carousel7",
-    );
+    expect(
+      slugFromUrl("/CarouselCC/carousel/portrait/480/carousel7.webp"),
+    ).toBe("carousel7");
     expect(slugFromUrl("carousel3.webp")).toBe("carousel3");
   });
 });

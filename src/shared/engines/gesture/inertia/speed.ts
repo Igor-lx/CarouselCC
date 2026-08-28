@@ -2,7 +2,11 @@
  * carried speed survives only when it helps the new motion. See ../README.md. */
 export const sameDirectionSpeed = (velocity: number, distance: number) => {
   const direction = Math.sign(distance);
-  if (direction === 0 || !Number.isFinite(velocity) || Math.sign(velocity) !== direction) {
+  if (
+    direction === 0 ||
+    !Number.isFinite(velocity) ||
+    Math.sign(velocity) !== direction
+  ) {
     return 0;
   }
   return Math.abs(velocity);

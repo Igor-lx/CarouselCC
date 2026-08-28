@@ -1,5 +1,13 @@
 // @vitest-environment jsdom
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
@@ -134,7 +142,9 @@ const createVisualPosition = () => {
  * 0.5 — mid-flight assertions stay independent of how long the test itself
  * takes, without anyone having to fake the motion clock.
  */
-const sweepStartedAt = (startedAt: number): Extract<PublishablePlan, { kind: "waapi" }> => ({
+const sweepStartedAt = (
+  startedAt: number,
+): Extract<PublishablePlan, { kind: "waapi" }> => ({
   kind: "waapi",
   direction: 1,
   duration: 100_000,
@@ -174,7 +184,11 @@ function Probe({ targetPageIndex }: { targetPageIndex: number }) {
   return (
     <>
       {Array.from({ length: PAGE_COUNT }, (_, pageIndex) => (
-        <div key={pageIndex} ref={bindDotRef(pageIndex)} data-page={pageIndex} />
+        <div
+          key={pageIndex}
+          ref={bindDotRef(pageIndex)}
+          data-page={pageIndex}
+        />
       ))}
     </>
   );
@@ -188,7 +202,8 @@ const render = (targetPageIndex: number) =>
 const dot = (pageIndex: number) =>
   host.querySelector<HTMLElement>(`[data-page="${pageIndex}"]`)!;
 
-const paintedOpacity = (pageIndex: number) => Number(dot(pageIndex).style.opacity);
+const paintedOpacity = (pageIndex: number) =>
+  Number(dot(pageIndex).style.opacity);
 const animationOf = (pageIndex: number) =>
   recorded.find((entry) => entry.element === dot(pageIndex));
 
@@ -199,15 +214,25 @@ const animationOf = (pageIndex: number) =>
  */
 const expectTheSharedDropRule = () => {
   let painted = paintedOpacity(1);
-  for (let index = 0; index < FALLBACK_DROP_EVERY_NTH_FRAME * 2 + 1; index += 1) {
+  for (
+    let index = 0;
+    index < FALLBACK_DROP_EVERY_NTH_FRAME * 2 + 1;
+    index += 1
+  ) {
     const offset = 0.1 * (index + 1);
-    const frame = frameAt(offset, { phase: "running", runningFrameIndex: index });
+    const frame = frameAt(offset, {
+      phase: "running",
+      runningFrameIndex: index,
+    });
     visual.emit(frame);
 
     if (isDroppedFallbackFrame(frame)) {
       expect(paintedOpacity(1)).toBeCloseTo(painted, 10);
     } else {
-      expect(paintedOpacity(1)).toBeCloseTo(opacityAt(strengthOf(1, offset)), 6);
+      expect(paintedOpacity(1)).toBeCloseTo(
+        opacityAt(strengthOf(1, offset)),
+        6,
+      );
     }
     painted = paintedOpacity(1);
   }

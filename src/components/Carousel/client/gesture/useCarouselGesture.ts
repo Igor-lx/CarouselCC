@@ -85,72 +85,69 @@ export function useCarouselGesture({
     dispatch({ type: "START_DRAG", ...pending });
   }, [dispatch]);
 
-  const offsetToPosition = useCallback(
-    (uiOffset: number) => {
-      const origin = originPositionRef.current ?? 0;
-      const slot = slotSizeRef.current;
-      return slot > 0 ? origin - uiOffset / slot : origin;
-    },
-    [],
-  );
-
-  const startDragFromCurrentPosition = useCallback((pressClientX?: number) => {
-    if (originPositionRef.current !== null) return; // dedupe the two entry paths
-
-    slotSizeRef.current = getSlotSize();
-    const origin = readCurrentPosition();
-    // Take the track synchronously so the finger owns it this turn.
-    cancelTrackMotion(origin);
-    applyTrackPosition(origin);
-    const pageIndex = inFlightTargetPageIndex ?? nearestPageIndex(origin, layout);
-
-    // Which page the finger landed on (press-X → lane → page); null if unmeasurable.
-    let pressedPageIndex: number | null = null;
-    const viewport = viewportRef.current;
+  const offsetToPosition = useCallback((uiOffset: number) => {
+    const origin = originPositionRef.current ?? 0;
     const slot = slotSizeRef.current;
-    if (typeof pressClientX === "number" && viewport && slot > 0) {
-      const rect = viewport.getBoundingClientRect();
-      const lane = (pressClientX - rect.left) / slot;
-      if (Number.isFinite(lane)) {
-        pressedPageIndex = pageContaining(Math.floor(origin + lane), layout);
+    return slot > 0 ? origin - uiOffset / slot : origin;
+  }, []);
+
+  const startDragFromCurrentPosition = useCallback(
+    (pressClientX?: number) => {
+      if (originPositionRef.current !== null) return; // dedupe the two entry paths
+
+      slotSizeRef.current = getSlotSize();
+      const origin = readCurrentPosition();
+      // Take the track synchronously so the finger owns it this turn.
+      cancelTrackMotion(origin);
+      applyTrackPosition(origin);
+      const pageIndex =
+        inFlightTargetPageIndex ?? nearestPageIndex(origin, layout);
+
+      // Which page the finger landed on (press-X → lane → page); null if unmeasurable.
+      let pressedPageIndex: number | null = null;
+      const viewport = viewportRef.current;
+      const slot = slotSizeRef.current;
+      if (typeof pressClientX === "number" && viewport && slot > 0) {
+        const rect = viewport.getBoundingClientRect();
+        const lane = (pressClientX - rect.left) / slot;
+        if (Number.isFinite(lane)) {
+          pressedPageIndex = pageContaining(Math.floor(origin + lane), layout);
+        }
       }
-    }
 
-    originPositionRef.current = origin;
-    originPageIndexRef.current = pageIndex;
-    isInFlightGrabRef.current = inFlightTargetPageIndex !== null;
-    pressedPageIndexRef.current = pressedPageIndex;
-    contextMenuSeenRef.current = false;
+      originPositionRef.current = origin;
+      originPageIndexRef.current = pageIndex;
+      isInFlightGrabRef.current = inFlightTargetPageIndex !== null;
+      pressedPageIndexRef.current = pressedPageIndex;
+      contextMenuSeenRef.current = false;
 
-    pendingStartRef.current = {
-      fromVirtualIndex: origin,
-      targetPageIndex: pageIndex,
-    };
-    startTimerRef.current = window.setTimeout(() => {
-      startTimerRef.current = null;
-      flushPendingStart();
-    }, 0);
-  }, [
-    flushPendingStart,
-    applyTrackPosition,
-    cancelTrackMotion,
-    getSlotSize,
-    inFlightTargetPageIndex,
-    layout,
-    readCurrentPosition,
-    viewportRef,
-  ]);
+      pendingStartRef.current = {
+        fromVirtualIndex: origin,
+        targetPageIndex: pageIndex,
+      };
+      startTimerRef.current = window.setTimeout(() => {
+        startTimerRef.current = null;
+        flushPendingStart();
+      }, 0);
+    },
+    [
+      flushPendingStart,
+      applyTrackPosition,
+      cancelTrackMotion,
+      getSlotSize,
+      inFlightTargetPageIndex,
+      layout,
+      readCurrentPosition,
+      viewportRef,
+    ],
+  );
 
   const handleDragStart = useCallback(
     (payload: PointerSwipeMovePayload) => {
       startDragFromCurrentPosition();
       applyTrackPosition(offsetToPosition(payload.uiOffset));
     },
-    [
-      applyTrackPosition,
-      offsetToPosition,
-      startDragFromCurrentPosition,
-    ],
+    [applyTrackPosition, offsetToPosition, startDragFromCurrentPosition],
   );
 
   const handleDragMove = useCallback(
@@ -216,13 +213,7 @@ export function useCarouselGesture({
       originPositionRef.current = null;
       slotSizeRef.current = 0;
     },
-    [
-      applyTrackPosition,
-      dispatch,
-      flushPendingStart,
-      layout,
-      offsetToPosition,
-    ],
+    [applyTrackPosition, dispatch, flushPendingStart, layout, offsetToPosition],
   );
 
   // Gesture surface gone (canSlide collapse, or isSwipeOn off) with no onRelease:
@@ -297,7 +288,8 @@ export function useCarouselGesture({
     hostRef: viewportRef,
     surfaceRef: trackRef,
     config: swipeConfig,
-    onPressStart: (payload) => startDragFromCurrentPosition(payload.pressClientX),
+    onPressStart: (payload) =>
+      startDragFromCurrentPosition(payload.pressClientX),
     onDragStart: handleDragStart,
     onDragMove: handleDragMove,
     onRelease: handleRelease,

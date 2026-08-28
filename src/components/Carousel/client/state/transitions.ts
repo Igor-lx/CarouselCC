@@ -166,7 +166,9 @@ export const isSameDirectionRepeat = (
   if (state.motionPhase === "idle" || state.motionPhase === "dragging") {
     return false;
   }
-  const currentDirection = Math.sign(state.virtualIndex - state.fromVirtualIndex);
+  const currentDirection = Math.sign(
+    state.virtualIndex - state.fromVirtualIndex,
+  );
   return currentDirection !== 0 && currentDirection === direction;
 };
 

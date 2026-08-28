@@ -26,7 +26,9 @@ function shallowEqualProps(
   for (const key of aKeys) {
     if (Object.is(a[key], b[key])) continue;
     if (key === "children") {
-      if (!areChildrenEquivalent(a[key] as ReactNode, b[key] as ReactNode, depth)) {
+      if (
+        !areChildrenEquivalent(a[key] as ReactNode, b[key] as ReactNode, depth)
+      ) {
         return false;
       }
       continue;
@@ -45,11 +47,7 @@ const toChildList = (children: ReactNode): ReactNode[] => {
   return list;
 };
 
-function areChildrenEquivalent(
-  a: ReactNode,
-  b: ReactNode,
-  depth = 0,
-): boolean {
+function areChildrenEquivalent(a: ReactNode, b: ReactNode, depth = 0): boolean {
   if (depth >= MAX_CHILD_COMPARE_DEPTH) return false;
 
   const listA = toChildList(a);

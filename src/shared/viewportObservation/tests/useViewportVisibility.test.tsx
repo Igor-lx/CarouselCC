@@ -53,7 +53,8 @@ class StubObserver {
   }
 }
 
-const installObserver = () => vi.stubGlobal("IntersectionObserver", StubObserver);
+const installObserver = () =>
+  vi.stubGlobal("IntersectionObserver", StubObserver);
 
 const setTabVisibility = (state: DocumentVisibilityState) => {
   Object.defineProperty(document, "visibilityState", {

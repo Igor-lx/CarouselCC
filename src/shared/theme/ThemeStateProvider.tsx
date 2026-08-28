@@ -9,10 +9,18 @@ import {
 
 import { useIsomorphicLayoutEffect } from "../hooks/useIsomorphicLayoutEffect";
 import { ThemeContext } from "./internal/ThemeContext";
-import { ON_SCREEN_MODES, THEME_MODES, THEME_STORAGE_KEY } from "./internal/constants";
+import {
+  ON_SCREEN_MODES,
+  THEME_MODES,
+  THEME_STORAGE_KEY,
+} from "./internal/constants";
 import { asThemeMode, prefersDark, resolveOnScreen } from "./internal/resolve";
 import { readStoredMode, writeStoredMode } from "./internal/storage";
-import type { OnScreenThemeMode, ThemeContextValue, ThemeMode } from "./internal/types";
+import type {
+  OnScreenThemeMode,
+  ThemeContextValue,
+  ThemeMode,
+} from "./internal/types";
 
 export function ThemeStateProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<ThemeMode>(readStoredMode);
@@ -42,7 +50,8 @@ export function ThemeStateProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
-      if (event.key === THEME_STORAGE_KEY) setTheme(asThemeMode(event.newValue));
+      if (event.key === THEME_STORAGE_KEY)
+        setTheme(asThemeMode(event.newValue));
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -61,5 +70,7 @@ export function ThemeStateProvider({ children }: { children: ReactNode }) {
     [theme, onScreenTheme, toggleTheme],
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
 }

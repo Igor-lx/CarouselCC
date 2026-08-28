@@ -69,7 +69,11 @@ describe("createCompositedRide (the kinetic fork)", () => {
 
     const element = document.createElement("div");
     const ride = createCompositedRide(controller);
-    const composited = ride.start({ element, segment: segmentTo(0, 100), toKeyframe });
+    const composited = ride.start({
+      element,
+      segment: segmentTo(0, 100),
+      toKeyframe,
+    });
 
     expect(composited).toBe(true);
     expect(ride.isComposited()).toBe(true);
@@ -125,7 +129,11 @@ describe("createCompositedRide (the kinetic fork)", () => {
     const controller = createMotionController(0);
     const element = document.createElement("div");
     const ride = createCompositedRide(controller);
-    const composited = ride.start({ element, segment: segmentTo(0, 100), toKeyframe });
+    const composited = ride.start({
+      element,
+      segment: segmentTo(0, 100),
+      toKeyframe,
+    });
 
     expect(composited).toBe(false);
     expect(ride.isComposited()).toBe(false);

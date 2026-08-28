@@ -19,12 +19,10 @@ describe("mergeStyleMaps", () => {
   });
 
   it("skips null / undefined maps and empty values", () => {
-    const merged = mergeStyleMaps<Cls>(
-      { a: "x" },
-      null,
-      undefined,
-      { a: "", b: "y" },
-    );
+    const merged = mergeStyleMaps<Cls>({ a: "x" }, null, undefined, {
+      a: "",
+      b: "y",
+    });
     expect(merged).toEqual({ a: "x", b: "y" });
   });
 

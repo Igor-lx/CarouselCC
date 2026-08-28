@@ -25,7 +25,8 @@
     max-width: 100%;
     row-gap: var(--pagination-gap);
     background-color: var(--bg);
-    transition: background-color var(--transition-bg),
+    transition:
+      background-color var(--transition-bg),
       border-color var(--transition-border);
     overflow: hidden;
     user-select: none;

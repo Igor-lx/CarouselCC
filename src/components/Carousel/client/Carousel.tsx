@@ -85,7 +85,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // --- slots ----------------------------------------------------------------
   const slots = useMemo(
     () => resolveSlots(children, CAROUSEL_SLOTS),
-    [children]
+    [children],
   );
 
   // The responsive-image stack is switched by the <ResponsiveImages> slot's presence.
@@ -120,7 +120,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // --- boundary state (shared by status, motion, autoplay) ------------------
   const { isAtStart, isAtEnd } = useMemo(
     () => carouselBoundaryState(state.targetPageIndex, layout),
-    [layout, state.targetPageIndex]
+    [layout, state.targetPageIndex],
   );
 
   // Art-direction descriptors — dev Diagnostic slot only (never runs shipped).
@@ -130,15 +130,15 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
         ? records.flatMap((record) =>
             typeof record.slideData.content === "string"
               ? [{ sources: record.slideData.image?.sources }]
-              : []
+              : [],
           )
         : EMPTY_SLIDE_MEDIA,
-    [isContentImg, records]
+    [isContentImg, records],
   );
 
   const hasDeckImageSets = useMemo(
     () => deckCarriesImageSets(records),
-    [records]
+    [records],
   );
 
   const imageResourceStore = useImageResourceStore({
@@ -253,7 +253,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
       prev: navigation.handlePrev,
       next: navigation.handleNext,
     }),
-    [navigation.handlePrev, navigation.handleNext]
+    [navigation.handlePrev, navigation.handleNext],
   );
 
   // --- gesture --------------------------------------------------------------

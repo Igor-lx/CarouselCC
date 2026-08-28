@@ -10,7 +10,8 @@ const linearSampler: MotionSegmentSampler<MotionSegmentBase> = (
   timestamp,
 ) => {
   const elapsed = Math.max(0, timestamp - segment.startedAt);
-  const progress = segment.duration > 0 ? Math.min(1, elapsed / segment.duration) : 1;
+  const progress =
+    segment.duration > 0 ? Math.min(1, elapsed / segment.duration) : 1;
   const span = segment.to - segment.from;
   return {
     progress,
@@ -65,8 +66,13 @@ describe("start", () => {
   it("emits the initial sample of the segment synchronously", () => {
     const controller = createMotionController<string>(0, "idle");
     const samples: number[] = [];
-    controller.subscribe((sample) => samples.push(sample.value), { emitCurrent: false });
-    controller.start({ segment: segment({ from: 10, to: 110 }), sampler: linearSampler });
+    controller.subscribe((sample) => samples.push(sample.value), {
+      emitCurrent: false,
+    });
+    controller.start({
+      segment: segment({ from: 10, to: 110 }),
+      sampler: linearSampler,
+    });
     expect(samples).toEqual([10]);
     expect(controller.getSnapshot().phase).toBe("running");
     expect(controller.isActive()).toBe(true);
@@ -76,7 +82,9 @@ describe("start", () => {
     const controller = createMotionController<string>(0, "idle");
     const phases: string[] = [];
     let completed = 0;
-    controller.subscribe((sample) => phases.push(sample.phase), { emitCurrent: false });
+    controller.subscribe((sample) => phases.push(sample.phase), {
+      emitCurrent: false,
+    });
     controller.start({
       segment: segment({ duration: 0, to: 70 }),
       sampler: linearSampler,
@@ -92,7 +100,10 @@ describe("start", () => {
 
   it("a new start replaces the running segment (retarget)", () => {
     const controller = createMotionController<string>(0, "idle");
-    controller.start({ segment: segment({ from: 0, to: 100 }), sampler: linearSampler });
+    controller.start({
+      segment: segment({ from: 0, to: 100 }),
+      sampler: linearSampler,
+    });
     controller.start({
       segment: segment({ from: 40, to: 240, startedAt: 1000, duration: 1000 }),
       sampler: linearSampler,
@@ -126,7 +137,9 @@ describe("subscribe", () => {
   it("unsubscribe stops further emissions", () => {
     const controller = createMotionController<string>(0, "idle");
     let emits = 0;
-    const unsubscribe = controller.subscribe(() => (emits += 1), { emitCurrent: false });
+    const unsubscribe = controller.subscribe(() => (emits += 1), {
+      emitCurrent: false,
+    });
     controller.set(5);
     unsubscribe();
     controller.set(9);
@@ -150,7 +163,13 @@ describe("set", () => {
 
   it("honors explicit options", () => {
     const controller = createMotionController<string>(0, "idle");
-    controller.set(10, { velocity: 2, target: 50, strategy: "drag", phase: "running", progress: 0.2 });
+    controller.set(10, {
+      velocity: 2,
+      target: 50,
+      strategy: "drag",
+      phase: "running",
+      progress: 0.2,
+    });
     const snapshot = controller.getSnapshot();
     expect(snapshot.velocity).toBe(2);
     expect(snapshot.target).toBe(50);
@@ -210,7 +229,10 @@ describe("soft lifecycle", () => {
     expect(controller.isActive()).toBe(false);
 
     // A destroyed controller is a soft reset, not a brick: it can be reused.
-    controller.start({ segment: segment({ from: 0, to: 200 }), sampler: linearSampler });
+    controller.start({
+      segment: segment({ from: 0, to: 200 }),
+      sampler: linearSampler,
+    });
     expect(controller.isActive()).toBe(true);
     expect(controller.captureHandoff(500).position).toBeCloseTo(100);
   });

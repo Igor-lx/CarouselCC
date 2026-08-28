@@ -25,5 +25,8 @@ export interface VisualPositionSource {
   sampleNow(): number;
   /** Take paint back onto the JS loop when a passive segment's owner vanishes. */
   wake(): void;
-  subscribe(listener: VisualPositionListener, options?: { emitCurrent?: boolean }): () => void;
+  subscribe(
+    listener: VisualPositionListener,
+    options?: { emitCurrent?: boolean },
+  ): () => void;
 }

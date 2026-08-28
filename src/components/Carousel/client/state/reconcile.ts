@@ -1,9 +1,5 @@
 // See docs/architecture/state.md + adr/0001-layout-reconciliation.md
-import {
-  pageStart,
-  reconciledPageIndex,
-  type CarouselLayout,
-} from "../domain";
+import { pageStart, reconciledPageIndex, type CarouselLayout } from "../domain";
 import { buildInitialState } from "./initial";
 import { ZERO_GESTURE_RELEASE, type CarouselState } from "./types";
 
@@ -37,7 +33,10 @@ export const reconcileStateToLayout = (
     currentLayout,
     nextLayout,
   );
-  const virtualIndex = pageStart(targetPageIndex, nextLayout.visibleSlidesCount);
+  const virtualIndex = pageStart(
+    targetPageIndex,
+    nextLayout.visibleSlidesCount,
+  );
 
   return {
     ...state,

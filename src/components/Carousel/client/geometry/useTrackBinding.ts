@@ -8,7 +8,10 @@ import {
   startPinnedAnimation,
   type MotionPlanSource,
 } from "../motion";
-import { isDroppedFallbackFrame, type VisualPositionSource } from "../visual-position";
+import {
+  isDroppedFallbackFrame,
+  type VisualPositionSource,
+} from "../visual-position";
 import type { SlotSizeSource } from "./useSlotSizeSource";
 
 interface UseTrackBindingInput {
@@ -136,7 +139,13 @@ export function useTrackBinding({
   );
 
   const startCompositorMotion = useCallback(
-    ({ from, to, duration, stops, startedAt }: TrackCompositorMotionOptions): boolean => {
+    ({
+      from,
+      to,
+      duration,
+      stops,
+      startedAt,
+    }: TrackCompositorMotionOptions): boolean => {
       const track = trackRef.current;
       const slot = readSlotSize();
       if (
@@ -157,7 +166,11 @@ export function useTrackBinding({
         to,
         stops,
         (position) => ({
-          transform: trackPixelTransform(position, layoutOriginRef.current, slot),
+          transform: trackPixelTransform(
+            position,
+            layoutOriginRef.current,
+            slot,
+          ),
         }),
       );
       const fromTransform = keyframes[0]!.transform as string;

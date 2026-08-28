@@ -20,7 +20,10 @@ export interface ImageCandidate {
 /** An art-directed variant the browser uses only when `media` matches — the
  * emitted `GeneratedImageSource`, with raw `candidates` in place of the
  * assembled `srcSet` string. */
-export interface ArtDirectedSource extends Omit<GeneratedImageSource, "srcSet"> {
+export interface ArtDirectedSource extends Omit<
+  GeneratedImageSource,
+  "srcSet"
+> {
   candidates: ImageCandidate[];
 }
 

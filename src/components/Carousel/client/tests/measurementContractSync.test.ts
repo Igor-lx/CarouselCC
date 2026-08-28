@@ -82,7 +82,9 @@ const offendingDeclarations = (selector: string): string[] => {
       property,
     );
     const isBorderWidth =
-      /^border(-(top|right|bottom|left|inline|block))?(-width)?$/.test(property);
+      /^border(-(top|right|bottom|left|inline|block))?(-width)?$/.test(
+        property,
+      );
 
     if ((isPadding || isBorderWidth) && !isLayoutNeutral(value)) {
       offenders.push(declaration);

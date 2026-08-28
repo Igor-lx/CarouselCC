@@ -5,7 +5,8 @@ import type { CarouselStatusSnapshot } from "../public-api/types";
 import { areStatusSnapshotsEqual } from "./statusSnapshot";
 
 interface UseCarouselStatusReporterInput {
-  onCarouselStatusChange: ((snapshot: CarouselStatusSnapshot) => void) | undefined;
+  onCarouselStatusChange:
+    ((snapshot: CarouselStatusSnapshot) => void) | undefined;
   isIdle: boolean;
   targetPageIndex: number;
   pageCount: number;
@@ -36,5 +37,12 @@ export function useCarouselStatusReporter({
     if (previous && areStatusSnapshotsEqual(previous, snapshot)) return;
     lastSnapshotRef.current = snapshot;
     onCarouselStatusChange(snapshot);
-  }, [onCarouselStatusChange, isIdle, targetPageIndex, pageCount, isAtStart, isAtEnd]);
+  }, [
+    onCarouselStatusChange,
+    isIdle,
+    targetPageIndex,
+    pageCount,
+    isAtStart,
+    isAtEnd,
+  ]);
 }

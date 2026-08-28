@@ -6,8 +6,10 @@ import { useMotionRunner, type UseMotionRunnerInput } from "./useMotionRunner";
 
 /** The runner's own input, with the settle callback replaced by the dispatch
  * it is derived from — adding a runner field extends this hook automatically. */
-interface UseCarouselMotionExecutionInput
-  extends Omit<UseMotionRunnerInput, "onSettle"> {
+interface UseCarouselMotionExecutionInput extends Omit<
+  UseMotionRunnerInput,
+  "onSettle"
+> {
   dispatch: CarouselDispatch;
 }
 

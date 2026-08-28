@@ -1,9 +1,6 @@
 export { collectPropWarnings } from "./propChecks";
 export { collectConstantWarnings } from "./constantChecks";
-export {
-  collectLayoutWarnings,
-  collectSlotWarnings,
-} from "./layoutChecks";
+export { collectLayoutWarnings, collectSlotWarnings } from "./layoutChecks";
 export { collectStateWarnings } from "./stateChecks";
 export {
   collectWidgetWarnings,

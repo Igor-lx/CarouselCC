@@ -35,7 +35,9 @@ describe("useMotionPaint", () => {
     expect(paint.mock.calls[0]![0].value).toBe(7);
 
     act(() => controller.set(12));
-    expect(paint).toHaveBeenLastCalledWith(expect.objectContaining({ value: 12 }));
+    expect(paint).toHaveBeenLastCalledWith(
+      expect.objectContaining({ value: 12 }),
+    );
   });
 
   it("always calls the LATEST closure without resubscribing", () => {

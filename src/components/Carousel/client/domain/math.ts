@@ -9,4 +9,3 @@ export const clamp = (value: number, min: number, max: number) =>
 
 export const normalizePageIndex = (pageIndex: number, pageCount: number) =>
   pageCount <= 0 ? 0 : mod(pageIndex, pageCount);
-

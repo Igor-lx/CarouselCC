@@ -78,7 +78,14 @@ export const buildDotKeyframes = (
   isFinite: boolean,
 ): DotFadeKeyframe[] =>
   keyframesAlongStops(fromOffset, toOffset, stops, (offset) => {
-    const state = dotStateAt(index, offset, inactive, active, pageCount, isFinite);
+    const state = dotStateAt(
+      index,
+      offset,
+      inactive,
+      active,
+      pageCount,
+      isFinite,
+    );
     return { opacity: state.opacity, transform: `scaleX(${state.scale})` };
   });
 
@@ -114,7 +121,11 @@ export const reachedDotIndexes = (
   const high = Math.floor(Math.max(fromOffset, toOffset) + 1);
   if (isFinite) {
     const ids: number[] = [];
-    for (let id = Math.max(0, low); id <= Math.min(pageCount - 1, high); id += 1) {
+    for (
+      let id = Math.max(0, low);
+      id <= Math.min(pageCount - 1, high);
+      id += 1
+    ) {
       ids.push(id);
     }
     return ids;

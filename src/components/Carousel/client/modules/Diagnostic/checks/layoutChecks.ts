@@ -19,7 +19,8 @@ export const collectSlotWarnings = (
       actual: true,
       expected:
         "Expected a <Controls /> child when isControlsOn is true, or isControlsOn={false}",
-      consequence: "No prev/next controls render even though the consumer asked for them",
+      consequence:
+        "No prev/next controls render even though the consumer asked for them",
     });
   }
 
@@ -57,7 +58,8 @@ export const collectSlotWarnings = (
       actual: true,
       expected:
         "Expected a <Pagination /> or <PaginationWidget /> child when isPaginationOn is true, or isPaginationOn={false}",
-      consequence: "No pagination dots render even though the consumer asked for them",
+      consequence:
+        "No pagination dots render even though the consumer asked for them",
     });
   }
 

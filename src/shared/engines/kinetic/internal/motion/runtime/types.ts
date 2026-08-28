@@ -65,8 +65,9 @@ export interface MotionSetOptions<Strategy extends string = string> {
   phase?: MotionPhase | undefined;
 }
 
-export interface MotionSnapOptions<Strategy extends string = string>
-  extends MotionSetOptions<Strategy> {
+export interface MotionSnapOptions<
+  Strategy extends string = string,
+> extends MotionSetOptions<Strategy> {
   onComplete?: ((sample: MotionSample<Strategy>) => void) | undefined;
   completion?: MotionCompletionMode | undefined;
 }

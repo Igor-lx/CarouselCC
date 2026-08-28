@@ -9,7 +9,9 @@ const LAYER = "State";
 
 // See docs/architecture/diagnostics.md
 /** Structural state violations — always CRITICAL (the reducer should never produce them). */
-const issueToWarning = (issue: CarouselStateIssue): CarouselDiagnosticWarning => ({
+const issueToWarning = (
+  issue: CarouselStateIssue,
+): CarouselDiagnosticWarning => ({
   severity: "CRITICAL",
   layer: LAYER,
   field: issue.field,

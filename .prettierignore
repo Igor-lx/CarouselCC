@@ -3,3 +3,7 @@ coverage
 node_modules
 public
 package-lock.json
+
+# Markdown here is hand-wrapped prose (docs, ADRs, the .context knowledge base).
+# Prettier only pads it with blank lines, so it is left alone.
+*.md

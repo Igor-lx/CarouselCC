@@ -44,9 +44,7 @@ export function useImageResource(
 
   const getSnapshot = useCallback(
     () =>
-      store !== null && url !== null
-        ? store.getSnapshot(url)
-        : READY_SNAPSHOT,
+      store !== null && url !== null ? store.getSnapshot(url) : READY_SNAPSHOT,
     [store, url],
   );
 

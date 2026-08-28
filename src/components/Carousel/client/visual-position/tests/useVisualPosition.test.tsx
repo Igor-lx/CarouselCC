@@ -3,7 +3,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
-import { useVisualPosition, type UseVisualPositionResult } from "../useVisualPosition";
+import {
+  useVisualPosition,
+  type UseVisualPositionResult,
+} from "../useVisualPosition";
 import { isDroppedFallbackFrame } from "../fallbackPacing";
 import type { VisualPositionFrame } from "../types";
 import { FALLBACK_DROP_EVERY_NTH_FRAME } from "../../config";

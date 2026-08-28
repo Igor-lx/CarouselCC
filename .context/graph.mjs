@@ -21,8 +21,10 @@ const resolve = (fromFile, spec) => {
   if (!spec.startsWith(".")) return null;
   const base = path.resolve(path.dirname(fromFile), spec).replace(/\\/g, "/");
   const cands = [
-    base + ".ts", base + ".tsx",
-    base + "/index.ts", base + "/index.tsx",
+    base + ".ts",
+    base + ".tsx",
+    base + "/index.ts",
+    base + "/index.tsx",
     base,
   ];
   for (const c of cands) if (files.includes(c)) return c;
@@ -30,9 +32,9 @@ const resolve = (fromFile, spec) => {
 };
 
 // --- parse imports + exports ------------------------------------------------
-const importsOf = new Map();   // file -> Set<file>
+const importsOf = new Map(); // file -> Set<file>
 const importedNames = new Map(); // file -> Set<name>  (names pulled FROM that file)
-const exportsOf = new Map();   // file -> Set<name>
+const exportsOf = new Map(); // file -> Set<name>
 
 const NAME_RE = /^[A-Za-z_$][\w$]*$/;
 
@@ -41,7 +43,8 @@ for (const f of files) {
   importsOf.set(f, new Set());
 
   // import { a, b as c } from "x" | import x from "y" | export {...} from "z"
-  const re = /(?:^|\n)\s*(?:import|export)\s+([\s\S]*?)\s*from\s*["']([^"']+)["']/g;
+  const re =
+    /(?:^|\n)\s*(?:import|export)\s+([\s\S]*?)\s*from\s*["']([^"']+)["']/g;
   let m;
   while ((m = re.exec(src))) {
     const clause = m[1];
@@ -50,7 +53,10 @@ for (const f of files) {
     importsOf.get(f).add(target);
     if (!importedNames.has(target)) importedNames.set(target, new Set());
     const set = importedNames.get(target);
-    if (clause.includes("*")) { set.add("*"); continue; }
+    if (clause.includes("*")) {
+      set.add("*");
+      continue;
+    }
     const braces = clause.match(/\{([\s\S]*)\}/);
     if (braces) {
       for (let part of braces[1].split(",")) {
@@ -60,19 +66,28 @@ for (const f of files) {
         if (NAME_RE.test(name)) set.add(name);
       }
     }
-    const def = clause.replace(/\{[\s\S]*\}/, "").replace(/^type\s+/, "").split(",")[0].trim();
+    const def = clause
+      .replace(/\{[\s\S]*\}/, "")
+      .replace(/^type\s+/, "")
+      .split(",")[0]
+      .trim();
     if (def && NAME_RE.test(def)) set.add("default");
   }
 
   // exports declared in this file
   const ex = new Set();
-  for (const mm of src.matchAll(/export\s+(?:const|function|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g)) ex.add(mm[1]);
+  for (const mm of src.matchAll(
+    /export\s+(?:const|function|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g,
+  ))
+    ex.add(mm[1]);
   if (/export\s+default\s/.test(src)) ex.add("default");
   for (const mm of src.matchAll(/export\s*\{([^}]*)\}/g)) {
     for (let part of mm[1].split(",")) {
       part = part.trim().replace(/^type\s+/, "");
       if (!part) continue;
-      const name = (part.split(/\s+as\s+/)[1] ?? part.split(/\s+as\s+/)[0]).trim();
+      const name = (
+        part.split(/\s+as\s+/)[1] ?? part.split(/\s+as\s+/)[0]
+      ).trim();
       if (NAME_RE.test(name)) ex.add(name);
     }
   }
@@ -103,7 +118,9 @@ if (mode === "dead") {
   for (const [f, dead] of rows.sort((a, b) => a[0].localeCompare(b[0]))) {
     console.log(`${f}\n    ${dead.join(", ")}`);
   }
-  console.log(`\n${rows.length} files carry at least one never-imported export.`);
+  console.log(
+    `\n${rows.length} files carry at least one never-imported export.`,
+  );
 }
 
 if (mode === "blast") {
@@ -128,12 +145,14 @@ if (mode === "cycles") {
   const stack = [];
   const found = [];
   const visit = (f) => {
-    color.set(f, 1); stack.push(f);
+    color.set(f, 1);
+    stack.push(f);
     for (const d of importsOf.get(f) ?? []) {
       if (color.get(d) === 1) found.push([...stack.slice(stack.indexOf(d)), d]);
       else if (!color.has(d)) visit(d);
     }
-    stack.pop(); color.set(f, 2);
+    stack.pop();
+    color.set(f, 2);
   };
   for (const f of files) if (!color.has(f)) visit(f);
   console.log("=== Import cycles ===\n");

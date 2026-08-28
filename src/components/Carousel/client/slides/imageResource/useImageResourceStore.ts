@@ -18,6 +18,11 @@ export function useImageResourceStore({
   isResponsiveImagesOn,
 }: UseImageResourceStoreInput): ImageResourceStore | null {
   const store = useImageResourceStoreInstance(isContentImg);
-  useImageResourceRetention({ store, records, isContentImg, isResponsiveImagesOn });
+  useImageResourceRetention({
+    store,
+    records,
+    isContentImg,
+    isResponsiveImagesOn,
+  });
   return store;
 }

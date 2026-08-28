@@ -29,9 +29,9 @@ const WINDOW_SIZES = [3, 5, 7, 9, 11];
 /** Ids the resting strip paints, centred on `offset` (mirrors `writeOffset`). */
 const restingIds = (offset: number, visibleCount: number) => {
   const side = widgetProjectionSide(visibleCount);
-  const first =
-    Math.round(offset) - side - DOT_COVERAGE_MARGIN_SLOTS / 2;
-  const count = widgetProjectionSlotCount(visibleCount) + DOT_COVERAGE_MARGIN_SLOTS;
+  const first = Math.round(offset) - side - DOT_COVERAGE_MARGIN_SLOTS / 2;
+  const count =
+    widgetProjectionSlotCount(visibleCount) + DOT_COVERAGE_MARGIN_SLOTS;
   return { low: first, high: first + count - 1 };
 };
 
@@ -40,7 +40,8 @@ const stepIds = (from: number, target: number, visibleCount: number) => {
   const side = widgetProjectionSide(visibleCount);
   const low =
     Math.floor(Math.min(from, target)) - side - DOT_COVERAGE_MARGIN_SLOTS / 2;
-  const count = widgetProjectionSlotCount(visibleCount) + DOT_COVERAGE_MARGIN_SLOTS;
+  const count =
+    widgetProjectionSlotCount(visibleCount) + DOT_COVERAGE_MARGIN_SLOTS;
   return { low, high: low + count - 1 };
 };
 

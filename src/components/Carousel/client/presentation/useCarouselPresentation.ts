@@ -84,5 +84,11 @@ export const useCarouselPresentation = ({
 
   const flagAttributes = useMemo(() => buildFlagAttributes(flags), [flags]);
 
-  return { classNames, slideClassMap, rootStyle, slideStyleFor, flagAttributes };
+  return {
+    classNames,
+    slideClassMap,
+    rootStyle,
+    slideStyleFor,
+    flagAttributes,
+  };
 };

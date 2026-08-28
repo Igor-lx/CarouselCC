@@ -1,6 +1,9 @@
 // See docs/architecture/focus.md
 import { useRef, type RefObject } from "react";
-import { manageFocusShift, useIsomorphicLayoutEffect } from "../../../../shared";
+import {
+  manageFocusShift,
+  useIsomorphicLayoutEffect,
+} from "../../../../shared";
 
 interface UseFocusRecoveryInput {
   containerRef: RefObject<HTMLElement | null>;

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -36,8 +36,8 @@
         const theme = isExplicit
           ? mode
           : window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
+            ? "dark"
+            : "light";
 
         const root = document.documentElement;
         root.setAttribute("data-theme", theme);

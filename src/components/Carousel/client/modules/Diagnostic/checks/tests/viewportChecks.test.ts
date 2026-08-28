@@ -40,7 +40,9 @@ const FLAGS = Object.keys(SLIDE_VIEWPORT_FLAGS);
 /** Every state name the root really stamps — the shape a healthy sheet keys on. */
 const healthySheet = () =>
   [
-    ...NON_BASE_TIERS.map((name) => `[data-breakpoint="${name}"] { color: red; }`),
+    ...NON_BASE_TIERS.map(
+      (name) => `[data-breakpoint="${name}"] { color: red; }`,
+    ),
     ...FLAGS.map((flag) => `[data-${flag}="true"] { color: red; }`),
   ].join("\n");
 
@@ -183,9 +185,9 @@ describe("collectViewportCssWarnings", () => {
     // tier with its own attribute block would be the redundant one.
     inject(healthySheet());
     const warnings = collectViewportCssWarnings();
-    expect(
-      warnings.map((warning) => warning.actual),
-    ).not.toContain(SLIDE_VIEWPORT_BASE_BREAKPOINT);
+    expect(warnings.map((warning) => warning.actual)).not.toContain(
+      SLIDE_VIEWPORT_BASE_BREAKPOINT,
+    );
   });
 
   it("flags a declared flag that no rule anywhere references", () => {

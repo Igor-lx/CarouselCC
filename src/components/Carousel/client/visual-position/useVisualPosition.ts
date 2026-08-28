@@ -77,7 +77,13 @@ export function useVisualPosition({
   useEffect(() => {
     const unsubscribe = controller.subscribe(
       (sample) => {
-        emit(toFrame(sample, stepSizeRef.current, nextRunningFrameIndex(sample.phase)));
+        emit(
+          toFrame(
+            sample,
+            stepSizeRef.current,
+            nextRunningFrameIndex(sample.phase),
+          ),
+        );
       },
       { emitCurrent: false },
     );
@@ -98,7 +104,13 @@ export function useVisualPosition({
 
   useIsomorphicLayoutEffect(() => {
     const snapshot = controller.getSnapshot();
-    emit(toFrame(snapshot, stepSizeRef.current, nextRunningFrameIndex(snapshot.phase)));
+    emit(
+      toFrame(
+        snapshot,
+        stepSizeRef.current,
+        nextRunningFrameIndex(snapshot.phase),
+      ),
+    );
   }, [controller, emit, nextRunningFrameIndex, visibleSlidesCount]);
 
   const subscribe = useCallback<VisualPositionSource["subscribe"]>(

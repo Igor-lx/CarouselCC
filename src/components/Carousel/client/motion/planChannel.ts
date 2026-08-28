@@ -45,10 +45,7 @@ export interface WaapiMotionPlan extends MotionPlanBase {
 }
 
 export type CarouselMotionPlan =
-  | IdleMotionPlan
-  | FollowMotionPlan
-  | InstantMotionPlan
-  | WaapiMotionPlan;
+  IdleMotionPlan | FollowMotionPlan | InstantMotionPlan | WaapiMotionPlan;
 
 export type MotionPlanListener = (plan: CarouselMotionPlan) => void;
 
@@ -63,7 +60,10 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
   ? Omit<T, K>
   : never;
 
-export type PublishableMotionPlan = DistributiveOmit<CarouselMotionPlan, "planId">;
+export type PublishableMotionPlan = DistributiveOmit<
+  CarouselMotionPlan,
+  "planId"
+>;
 
 export interface MotionPlanChannel {
   source: MotionPlanSource;

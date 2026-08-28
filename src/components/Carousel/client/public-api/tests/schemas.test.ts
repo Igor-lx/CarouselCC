@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 
-import {
-  CarouselSlidesDataSchema,
-  SlideSchema,
-} from "../schemas";
+import { CarouselSlidesDataSchema, SlideSchema } from "../schemas";
 
 /**
  * The host's only supported way to validate external slide data, and the
@@ -22,7 +19,10 @@ const IMAGE_SLIDE = {
     sizes: "50vw",
     defaultSrc: "https://example.test/a-720.webp",
     sources: [
-      { media: "(orientation: portrait)", srcSet: "https://example.test/tall.webp 480w" },
+      {
+        media: "(orientation: portrait)",
+        srcSet: "https://example.test/tall.webp 480w",
+      },
     ],
   },
 };
@@ -33,25 +33,33 @@ describe("SlideSchema — what a slide may be", () => {
   });
 
   it("accepts the bare minimum: an id and some content", () => {
-    expect(SlideSchema.safeParse({ id: 1, content: "hello" }).success).toBe(true);
+    expect(SlideSchema.safeParse({ id: 1, content: "hello" }).success).toBe(
+      true,
+    );
   });
 
   it("takes an id as either a string or a number, and nothing else", () => {
     expect(SlideSchema.safeParse({ id: 1, content: "x" }).success).toBe(true);
     expect(SlideSchema.safeParse({ id: "a", content: "x" }).success).toBe(true);
-    expect(SlideSchema.safeParse({ id: null, content: "x" }).success).toBe(false);
+    expect(SlideSchema.safeParse({ id: null, content: "x" }).success).toBe(
+      false,
+    );
     expect(SlideSchema.safeParse({ content: "x" }).success).toBe(false);
   });
 
   it("accepts a React element as content — a slide need not be a picture", () => {
     const element = createElement("div", null, "custom");
-    expect(SlideSchema.safeParse({ id: "e", content: element }).success).toBe(true);
+    expect(SlideSchema.safeParse({ id: "e", content: element }).success).toBe(
+      true,
+    );
   });
 
   it("rejects content that is empty or only whitespace", () => {
     // An empty string would render as a slide with no picture and no text.
     expect(SlideSchema.safeParse({ id: "e", content: "" }).success).toBe(false);
-    expect(SlideSchema.safeParse({ id: "e", content: "   " }).success).toBe(false);
+    expect(SlideSchema.safeParse({ id: "e", content: "   " }).success).toBe(
+      false,
+    );
   });
 
   it("rejects content that is neither text, number nor element", () => {
@@ -65,21 +73,37 @@ describe("SlideSchema — what a slide may be", () => {
       ...IMAGE_SLIDE,
       image: { sources: [source] },
     });
-    expect(SlideSchema.safeParse(withSource({ media: "(x)", srcSet: "a 1w" })).success).toBe(true);
-    expect(SlideSchema.safeParse(withSource({ srcSet: "a 1w" })).success).toBe(false);
-    expect(SlideSchema.safeParse(withSource({ media: "(x)" })).success).toBe(false);
-    expect(SlideSchema.safeParse(withSource({ media: "", srcSet: "a 1w" })).success).toBe(false);
+    expect(
+      SlideSchema.safeParse(withSource({ media: "(x)", srcSet: "a 1w" }))
+        .success,
+    ).toBe(true);
+    expect(SlideSchema.safeParse(withSource({ srcSet: "a 1w" })).success).toBe(
+      false,
+    );
+    expect(SlideSchema.safeParse(withSource({ media: "(x)" })).success).toBe(
+      false,
+    );
+    expect(
+      SlideSchema.safeParse(withSource({ media: "", srcSet: "a 1w" })).success,
+    ).toBe(false);
   });
 
   it("keeps every image field optional — a text slide carries none of them", () => {
-    expect(SlideSchema.safeParse({ id: "t", content: "words" }).success).toBe(true);
-    expect(SlideSchema.safeParse({ ...IMAGE_SLIDE, image: {} }).success).toBe(true);
+    expect(SlideSchema.safeParse({ id: "t", content: "words" }).success).toBe(
+      true,
+    );
+    expect(SlideSchema.safeParse({ ...IMAGE_SLIDE, image: {} }).success).toBe(
+      true,
+    );
   });
 });
 
 describe("CarouselSlidesDataSchema — the document", () => {
   it("accepts a well-formed deck and hands back the parsed value", () => {
-    const result = CarouselSlidesDataSchema.safeParse([IMAGE_SLIDE, IMAGE_SLIDE]);
+    const result = CarouselSlidesDataSchema.safeParse([
+      IMAGE_SLIDE,
+      IMAGE_SLIDE,
+    ]);
     expect(result.success).toBe(true);
     if (result.success) expect(result.data).toHaveLength(2);
   });

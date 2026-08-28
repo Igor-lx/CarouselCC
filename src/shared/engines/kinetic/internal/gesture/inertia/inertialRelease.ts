@@ -25,8 +25,12 @@ export function resolveInertialRelease({
   baseDuration,
   config,
 }: ResolveReleaseInput): InertialReleaseResult {
-  const minimumSpeed = baseDuration > 0 ? Math.abs(distanceToTarget) / baseDuration : 0;
-  const releaseSpeed = sameDirectionSpeed(gestureReleaseVelocity, distanceToTarget);
+  const minimumSpeed =
+    baseDuration > 0 ? Math.abs(distanceToTarget) / baseDuration : 0;
+  const releaseSpeed = sameDirectionSpeed(
+    gestureReleaseVelocity,
+    distanceToTarget,
+  );
   const fasterThanBase = releaseSpeed > minimumSpeed;
   const boostedReleaseSpeed = releaseSpeed * config.inertiaBoost;
   const effectiveReleaseSpeed = !fasterThanBase

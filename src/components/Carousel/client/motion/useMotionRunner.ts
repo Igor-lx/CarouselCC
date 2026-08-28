@@ -170,7 +170,10 @@ export function useMotionRunner({
       });
 
       // One percent-progress curve per segment, shared by track and widget.
-      const stops = profileProgressStops(segment.profile, segment.to - segment.from);
+      const stops = profileProgressStops(
+        segment.profile,
+        segment.to - segment.from,
+      );
 
       const isComposited = startCompositorMotion({
         from: segment.from,
@@ -219,8 +222,10 @@ export function useMotionRunner({
           distance: 1,
           duration: totalDuration,
           startSpeed: 0,
-          accelerationDistanceShare: config.motion.goToAccelerationDistanceShare,
-          decelerationDistanceShare: config.motion.goToDecelerationDistanceShare,
+          accelerationDistanceShare:
+            config.motion.goToAccelerationDistanceShare,
+          decelerationDistanceShare:
+            config.motion.goToDecelerationDistanceShare,
         });
         const unitProfile = buildProfile({
           from: 0,
@@ -228,8 +233,10 @@ export function useMotionRunner({
           startSpeed: 0,
           peakSpeed: unitPeak,
           endSpeed: 0,
-          accelerationDistanceShare: config.motion.goToAccelerationDistanceShare,
-          decelerationDistanceShare: config.motion.goToDecelerationDistanceShare,
+          accelerationDistanceShare:
+            config.motion.goToAccelerationDistanceShare,
+          decelerationDistanceShare:
+            config.motion.goToDecelerationDistanceShare,
         });
         planStops = profileProgressStops(unitProfile, 1);
         planDuration = unitProfile.duration;
@@ -273,18 +280,23 @@ export function useMotionRunner({
         maxCoastMs: config.gestureCoastMaxMs,
         targetVirtualIndex: state.virtualIndex,
       });
-      startResolvedMotion(buildStartFromGesture(state, launchPosition), startedAt);
+      startResolvedMotion(
+        buildStartFromGesture(state, launchPosition),
+        startedAt,
+      );
       return;
     }
 
     // Cold start: origin from the reducer, only residual velocity from the
     // controller — an intentional split, not a mixed handoff (see motion.md).
     const handoff = controller.captureHandoff(startedAt);
-    startResolvedMotion(buildStartFromState(state, handoff.velocity), startedAt);
+    startResolvedMotion(
+      buildStartFromState(state, handoff.velocity),
+      startedAt,
+    );
     // `state` is read whole inside, but only `replanInputs` may RE-RUN this:
     // config/controller identity changes must not restart a live segment, and
     // the key above stops them at the door.
-     
   }, [
     cancelCompositorMotion,
     config,

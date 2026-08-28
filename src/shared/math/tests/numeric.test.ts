@@ -14,7 +14,15 @@ import {
 } from "../numeric";
 
 /** Every guard must reject these regardless of its own rule. */
-const NEVER_NUMBERS: unknown[] = [Number.NaN, Infinity, -Infinity, "3", null, undefined, {}];
+const NEVER_NUMBERS: unknown[] = [
+  Number.NaN,
+  Infinity,
+  -Infinity,
+  "3",
+  null,
+  undefined,
+  {},
+];
 
 const guards = {
   isFiniteNumber,

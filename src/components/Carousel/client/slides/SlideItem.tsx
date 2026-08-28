@@ -62,7 +62,7 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
 
   // Render-only responsive sources, gated by the module's presence (see slides.md).
   const image = slideData.image;
-  const sources = isResponsiveImagesOn ? image?.sources ?? [] : [];
+  const sources = isResponsiveImagesOn ? (image?.sources ?? []) : [];
   const isResponsive =
     isResponsiveImagesOn && (image?.srcSet !== undefined || sources.length > 0);
   const resolvedSizes = image?.sizes ?? imageSizes;
@@ -112,15 +112,17 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
       {...(isClickable && { type: "button" as const })}
       onClick={isClickable ? () => onSlideClick?.(slideData) : undefined}
     >
+      {/*
+        Bandwidth gate: the buffer waits out the visible band and the ride (see
+        `useSlideFetchReach`). Sources are withheld by NOT MOUNTING the element —
+        a mounted `<img>` with no `src` inside a `<picture>` would still resolve
+        a candidate from the `<source>`s and fetch it, and a src-less `<img>`
+        renders its `alt` text as visible content.
+      */}
       {imageSource !== null ? (
         hasImageError ? (
           slideData.alt || errAltPlaceholder
-        ) : !isFetchOn ? // Bandwidth gate: the buffer waits out the visible band and the
-        // ride (see `useSlideFetchReach`). Sources are withheld by NOT MOUNTING the
-        // element — a mounted `<img>` with no `src` inside a `<picture>` would
-        // still resolve a candidate from the `<source>`s and fetch it, and a
-        // src-less `<img>` renders its `alt` text as visible content.
-        null : sources.length > 0 ? (
+        ) : !isFetchOn ? null : sources.length > 0 ? (
           <picture key={generation}>
             {sources.map((source) => (
               <source

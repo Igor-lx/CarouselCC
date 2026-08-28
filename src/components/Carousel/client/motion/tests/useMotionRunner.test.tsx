@@ -23,7 +23,10 @@ import { useMotionRunner } from "../useMotionRunner";
 import { createMotionPlanChannel } from "../planChannel";
 import type { CarouselMotionPlan } from "../planChannel";
 import type { CarouselMotionStrategy } from "../types";
-import { useMotionController, type MotionController } from "../../../../../shared";
+import {
+  useMotionController,
+  type MotionController,
+} from "../../../../../shared";
 
 /**
  * The only bridge from "the reducer decided" to "the deck moves".
@@ -41,7 +44,10 @@ const config: CarouselRuntimeConfig = buildCarouselConfig({});
 
 const layout = buildCarouselLayout(
   buildSlideRecords(
-    Array.from({ length: 12 }, (_, i): Slide => ({ id: `s${i}`, content: `c${i}` })),
+    Array.from({ length: 12 }, (_, i): Slide => ({
+      id: `s${i}`,
+      content: `c${i}`,
+    })),
   ),
   3,
   false,

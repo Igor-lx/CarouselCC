@@ -22,10 +22,18 @@ const ControlsBase = memo(function Controls({ className }: ControlsProps) {
   return (
     <>
       {!isAtStart && (
-        <NavigationZone direction="left" classNames={classNames} onClick={handlePrev} />
+        <NavigationZone
+          direction="left"
+          classNames={classNames}
+          onClick={handlePrev}
+        />
       )}
       {!isAtEnd && (
-        <NavigationZone direction="right" classNames={classNames} onClick={handleNext} />
+        <NavigationZone
+          direction="right"
+          classNames={classNames}
+          onClick={handleNext}
+        />
       )}
     </>
   );

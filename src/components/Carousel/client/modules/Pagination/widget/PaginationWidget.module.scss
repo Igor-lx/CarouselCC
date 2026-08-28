@@ -9,7 +9,9 @@
     --widget-padding-inline: 28px;
     --widget-padding-block: 12px;
     --visible-dots-width: calc(var(--visible-dots-count) * var(--dot-size));
-    --visible-gaps-width: calc((var(--visible-dots-count) - 1) * var(--dots-gap));
+    --visible-gaps-width: calc(
+      (var(--visible-dots-count) - 1) * var(--dots-gap)
+    );
     --widget-width: calc(
       var(--visible-dots-width) + var(--visible-gaps-width) +
         (var(--widget-padding-inline) * 2)
@@ -87,7 +89,8 @@
   }
 
   @media (width > 380px) {
-    [data-breakpoint="mobile"]:not([data-short-landscape="true"]) .container_PW {
+    [data-breakpoint="mobile"]:not([data-short-landscape="true"])
+      .container_PW {
       --widget-padding-inline: 20px;
       --widget-padding-block: 10px;
     }
@@ -96,7 +99,8 @@
   // A widget-PRIVATE threshold (no shared-axis counterpart), so it stays a raw
   // query, split by width from its sibling (see styling.md).
   @media (width <= 380px) {
-    [data-breakpoint="mobile"]:not([data-short-landscape="true"]) .container_PW {
+    [data-breakpoint="mobile"]:not([data-short-landscape="true"])
+      .container_PW {
       --widget-padding-inline: 12px;
       --widget-padding-block: 8px;
     }

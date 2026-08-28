@@ -1,6 +1,9 @@
 // Internal fork of shared/gesture (duplicated, not imported; may drift — by
 // design). Physics/traps documented in shared/gesture/README.md.
-export { usePointerSwipe, POINTER_SWIPE_DEFAULTS } from "./swipe/usePointerSwipe";
+export {
+  usePointerSwipe,
+  POINTER_SWIPE_DEFAULTS,
+} from "./swipe/usePointerSwipe";
 export { DRAG_IGNORE_ATTRIBUTE } from "./swipe/internals/index";
 export type {
   PointerSwipeConfig,

@@ -10,14 +10,20 @@ const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 /** A dot's opacity by distance from the live offset: plateau, then resting at
  * the edge slot, then the handover fade over one FULL step — so leaving and
  * arriving edge dots are exact mirror fades (neither goes dark mid-handover). */
-export const dotOpacityAt = (absDistance: number, centerIndex: number): number => {
+export const dotOpacityAt = (
+  absDistance: number,
+  centerIndex: number,
+): number => {
   const plateauEnd = centerIndex - 0.5;
   if (absDistance <= plateauEnd) return 1;
   if (absDistance <= centerIndex) {
     const t = (absDistance - plateauEnd) / 0.5;
     return 1 - (1 - EDGE_DOT_RESTING_OPACITY) * t;
   }
-  return Math.max(0, EDGE_DOT_RESTING_OPACITY * (1 - (absDistance - centerIndex)));
+  return Math.max(
+    0,
+    EDGE_DOT_RESTING_OPACITY * (1 - (absDistance - centerIndex)),
+  );
 };
 
 /** Write one dot's projection into `target` (reused to avoid per-frame allocs). */

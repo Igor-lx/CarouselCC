@@ -32,7 +32,12 @@ describe("createProfileSegment", () => {
   });
 
   it("stamps startedAt with the motion clock when omitted", () => {
-    const auto = createProfileSegment({ strategy: "x", from: 0, to: 1, profile });
+    const auto = createProfileSegment({
+      strategy: "x",
+      from: 0,
+      to: 1,
+      profile,
+    });
     expect(Number.isFinite(auto.startedAt)).toBe(true);
   });
 });

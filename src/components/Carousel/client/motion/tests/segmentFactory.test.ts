@@ -48,7 +48,10 @@ const makeLayout = (slideCount: number, visible: number) => {
   return buildCarouselLayout(buildSlideRecords(slides), visible, false);
 };
 
-const reduce = (state: CarouselState, command: CarouselCommand): CarouselState =>
+const reduce = (
+  state: CarouselState,
+  command: CarouselCommand,
+): CarouselState =>
   carouselReducer(state, {
     ...command,
     context: { layout: state.layout, config, isInstantMode: false },
@@ -91,7 +94,11 @@ describe("ride-duration floor", () => {
       state,
       config,
       isInstantMode: false,
-      start: { position: state.fromVirtualIndex, velocity: 0, strategy: "idle" },
+      start: {
+        position: state.fromVirtualIndex,
+        velocity: 0,
+        strategy: "idle",
+      },
       startedAt: 0,
     });
     // float-tolerant: the solver lands exactly on the floor
@@ -108,12 +115,14 @@ describe("ride-duration floor", () => {
       state,
       config,
       isInstantMode: false,
-      start: { position: state.fromVirtualIndex, velocity: 0, strategy: "idle" },
+      start: {
+        position: state.fromVirtualIndex,
+        velocity: 0,
+        strategy: "idle",
+      },
       startedAt: 0,
     });
-    expect(segment.duration).toBeLessThan(
-      RELEASE_KNOBS.minRideDurationMs,
-    );
+    expect(segment.duration).toBeLessThan(RELEASE_KNOBS.minRideDurationMs);
     const launch = sampleCarouselSegment(segment, 1);
     expect(Math.abs(launch.velocity)).toBeGreaterThan(0.03);
   });
@@ -125,7 +134,11 @@ describe("ride-duration floor", () => {
       state,
       config,
       isInstantMode: false,
-      start: { position: state.fromVirtualIndex, velocity: 0, strategy: "idle" },
+      start: {
+        position: state.fromVirtualIndex,
+        velocity: 0,
+        strategy: "idle",
+      },
       startedAt: 0,
     });
     expect(segment.duration).toBeGreaterThan(
@@ -163,7 +176,11 @@ describe("step tempo by move reason", () => {
       state,
       config,
       isInstantMode: false,
-      start: { position: state.fromVirtualIndex, velocity: 0, strategy: "idle" },
+      start: {
+        position: state.fromVirtualIndex,
+        velocity: 0,
+        strategy: "idle",
+      },
       startedAt: 0,
     });
 
@@ -185,7 +202,11 @@ describe("step tempo by move reason", () => {
       state,
       config,
       isInstantMode: false,
-      start: { position: state.fromVirtualIndex, velocity: 0, strategy: "idle" },
+      start: {
+        position: state.fromVirtualIndex,
+        velocity: 0,
+        strategy: "idle",
+      },
       startedAt: 0,
     });
 
@@ -207,7 +228,11 @@ describe("gesture-release continuity launch", () => {
       state,
       config,
       isInstantMode: false,
-      start: { position: state.fromVirtualIndex, velocity: 0, strategy: "idle" },
+      start: {
+        position: state.fromVirtualIndex,
+        velocity: 0,
+        strategy: "idle",
+      },
       startedAt: 0,
     });
 
@@ -219,7 +244,8 @@ describe("gesture-release continuity launch", () => {
     // mid-segment the speed clearly exceeds the launch speed.
     const samples = Array.from({ length: 40 }, (_, i) =>
       Math.abs(
-        sampleCarouselSegment(segment, ((i + 1) / 41) * segment.duration).velocity,
+        sampleCarouselSegment(segment, ((i + 1) / 41) * segment.duration)
+          .velocity,
       ),
     );
     expect(Math.max(...samples)).toBeGreaterThan(uiVelocity * 3);
@@ -233,14 +259,19 @@ describe("gesture-release continuity launch", () => {
       state,
       config,
       isInstantMode: false,
-      start: { position: state.fromVirtualIndex, velocity: 0, strategy: "idle" },
+      start: {
+        position: state.fromVirtualIndex,
+        velocity: 0,
+        strategy: "idle",
+      },
       startedAt: 0,
     });
     const launch = sampleCarouselSegment(segment, 1);
     const cruisePeak = Math.max(
       ...Array.from({ length: 40 }, (_, i) =>
         Math.abs(
-          sampleCarouselSegment(segment, ((i + 1) / 41) * segment.duration).velocity,
+          sampleCarouselSegment(segment, ((i + 1) / 41) * segment.duration)
+            .velocity,
         ),
       ),
     );
@@ -275,7 +306,11 @@ describe("a micro-hold before lift-off must not launch the ride from a standstil
       state: launched,
       config,
       isInstantMode: false,
-      start: { position: launched.fromVirtualIndex, velocity: 0, strategy: "idle" },
+      start: {
+        position: launched.fromVirtualIndex,
+        velocity: 0,
+        strategy: "idle",
+      },
       startedAt: 0,
     });
 
@@ -296,11 +331,17 @@ describe("a micro-hold before lift-off must not launch the ride from a standstil
       state: stopped,
       config,
       isInstantMode: false,
-      start: { position: stopped.fromVirtualIndex, velocity: 0, strategy: "idle" },
+      start: {
+        position: stopped.fromVirtualIndex,
+        velocity: 0,
+        strategy: "idle",
+      },
       startedAt: 0,
     });
 
-    expect(Math.abs(sampleCarouselSegment(segment, 1).velocity)).toBeLessThan(0.001);
+    expect(Math.abs(sampleCarouselSegment(segment, 1).velocity)).toBeLessThan(
+      0.001,
+    );
   });
 });
 
@@ -334,7 +375,10 @@ describe("GO_TO flight-envelope time ceiling", () => {
   };
 
   /** Issue a GO_TO from page 0 and build its first (ride or preflight) segment. */
-  const jumpFrom0 = (cfg: ReturnType<typeof makeGoToConfig>, targetPageIndex: number) => {
+  const jumpFrom0 = (
+    cfg: ReturnType<typeof makeGoToConfig>,
+    targetPageIndex: number,
+  ) => {
     const layout = makeLayout(30, 3); // pageCount 10, stepSize 3
     const state = carouselReducer(buildInitialState(layout), {
       type: "GO_TO",
@@ -385,7 +429,11 @@ describe("GO_TO flight-envelope time ceiling", () => {
     // span 4+ flies: preflight segment + precomputable approach = full flight
     const { state: far, segment: preflight } = jumpFrom0(cfg, 4);
     expect(far.teleportVirtualIndex).not.toBeNull();
-    const peak = resolveJumpPeakSpeed(3, cfg.stepDuration, cfg.motion.goToSpeedMultiplier);
+    const peak = resolveJumpPeakSpeed(
+      3,
+      cfg.stepDuration,
+      cfg.motion.goToSpeedMultiplier,
+    );
     const flightTotal =
       preflight.duration + resolveGoToApproachDuration(3, cfg.motion, peak);
     expect(d1).toBeLessThanOrEqual(d2 + 1e-9);
@@ -399,7 +447,9 @@ describe("GO_TO flight-envelope time ceiling", () => {
     expect(state.teleportVirtualIndex).toBeNull();
     expect(segment.duration).toBeGreaterThan(flightEnvelope(cfg) * 2);
     // consistent SPEED, not consistent time: farther rides take longer
-    expect(segment.duration).toBeGreaterThan(jumpFrom0(cfg, 3).segment.duration);
+    expect(segment.duration).toBeGreaterThan(
+      jumpFrom0(cfg, 3).segment.duration,
+    );
   });
 
   it("holds for a different preflight/approach/gate ratio (tuning-agnostic)", () => {

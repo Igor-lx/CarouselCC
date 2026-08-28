@@ -77,8 +77,6 @@ const emptyDotState = (): PaginationWidgetDotState => ({
 const toTransform = (x: number, scale: number) =>
   `translate3d(${x}px, 0, 0) scale(${scale})`;
 
-
-
 /** Caches the transform inputs (not the string) for the epsilon write gates. */
 interface DotWriteCache {
   x: number;
@@ -161,7 +159,9 @@ export function usePaginationWidgetBinding({
   const isFallbackFollowRef = useRef(false);
 
   const side = widgetProjectionSide(geometry.visibleCount);
-  const dotCount = widgetProjectionSlotCount(geometry.visibleCount) + DOT_COVERAGE_MARGIN_SLOTS;
+  const dotCount =
+    widgetProjectionSlotCount(geometry.visibleCount) +
+    DOT_COVERAGE_MARGIN_SLOTS;
   const activeSlotIndex = side + DOT_COVERAGE_MARGIN_SLOTS / 2;
 
   const bindDotRef = useCallback((index: number) => {
@@ -201,7 +201,10 @@ export function usePaginationWidgetBinding({
     for (let index = 0; index < dotCount; index += 1) {
       const dot = dotRefs.current[index];
       if (!dot) continue;
-      if (previousActiveClassName && previousActiveClassName !== activeClassName) {
+      if (
+        previousActiveClassName &&
+        previousActiveClassName !== activeClassName
+      ) {
         dot.classList.remove(previousActiveClassName);
       }
       if (!activeClassName) continue;
@@ -233,7 +236,12 @@ export function usePaginationWidgetBinding({
         const isDuplicate = index === 1 && ceilId === floorId;
         const state =
           id !== null && !isDuplicate
-            ? writeDotProjection(activeProjectionRef.current, id, visualOffset, geometry)
+            ? writeDotProjection(
+                activeProjectionRef.current,
+                id,
+                visualOffset,
+                geometry,
+              )
             : null;
         const x = state?.x ?? 0;
         const scale = state?.scale ?? 0;
@@ -267,7 +275,8 @@ export function usePaginationWidgetBinding({
 
   const writeOffset = useCallback(
     (visualOffset: number) => {
-      const firstId = Math.round(visualOffset) - side - DOT_COVERAGE_MARGIN_SLOTS / 2;
+      const firstId =
+        Math.round(visualOffset) - side - DOT_COVERAGE_MARGIN_SLOTS / 2;
       const cache = dotCacheRef.current;
 
       for (let index = 0; index < dotCount; index += 1) {
@@ -275,13 +284,22 @@ export function usePaginationWidgetBinding({
         if (!dot) continue;
 
         const id = firstId + index;
-        const state = writeDotProjection(projectionRef.current, id, visualOffset, geometry);
+        const state = writeDotProjection(
+          projectionRef.current,
+          id,
+          visualOffset,
+          geometry,
+        );
         const last = cache[index];
 
         // Already hidden and staying hidden: nothing to write.
         if (state.opacity === 0 && last && last.opacity === 0) continue;
 
-        const transformChanged = shouldWriteTransform(last, state.x, state.scale);
+        const transformChanged = shouldWriteTransform(
+          last,
+          state.x,
+          state.scale,
+        );
         const opacityChanged = shouldWriteOpacity(last, state.opacity);
 
         if (transformChanged) {
@@ -291,7 +309,11 @@ export function usePaginationWidgetBinding({
           dot.style.opacity = String(state.opacity);
         }
         if (!last) {
-          cache[index] = { x: state.x, scale: state.scale, opacity: state.opacity };
+          cache[index] = {
+            x: state.x,
+            scale: state.scale,
+            opacity: state.opacity,
+          };
         } else {
           if (transformChanged) {
             last.x = state.x;
@@ -372,7 +394,9 @@ export function usePaginationWidgetBinding({
       const animations: Animation[] = [];
       const stripStops = resampleStops(plan.stops, STRIP_CURVE_INTERVALS);
       const lowId =
-        Math.floor(Math.min(from, target)) - side - DOT_COVERAGE_MARGIN_SLOTS / 2;
+        Math.floor(Math.min(from, target)) -
+        side -
+        DOT_COVERAGE_MARGIN_SLOTS / 2;
 
       // Curve + spatial path fold into one keyframe list per dot (no easing fn).
       for (let index = 0; index < dotCount; index += 1) {
@@ -387,7 +411,9 @@ export function usePaginationWidgetBinding({
         );
 
         // A dot invisible all step is pinned (stays mounted), not animated.
-        if (keyframes.every((frame) => frame.opacity <= INVISIBLE_OPACITY_MAX)) {
+        if (
+          keyframes.every((frame) => frame.opacity <= INVISIBLE_OPACITY_MAX)
+        ) {
           const last = keyframes[keyframes.length - 1]!;
           dot.style.transform = last.transform;
           dot.style.opacity = String(last.opacity);
@@ -419,7 +445,9 @@ export function usePaginationWidgetBinding({
           stripStops,
         );
         // Same invisible-pin rule as the dots.
-        if (keyframes.every((frame) => frame.opacity <= INVISIBLE_OPACITY_MAX)) {
+        if (
+          keyframes.every((frame) => frame.opacity <= INVISIBLE_OPACITY_MAX)
+        ) {
           overlay.style.opacity = "0";
           continue;
         }
@@ -508,7 +536,8 @@ export function usePaginationWidgetBinding({
           offsetRef.current = next;
 
           // Fallback relief: same shared frame-drop rule as the track.
-          if (isFallbackFollowRef.current && isDroppedFallbackFrame(frame)) return;
+          if (isFallbackFollowRef.current && isDroppedFallbackFrame(frame))
+            return;
           writeOffset(next);
         },
         { emitCurrent: true },
@@ -552,7 +581,13 @@ export function usePaginationWidgetBinding({
         }
       }
     },
-    [currentOffset, finalizeStep, startFollowing, startWaapiStep, stopFollowing],
+    [
+      currentOffset,
+      finalizeStep,
+      startFollowing,
+      startWaapiStep,
+      stopFollowing,
+    ],
   );
 
   useIsomorphicLayoutEffect(() => {

@@ -27,7 +27,10 @@ import type {
 
 const layout = buildCarouselLayout(
   buildSlideRecords(
-    Array.from({ length: 12 }, (_, i): Slide => ({ id: `s${i}`, content: `c${i}` })),
+    Array.from({ length: 12 }, (_, i): Slide => ({
+      id: `s${i}`,
+      content: `c${i}`,
+    })),
   ),
   3,
   false,

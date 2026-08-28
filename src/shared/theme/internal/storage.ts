@@ -5,7 +5,9 @@ import type { ThemeMode } from "./types";
 // localStorage may be absent (SSR) or throw (privacy mode / disabled) — never crash.
 export const readStoredMode = (): ThemeMode => {
   try {
-    return asThemeMode(globalThis.localStorage?.getItem(THEME_STORAGE_KEY) ?? null);
+    return asThemeMode(
+      globalThis.localStorage?.getItem(THEME_STORAGE_KEY) ?? null,
+    );
   } catch {
     return asThemeMode(null);
   }

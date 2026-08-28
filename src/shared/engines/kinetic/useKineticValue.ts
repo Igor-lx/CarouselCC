@@ -12,7 +12,11 @@ import {
   type MotionSample,
 } from "./internal/motion";
 import { KINETIC_DEFAULTS } from "./internal/defaults";
-import type { KineticConfig, UseKineticValueInput, KineticValue } from "./internal/types";
+import type {
+  KineticConfig,
+  UseKineticValueInput,
+  KineticValue,
+} from "./internal/types";
 
 // The facade hook: fuses the gesture + motion forks into one draggable/flyable
 // value. Wires every seam the standalone engines leave to the consumer; the
@@ -146,7 +150,13 @@ export function useKineticValue({
         handoffVelocity: 0,
         intentSpeed: cfg.cruiseSpeed,
       });
-      rideTo(from, to, launch.startSpeed, launch.cruiseSpeed, handoff.timestamp);
+      rideTo(
+        from,
+        to,
+        launch.startSpeed,
+        launch.cruiseSpeed,
+        handoff.timestamp,
+      );
     },
   });
 

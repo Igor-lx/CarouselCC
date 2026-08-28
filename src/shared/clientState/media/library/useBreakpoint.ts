@@ -25,8 +25,7 @@ export const breakpointMinWidthQuery = (px: number): string =>
  * resolution semantics of the hook. */
 export const sortedBreakpointEntries = (
   table: BreakpointTable,
-): Array<[string, number]> =>
-  Object.entries(table).sort((a, b) => b[1] - a[1]);
+): Array<[string, number]> => Object.entries(table).sort((a, b) => b[1] - a[1]);
 
 /** First tier (descending) whose query matches, else the narrowest fallback. */
 export const resolveActiveBreakpoint = (
@@ -45,7 +44,9 @@ export interface BreakpointState {
    * Pick a value for the active tier: `pick({ desktop: 2, mobile: 1 })`.
    * Falls back to a `DEFAULT` entry when the active tier has no value.
    */
-  pick: <T>(values: Partial<Record<string, T>> & { DEFAULT?: T }) => T | undefined;
+  pick: <T>(
+    values: Partial<Record<string, T>> & { DEFAULT?: T },
+  ) => T | undefined;
 }
 
 // The `table` MUST be a static module constant (one hook subscribed per tier).

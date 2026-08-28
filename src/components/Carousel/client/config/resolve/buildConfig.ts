@@ -45,20 +45,20 @@ export const buildCarouselConfig = ({
 }: RawConfigInput): CarouselRuntimeConfig => ({
   visibleSlidesCount: withDefault(
     visibleSlidesNr,
-    CAROUSEL_DEFAULTS.visibleSlidesNr
+    CAROUSEL_DEFAULTS.visibleSlidesNr,
   ),
   autoplayDuration: withDefault(
     durationAutoplay,
-    CAROUSEL_DEFAULTS.durationAutoplay
+    CAROUSEL_DEFAULTS.durationAutoplay,
   ),
   stepDuration: withDefault(durationStep, CAROUSEL_DEFAULTS.durationStep),
   autoplayInterval: withDefault(
     intervalAutoplay,
-    CAROUSEL_DEFAULTS.intervalAutoplay
+    CAROUSEL_DEFAULTS.intervalAutoplay,
   ),
   errorAltPlaceholder: withDefault(
     errAltPlaceholder,
-    CAROUSEL_DEFAULTS.errAltPlaceholder
+    CAROUSEL_DEFAULTS.errAltPlaceholder,
   ),
   motion: {
     snapBackDurationMs: SNAP_BACK_DURATION_MS,

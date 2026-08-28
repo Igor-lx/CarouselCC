@@ -25,6 +25,6 @@ export function useCarouselConfig({
       errAltPlaceholder,
       intervalAutoplay,
       visibleSlidesNr,
-    ]
+    ],
   );
 }

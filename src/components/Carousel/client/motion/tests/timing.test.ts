@@ -27,8 +27,12 @@ describe("resolveJumpPeakSpeed", () => {
     const stepSize = 3;
     const stepDuration = 2000;
     const oneStep = resolveSpeed(stepSize, stepDuration);
-    expect(resolveJumpPeakSpeed(stepSize, stepDuration, 8)).toBeCloseTo(oneStep * 8);
-    expect(resolveJumpPeakSpeed(stepSize, stepDuration, 1)).toBeCloseTo(oneStep);
+    expect(resolveJumpPeakSpeed(stepSize, stepDuration, 8)).toBeCloseTo(
+      oneStep * 8,
+    );
+    expect(resolveJumpPeakSpeed(stepSize, stepDuration, 1)).toBeCloseTo(
+      oneStep,
+    );
   });
 });
 
@@ -42,8 +46,12 @@ describe("resolveGoToProfileZones", () => {
       expect(zones.decelerationDistance).toBeCloseTo(
         stepSize * motion.goToDecelerationDistanceShare,
       );
-      expect(zones.preflightDistance).toBe(stepSize * motion.goToPreflightPageSpan);
-      expect(zones.approachDistance).toBe(stepSize * motion.goToFinalApproachPageSpan);
+      expect(zones.preflightDistance).toBe(
+        stepSize * motion.goToPreflightPageSpan,
+      );
+      expect(zones.approachDistance).toBe(
+        stepSize * motion.goToFinalApproachPageSpan,
+      );
     }
   });
 });
@@ -87,9 +95,9 @@ describe("resolveGoToPlan", () => {
       expect(plan.leadDistance).toBe(preflight * stepSize);
       expect(plan.approachDistance).toBe(approach * stepSize);
       // preflight + teleport + approach must cover the whole real distance.
-      expect(plan.leadDistance + plan.teleportDistance + plan.approachDistance).toBe(
-        realDistance,
-      );
+      expect(
+        plan.leadDistance + plan.teleportDistance + plan.approachDistance,
+      ).toBe(realDistance);
       // …and the teleported width always spans at least one full skipped
       // page plus the boundary step — never a between-neighbours blink.
       expect(plan.teleportDistance).toBeGreaterThanOrEqual(2 * stepSize);
@@ -115,7 +123,10 @@ describe("resolveGoToPlan", () => {
     // span 4 (one skippable page) still flies. Diagnostics reports the idle
     // knob separately.
     for (const idleMin of [1, 2]) {
-      const lowered: MotionSettings = { ...motion, goToTeleportMinPageSpan: idleMin };
+      const lowered: MotionSettings = {
+        ...motion,
+        goToTeleportMinPageSpan: idleMin,
+      };
       const ride = resolveGoToPlan(3, stepSize, lowered);
       expect(ride.isTeleport).toBe(false);
       expect(ride.leadDistance).toBe(3 * stepSize);
@@ -171,9 +182,10 @@ describe("resolveGoToFlightDuration (the ride time ceiling)", () => {
     const standing = resolveGoToFlightDuration(stepSize, motion, peak, 0);
     const rolling = resolveGoToFlightDuration(stepSize, motion, peak, peak / 2);
     expect(rolling).toBeLessThan(standing);
-    expect(
-      resolveGoToApproachDuration(stepSize, motion, peak),
-    ).toBeCloseTo(standing - resolveGoToPreflightDuration(stepSize, motion, peak), 9);
+    expect(resolveGoToApproachDuration(stepSize, motion, peak)).toBeCloseTo(
+      standing - resolveGoToPreflightDuration(stepSize, motion, peak),
+      9,
+    );
   });
 
   it("degenerate tunings yield 0 — consumers read that as 'no ceiling'", () => {

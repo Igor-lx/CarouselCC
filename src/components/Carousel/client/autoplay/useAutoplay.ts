@@ -84,7 +84,16 @@ export function useAutoplay({
     };
     arm();
     return () => clearTimeout(timer);
-  }, [enabled, internalPaused, intervalMs, isAtEnd, isPaused, onGoToStart, onStep, shouldDeferTick]);
+  }, [
+    enabled,
+    internalPaused,
+    intervalMs,
+    isAtEnd,
+    isPaused,
+    onGoToStart,
+    onStep,
+    shouldDeferTick,
+  ]);
 
   useEffect(() => () => clearHoverTimer(), [clearHoverTimer]);
 

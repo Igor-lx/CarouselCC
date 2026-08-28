@@ -27,7 +27,10 @@ const IMAGE: Slide = {
   image: {
     srcSet: "https://example.test/photo-480.webp 480w",
     sources: [
-      { media: "(orientation: portrait)", srcSet: "https://example.test/tall.webp 480w" },
+      {
+        media: "(orientation: portrait)",
+        srcSet: "https://example.test/tall.webp 480w",
+      },
     ],
   },
 };
@@ -40,7 +43,12 @@ let store: ImageResourceStore;
 
 const base = (): SlideItemProps => ({
   slideData: IMAGE,
-  className: { slide: "slide", slideInteractive: "", slideError: "", slideText: "" },
+  className: {
+    slide: "slide",
+    slideInteractive: "",
+    slideError: "",
+    slideText: "",
+  },
   style: {},
   isContentImg: true,
   isResponsiveImagesOn: true,
@@ -182,15 +190,20 @@ describe("SlideItem — interactivity", () => {
     expect(rootEl().tagName).toBe("BUTTON");
     expect(rootEl().getAttribute("type")).toBe("button");
 
-    (rootEl()).click();
+    rootEl().click();
     expect(onSlideClick).toHaveBeenCalledWith(IMAGE);
   });
 
   it("a text slide is clickable immediately — there is no image to wait for", () => {
     const onSlideClick = vi.fn();
-    render({ slideData: TEXT, isContentImg: false, isInteractiveOn: true, onSlideClick });
+    render({
+      slideData: TEXT,
+      isContentImg: false,
+      isInteractiveOn: true,
+      onSlideClick,
+    });
     expect(rootEl().tagName).toBe("BUTTON");
-    (rootEl()).click();
+    rootEl().click();
     expect(onSlideClick).toHaveBeenCalledWith(TEXT);
   });
 });

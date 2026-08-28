@@ -6,7 +6,9 @@ import { collectPropWarnings } from "../propChecks";
 type DiagnosticProps = CarouselDiagnosticContextValue["props"];
 
 /** All public props undefined — the public-default contract, no warnings. */
-const baseProps = (overrides: Partial<DiagnosticProps> = {}): DiagnosticProps => ({
+const baseProps = (
+  overrides: Partial<DiagnosticProps> = {},
+): DiagnosticProps => ({
   visibleSlidesNr: undefined,
   durationAutoplay: undefined,
   durationStep: undefined,
@@ -23,7 +25,11 @@ describe("collectPropWarnings — value props", () => {
   it("emits nothing when every prop is undefined except a complete environment", () => {
     const warnings = collectPropWarnings(
       baseProps({
-        userEnvironment: { reducedMotion: false, touch: false, dataSaver: false },
+        userEnvironment: {
+          reducedMotion: false,
+          touch: false,
+          dataSaver: false,
+        },
       }),
     );
     expect(warnings).toHaveLength(0);
@@ -33,7 +39,11 @@ describe("collectPropWarnings — value props", () => {
     const warnings = collectPropWarnings(
       baseProps({
         visibleSlidesNr: -1,
-        userEnvironment: { reducedMotion: false, touch: false, dataSaver: false },
+        userEnvironment: {
+          reducedMotion: false,
+          touch: false,
+          dataSaver: false,
+        },
       }),
     );
     expect(warnings.some((w) => w.field === "visibleSlidesNr")).toBe(true);
@@ -67,7 +77,11 @@ describe("collectPropWarnings — environment wiring", () => {
   it("reports a field whose value is not a boolean", () => {
     const warnings = environmentWarnings(
       baseProps({
-        userEnvironment: { reducedMotion: "yes", touch: true, dataSaver: false },
+        userEnvironment: {
+          reducedMotion: "yes",
+          touch: true,
+          dataSaver: false,
+        },
       }),
     );
     expect(warnings).toHaveLength(1);

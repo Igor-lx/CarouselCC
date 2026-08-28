@@ -13,7 +13,10 @@ const ROTATION: Record<ChevronDirection, string | undefined> = {
   down: "rotate(90deg)",
 };
 
-export function ChevronIcon({ direction = "right", className }: ChevronIconProps) {
+export function ChevronIcon({
+  direction = "right",
+  className,
+}: ChevronIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

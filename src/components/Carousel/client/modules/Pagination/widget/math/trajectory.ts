@@ -49,7 +49,14 @@ export const sampleDotTrajectory = (
   geometry: PaginationWidgetGeometry,
   stops: readonly number[],
 ): DotTrajectoryKeyframe[] =>
-  sampleTrajectory(id, fromOffset, toOffset, geometry, stops, (state) => state.opacity);
+  sampleTrajectory(
+    id,
+    fromOffset,
+    toOffset,
+    geometry,
+    stops,
+    (state) => state.opacity,
+  );
 
 /** Keyframes of an active-highlight overlay for integer page `id`: same
  * spatial path, but its opacity is the active strength (1 at the exact page,

@@ -51,32 +51,31 @@ const visualPosition: VisualPositionSource = {
 const stableWith = (
   isReducedMotion: boolean,
   bound: boolean,
-): CarouselStableContextValue =>
-  ({
-    layout: {
-      pageCount: 4,
-      visibleSlidesCount: 3,
-      isFinite: false,
-      canSlide: true,
-      isAtStart: false,
-      isAtEnd: false,
-      isTouch: true,
-      isReducedMotion,
-      isDataSaverEnabled: false,
-      isDiagnosticActive: false,
-    },
-    navigation: {
-      handlePrev: () => {},
-      handleNext: () => {},
-      handlePageSelect: () => {},
-    },
-    visualPosition: bound ? visualPosition : null,
-    motionPlan: bound ? channel.source : null,
-    slides: [],
-    trackRef,
-    isOffBandFetchOn: true,
-    isPaginationInteractiveOn: true,
-  });
+): CarouselStableContextValue => ({
+  layout: {
+    pageCount: 4,
+    visibleSlidesCount: 3,
+    isFinite: false,
+    canSlide: true,
+    isAtStart: false,
+    isAtEnd: false,
+    isTouch: true,
+    isReducedMotion,
+    isDataSaverEnabled: false,
+    isDiagnosticActive: false,
+  },
+  navigation: {
+    handlePrev: () => {},
+    handleNext: () => {},
+    handlePageSelect: () => {},
+  },
+  visualPosition: bound ? visualPosition : null,
+  motionPlan: bound ? channel.source : null,
+  slides: [],
+  trackRef,
+  isOffBandFetchOn: true,
+  isPaginationInteractiveOn: true,
+});
 
 const motion = {
   status: {
@@ -95,7 +94,9 @@ let root: Root;
 const render = (isReducedMotion: boolean, bound = true) =>
   act(() => {
     root.render(
-      <CarouselStableContext.Provider value={stableWith(isReducedMotion, bound)}>
+      <CarouselStableContext.Provider
+        value={stableWith(isReducedMotion, bound)}
+      >
         <CarouselMotionContext.Provider value={motion}>
           <PaginationWidget />
         </CarouselMotionContext.Provider>

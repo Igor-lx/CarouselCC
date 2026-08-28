@@ -47,7 +47,12 @@ export function useSlideRenderModel({
   const layoutOriginRef = useRef<number | null>(null);
 
   const renderWindow = useMemo(() => {
-    const next = buildRenderWindow(previous, current, layout, renderWindowBufferMultiplier);
+    const next = buildRenderWindow(
+      previous,
+      current,
+      layout,
+      renderWindowBufferMultiplier,
+    );
 
     if (!layout.canSlide || !isMoving) {
       persistedWindowRef.current = next;
@@ -142,7 +147,11 @@ export function useSlideRenderModel({
         isActual,
         // `isActual` is the only input the aria payload has beyond the record,
         // so it is rebuilt exactly when the identity check above already failed.
-        ariaProps: buildSlideAriaProps(record.layoutIndex, isActual, totalSlides),
+        ariaProps: buildSlideAriaProps(
+          record.layoutIndex,
+          isActual,
+          totalSlides,
+        ),
       };
       cache.set(virtualIndex, next);
       return next;

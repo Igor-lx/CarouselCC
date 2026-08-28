@@ -36,7 +36,13 @@ const stable = {
 
 const motionOf = (isIdle: boolean, targetPageIndex = 0) =>
   ({
-    status: { motionPhase: isIdle ? "idle" : "step-normal", isIdle, isMoving: !isIdle, isJumping: false, isDragging: false },
+    status: {
+      motionPhase: isIdle ? "idle" : "step-normal",
+      isIdle,
+      isMoving: !isIdle,
+      isJumping: false,
+      isDragging: false,
+    },
     intent: { targetPageIndex },
   }) as CarouselMotionContextValue;
 
@@ -51,17 +57,20 @@ const addSlide = (isActual: boolean, currentSrc: string, complete = true) => {
   const slide = document.createElement("div");
   slide.setAttribute("data-active-zone", String(isActual));
   const image = document.createElement("img");
-  Object.defineProperty(image, "currentSrc", { value: currentSrc, configurable: true });
-  Object.defineProperty(image, "complete", { value: complete, configurable: true });
+  Object.defineProperty(image, "currentSrc", {
+    value: currentSrc,
+    configurable: true,
+  });
+  Object.defineProperty(image, "complete", {
+    value: complete,
+    configurable: true,
+  });
   slide.append(image);
   track.append(slide);
   return image;
 };
 
-const render = (
-  motion: CarouselMotionContextValue,
-  isPredecodeOn = true,
-) =>
+const render = (motion: CarouselMotionContextValue, isPredecodeOn = true) =>
   act(() => {
     root.render(
       <CarouselStableContext.Provider value={stable}>

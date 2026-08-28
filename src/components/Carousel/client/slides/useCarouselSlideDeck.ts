@@ -39,11 +39,17 @@ export function useCarouselSlideDeck({
 }: UseCarouselSlideDeckInput): UseCarouselSlideDeckResult {
   const rawRecords = useMemo(() => buildSlideRecords(slidesData), [slidesData]);
 
-  const hasPartial = hasPartialPageLayout(rawRecords.length, visibleSlidesCount);
+  const hasPartial = hasPartialPageLayout(
+    rawRecords.length,
+    visibleSlidesCount,
+  );
   const didExtend = isFullPagesOn && hasPartial;
 
   const records = useMemo(
-    () => (didExtend ? padDeckToFullPage(rawRecords, visibleSlidesCount) : rawRecords),
+    () =>
+      didExtend
+        ? padDeckToFullPage(rawRecords, visibleSlidesCount)
+        : rawRecords,
     [didExtend, rawRecords, visibleSlidesCount],
   );
 

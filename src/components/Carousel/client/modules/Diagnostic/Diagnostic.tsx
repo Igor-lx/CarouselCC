@@ -37,7 +37,7 @@ const DiagnosticBase = memo(function CarouselDiagnostic() {
 
   // Stylesheet audit runs AFTER mount (styles must be attached).
   const [cssWarnings, setCssWarnings] = useState<CarouselDiagnosticWarning[]>(
-    []
+    [],
   );
   useEffect(() => {
     if (!IS_DEV) return;
@@ -54,27 +54,27 @@ const DiagnosticBase = memo(function CarouselDiagnostic() {
       IS_DEV
         ? [...collectConstantWarnings(), ...collectViewportAxisWarnings()]
         : EMPTY,
-    []
+    [],
   );
   const propWarnings = useMemo(
     () => (IS_DEV ? collectPropWarnings(props) : EMPTY),
-    [props]
+    [props],
   );
   const dataWarnings = useMemo(
     () => (IS_DEV ? collectSlideSourceMediaWarnings(slides) : EMPTY),
-    [slides]
+    [slides],
   );
   const layoutWarnings = useMemo(
     () => (IS_DEV ? collectLayoutWarnings(layout) : EMPTY),
-    [layout]
+    [layout],
   );
   const slotWarnings = useMemo(
     () => (IS_DEV ? collectSlotWarnings(slots) : EMPTY),
-    [slots]
+    [slots],
   );
   const stateWarnings = useMemo(
     () => (IS_DEV ? collectStateWarnings(state) : EMPTY),
-    [state]
+    [state],
   );
 
   const warnings = useMemo<CarouselDiagnosticWarning[]>(
@@ -95,7 +95,7 @@ const DiagnosticBase = memo(function CarouselDiagnostic() {
       propWarnings,
       slotWarnings,
       stateWarnings,
-    ]
+    ],
   );
 
   useGroupedWarnings(warnings);

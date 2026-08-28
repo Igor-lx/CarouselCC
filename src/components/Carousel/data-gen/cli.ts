@@ -19,10 +19,14 @@ const main = async (): Promise<void> => {
   }
 
   const configPath = path.resolve(process.cwd(), configArg);
-  const config = JSON.parse(await readFile(configPath, "utf8")) as DataGenConfig;
+  const config = JSON.parse(
+    await readFile(configPath, "utf8"),
+  ) as DataGenConfig;
 
   const { written, output } = await runDataGen(config);
-  console.log(`Wrote ${written} slides -> ${path.relative(process.cwd(), output)}`);
+  console.log(
+    `Wrote ${written} slides -> ${path.relative(process.cwd(), output)}`,
+  );
 };
 
 main().catch((error: unknown) => {

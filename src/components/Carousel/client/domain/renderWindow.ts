@@ -51,7 +51,10 @@ export const buildSegmentWindow = (
 export const windowContains = (outer: RenderWindow, inner: RenderWindow) =>
   outer.start <= inner.start && outer.end >= inner.end;
 
-export const expandWindow = (current: RenderWindow, next: RenderWindow): RenderWindow => ({
+export const expandWindow = (
+  current: RenderWindow,
+  next: RenderWindow,
+): RenderWindow => ({
   start: Math.min(current.start, next.start),
   end: Math.max(current.end, next.end),
 });

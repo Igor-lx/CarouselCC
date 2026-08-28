@@ -266,7 +266,11 @@ export function createMotionController<Strategy extends string = string>(
       emit(settled);
 
       if (options.onComplete) {
-        scheduleCompletion(options.onComplete, settled, options.completion ?? "next-frame");
+        scheduleCompletion(
+          options.onComplete,
+          settled,
+          options.completion ?? "next-frame",
+        );
       }
     },
 

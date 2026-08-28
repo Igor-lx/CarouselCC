@@ -46,7 +46,10 @@ describe("viewport axes SSOT", () => {
   });
 
   it("every <source media> in the generator configs is canonical", () => {
-    for (const config of ["carousel-data.config1.json", "carousel-data.config2.json"]) {
+    for (const config of [
+      "carousel-data.config1.json",
+      "carousel-data.config2.json",
+    ]) {
       const text = JSON.stringify(JSON.parse(read(config)));
       const mediaValues = [...text.matchAll(/"media":"([^"]+)"/g)].map(
         (m) => m[1],

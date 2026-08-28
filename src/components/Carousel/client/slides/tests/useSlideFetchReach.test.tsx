@@ -30,15 +30,14 @@ let host: HTMLDivElement;
 let root: Root;
 let store: ImageResourceStore;
 
-const slide = (src: string, isActual: boolean): VirtualSlide =>
-  ({
-    slideKey: src,
-    slideData: { id: src, content: src },
-    virtualIndex: 0,
-    isActive: isActual,
-    isActual,
-    ariaProps: {},
-  });
+const slide = (src: string, isActual: boolean): VirtualSlide => ({
+  slideKey: src,
+  slideData: { id: src, content: src },
+  virtualIndex: 0,
+  isActive: isActual,
+  isActual,
+  ariaProps: {},
+});
 
 let observed = BAND_ONLY;
 
@@ -92,7 +91,11 @@ describe("useSlideFetchReach — waiting for the band", () => {
   });
 
   it("waits for EVERY slide of a multi-slide band", () => {
-    render([slide("a.webp", true), slide("b.webp", true), slide("c.webp", false)]);
+    render([
+      slide("a.webp", true),
+      slide("b.webp", true),
+      slide("c.webp", false),
+    ]);
 
     act(() => store.reportLoaded("a.webp"));
     expect(observed).toBe(BAND_ONLY);

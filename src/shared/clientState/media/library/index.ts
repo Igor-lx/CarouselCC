@@ -13,7 +13,4 @@ export {
   LANDSCAPE_ORIENTATION_QUERY,
 } from "./useOrientation";
 export type { ViewportOrientation } from "./useOrientation";
-export {
-  useShortLandscape,
-  SHORT_LANDSCAPE_QUERY,
-} from "./useShortLandscape";
+export { useShortLandscape, SHORT_LANDSCAPE_QUERY } from "./useShortLandscape";

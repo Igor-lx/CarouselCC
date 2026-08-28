@@ -23,7 +23,9 @@ import type { MediaAxes } from "../internal/canonicalMedia";
 
 const AXES: MediaAxes = {
   breakpoints: { desktop: 1024, tablet: 768, mobile: 0 },
-  flags: { "short-landscape": "(orientation: landscape) and (max-height: 520px)" },
+  flags: {
+    "short-landscape": "(orientation: landscape) and (max-height: 520px)",
+  },
 };
 
 type MediaListener = (event: { matches: boolean }) => void;

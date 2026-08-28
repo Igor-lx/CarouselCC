@@ -41,13 +41,17 @@ describe("formatWarning", () => {
 
   it("says outright that it changed nothing", () => {
     // Observe-only is the module's whole promise; the line has to carry it.
-    expect(formatWarning(warning())).toContain("does not apply runtime changes");
+    expect(formatWarning(warning())).toContain(
+      "does not apply runtime changes",
+    );
   });
 
   it("renders the values that break naive stringification", () => {
     expect(formatWarning(warning({ actual: Number.NaN }))).toContain("NaN");
     expect(formatWarning(warning({ actual: Infinity }))).toContain("Infinity");
-    expect(formatWarning(warning({ actual: undefined }))).toContain("undefined");
+    expect(formatWarning(warning({ actual: undefined }))).toContain(
+      "undefined",
+    );
     expect(formatWarning(warning({ actual: null }))).toContain("null");
     expect(formatWarning(warning({ actual: "auto" }))).toContain('"auto"');
     expect(formatWarning(warning({ actual: { a: 1 } }))).toContain('{"a":1}');

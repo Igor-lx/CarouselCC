@@ -9,7 +9,9 @@ describe("trackPixelTransform", () => {
   });
 
   it("is origin-relative: same (position - origin) => same transform", () => {
-    expect(trackPixelTransform(10, 4, 50)).toBe(trackPixelTransform(106, 100, 50));
+    expect(trackPixelTransform(10, 4, 50)).toBe(
+      trackPixelTransform(106, 100, 50),
+    );
   });
 });
 

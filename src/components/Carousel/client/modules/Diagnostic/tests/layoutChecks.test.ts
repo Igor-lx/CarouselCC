@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { CarouselDiagnosticContextValue } from "../../../context";
-import { collectLayoutWarnings, collectSlotWarnings } from "../checks/layoutChecks";
+import {
+  collectLayoutWarnings,
+  collectSlotWarnings,
+} from "../checks/layoutChecks";
 
 /**
  * Diagnostics is a developer's smoke alarm, and an alarm has exactly two ways
@@ -56,9 +59,7 @@ describe("collectSlotWarnings", () => {
   });
 
   it("says nothing when the module is switched OFF and its child absent", () => {
-    expect(
-      slots({ isControlsOn: false, hasControlsSlot: false }),
-    ).toEqual([]);
+    expect(slots({ isControlsOn: false, hasControlsSlot: false })).toEqual([]);
   });
 
   it("flags responsive variants the deck cannot use", () => {

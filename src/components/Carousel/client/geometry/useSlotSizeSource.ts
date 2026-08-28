@@ -72,7 +72,11 @@ export function useSlotSizeSource({
 
       const width = viewportWidth ?? viewport.offsetWidth;
       lastMeasuredWidthRef.current = width;
-      const slot = measureSlotSize(viewport, visibleSlidesCountRef.current, width);
+      const slot = measureSlotSize(
+        viewport,
+        visibleSlidesCountRef.current,
+        width,
+      );
       const next = slot > 0 ? slot : null;
       const moved = next !== slotSizeRef.current;
       slotSizeRef.current = next;

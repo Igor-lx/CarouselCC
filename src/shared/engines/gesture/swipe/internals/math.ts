@@ -6,7 +6,8 @@ const FRAME_BUDGET_MS = 1000 / 60;
 /** Keeps `applyResistance` finite as `resistance` → 1. */
 const MIN_RESISTANCE_DENOMINATOR = 0.001;
 
-export const safeResistance = (value: number) => Math.max(0, Math.min(1, value));
+export const safeResistance = (value: number) =>
+  Math.max(0, Math.min(1, value));
 
 /** Progressive drag resistance: UI offset lags the finger more as the pull
  * grows (`resistance` = how strongly, `curvature` = how fast it ramps). */
@@ -58,10 +59,13 @@ export const dominantMagnitude = (a: number, b: number) =>
   Math.abs(a) >= Math.abs(b) ? a : b;
 
 /** EMA-decay a velocity toward zero over an idle gap of `dt` ms. */
-export const decayedVelocity = (velocity: number, alpha: number, dt: number) => {
+export const decayedVelocity = (
+  velocity: number,
+  alpha: number,
+  dt: number,
+) => {
   const safe = Math.max(0, Math.min(1, alpha));
   const frames = Math.max(0, dt / FRAME_BUDGET_MS);
   const elapsedAlpha = 1 - Math.pow(1 - safe, frames);
   return calculateEma(velocity, 0, elapsedAlpha);
 };
-

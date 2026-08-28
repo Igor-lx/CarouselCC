@@ -13,7 +13,10 @@ import { getMediaQueryStore } from "../useMediaQuery";
  */
 
 const installMatchMedia = () => {
-  const registry = new Map<string, { matches: boolean; listeners: Set<(e: { matches: boolean }) => void> }>();
+  const registry = new Map<
+    string,
+    { matches: boolean; listeners: Set<(e: { matches: boolean }) => void> }
+  >();
 
   const entryOf = (query: string) => {
     let entry = registry.get(query);

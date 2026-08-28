@@ -12,7 +12,9 @@ describe("canonicalMediaQueries", () => {
   it("emits width tiers (px>0), both orientations, and every flag", () => {
     const media = canonicalMediaQueries({
       breakpoints: { desktop: 1024, tablet: 768, mobile: 0 },
-      flags: { "short-landscape": "(orientation: landscape) and (max-height: 520px)" },
+      flags: {
+        "short-landscape": "(orientation: landscape) and (max-height: 520px)",
+      },
     });
     expect(media).toEqual([
       "(min-width: 1024px)",

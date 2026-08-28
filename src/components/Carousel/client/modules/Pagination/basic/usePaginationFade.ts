@@ -52,7 +52,11 @@ const DOT_CURVE_INTERVALS = 32;
  * opacity/scale span (a near-flat span would swallow an absolute gate whole). */
 const FOLLOW_STRENGTH_EPSILON = 1 / 512;
 
-const readVar = (styles: CSSStyleDeclaration, name: string, fallback: number) => {
+const readVar = (
+  styles: CSSStyleDeclaration,
+  name: string,
+  fallback: number,
+) => {
   const parsed = Number.parseFloat(styles.getPropertyValue(name));
   return Number.isFinite(parsed) ? parsed : fallback;
 };
@@ -64,7 +68,11 @@ const readDotStates = (
   const styles = getComputedStyle(element);
   return {
     inactive: {
-      opacity: readVar(styles, "--pagination-dot-opacity", FALLBACK_INACTIVE.opacity),
+      opacity: readVar(
+        styles,
+        "--pagination-dot-opacity",
+        FALLBACK_INACTIVE.opacity,
+      ),
       scale: 1,
     },
     active: {
@@ -73,7 +81,11 @@ const readDotStates = (
         "--pagination-dot-opacity-active",
         FALLBACK_ACTIVE.opacity,
       ),
-      scale: readVar(styles, "--pagination-dot-scale-active", FALLBACK_ACTIVE.scale),
+      scale: readVar(
+        styles,
+        "--pagination-dot-scale-active",
+        FALLBACK_ACTIVE.scale,
+      ),
     },
   };
 };
@@ -109,7 +121,9 @@ export function usePaginationFade({
   isFinite,
 }: UsePaginationFadeInput): PaginationFadeBinding {
   const dotRefs = useRef<Array<HTMLElement | null>>([]);
-  const callbacksRef = useRef<Array<((node: HTMLElement | null) => void) | null>>([]);
+  const callbacksRef = useRef<
+    Array<((node: HTMLElement | null) => void) | null>
+  >([]);
   const animationsRef = useRef(new Map<number, Animation>());
 
   /** Dots whose inline layer (look + suppressed transition) the binding owns.
@@ -122,14 +136,19 @@ export function usePaginationFade({
   const offsetRef = useRef(targetPageIndex);
   const stepRef = useRef<ActiveFade | null>(null);
   const followUnsubRef = useRef<(() => void) | null>(null);
-  const followBaseRef = useRef<{ pageOffset: number; offset: number } | null>(null);
+  const followBaseRef = useRef<{ pageOffset: number; offset: number } | null>(
+    null,
+  );
   /** Which follow the live subscription is serving. A drag that releases into the
    * no-WAAPI path switches flavour WITHOUT a new subscription, and the frame-drop
    * rule has to switch with it or the strip outruns the track. */
   const isFallbackFollowRef = useRef(false);
 
   // Reading the CSS-owned look forces a recalc, so cache it; refresh only at rest.
-  const dotStatesRef = useRef<{ inactive: DotVisualState; active: DotVisualState } | null>(null);
+  const dotStatesRef = useRef<{
+    inactive: DotVisualState;
+    active: DotVisualState;
+  } | null>(null);
 
   const refreshDotStates = useCallback(() => {
     const anyDot = dotRefs.current.find((dot) => dot) ?? null;
@@ -157,15 +176,18 @@ export function usePaginationFade({
   // paints it, or Blink is left with two effects on one property and drops the
   // animation to the main thread. Do NOT remove (see modules.md). Idempotent, so
   // a dot that mounts mid-motion is claimed by the write that first reaches it.
-  const takeDotOwnership = useCallback((pageIndex: number): HTMLElement | null => {
-    const dot = dotRefs.current[pageIndex];
-    if (!dot) return null;
-    if (!ownedDotsRef.current.has(pageIndex)) {
-      dot.style.transition = "none";
-      ownedDotsRef.current.add(pageIndex);
-    }
-    return dot;
-  }, []);
+  const takeDotOwnership = useCallback(
+    (pageIndex: number): HTMLElement | null => {
+      const dot = dotRefs.current[pageIndex];
+      if (!dot) return null;
+      if (!ownedDotsRef.current.has(pageIndex)) {
+        dot.style.transition = "none";
+        ownedDotsRef.current.add(pageIndex);
+      }
+      return dot;
+    },
+    [],
+  );
 
   /** Hand one dot back to its class styles — look AND transition, together. */
   const releaseDot = useCallback((pageIndex: number) => {
@@ -232,7 +254,10 @@ export function usePaginationFade({
         );
         const last = written.get(index);
         // Gate on strength, paint from dotStateAt — one look function, one owner.
-        if (last !== undefined && Math.abs(last - strength) <= FOLLOW_STRENGTH_EPSILON) {
+        if (
+          last !== undefined &&
+          Math.abs(last - strength) <= FOLLOW_STRENGTH_EPSILON
+        ) {
           continue;
         }
         const dot = takeDotOwnership(index);
@@ -293,7 +318,8 @@ export function usePaginationFade({
 
           // Fallback relief: the same shared frame-drop rule the track and the
           // widget apply, so the three consumers cannot desync.
-          if (isFallbackFollowRef.current && isDroppedFallbackFrame(frame)) return;
+          if (isFallbackFollowRef.current && isDroppedFallbackFrame(frame))
+            return;
           writeFollowOffset(next);
         },
         { emitCurrent: true },
@@ -326,7 +352,8 @@ export function usePaginationFade({
           // A dot travels a few px, so it rides a coarser re-sample of the curve.
           const dotStops = resampleStops(plan.stops, DOT_CURVE_INTERVALS);
           if (!dotStatesRef.current) refreshDotStates();
-          const { inactive, active } = dotStatesRef.current ?? readDotStates(anyDot);
+          const { inactive, active } =
+            dotStatesRef.current ?? readDotStates(anyDot);
 
           // GO_TO teleports the middle → dots cross-fade straight (direct), still
           // on the plan's curve/clock so the landing dot arrives with the picture.
@@ -347,19 +374,37 @@ export function usePaginationFade({
                 const blend = previous.blends?.get(index);
                 return blend
                   ? blendDotStates(blend.from, blend.to, previousProgress!)
-                  : dotStateAt(index, previous.landing, inactive, active, pageCount, isFinite);
+                  : dotStateAt(
+                      index,
+                      previous.landing,
+                      inactive,
+                      active,
+                      pageCount,
+                      isFinite,
+                    );
               }
-              return dotStateAt(index, previousOffset, inactive, active, pageCount, isFinite);
+              return dotStateAt(
+                index,
+                previousOffset,
+                inactive,
+                active,
+                pageCount,
+                isFinite,
+              );
             };
 
-            const blends = new Map<number, { from: DotVisualState; to: DotVisualState }>();
+            const blends = new Map<
+              number,
+              { from: DotVisualState; to: DotVisualState }
+            >();
             for (let index = 0; index < pageCount; index += 1) {
               const fromState = startStateOf(index);
               const toState = index === target ? active : inactive;
               const isAlreadyThere =
                 Math.abs(fromState.opacity - toState.opacity) < 1e-3 &&
                 Math.abs(fromState.scale - toState.scale) < 1e-3;
-              if (!isAlreadyThere) blends.set(index, { from: fromState, to: toState });
+              if (!isAlreadyThere)
+                blends.set(index, { from: fromState, to: toState });
             }
 
             cancelAllFades();
@@ -386,12 +431,14 @@ export function usePaginationFade({
                 continue;
               }
               animationsRef.current.set(index, animation);
-              if (index === target || settleOwner === null) settleOwner = animation;
+              if (index === target || settleOwner === null)
+                settleOwner = animation;
             }
             if (settleOwner) {
               const owner = settleOwner;
               owner.onfinish = () => {
-                if (![...animationsRef.current.values()].includes(owner)) return;
+                if (![...animationsRef.current.values()].includes(owner))
+                  return;
                 settle(target);
               };
             }
@@ -429,7 +476,12 @@ export function usePaginationFade({
           // One motion for the whole strip: same curve/duration/clock per dot.
           cancelAllFades();
           releaseAllDots();
-          for (const index of reachedDotIndexes(from, to, pageCount, isFinite)) {
+          for (const index of reachedDotIndexes(
+            from,
+            to,
+            pageCount,
+            isFinite,
+          )) {
             const dot = dotRefs.current[index];
             if (!dot) continue;
 

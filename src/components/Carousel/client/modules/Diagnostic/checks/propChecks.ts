@@ -18,7 +18,10 @@ export const collectPropWarnings = (
 ): CarouselDiagnosticWarning[] => {
   const out: CarouselDiagnosticWarning[] = [];
 
-  if (typeof props.visibleSlidesNr !== "undefined" && !isPositiveInteger(props.visibleSlidesNr)) {
+  if (
+    typeof props.visibleSlidesNr !== "undefined" &&
+    !isPositiveInteger(props.visibleSlidesNr)
+  ) {
     out.push({
       severity: "CRITICAL",
       layer: LAYER,
@@ -97,7 +100,10 @@ const readEnvironmentField = (environment: unknown, field: string): unknown =>
     ? (environment as Record<string, unknown>)[field]
     : undefined;
 
-const ENVIRONMENT_FIELDS: ReadonlyArray<{ field: string; consequence: string }> = [
+const ENVIRONMENT_FIELDS: ReadonlyArray<{
+  field: string;
+  consequence: string;
+}> = [
   {
     field: "reducedMotion",
     consequence:

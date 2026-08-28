@@ -27,7 +27,8 @@ import { describe, expect, it } from "vitest";
  */
 
 const repoRoot = resolve(__dirname, "../../../../..");
-const read = (relative: string) => readFileSync(resolve(repoRoot, relative), "utf8");
+const read = (relative: string) =>
+  readFileSync(resolve(repoRoot, relative), "utf8");
 
 const GLOBALS = "src/globals.scss";
 const HOST_STYLESHEET = "src/app/App.module.scss";
@@ -57,8 +58,13 @@ describe("component styles are layered, the host's are not", () => {
 
     for (const path of COMPONENT_STYLESHEETS) {
       const layer = layerOf(read(path));
-      expect(layer, `${path} is unlayered — a host override would become a specificity race`).not.toBeNull();
-      expect(declared, `${path} names a layer nothing declares`).toContain(layer);
+      expect(
+        layer,
+        `${path} is unlayered — a host override would become a specificity race`,
+      ).not.toBeNull();
+      expect(declared, `${path} names a layer nothing declares`).toContain(
+        layer,
+      );
     }
   });
 

@@ -54,7 +54,10 @@ export const measureSlotSize = (
 };
 
 // Negative: moving the pointer right lowers the virtual index.
-export const pointerVelocityToVirtual = (pointerVelocity: number, slotSize: number) => {
+export const pointerVelocityToVirtual = (
+  pointerVelocity: number,
+  slotSize: number,
+) => {
   if (!(slotSize > 0)) return 0;
   return -(pointerVelocity / slotSize);
 };

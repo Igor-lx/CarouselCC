@@ -1,5 +1,13 @@
 // @vitest-environment jsdom
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
@@ -40,11 +48,16 @@ let circle: HTMLElement | null = null;
 let api: KineticValue | null = null;
 
 const translateOf = (keyframe: Keyframe | undefined): number => {
-  const match = /translateX\((-?[\d.]+)px\)/.exec(String(keyframe?.transform ?? ""));
+  const match = /translateX\((-?[\d.]+)px\)/.exec(
+    String(keyframe?.transform ?? ""),
+  );
   return match ? Number.parseFloat(match[1]!) : Number.NaN;
 };
 
-const pointerEvent = (type: string, { x, y, t }: { x: number; y: number; t?: number }) => {
+const pointerEvent = (
+  type: string,
+  { x, y, t }: { x: number; y: number; t?: number },
+) => {
   const event = new MouseEvent(type, {
     bubbles: true,
     cancelable: true,
@@ -125,7 +138,9 @@ describe("useKineticValue", () => {
     expect(animateMock).toHaveBeenCalledTimes(1);
     const keyframes = animateMock.mock.calls[0]![0] as Keyframe[];
     expect(translateOf(keyframes[0])).toBeCloseTo(beforeRelease, 4);
-    expect(translateOf(keyframes[keyframes.length - 1])).toBeGreaterThan(beforeRelease);
+    expect(translateOf(keyframes[keyframes.length - 1])).toBeGreaterThan(
+      beforeRelease,
+    );
   });
 
   it("a slow drop just rests: no ride, onSettle fires where it was dropped", () => {

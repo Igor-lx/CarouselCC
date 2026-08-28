@@ -86,7 +86,9 @@ const createIdleSample = (width = 0, timestamp = 0): InternalSample => ({
   timestamp,
 });
 
-const resolveConfig = (config?: PointerSwipeConfig): ResolvedPointerSwipeConfig => ({
+const resolveConfig = (
+  config?: PointerSwipeConfig,
+): ResolvedPointerSwipeConfig => ({
   ...POINTER_SWIPE_DEFAULTS,
   ...config,
 });
@@ -158,16 +160,19 @@ export function usePointerSwipe({
     [externalHostRef],
   );
 
-  const ensureCapture = useCallback((target: HTMLElement, pointerId: number) => {
-    const gesture = gestureRef.current;
-    if (gesture.hasCapture) return;
-    try {
-      target.setPointerCapture(pointerId);
-      gesture.hasCapture = true;
-    } catch {
-      // capture lost between events — ignore
-    }
-  }, []);
+  const ensureCapture = useCallback(
+    (target: HTMLElement, pointerId: number) => {
+      const gesture = gestureRef.current;
+      if (gesture.hasCapture) return;
+      try {
+        target.setPointerCapture(pointerId);
+        gesture.hasCapture = true;
+      } catch {
+        // capture lost between events — ignore
+      }
+    },
+    [],
+  );
 
   // Pending catch: a press becomes a brake only if it outlasts the window.
   // See ../README.md § Recognition internals (the catch window).
@@ -353,7 +358,8 @@ export function usePointerSwipe({
               settingsRef.current.emaAlpha,
               now - sampleRef.current.timestamp,
             ),
-            width: gesture.width || target?.offsetWidth || sampleRef.current.width,
+            width:
+              gesture.width || target?.offsetWidth || sampleRef.current.width,
             timestamp: now,
           };
       sample.flickVelocity = dominantMagnitude(
@@ -419,7 +425,12 @@ export function usePointerSwipe({
   const handlePointerDown = useCallback(
     (event: React.PointerEvent) => {
       const now = eventTime(event);
-      if (!enabled || !event.isPrimary || event.pointerType !== "touch" || event.button !== 0) {
+      if (
+        !enabled ||
+        !event.isPrimary ||
+        event.pointerType !== "touch" ||
+        event.button !== 0
+      ) {
         return;
       }
 
@@ -431,7 +442,9 @@ export function usePointerSwipe({
       // See ../README.md § Principle.
       const surface = surfaceRef?.current ?? null;
       const offSurface =
-        surface && event.target instanceof Node && !surface.contains(event.target);
+        surface &&
+        event.target instanceof Node &&
+        !surface.contains(event.target);
       const dragIgnored = getDragIgnoreTarget(event.target, target);
       if (offSurface || dragIgnored) {
         allowedClickTargetRef.current =
@@ -496,7 +509,10 @@ export function usePointerSwipe({
           }
 
           if (event.cancelable) event.preventDefault();
-          activateOwnership(event.currentTarget as HTMLElement, event.pointerId);
+          activateOwnership(
+            event.currentTarget as HTMLElement,
+            event.pointerId,
+          );
 
           // Re-anchor the visual origin to the finger (see README § visual re-anchor).
           gesture.visualStartX = event.clientX;
@@ -576,7 +592,9 @@ export function usePointerSwipe({
     };
 
     element.addEventListener("click", suppressClick, { capture: true });
-    element.addEventListener("touchmove", suppressTouchMove, { passive: false });
+    element.addEventListener("touchmove", suppressTouchMove, {
+      passive: false,
+    });
 
     return () => {
       element.removeEventListener("click", suppressClick, { capture: true });
@@ -606,7 +624,13 @@ export function usePointerSwipe({
       onLostPointerCapture: (event) =>
         finishInteraction("external-cancel", event.clientX, eventTime(event)),
     };
-  }, [enabled, finishInteraction, handlePointerDown, handlePointerMove, setHostNode]);
+  }, [
+    enabled,
+    finishInteraction,
+    handlePointerDown,
+    handlePointerMove,
+    setHostNode,
+  ]);
 
   return { hostProps };
 }

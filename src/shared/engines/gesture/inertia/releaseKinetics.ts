@@ -52,7 +52,9 @@ export const resolveReleaseKinetics = ({
 
   // The intent primitive is duration-authored; express base SPEED as a duration.
   const baseDuration =
-    baseSpeed > 0 && Math.abs(distance) > 0 ? Math.abs(distance) / baseSpeed : 0;
+    baseSpeed > 0 && Math.abs(distance) > 0
+      ? Math.abs(distance) / baseSpeed
+      : 0;
 
   const intent = resolveInertialRelease({
     gestureReleaseVelocity: pointerReleaseVelocity ?? launchVelocity,

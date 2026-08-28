@@ -46,7 +46,9 @@ export const formatWarning = (warning: CarouselDiagnosticWarning): string =>
     finishSentence(warning.expected),
     finishSentence(warning.consequence),
     TRAILER,
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 
 /** Deterministic signature for dedupe / cache. */
 export const warningSignature = (warning: CarouselDiagnosticWarning): string =>

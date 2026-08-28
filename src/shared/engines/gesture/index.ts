@@ -1,6 +1,9 @@
 // The gesture library facade: swipe/ (registration) + inertia/ (release meaning).
 // Imports nothing outside itself → copy-portable. See README.md.
-export { usePointerSwipe, POINTER_SWIPE_DEFAULTS } from "./swipe/usePointerSwipe";
+export {
+  usePointerSwipe,
+  POINTER_SWIPE_DEFAULTS,
+} from "./swipe/usePointerSwipe";
 export { DRAG_IGNORE_ATTRIBUTE } from "./swipe/internals/index";
 export type {
   PointerSwipeConfig,

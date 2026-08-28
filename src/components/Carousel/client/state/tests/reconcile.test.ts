@@ -9,7 +9,10 @@ import type { CarouselState } from "../types";
 import { makeLayout } from "./layoutBuilder";
 
 /** A non-idle state to prove reconciliation collapses motion to a snap. */
-const movedState = (layout: CarouselLayout, targetPageIndex: number): CarouselState => ({
+const movedState = (
+  layout: CarouselLayout,
+  targetPageIndex: number,
+): CarouselState => ({
   ...buildInitialState(layout),
   targetPageIndex,
   fromVirtualIndex: 0,
@@ -64,15 +67,25 @@ describe("reconcileStateToLayout — proportional remap", () => {
     expect(next.motionPhase).toBe("step-instant");
     expect(next.targetPageIndex).toBeGreaterThanOrEqual(0);
     expect(next.targetPageIndex).toBeLessThan(after.pageCount);
-    expect(next.virtualIndex).toBe(next.targetPageIndex * after.visibleSlidesCount);
+    expect(next.virtualIndex).toBe(
+      next.targetPageIndex * after.visibleSlidesCount,
+    );
     expect(next.fromVirtualIndex).toBe(next.virtualIndex);
   });
 });
 
 describe("reconcileStateToLayout — idempotency (ADR-001 contract)", () => {
   const cases: Array<[string, CarouselState, CarouselLayout]> = [
-    ["same shape", movedState(makeLayout(12, 3, false), 2), makeLayout(12, 4, false)],
-    ["hard reset", movedState(makeLayout(12, 3, false), 2), makeLayout(9, 3, true)],
+    [
+      "same shape",
+      movedState(makeLayout(12, 3, false), 2),
+      makeLayout(12, 4, false),
+    ],
+    [
+      "hard reset",
+      movedState(makeLayout(12, 3, false), 2),
+      makeLayout(9, 3, true),
+    ],
   ];
 
   for (const [name, state, nextLayout] of cases) {
@@ -113,13 +126,21 @@ describe("reconcileStateToLayout — render-only image variants do not affect id
 
   it("produces an identical dataKey when only image variants differ", () => {
     const plain = buildCarouselLayout(buildSlideRecords(baseSlides), 3, false);
-    const responsive = buildCarouselLayout(buildSlideRecords(withVariants), 3, false);
+    const responsive = buildCarouselLayout(
+      buildSlideRecords(withVariants),
+      3,
+      false,
+    );
     expect(responsive.dataKey).toBe(plain.dataKey);
   });
 
   it("keeps the viewing position (no hard reset) when image variants are added", () => {
     const plain = buildCarouselLayout(buildSlideRecords(baseSlides), 3, false);
-    const responsive = buildCarouselLayout(buildSlideRecords(withVariants), 3, false);
+    const responsive = buildCarouselLayout(
+      buildSlideRecords(withVariants),
+      3,
+      false,
+    );
     const next = reconcileStateToLayout(movedState(plain, 2), responsive);
     // Same-shape fast path: position preserved, motion not collapsed to a snap.
     expect(next.targetPageIndex).toBe(2);

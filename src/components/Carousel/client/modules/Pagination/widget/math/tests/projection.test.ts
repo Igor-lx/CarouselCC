@@ -17,7 +17,10 @@ describe("dotOpacityAt", () => {
   it("keeps every resting look: interior full, edge slot at resting, beyond gone", () => {
     expect(dotOpacityAt(0, CENTER)).toBe(1);
     expect(dotOpacityAt(1, CENTER)).toBe(1);
-    expect(dotOpacityAt(CENTER, CENTER)).toBeCloseTo(EDGE_DOT_RESTING_OPACITY, 10);
+    expect(dotOpacityAt(CENTER, CENTER)).toBeCloseTo(
+      EDGE_DOT_RESTING_OPACITY,
+      10,
+    );
     expect(dotOpacityAt(CENTER + 1, CENTER)).toBe(0);
     expect(dotOpacityAt(CENTER + 3, CENTER)).toBe(0);
   });
@@ -52,7 +55,8 @@ describe("dotOpacityAt", () => {
     for (const center of [1, 3, 4]) {
       for (let f = 0; f <= 1.0001; f += 0.25) {
         expect(
-          dotOpacityAt(center + f, center) + dotOpacityAt(center + 1 - f, center),
+          dotOpacityAt(center + f, center) +
+            dotOpacityAt(center + 1 - f, center),
         ).toBeCloseTo(EDGE_DOT_RESTING_OPACITY, 10);
       }
     }

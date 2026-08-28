@@ -9,10 +9,17 @@ import styles from "./Pagination.module.scss";
 import { usePaginationFade } from "./usePaginationFade";
 import type { PaginationProps } from "./types";
 
-const PaginationBase = memo(function Pagination({ className }: PaginationProps) {
+const PaginationBase = memo(function Pagination({
+  className,
+}: PaginationProps) {
   const { intent } = useCarouselMotion();
-  const { layout, navigation, motionPlan, visualPosition, isPaginationInteractiveOn } =
-    useCarouselStable();
+  const {
+    layout,
+    navigation,
+    motionPlan,
+    visualPosition,
+    isPaginationInteractiveOn,
+  } = useCarouselStable();
 
   const classNames = useMemo(
     () => (className ? mergeStyleMaps(styles, className) : styles),
@@ -50,5 +57,7 @@ const PaginationBase = memo(function Pagination({ className }: PaginationProps) 
   );
 });
 
-export const Pagination: CarouselSlotComponent<typeof PaginationBase, "pagination"> =
-  Object.assign(PaginationBase, { slot: "pagination" as const });
+export const Pagination: CarouselSlotComponent<
+  typeof PaginationBase,
+  "pagination"
+> = Object.assign(PaginationBase, { slot: "pagination" as const });

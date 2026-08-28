@@ -140,4 +140,3 @@ describe("useFocusRecovery — when it rescues", () => {
     ).not.toThrow();
   });
 });
-

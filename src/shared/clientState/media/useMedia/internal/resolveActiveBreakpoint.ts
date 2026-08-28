@@ -21,8 +21,7 @@ export const breakpointMinWidthQuery = (px: number): string =>
  * exact resolution semantics of the hook. */
 export const sortedBreakpointEntries = (
   table: BreakpointTable,
-): Array<[string, number]> =>
-  Object.entries(table).sort((a, b) => b[1] - a[1]);
+): Array<[string, number]> => Object.entries(table).sort((a, b) => b[1] - a[1]);
 
 /** First tier (descending) whose query matches, else the narrowest fallback. */
 export const resolveActiveBreakpoint = (

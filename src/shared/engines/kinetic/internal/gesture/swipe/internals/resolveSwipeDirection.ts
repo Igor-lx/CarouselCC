@@ -26,7 +26,10 @@ export const resolveSwipeDirection = ({
   const gestureVelocity = dominantMagnitude(rawVelocity, flickVelocity);
 
   if (!canCommit) {
-    return { direction: "none" as const, pointerReleaseVelocity: gestureVelocity };
+    return {
+      direction: "none" as const,
+      pointerReleaseVelocity: gestureVelocity,
+    };
   }
 
   const flicked =
@@ -38,7 +41,10 @@ export const resolveSwipeDirection = ({
     Math.max(0, width) * config.swipeThresholdRatio,
   );
   const resistanceFactor = 1 - safeResistance(config.resistance);
-  const adapted = Math.max(config.minSwipeDistance, distanceThreshold * resistanceFactor);
+  const adapted = Math.max(
+    config.minSwipeDistance,
+    distanceThreshold * resistanceFactor,
+  );
 
   if (flicked) {
     // A FLICK commits where the finger was GOING, not where it happened to be.
@@ -62,5 +68,8 @@ export const resolveSwipeDirection = ({
     };
   }
 
-  return { direction: "none" as const, pointerReleaseVelocity: gestureVelocity };
+  return {
+    direction: "none" as const,
+    pointerReleaseVelocity: gestureVelocity,
+  };
 };

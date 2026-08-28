@@ -15,9 +15,7 @@ import {
   AUTOPLAY_DECELERATION_DISTANCE_SHARE,
   CAROUSEL_INERTIAL_RELEASE_CONFIG,
   CAROUSEL_SWIPE_CONFIG,
-
   FALLBACK_DROP_EVERY_NTH_FRAME,
-
   GO_TO_ACCELERATION_DISTANCE_SHARE,
   GO_TO_DECELERATION_DISTANCE_SHARE,
   GO_TO_FINAL_APPROACH_PAGE_SPAN,
@@ -29,7 +27,6 @@ import {
   PAUSE_HOVER_DELAY_MS,
   PAUSE_VISIBILITY_RATIO,
   SLIDE_REORIENT_VEIL,
-
   REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
   REPEATED_CLICK_DECELERATION_DISTANCE_SHARE,
   REPEATED_CLICK_SPEED_MULTIPLIER,
@@ -82,7 +79,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: SNAP_BACK_DURATION_MS,
     severity: "CRITICAL",
     expected: "Expected a positive finite number of milliseconds",
-    consequence: "Snap-back duration of zero or negative causes motion to flash or freeze",
+    consequence:
+      "Snap-back duration of zero or negative causes motion to flash or freeze",
     predicate: greaterThan(0),
   },
   {
@@ -91,7 +89,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: REPEATED_CLICK_SPEED_MULTIPLIER,
     severity: "LOGICAL",
     expected: "Expected a finite number greater than 1",
-    consequence: "Repeated-click acceleration loses the feel of an in-flight boost",
+    consequence:
+      "Repeated-click acceleration loses the feel of an in-flight boost",
     predicate: greaterThan(1),
   },
   {
@@ -100,7 +99,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: REPEATED_CLICK_ACCELERATION_DISTANCE_SHARE,
     severity: "CRITICAL",
     expected: "Expected a finite number in the range [0, 1]",
-    consequence: "Acceleration zone share outside [0,1] leads to malformed motion profile zones",
+    consequence:
+      "Acceleration zone share outside [0,1] leads to malformed motion profile zones",
     predicate: inRangeInclusive(0, 1),
   },
   {
@@ -109,7 +109,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: REPEATED_CLICK_DECELERATION_DISTANCE_SHARE,
     severity: "CRITICAL",
     expected: "Expected a finite number in the range [0, 1]",
-    consequence: "Deceleration zone share outside [0,1] leads to malformed motion profile zones",
+    consequence:
+      "Deceleration zone share outside [0,1] leads to malformed motion profile zones",
     predicate: inRangeInclusive(0, 1),
   },
   {
@@ -169,7 +170,8 @@ const buildNumericRules = (): NumericRule[] => [
     field: "GO_TO_SPEED_MULTIPLIER",
     value: GO_TO_SPEED_MULTIPLIER,
     severity: "LOGICAL",
-    expected: "Expected a finite number >= 1 (a jump at least as fast as a step)",
+    expected:
+      "Expected a finite number >= 1 (a jump at least as fast as a step)",
     consequence:
       "A GO_TO slower than a single step inverts the visual contract and feels wrong",
     predicate: atLeast(1),
@@ -180,7 +182,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: GO_TO_ACCELERATION_DISTANCE_SHARE,
     severity: "CRITICAL",
     expected: "Expected a finite number in the range [0, 1]",
-    consequence: "Acceleration zone share outside [0,1] leads to malformed GO_TO profile zones",
+    consequence:
+      "Acceleration zone share outside [0,1] leads to malformed GO_TO profile zones",
     predicate: inRangeInclusive(0, 1),
   },
   {
@@ -189,7 +192,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: GO_TO_DECELERATION_DISTANCE_SHARE,
     severity: "CRITICAL",
     expected: "Expected a finite number in the range [0, 1]",
-    consequence: "Deceleration zone share outside [0,1] leads to malformed GO_TO profile zones",
+    consequence:
+      "Deceleration zone share outside [0,1] leads to malformed GO_TO profile zones",
     predicate: inRangeInclusive(0, 1),
   },
   // Duration-authored step profiles (click / autoplay / snap-back shapes)
@@ -197,22 +201,33 @@ const buildNumericRules = (): NumericRule[] => [
     [
       ["STEP_ACCELERATION_DISTANCE_SHARE", STEP_ACCELERATION_DISTANCE_SHARE],
       ["STEP_DECELERATION_DISTANCE_SHARE", STEP_DECELERATION_DISTANCE_SHARE],
-      ["AUTOPLAY_ACCELERATION_DISTANCE_SHARE", AUTOPLAY_ACCELERATION_DISTANCE_SHARE],
-      ["AUTOPLAY_DECELERATION_DISTANCE_SHARE", AUTOPLAY_DECELERATION_DISTANCE_SHARE],
-      ["SNAP_BACK_ACCELERATION_DISTANCE_SHARE", SNAP_BACK_ACCELERATION_DISTANCE_SHARE],
-      ["SNAP_BACK_DECELERATION_DISTANCE_SHARE", SNAP_BACK_DECELERATION_DISTANCE_SHARE],
+      [
+        "AUTOPLAY_ACCELERATION_DISTANCE_SHARE",
+        AUTOPLAY_ACCELERATION_DISTANCE_SHARE,
+      ],
+      [
+        "AUTOPLAY_DECELERATION_DISTANCE_SHARE",
+        AUTOPLAY_DECELERATION_DISTANCE_SHARE,
+      ],
+      [
+        "SNAP_BACK_ACCELERATION_DISTANCE_SHARE",
+        SNAP_BACK_ACCELERATION_DISTANCE_SHARE,
+      ],
+      [
+        "SNAP_BACK_DECELERATION_DISTANCE_SHARE",
+        SNAP_BACK_DECELERATION_DISTANCE_SHARE,
+      ],
     ] as Array<[string, number]>
-  ).map(
-    ([field, value]): NumericRule => ({
-      layer: "Motion",
-      field,
-      value,
-      severity: "CRITICAL",
-      expected: "Expected a finite number in the range [0, 1]",
-      consequence: "Profile zone share outside [0,1] leads to malformed motion profile zones",
-      predicate: inRangeInclusive(0, 1),
-    }),
-  ),
+  ).map(([field, value]): NumericRule => ({
+    layer: "Motion",
+    field,
+    value,
+    severity: "CRITICAL",
+    expected: "Expected a finite number in the range [0, 1]",
+    consequence:
+      "Profile zone share outside [0,1] leads to malformed motion profile zones",
+    predicate: inRangeInclusive(0, 1),
+  })),
 
   // Epsilons (must be small positive)
   {
@@ -221,7 +236,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: MOTION_EPSILON,
     severity: "CRITICAL",
     expected: "Expected a small positive finite number (e.g. 1e-4)",
-    consequence: "Motion-runner sees the same logical state as a new segment and oscillates",
+    consequence:
+      "Motion-runner sees the same logical state as a new segment and oscillates",
     predicate: greaterThan(0),
   },
   {
@@ -230,7 +246,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: DRAG_RELEASE_EPSILON,
     severity: "CRITICAL",
     expected: "Expected a small positive finite number (e.g. 1e-3)",
-    consequence: "Drag release cannot identify 'already on target' and may animate trivially",
+    consequence:
+      "Drag release cannot identify 'already on target' and may animate trivially",
     predicate: greaterThan(0),
   },
 
@@ -239,7 +256,8 @@ const buildNumericRules = (): NumericRule[] => [
     field: "FALLBACK_DROP_EVERY_NTH_FRAME",
     value: FALLBACK_DROP_EVERY_NTH_FRAME,
     severity: "LOGICAL",
-    expected: "Expected a non-negative finite integer (values below 2 disable dropping)",
+    expected:
+      "Expected a non-negative finite integer (values below 2 disable dropping)",
     consequence:
       "Legacy-fallback frame pacing becomes incoherent and track/widget writes desynchronize",
     predicate: isNonNegativeInteger,
@@ -252,7 +270,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: RENDER_WINDOW_BUFFER_MULTIPLIER,
     severity: "LOGICAL",
     expected: "Expected a non-negative finite integer",
-    consequence: "Render window buffer collapses or oversizes, increasing churn or blank slides",
+    consequence:
+      "Render window buffer collapses or oversizes, increasing churn or blank slides",
     predicate: isNonNegativeInteger,
   },
   {
@@ -288,7 +307,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: SLIDE_REORIENT_VEIL.fadeOutMs,
     severity: "LOGICAL",
     expected: "Expected a positive finite number of milliseconds",
-    consequence: "Orientation-swap fade-out collapses to an instant blink or a negative transition",
+    consequence:
+      "Orientation-swap fade-out collapses to an instant blink or a negative transition",
     predicate: greaterThan(0),
   },
   {
@@ -297,7 +317,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: SLIDE_REORIENT_VEIL.fadeInMs,
     severity: "LOGICAL",
     expected: "Expected a positive finite number of milliseconds",
-    consequence: "Orientation-swap fade-in collapses to an instant blink or a negative transition",
+    consequence:
+      "Orientation-swap fade-in collapses to an instant blink or a negative transition",
     predicate: greaterThan(0),
   },
   {
@@ -318,7 +339,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: PAUSE_HOVER_DELAY_MS,
     severity: "LOGICAL",
     expected: "Expected a non-negative finite number of milliseconds",
-    consequence: "setTimeout receives an invalid delay; hover-pause debounce becomes unreliable",
+    consequence:
+      "setTimeout receives an invalid delay; hover-pause debounce becomes unreliable",
     predicate: atLeast(0),
   },
   {
@@ -358,7 +380,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: PAUSE_VISIBILITY_RATIO,
     severity: "CRITICAL",
     expected: "Expected a finite number in the range (0, 1]",
-    consequence: "IntersectionObserver threshold outside (0,1] makes visibility detection break",
+    consequence:
+      "IntersectionObserver threshold outside (0,1] makes visibility detection break",
     predicate: inRangeExclusiveLower(0, 1),
   },
 
@@ -369,7 +392,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: CAROUSEL_SWIPE_CONFIG.cooldownMs,
     severity: "LOGICAL",
     expected: "Expected a non-negative finite number of milliseconds",
-    consequence: "Negative or NaN cooldown leaves the gesture stuck or rapidly retriggering",
+    consequence:
+      "Negative or NaN cooldown leaves the gesture stuck or rapidly retriggering",
     predicate: atLeast(0),
   },
   {
@@ -378,7 +402,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: CAROUSEL_SWIPE_CONFIG.flickVelocityAlpha,
     severity: "LOGICAL",
     expected: "Expected a finite number in the range (0, 1]",
-    consequence: "Flick-memory EMA weight outside (0,1] makes the weighted-average gesture speed degenerate",
+    consequence:
+      "Flick-memory EMA weight outside (0,1] makes the weighted-average gesture speed degenerate",
     predicate: inRangeExclusiveLower(0, 1),
   },
   {
@@ -396,7 +421,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: CAROUSEL_SWIPE_CONFIG.flickVelocityHalfLifeMs,
     severity: "LOGICAL",
     expected: "Expected a positive finite number of milliseconds",
-    consequence: "Flick-memory decay either never decays or collapses instantly",
+    consequence:
+      "Flick-memory decay either never decays or collapses instantly",
     predicate: greaterThan(0),
   },
   {
@@ -416,7 +442,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: CAROUSEL_SWIPE_CONFIG.intentThreshold,
     severity: "LOGICAL",
     expected: "Expected a non-negative finite number of pixels",
-    consequence: "Drag intent detection becomes either too eager or never fires",
+    consequence:
+      "Drag intent detection becomes either too eager or never fires",
     predicate: atLeast(0),
   },
   {
@@ -434,7 +461,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: CAROUSEL_SWIPE_CONFIG.resistanceCurvature,
     severity: "LOGICAL",
     expected: "Expected a non-negative finite number",
-    consequence: "Resistance curvature outside [0, +inf) inverts overpull behaviour",
+    consequence:
+      "Resistance curvature outside [0, +inf) inverts overpull behaviour",
     predicate: atLeast(0),
   },
   {
@@ -443,7 +471,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: CAROUSEL_SWIPE_CONFIG.maxVelocity,
     severity: "CRITICAL",
     expected: "Expected a positive finite number (px/ms)",
-    consequence: "Velocity clamp collapses to zero and release segments lose all inertia",
+    consequence:
+      "Velocity clamp collapses to zero and release segments lose all inertia",
     predicate: greaterThan(0),
   },
   {
@@ -461,7 +490,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: CAROUSEL_SWIPE_CONFIG.quickFlickVelocity,
     severity: "LOGICAL",
     expected: "Expected a positive finite number (px/ms)",
-    consequence: "Quick-flick detection cannot trigger and gestures must rely on distance only",
+    consequence:
+      "Quick-flick detection cannot trigger and gestures must rely on distance only",
     predicate: greaterThan(0),
   },
   {
@@ -470,7 +500,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: CAROUSEL_SWIPE_CONFIG.quickFlickMinOffset,
     severity: "LOGICAL",
     expected: "Expected a non-negative finite number of pixels",
-    consequence: "Quick-flick offset gate is invalid and gesture intent becomes inconsistent",
+    consequence:
+      "Quick-flick offset gate is invalid and gesture intent becomes inconsistent",
     predicate: atLeast(0),
   },
   {
@@ -479,7 +510,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: CAROUSEL_SWIPE_CONFIG.commit.slotShare,
     severity: "LOGICAL",
     expected: "Expected a finite number in the range (0, 1]",
-    consequence: "Slot-relative commit share outside (0,1] makes the swipe threshold degenerate",
+    consequence:
+      "Slot-relative commit share outside (0,1] makes the swipe threshold degenerate",
     predicate: inRangeExclusiveLower(0, 1),
   },
   {
@@ -514,7 +546,8 @@ const buildNumericRules = (): NumericRule[] => [
     field: "CAROUSEL_INERTIAL_RELEASE_CONFIG.inertiaBoost",
     value: CAROUSEL_INERTIAL_RELEASE_CONFIG.inertiaBoost,
     severity: "LOGICAL",
-    expected: "Expected a finite number >= 1 (1 = no boost; below 1 the multiplier DAMPS the flick)",
+    expected:
+      "Expected a finite number >= 1 (1 = no boost; below 1 the multiplier DAMPS the flick)",
     consequence:
       "A flick's cruise intent falls below its own release speed — the boost is neutered (the continuity launch clamps cruise to the start speed) and fast swipes read as damped",
     predicate: atLeast(1),
@@ -525,7 +558,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: CAROUSEL_INERTIAL_RELEASE_CONFIG.accelerationDistanceShare,
     severity: "CRITICAL",
     expected: "Expected a finite number in the range [0, 1]",
-    consequence: "Continuity-launch ramp share outside [0,1] yields malformed release profiles",
+    consequence:
+      "Continuity-launch ramp share outside [0,1] yields malformed release profiles",
     predicate: inRangeInclusive(0, 1),
   },
   {
@@ -545,7 +579,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: GESTURE_COAST_MAX_MS,
     severity: "LOGICAL",
     expected: "Expected a positive finite number of milliseconds",
-    consequence: "Coast-bridge fail-safe becomes incoherent (a stalled takeover could coast forever or never)",
+    consequence:
+      "Coast-bridge fail-safe becomes incoherent (a stalled takeover could coast forever or never)",
     predicate: greaterThan(0),
   },
   {
@@ -554,7 +589,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs,
     severity: "LOGICAL",
     expected: "Expected a positive finite number of milliseconds",
-    consequence: "Ride-duration floor becomes incoherent — flicks may collapse into teleports again",
+    consequence:
+      "Ride-duration floor becomes incoherent — flicks may collapse into teleports again",
     predicate: greaterThan(0),
   },
   {
@@ -563,7 +599,8 @@ const buildNumericRules = (): NumericRule[] => [
     value: CAROUSEL_INERTIAL_RELEASE_CONFIG.decelerationDistanceShare,
     severity: "CRITICAL",
     expected: "Expected a finite number in the range [0, 1]",
-    consequence: "Release deceleration share outside [0,1] yields negative or oversized durations",
+    consequence:
+      "Release deceleration share outside [0,1] yields negative or oversized durations",
     predicate: inRangeInclusive(0, 1),
   },
 ];
@@ -616,19 +653,24 @@ const collectReorientVeilRelation = (): CarouselDiagnosticWarning | null => {
 
 const collectRideFloorRelation = (): CarouselDiagnosticWarning | null => {
   // The floor must stay under the default step, else a flick isn't faster.
-  if (CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs < CAROUSEL_DEFAULTS.durationStep) {
+  if (
+    CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs <
+    CAROUSEL_DEFAULTS.durationStep
+  ) {
     return null;
   }
   return {
     severity: "LOGICAL",
     layer: "Gesture",
-    field: "CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs < CAROUSEL_DEFAULTS.durationStep",
+    field:
+      "CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs < CAROUSEL_DEFAULTS.durationStep",
     actual: {
       minRideDurationMs: CAROUSEL_INERTIAL_RELEASE_CONFIG.minRideDurationMs,
       defaultStepDurationMs: CAROUSEL_DEFAULTS.durationStep,
     },
     expected: "Expected the ride floor to stay below the default step duration",
-    consequence: "A flick rides no faster than a plain click step — the gesture loses its snap",
+    consequence:
+      "A flick rides no faster than a plain click step — the gesture loses its snap",
   };
 };
 
@@ -642,7 +684,8 @@ const collectSwipeCommitRelations = (): CarouselDiagnosticWarning[] => {
       field: "CAROUSEL_SWIPE_CONFIG.commit.minPx <= .maxPx",
       actual: { minPx, maxPx },
       expected: "Expected the ergonomic floor not to exceed the ceiling",
-      consequence: "The commit-distance clamp collapses to the ceiling for every slot",
+      consequence:
+        "The commit-distance clamp collapses to the ceiling for every slot",
     });
   }
   const atReference = slotShare * SWIPE_REFERENCE_SLOT_PX;
@@ -650,7 +693,8 @@ const collectSwipeCommitRelations = (): CarouselDiagnosticWarning[] => {
     out.push({
       severity: "LOGICAL",
       layer: "Gesture",
-      field: "CAROUSEL_SWIPE_CONFIG.commit.slotShare * SWIPE_REFERENCE_SLOT_PX within [minPx, maxPx]",
+      field:
+        "CAROUSEL_SWIPE_CONFIG.commit.slotShare * SWIPE_REFERENCE_SLOT_PX within [minPx, maxPx]",
       actual: {
         commitAtReferencePx: atReference,
         minPx,
@@ -675,7 +719,8 @@ const collectRetryDelayRelation = (): CarouselDiagnosticWarning | null => {
       baseDelayMs: IMAGE_RETRY.baseDelayMs,
       maxDelayMs: IMAGE_RETRY.maxDelayMs,
     },
-    expected: "Expected max retry delay to be greater than or equal to the base delay",
+    expected:
+      "Expected max retry delay to be greater than or equal to the base delay",
     consequence: "Exponential backoff clamps below its own starting delay",
   };
 };
@@ -750,7 +795,8 @@ const collectGoToRampBudgetRelations = (): CarouselDiagnosticWarning[] => {
     out.push({
       severity: "LOGICAL",
       layer: "Motion",
-      field: "GO_TO_DECELERATION_DISTANCE_SHARE <= GO_TO_FINAL_APPROACH_PAGE_SPAN",
+      field:
+        "GO_TO_DECELERATION_DISTANCE_SHARE <= GO_TO_FINAL_APPROACH_PAGE_SPAN",
       actual: {
         decelerationDistanceShare: GO_TO_DECELERATION_DISTANCE_SHARE,
         finalApproachPageSpan: GO_TO_FINAL_APPROACH_PAGE_SPAN,

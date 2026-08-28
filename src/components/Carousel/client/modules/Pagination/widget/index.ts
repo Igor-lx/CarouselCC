@@ -1,5 +1,2 @@
 export { PaginationWidget } from "./PaginationWidget";
-export type {
-  PaginationWidgetProps,
-  PaginationWidgetClassMap,
-} from "./types";
+export type { PaginationWidgetProps, PaginationWidgetClassMap } from "./types";

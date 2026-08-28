@@ -1,6 +1,9 @@
 import { useRef } from "react";
 
-import { profileProgressStops, keyframesAlongStops } from "../profile/progressCurve";
+import {
+  profileProgressStops,
+  keyframesAlongStops,
+} from "../profile/progressCurve";
 import type { ProfileSegment } from "../profile/profileSegment";
 import { sampleProfileSegment } from "../profile/profileSegment";
 import type { MotionController, MotionSample } from "../runtime/types";
@@ -46,8 +49,10 @@ export const createCompositedRide = <Strategy extends string>(
   controller: MotionController<Strategy>,
 ): CompositedRide<Strategy> => {
   let animation: Animation | null = null;
-  let ridden: { element: Element; toKeyframe: (value: number) => Keyframe } | null =
-    null;
+  let ridden: {
+    element: Element;
+    toKeyframe: (value: number) => Keyframe;
+  } | null = null;
 
   const drop = () => {
     animation = null;
@@ -80,7 +85,10 @@ export const createCompositedRide = <Strategy extends string>(
 
     let composited = false;
     if (element) {
-      const stops = profileProgressStops(segment.profile, segment.to - segment.from);
+      const stops = profileProgressStops(
+        segment.profile,
+        segment.to - segment.from,
+      );
       const keyframes = keyframesAlongStops(
         segment.from,
         segment.to,
@@ -134,7 +142,10 @@ export const createCompositedRide = <Strategy extends string>(
 export function useCompositedRide<Strategy extends string>(
   controller: MotionController<Strategy>,
 ): CompositedRide<Strategy> {
-  const ref = useRef<{ controller: MotionController<Strategy>; ride: CompositedRide<Strategy> } | null>(null);
+  const ref = useRef<{
+    controller: MotionController<Strategy>;
+    ride: CompositedRide<Strategy>;
+  } | null>(null);
   if (!ref.current || ref.current.controller !== controller) {
     ref.current = { controller, ride: createCompositedRide(controller) };
   }

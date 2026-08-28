@@ -17,13 +17,15 @@ describe("resolveCoastedLaunchPosition", () => {
   });
 
   it("clamps AT the target when the extrapolation would cross it", () => {
-    expect(
-      resolveCoastedLaunchPosition({ ...base, livePosition: 2.999 }),
-    ).toBe(3);
+    expect(resolveCoastedLaunchPosition({ ...base, livePosition: 2.999 })).toBe(
+      3,
+    );
   });
 
   it("launches from the release point on a calm release (zero velocity)", () => {
-    expect(resolveCoastedLaunchPosition({ ...base, releaseVelocity: 0 })).toBe(0);
+    expect(resolveCoastedLaunchPosition({ ...base, releaseVelocity: 0 })).toBe(
+      0,
+    );
   });
 
   it("launches from the release point on a snap-back (velocity opposes target)", () => {

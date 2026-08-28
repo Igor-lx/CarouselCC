@@ -11,7 +11,11 @@ import {
   positionAtNow,
 } from "../profile/progressCurve";
 
-const stepProfile = (shares = { a: 0.35, d: 0.4 }, startSpeed = 0, duration = 2000) => {
+const stepProfile = (
+  shares = { a: 0.35, d: 0.4 },
+  startSpeed = 0,
+  duration = 2000,
+) => {
   const peak = resolvePeakSpeedForDuration({
     distance: 3,
     duration,
@@ -84,7 +88,10 @@ describe("profileProgressStops", () => {
   });
 
   it("front-loads progress for a front-loaded profile", () => {
-    const frontLoaded = profileProgressStops(stepProfile({ a: 0.05, d: 0.7 }), 3);
+    const frontLoaded = profileProgressStops(
+      stepProfile({ a: 0.05, d: 0.7 }),
+      3,
+    );
     const mid = frontLoaded[Math.floor(frontLoaded.length / 2)]!;
     // Half the time elapsed -> well past half the distance.
     expect(mid).toBeGreaterThan(0.55);
@@ -139,7 +146,13 @@ describe("sampleProgressStops", () => {
 });
 
 describe("positionAtNow", () => {
-  const span = { from: 2, to: 4, duration: 1000, startedAt: 10_000, stops: [0, 0.5, 1] };
+  const span = {
+    from: 2,
+    to: 4,
+    duration: 1000,
+    startedAt: 10_000,
+    stops: [0, 0.5, 1],
+  };
 
   it("reads the span's own curve, endpoints exact", () => {
     expect(positionAtNow(span, 10_000)).toBe(2);
@@ -156,7 +169,12 @@ describe("positionAtNow", () => {
 
 describe("keyframesAlongStops", () => {
   it("evaluates the caller's domain at the position each stop reaches", () => {
-    const frames = keyframesAlongStops(10, 20, [0, 0.25, 1], (position) => position * 2);
+    const frames = keyframesAlongStops(
+      10,
+      20,
+      [0, 0.25, 1],
+      (position) => position * 2,
+    );
     expect(frames).toEqual([20, 25, 40]);
   });
 
@@ -177,7 +195,9 @@ describe("keyframesAlongStops", () => {
 describe("progress-stop density follows the profile's shape", () => {
   it("is the same count whatever the ride lasts", () => {
     const counts = [300, 800, 1300, 2000, 3000, 4000].map((duration) =>
-      resolveProgressStopIntervals(stepProfile({ a: 0.35, d: 0.4 }, 0, duration)),
+      resolveProgressStopIntervals(
+        stepProfile({ a: 0.35, d: 0.4 }, 0, duration),
+      ),
     );
     // Identical up to the ceil() rounding of one interval — the criterion is
     // dimensionless in time, so duration must not move the answer.

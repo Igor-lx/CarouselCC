@@ -51,7 +51,8 @@ describe("resolveSwipeDirection", () => {
       Math.max(
         config.minSwipeDistance,
         base.width * config.swipeThresholdRatio,
-      ) * (1 - config.resistance),
+      ) *
+        (1 - config.resistance),
     );
     const under = resolveSwipeDirection({
       ...base,
@@ -90,7 +91,10 @@ describe("resolveSwipeDirection", () => {
     });
     expect(r.direction).toBe("left");
     // and the ride speed is the gesture's speed, not the stalled instant
-    expect(r.pointerReleaseVelocity).toBeCloseTo(-config.quickFlickVelocity * 2, 10);
+    expect(r.pointerReleaseVelocity).toBeCloseTo(
+      -config.quickFlickVelocity * 2,
+      10,
+    );
   });
 
   it("memory alone cannot flick without the token distance", () => {
@@ -104,8 +108,16 @@ describe("resolveSwipeDirection", () => {
   });
 
   it("maps offset sign to direction (negative = left, positive = right)", () => {
-    const left = resolveSwipeDirection({ ...base, rawOffset: -300, rawVelocity: 0 });
-    const right = resolveSwipeDirection({ ...base, rawOffset: 300, rawVelocity: 0 });
+    const left = resolveSwipeDirection({
+      ...base,
+      rawOffset: -300,
+      rawVelocity: 0,
+    });
+    const right = resolveSwipeDirection({
+      ...base,
+      rawOffset: 300,
+      rawVelocity: 0,
+    });
     expect(left.direction).toBe("left");
     expect(right.direction).toBe("right");
   });

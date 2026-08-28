@@ -1,6 +1,9 @@
 import { useRef } from "react";
 
-import { profileProgressStops, keyframesAlongStops } from "../profile/progressCurve";
+import {
+  profileProgressStops,
+  keyframesAlongStops,
+} from "../profile/progressCurve";
 import { buildProfile } from "../profile/profile";
 import type { ProfileSegment } from "../profile/profileSegment";
 import {
@@ -102,8 +105,10 @@ export const createCompositedRide = <Strategy extends string>(
   defaults?: CompositedRideDefaults,
 ): CompositedRide<Strategy> => {
   let animation: Animation | null = null;
-  let ridden: { element: Element; toKeyframe: (value: number) => Keyframe } | null =
-    null;
+  let ridden: {
+    element: Element;
+    toKeyframe: (value: number) => Keyframe;
+  } | null = null;
 
   const drop = () => {
     animation = null;
@@ -123,7 +128,6 @@ export const createCompositedRide = <Strategy extends string>(
       // already gone
     }
     controller.wake(); // passive controller has no loop → wake or it freezes
-
   };
 
   const start = ({
@@ -137,7 +141,10 @@ export const createCompositedRide = <Strategy extends string>(
 
     let composited = false;
     if (element && toKeyframe) {
-      const stops = profileProgressStops(segment.profile, segment.to - segment.from);
+      const stops = profileProgressStops(
+        segment.profile,
+        segment.to - segment.from,
+      );
       const keyframes = keyframesAlongStops(
         segment.from,
         segment.to,

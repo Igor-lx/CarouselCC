@@ -33,7 +33,10 @@ afterEach(() => {
 });
 
 const element = () => document.createElement("div");
-const KEYFRAMES = [{ transform: "translateX(0px)" }, { transform: "translateX(10px)" }];
+const KEYFRAMES = [
+  { transform: "translateX(0px)" },
+  { transform: "translateX(10px)" },
+];
 const TIMING = { duration: 500, startedAt: 1234 };
 
 describe("startPinnedAnimation", () => {

@@ -48,7 +48,10 @@ export function useSlideFetchReach({
     if (isContentImg && imageResourceStore !== null) {
       for (const slide of virtualSlides) {
         if (!slide.isActual || !slide.slideData) continue;
-        const url = resolveRenderedImageSrc(slide.slideData, isResponsiveImagesOn);
+        const url = resolveRenderedImageSrc(
+          slide.slideData,
+          isResponsiveImagesOn,
+        );
         if (url !== null && !next.includes(url)) next.push(url);
       }
     }

@@ -32,7 +32,10 @@ const reduce = (
   layout: CarouselLayout = state.layout,
   isInstantMode = false,
 ): CarouselState =>
-  carouselReducer(state, { ...command, context: { layout, config, isInstantMode } });
+  carouselReducer(state, {
+    ...command,
+    context: { layout, config, isInstantMode },
+  });
 
 // --- tests ------------------------------------------------------------------
 
@@ -197,7 +200,9 @@ describe("MOTION_SETTLED", () => {
 
   it("is a no-op while idle", () => {
     const idle = buildInitialState(layout);
-    expect(reduce(idle, { type: "MOTION_SETTLED", settledPosition: 0 })).toBe(idle);
+    expect(reduce(idle, { type: "MOTION_SETTLED", settledPosition: 0 })).toBe(
+      idle,
+    );
   });
 
   it("settles a normal step into idle", () => {

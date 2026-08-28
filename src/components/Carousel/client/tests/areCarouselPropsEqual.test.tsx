@@ -113,9 +113,9 @@ describe("areCarouselPropsEqual", () => {
   });
 
   it("holds for a carousel with no children at all", () => {
-    expect(
-      areCarouselPropsEqual(props(undefined), props(undefined)),
-    ).toBe(true);
+    expect(areCarouselPropsEqual(props(undefined), props(undefined))).toBe(
+      true,
+    );
   });
 
   it("sees through a wrapping fragment", () => {

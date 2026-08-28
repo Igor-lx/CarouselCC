@@ -120,7 +120,10 @@ const PaginationWidgetBase = memo(function PaginationWidget({
         : staticDots?.map((dot) => (
             <div
               key={dot.id}
-              className={clsx(classNames.dot_PW, dot.isActive && classNames.dotActive_PW)}
+              className={clsx(
+                classNames.dot_PW,
+                dot.isActive && classNames.dotActive_PW,
+              )}
               style={buildDotStyle(dot)}
             />
           ))}

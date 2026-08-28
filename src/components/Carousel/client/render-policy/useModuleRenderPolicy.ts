@@ -54,9 +54,12 @@ export function useModuleRenderPolicy({
       hasResponsiveImagesSlot,
       isDiagnosticActive: isDiagnosticAttached,
       slots: {
-        controls: isControlsOn && canSlide && hasControlsSlot ? controlsSlot : null,
+        controls:
+          isControlsOn && canSlide && hasControlsSlot ? controlsSlot : null,
         pagination:
-          isPaginationOn && canSlide && hasPaginationSlot ? paginationSlot : null,
+          isPaginationOn && canSlide && hasPaginationSlot
+            ? paginationSlot
+            : null,
         responsiveImages: hasResponsiveImagesSlot ? responsiveImagesSlot : null,
         diagnostic: isDiagnosticAttached ? diagnosticSlot : null,
       },

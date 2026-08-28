@@ -35,7 +35,7 @@
 | Тесты | `npm test` | **110 файлов / 957 тестов — все зелёные**, ~39 c |
 | Сборка | `npm run build` | **exit 0**, 227 модулей, 943 мс |
 | Линт | `npm run lint` | **exit 0** (заведён после базовой линии) |
-| Формат | `npm run format:check` | **красный: 213 файлов** — сплошной прогон `npm run format` запланирован отдельным заходом |
+| Формат | `npm run format:check` | **exit 0** (сплошной прогон выполнен) |
 
 **Размеры прод-бандла (эталон для сравнения после правок):**
 
@@ -82,7 +82,7 @@ solution-style, `files: []`. `tsc --noEmit` в корне проверяет **�
 | --- | --- |
 | `eslint.config.js` | flat config: `typescript-eslint` с типовой проверкой (`projectService`), `react-hooks`, `react-refresh`; форматирование целиком отдано Prettier через `eslint-config-prettier` |
 | `.prettierrc.json` | `printWidth: 80`, двойные кавычки, `trailingComma: "all"`, `endOfLine: "auto"` |
-| `.prettierignore` | `dist`, `coverage`, `node_modules`, `public`, `package-lock.json` |
+| `.prettierignore` | `dist`, `coverage`, `node_modules`, `public`, `package-lock.json`, а также **все `*.md`**: markdown здесь — свёрстанная руками проза, Prettier только доливает в неё пустые строки |
 | `.gitattributes` | `* text=auto eol=lf` — концы строк перестали зависеть от `core.autocrlf` машины (на этой он `true`, файлы в рабочем дереве были CRLF) |
 
 **Три обоснованных исключения в конфиге линта, все с комментарием на месте:**

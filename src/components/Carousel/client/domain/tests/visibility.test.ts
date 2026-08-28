@@ -30,9 +30,9 @@ describe("slideVisibilityFlags", () => {
 
   it("a fractional hold keeps every on-screen slide active (2 visible)", () => {
     for (const virtualIndex of [0, 1, 2]) {
-      expect(slideVisibilityFlags(virtualIndex, 0.4, 0.4, 2, true).isActive).toBe(
-        true,
-      );
+      expect(
+        slideVisibilityFlags(virtualIndex, 0.4, 0.4, 2, true).isActive,
+      ).toBe(true);
     }
     expect(slideVisibilityFlags(3, 0.4, 0.4, 2, true).isActive).toBe(false);
   });

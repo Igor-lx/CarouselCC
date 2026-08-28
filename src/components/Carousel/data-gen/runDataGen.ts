@@ -94,7 +94,9 @@ const loadPrevious = async (output: string): Promise<GeneratedSlide[]> => {
   }
 };
 
-export async function runDataGen(config: DataGenConfig): Promise<DataGenResult> {
+export async function runDataGen(
+  config: DataGenConfig,
+): Promise<DataGenResult> {
   const assetsDir = path.resolve(process.cwd(), config.assetsDir);
   const output = path.resolve(process.cwd(), config.output);
 
@@ -121,8 +123,12 @@ export async function runDataGen(config: DataGenConfig): Promise<DataGenResult> 
   const defaultUrlBySlug =
     config.default === undefined
       ? undefined
-      : (await readVariant(assetsDir, config.urlBase, { subdir: config.default, width: 0 }))
-          .urlBySlug;
+      : (
+          await readVariant(assetsDir, config.urlBase, {
+            subdir: config.default,
+            width: 0,
+          })
+        ).urlBySlug;
 
   // The first default variant defines the slide set + order.
   const slugs = Object.keys(widths[0]?.urlBySlug ?? {}).sort(

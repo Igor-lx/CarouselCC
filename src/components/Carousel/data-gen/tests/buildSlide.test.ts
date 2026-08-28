@@ -17,7 +17,10 @@ describe("buildSlide", () => {
   });
 
   it("omits sizes by default so the carousel supplies it", () => {
-    const slide = buildSlide({ id: "1", candidates: [{ url: "a.webp", width: 480 }] });
+    const slide = buildSlide({
+      id: "1",
+      candidates: [{ url: "a.webp", width: 480 }],
+    });
     expect(slide.image?.sizes).toBeUndefined();
   });
 
@@ -72,7 +75,10 @@ describe("buildSlide", () => {
   });
 
   it("produces no sources key when none are supplied", () => {
-    const slide = buildSlide({ id: "1", candidates: [{ url: "a.webp", width: 480 }] });
+    const slide = buildSlide({
+      id: "1",
+      candidates: [{ url: "a.webp", width: 480 }],
+    });
     expect(slide.image && "sources" in slide.image).toBe(false);
   });
 });

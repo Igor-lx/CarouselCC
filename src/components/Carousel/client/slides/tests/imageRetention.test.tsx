@@ -57,9 +57,7 @@ const deckA = buildSlideRecords([
   slideOf("1", "https://x.test/a.webp", "https://x.test/a-default.webp"),
   slideOf("2", "https://x.test/b.webp"),
 ]);
-const deckB = buildSlideRecords([
-  slideOf("3", "https://x.test/c.webp"),
-]);
+const deckB = buildSlideRecords([slideOf("3", "https://x.test/c.webp")]);
 
 beforeEach(() => {
   store = null;

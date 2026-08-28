@@ -18,7 +18,10 @@ describe("resolveSlotAdaptiveSwipeConfig", () => {
     // is off, and the commit distance sits at its ergonomic floor. (The base
     // is a CarouselSwipeConfig — it has no minSwipeDistance to hand back.)
     for (const slot of [null, 0] as const) {
-      const resolved = resolveSlotAdaptiveSwipeConfig(CAROUSEL_SWIPE_CONFIG, slot);
+      const resolved = resolveSlotAdaptiveSwipeConfig(
+        CAROUSEL_SWIPE_CONFIG,
+        slot,
+      );
       expect(resolved.swipeThresholdRatio).toBe(0);
       expect(resolved.minSwipeDistance).toBe(MIN_PX);
       expect(resolved.resistanceCurvature).toBe(
@@ -73,8 +76,14 @@ describe("resolveSlotAdaptiveSwipeConfig", () => {
     // Slots chosen FROM the knobs so the clamps engage for any sane tuning.
     const tinySlot = (MIN_PX / SLOT_SHARE) * 0.5;
     const hugeSlot = (MAX_PX / SLOT_SHARE) * 2;
-    const tiny = resolveSlotAdaptiveSwipeConfig(CAROUSEL_SWIPE_CONFIG, tinySlot);
-    const huge = resolveSlotAdaptiveSwipeConfig(CAROUSEL_SWIPE_CONFIG, hugeSlot);
+    const tiny = resolveSlotAdaptiveSwipeConfig(
+      CAROUSEL_SWIPE_CONFIG,
+      tinySlot,
+    );
+    const huge = resolveSlotAdaptiveSwipeConfig(
+      CAROUSEL_SWIPE_CONFIG,
+      hugeSlot,
+    );
     expect(tiny.minSwipeDistance).toBe(MIN_PX);
     expect(huge.minSwipeDistance).toBe(MAX_PX);
   });
@@ -134,8 +143,13 @@ describe("resolveSlotAdaptiveSwipeConfig", () => {
       quickFlickMinOffset: _o,
       ...rest
     } = resolved;
-    const { commit: _commit, resistanceCurvature, quickFlickVelocity, quickFlickMinOffset, ...baseRest } =
-      CAROUSEL_SWIPE_CONFIG;
+    const {
+      commit: _commit,
+      resistanceCurvature,
+      quickFlickVelocity,
+      quickFlickMinOffset,
+      ...baseRest
+    } = CAROUSEL_SWIPE_CONFIG;
     void resistanceCurvature;
     void quickFlickVelocity;
     void quickFlickMinOffset;
