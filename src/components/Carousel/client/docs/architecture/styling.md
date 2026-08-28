@@ -82,8 +82,8 @@ positioned over it.
 
 Two effects on one property is the recurring hazard: Blink cannot composite a
 property driven by both a CSS `transition` and a WAAPI animation, so it drops the
-whole animation onto the main thread for the ride — a large measured regression
-in exactly the frames the deck can least afford it.
+whole animation onto the main thread for the ride — in exactly the frames the
+deck can least afford it.
 
 - **Pagination dots and slide outline suppress their transition for the ride.**
   The dot's `transition` covers opacity/transform (the two properties the fade

@@ -83,11 +83,12 @@ export function useSlideRenderModel({
   // changed. `virtualSlides` is rebuilt on EVERY dispatch — twice per ride,
   // because the visibility flags depend on `isMoving` — yet the only fields
   // that ever move are the two flags, and only for the two or three slides at
-  // the band's edges. Without the cache each dispatch minted N slide objects,
-  // N `ariaProps` objects and N `aria-label` strings, and handed every memoised
-  // SlideItem a fresh `ariaProps` to shallow-compare. This is the same device
-  // the lane styles already use (`laneCacheRef` in presentation), for the same
-  // reason and in the same two frames.
+  // the band's edges.
+  // CONSTRAINT — without this cache every dispatch mints N slide objects, N
+  // `ariaProps` objects and N `aria-label` strings, and hands every memoised
+  // SlideItem a fresh `ariaProps` to shallow-compare: the whole deck then
+  // re-renders in the two frames a ride starts and settles in. The lane styles
+  // (`laneCacheRef` in presentation) are cached for the same reason.
   const slideCacheRef = useRef(new Map<number, VirtualSlide>());
 
   const virtualSlides = useMemo<VirtualSlide[]>(() => {

@@ -20,9 +20,9 @@ import type {
  *
  * The split only pays if the stable half really is stable. Let one
  * high-frequency field leak into it — or drop a `useMemo` — and every module
- * subscribed to it re-renders on every transition, which is exactly the cost
- * the split was introduced to remove. Nothing looks wrong; the deck just gets
- * slower, in the frames it can least afford.
+ * subscribed to it re-renders on every transition, which is the cost the split
+ * exists to remove. Nothing looks wrong; the deck just gets slower, in the
+ * frames it can least afford.
  */
 
 const layout = buildCarouselLayout(

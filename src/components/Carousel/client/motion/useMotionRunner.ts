@@ -40,11 +40,12 @@ const directionOf = (delta: number): MotionPlanDirection =>
 
 /**
  * The fields a re-plan depends on, in ONE place. It feeds both the effect's
- * dependency array and its dedupe key, so the two can no longer drift: they
- * were hand-maintained twin lists, and had already diverged
- * (`layout.visibleSlidesCount` was in the deps and missing from the key). A
- * field present in one and forgotten in the other is a silently missed — or
- * silently duplicated — re-plan, with nothing to notice it.
+ * dependency array and its dedupe key.
+ *
+ * CONSTRAINT — the two must stay one list. As separate hand-written lists they
+ * can drift, and a field present in one but missing from the other is a
+ * silently missed (or silently duplicated) re-plan: nothing throws, the deck
+ * simply strands at the old target or restarts a ride from its own midpoint.
  */
 const replanInputs = (state: CarouselState, isInstantMode: boolean) =>
   [
@@ -283,7 +284,7 @@ export function useMotionRunner({
     // `state` is read whole inside, but only `replanInputs` may RE-RUN this:
     // config/controller identity changes must not restart a live segment, and
     // the key above stops them at the door.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [
     cancelCompositorMotion,
     config,

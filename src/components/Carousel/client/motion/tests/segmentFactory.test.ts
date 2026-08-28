@@ -225,7 +225,7 @@ describe("gesture-release continuity launch", () => {
     expect(Math.max(...samples)).toBeGreaterThan(uiVelocity * 3);
   });
 
-  it("a fast lift-off collapses the ramp: launch в‰€ cruise, no artificial slowdown", () => {
+  it("a fast lift-off collapses the ramp: launch ≈ cruise, no artificial slowdown", () => {
     const uiVelocity = 0.01;
     const pointerVelocity = 0.01;
     const state = releasedState(uiVelocity, pointerVelocity);
@@ -251,12 +251,11 @@ describe("gesture-release continuity launch", () => {
 
 describe("a micro-hold before lift-off must not launch the ride from a standstill", () => {
   /**
-   * The defect this guards against, measured on a Redmi Note 11S: finishing a
-   * slow, deliberate swipe, the finger holds still for ~2 frames before lifting.
-   * The launch velocity used to be read off the fast per-frame EMA, which such a
-   * hold zeroes — so the ride launched from rest and crawled through its whole
-   * acceleration ramp (~300 ms at 3 px/frame) before picking up speed. Every
-   * frame was delivered on time and no counter saw a thing: the CURVE stalled.
+   * Finishing a slow, deliberate swipe, a finger holds still for ~2 frames
+   * before lifting. A launch velocity read off the fast per-frame EMA is zeroed
+   * by such a hold, so the ride would launch from rest and crawl through its
+   * whole acceleration ramp before picking up speed — and nothing detects it:
+   * every frame is delivered on time, the CURVE stalls.
    *
    * `launchVelocity` carries the visible speed on the flick's pause-protected
    * law, and the segment must launch from THAT — not from the zeroed reading.

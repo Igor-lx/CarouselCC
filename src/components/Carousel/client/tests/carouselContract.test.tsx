@@ -18,9 +18,9 @@ import { installCarouselBrowserEnv } from "./browserEnv";
  * The component's promise to its host, checked by mounting the real thing.
  *
  * Everything else in this suite tests a hook or a pure function in isolation;
- * nothing checked that the twenty of them are WIRED to each other. A prop lost
- * on the way down, a slot gated on the wrong flag, or a handle pointing at a
- * stale callback all pass every other file in the project.
+ * nothing else checks that the twenty of them are WIRED to each other. A prop
+ * lost on the way down, a slot gated on the wrong flag, or a handle pointing at
+ * a stale callback all pass every other file in the project.
  *
  * Deliberately not asserted here: pixel geometry (jsdom has no layout, and the
  * measured-slot path is covered in geometry/tests) and motion timing (covered

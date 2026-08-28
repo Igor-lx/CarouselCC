@@ -90,8 +90,8 @@ ride's destination.
 
 A click retarget is carried through the commit by the previous WAAPI animation,
 but a release has nothing painting — and nothing CAN paint through the gap (the
-commit task owns the main thread; a per-frame RAF bridge was measured on device
-and its ticks queue behind the very task they were meant to mask). So the gap is
+commit task owns the main thread, so a per-frame RAF bridge only queues its ticks
+behind the very task they would have to mask). So the gap is
 closed **spatially, not temporally**: `END_DRAG` records `releasedAt`
 (`motionNow()` at dispatch), and at takeover the runner extrapolates the launch
 position over the measured gap at the release's visual velocity

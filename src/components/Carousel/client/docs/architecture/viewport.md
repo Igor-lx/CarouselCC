@@ -36,9 +36,8 @@ stamped by the root as **data attributes**: `data-breakpoint`,
 deduplicates the browser listener, but not the per-consumer work: every extra
 `useMedia` call adds one `useSyncExternalStore` subscription per tracked
 condition plus a `MediaState` rebuild whenever the signature moves. A leaf that
-calls it pays that on every mounted instance — the orientation-swap veil once
-did, across a render window of tens of slides, to read the single `signature`
-scalar. Leaves take what they need from the root as a prop.
+calls it pays that on every mounted instance — across a render window of tens of
+slides, to read one scalar. Leaves take what they need from the root as a prop.
 
 The component SCSS styles slide geometry **by those attributes** — the
 stylesheet holds NO media queries and NO numbers. This is the attribute-driven

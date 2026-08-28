@@ -104,8 +104,8 @@ describe("pauseDecayedVelocity", () => {
   });
 
   it("a realistic lift-off stick keeps most of the speed (vs frame-EMA zeroing)", () => {
-    // 200ms stick: 80ms past grace -> ~80% kept. The old per-frame decay at
-    // alpha 0.85 would have kept ~0.000002%.
+    // 200ms stick: 80ms past grace -> ~80% kept. A per-frame decay at alpha
+    // 0.85 would keep ~0.000002%.
     const kept = pauseDecayedVelocity(1, 200, 120, 250);
     expect(kept).toBeGreaterThan(0.75);
     expect(decayedVelocity(1, 0.85, 200)).toBeLessThan(0.0001);

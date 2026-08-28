@@ -146,7 +146,7 @@ describe("GO_TO", () => {
 
   // Direction contract: a GO_TO rides in the direction the user moved on the
   // pagination strip (plain dot-scale delta), NEVER a cyclic shortcut. The
-  // wrap remains the business of В±1 MOVE steps.
+  // wrap remains the business of ±1 MOVE steps.
   it("rides backward to an earlier dot even when both directions are equidistant", () => {
     const layout = makeLayout(12, 3, false); // pageCount 4: 2 -> 0 is 2 either way
     const there = reduce(buildInitialState(layout), {

@@ -1,6 +1,6 @@
-// Shared fixtures for the state tests. Three of them declared an identical
-// `makeLayout` — duplication inside ONE unit of code, unlike the deliberate
-// forking between self-sufficient shelf packages.
+// Shared fixtures for the state tests. `makeLayout` lives here once: duplicating
+// it per test file would be duplication inside ONE unit of code, which is a
+// defect — unlike the deliberate forking between self-sufficient shelf packages.
 import { buildCarouselLayout, buildSlideRecords } from "../../domain";
 import type { CarouselLayout } from "../../domain";
 import type { MotionPhase } from "../types";

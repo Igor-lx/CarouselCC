@@ -42,12 +42,13 @@ export const resolveSwipeDirection = ({
 
   if (flicked) {
     // A FLICK commits where the finger was GOING, not where it happened to be.
-    // Reading the displacement here let a "pull right, then flick back left
-    // without crossing the origin" release commit RIGHT while carrying a
-    // negative release velocity — two contradictory answers from one call, and
-    // downstream `sameDirectionSpeed` then zeroed the speed, so the ride
-    // launched from a standstill after a fast gesture. The distance branch
-    // below still reads displacement: there it IS the criterion.
+    // CONSTRAINT — do not read the displacement here. On a late reversal ("pull
+    // right, then flick back left without crossing the origin") displacement
+    // commits RIGHT while the release velocity handed back is negative: two
+    // contradictory answers from one call, and a downstream `sameDirectionSpeed`
+    // zeroes the speed, launching the ride from a standstill after a fast
+    // gesture. The distance branch below still reads displacement: there it IS
+    // the criterion.
     return {
       direction: gestureVelocity < 0 ? ("left" as const) : ("right" as const),
       pointerReleaseVelocity: gestureVelocity,

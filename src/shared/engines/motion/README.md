@@ -79,9 +79,10 @@ controller.start({ segment, sampler, onComplete });
   steepest acceleration is `1.5·Δv/T` (smoothstep peaks at 1.5× its mean slope),
   so the relative velocity step is dimensionless in time — the stop COUNT that
   keeps it under ~5% is the SAME for a 300 ms flick and a 3 s ride, on 60 Hz and
-  120 Hz. A fixed count (32) let long rides step visibly; a fixed interval
-  secretly encoded 60 Hz. Deriving it from the profile also keeps it honest under
-  tuning (a sharper launch raises density on its own). Clamped to `[32, 256]`.
+  120 Hz. A fixed count makes long rides step visibly; a fixed interval silently
+  encodes one refresh rate. Deriving it from the profile also keeps it honest
+  under tuning (a sharper launch raises density on its own). Clamped to
+  `[32, 256]`.
 - **Peak-speed solver** (`resolvePeakSpeedForDuration`, duration-authored
   motions): with zone shares a/c/d, start speed s0, end 0, the zone times sum to
   `T = 2aD/(s0+p) + cD/p + 2dD/p`, a quadratic in the peak `p`:

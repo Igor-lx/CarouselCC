@@ -20,7 +20,7 @@
   is expressed twice (JS samples + a keyframe list), and the binding suppresses
   its per-frame write so they don't fight. The alternative keeps one expression
   but puts the heaviest per-frame write back on the main thread, where it drops
-  frames under commit/decode/paint contention — the original jank. Fallback is
+  frames under commit/decode/paint contention. Fallback is
   total (no `Element.animate` → JS write), so the duplication never forks
   correctness: the JS controller stays the single authority on where the deck is
   ([ADR-003](../adr/0003-single-compositor-path.md)).

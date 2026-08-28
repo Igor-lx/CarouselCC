@@ -40,13 +40,13 @@ describe("layout CSS custom properties SSOT", () => {
     expect(scss).toMatch(/transform:\s*translateX\(\s*calc\(var\(--slide-lane/);
   });
 
-  // Two greps used to live here and both were dropped for the same reason:
-  // they asserted where code SITS rather than what it DOES.
+  // Deliberately NOT asserted here — checks of where code SITS rather than what
+  // it DOES:
   //
   //  - `not.toContain("calc(")` over the view and vars module: an arbitrary
   //    spot-check, since `domain/track.ts` builds exactly such a string in JS
   //    by design (the pre-measurement fallback transform);
-  //  - `Carousel.tsx` does not contain the variable names: green with the
+  //  - "`Carousel.tsx` does not contain the variable names": green with the
   //    contract fully broken, red on a harmless move of the declaration.
   //
   // The four cases above name the actual variables on both sides, which is

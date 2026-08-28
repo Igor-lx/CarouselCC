@@ -88,7 +88,7 @@ describe("buildDotKeyframes", () => {
   });
 
   /** The wrap: stepping 0 -> -1 must light ONLY the last dot, and must leave
-   * every dot in between untouched — that was the reported bug. */
+   * every dot in between untouched. */
   it("wrapping backwards lights the last dot and nothing in between", () => {
     const stops = [0, 0.5, 1];
     const last = buildDotKeyframes(11, 0, -1, stops, INACTIVE, ACTIVE, PAGES, CYCLIC);

@@ -11,9 +11,9 @@ import { useViewportVisibility } from "../useViewportVisibility";
  * (the carousel stops autoplaying), so a wrong answer is either wasted battery
  * or a feature that silently never runs.
  *
- * The degradation matters as much as the happy path. This hook once built its
- * IntersectionObserver unconditionally, so on a platform without the API the
- * layout effect threw and took the whole host tree down with it.
+ * The degradation matters as much as the happy path: building the
+ * IntersectionObserver unconditionally makes the layout effect throw on a
+ * platform without the API, taking the whole host tree down with it.
  */
 
 let host: HTMLDivElement;

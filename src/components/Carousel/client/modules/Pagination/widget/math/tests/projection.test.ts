@@ -7,8 +7,8 @@ import { dotOpacityAt, projectDot } from "../projection";
 /**
  * Invariants of the widget's opacity field (see dotOpacityAt). The pivotal
  * one is handover symmetry: the leaving and arriving edge dots must be
- * mirror images at every instant of a step — the serialized handover (one
- * dies, THEN the other is born) was a reported, measured bug.
+ * mirror images at every instant of a step. A serialized handover (one dies,
+ * THEN the other is born) reads as a blink at the edge of the strip.
  */
 
 const CENTER = 2; // visibleDots = 5

@@ -8,18 +8,18 @@ import { createRoot, type Root } from "react-dom/client";
  * copy of the hook. The two are duplicated by design and hold SEPARATE module
  * state — a guard on one says nothing about the other.
  *
- * Regression test for the FIRST-FRAME touch signal.
+ * The FIRST-FRAME touch signal.
  *
  * `useSyncExternalStore` calls `getSnapshot` during render, BEFORE it
- * subscribes. The hook used to return a module-level cached `false` there and
- * only read `matchMedia` inside `subscribe`, so the first render on every phone
- * reported "not a touch device". React re-renders once the subscription lands,
- * which hides the defect from any assertion on the FINAL value — hence these
- * tests pin the value of the first render specifically.
+ * subscribes. Returning a module-level cached `false` there and reading
+ * `matchMedia` only inside `subscribe` makes the first render on every phone
+ * report "not a touch device". React re-renders once the subscription lands,
+ * which hides that from any assertion on the FINAL value — hence these tests
+ * pin the value of the first render specifically.
  *
- * The consequence was not cosmetic: a consumer that latched that first value
- * (`useState(isTouch)`) could never resync, which is how the app mounted the
- * dot pagination instead of the strip widget on touch devices.
+ * The consequence is not cosmetic: a consumer that latches the first value
+ * (`useState(isTouch)`) can never resync, and a touch device is left with the
+ * wrong pagination module for the session.
  */
 
 const installMatchMedia = (coarse: boolean) => {

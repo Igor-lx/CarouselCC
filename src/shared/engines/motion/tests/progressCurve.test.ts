@@ -199,9 +199,9 @@ describe("progress-stop density follows the profile's shape", () => {
     ).toBe(32);
   });
 
-  it("is denser than the old fixed 32 for a real button ride", () => {
-    // The regression this guards: at 32 intervals a 2 s ride's relative
-    // velocity jump reached ~15%, above the ~10% smooth-pursuit vision reads.
+  it("is denser than a fixed 32 for a real button ride", () => {
+    // At 32 intervals a 2 s ride's relative velocity jump reaches ~15%, above
+    // the ~10% that smooth-pursuit vision reads as a step.
     expect(resolveProgressStopIntervals(stepProfile())).toBeGreaterThan(32);
     expect(profileProgressStops(stepProfile(), 3).length).toBeGreaterThan(33);
   });

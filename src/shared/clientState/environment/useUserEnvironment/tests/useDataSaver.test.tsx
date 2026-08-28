@@ -4,17 +4,18 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 /**
- * Regression test for the FIRST-FRAME data-saver signal — the sibling of the
- * `useIsTouchDevice` case, and the same defect class.
+ * The FIRST-FRAME data-saver signal — the sibling of the `useIsTouchDevice`
+ * case, and the same failure class.
  *
  * `useSyncExternalStore` calls `getSnapshot` during render, BEFORE it
- * subscribes. The hook used to return the module-level cached `false` there and
- * read `prefers-reduced-data` / `navigator.connection.saveData` only inside
- * `subscribe()`. React re-renders once the subscription lands, so an assertion
- * on the FINAL value cannot see the defect — these tests pin the FIRST render.
+ * subscribes. Returning the module-level cached `false` there and reading
+ * `prefers-reduced-data` / `navigator.connection.saveData` only inside
+ * `subscribe()` makes the first render wrong. React re-renders once the
+ * subscription lands, so an assertion on the FINAL value cannot see it — these
+ * tests pin the FIRST render.
  *
- * It mattered because the first frame is exactly where the off-band image fetch
- * policy is decided: a data-saving user could still be served the speculative
+ * It matters because the first frame is exactly where the off-band image fetch
+ * policy is decided: a data-saving user would still be served the speculative
  * requests the flag exists to prevent.
  */
 

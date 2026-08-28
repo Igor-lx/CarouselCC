@@ -26,9 +26,9 @@ so any JS formula would be a second, drift-prone source of truth beside the CSS.
   - `subscribe(listener)` — fires synchronously after any measure that MOVED the
     slot. The track binding re-bases its geometry on it.
 
-  Three independent copies of this measurement used to observe the same element,
-  and two of them rounded while the third did not — the gesture was calibrated
-  against one number and the track painted with another.
+  CONSTRAINT — exactly one measurement per carousel. Several copies observing
+  the same element can disagree on rounding, and the gesture is then calibrated
+  against one number while the track paints with another.
 - **`resolveImageSizes`** turns that measured slot into the images' `sizes`
   attribute as a concrete pixel length. A `vw` formula would overstate the real
   (capped, padded) slot and bias the browser toward an oversized candidate — on a

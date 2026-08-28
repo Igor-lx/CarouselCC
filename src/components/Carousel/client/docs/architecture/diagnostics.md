@@ -94,9 +94,7 @@ runtime changes.
 
 `SEVERITY` is `CRITICAL` or `LOGICAL`. Diagnostic only ever describes a value
 and its consequence — it never claims a runtime repair, because the runtime
-performs none. (The former `normalizedTo` clause was removed when the last
-runtime normalization did: its only producer was the profile-share rescue, now
-gone.)
+performs none. There is deliberately no "normalized to" clause in the shape.
 
 ## Observe-only in practice
 

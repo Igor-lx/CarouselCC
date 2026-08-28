@@ -112,10 +112,10 @@ describe("resolveWidgetStepTarget", () => {
 /**
  * The chain is bounded against the LIVE offset, and that bound is what the
  * strip's pooled dots and highlight overlays are sized from. Without it a click
- * burst walked the destination past every element that exists to show it, and
- * `activeTrajectoryIds` then named more ids than there were overlays — the
- * extras were dropped from the front of the list, so a forward burst lost the
- * ARRIVING page's highlight and it popped into place at settle.
+ * burst walks the destination past every element that exists to show it, and
+ * `activeTrajectoryIds` then names more ids than there are overlays — the
+ * extras drop from the front of the list, so a forward burst loses the ARRIVING
+ * page's highlight and it pops into place at settle.
  *
  * Written against the constant, not against the number: retuning the reach must
  * not fail these, only move them.

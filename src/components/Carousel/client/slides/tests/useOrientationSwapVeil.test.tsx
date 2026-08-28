@@ -11,14 +11,14 @@ import { useOrientationSwapVeil } from "../useOrientationSwapVeil";
  * signature change and lifted when the new bitmap is decodable, with a
  * fail-open timer as the cap.
  *
- * The regression this pins: the effect guards on a signature ref BEFORE it
- * checks whether a bitmap is on screen. When `isBitmapShown` fell to false with
- * the veil up (an art-directed crop 404s right after a rotation, so the slide
- * renders its alt text instead), teardown killed the fail-open timer and the
- * re-run returned immediately on the unchanged signature. `isVeiled` stayed
- * true for good, and once the retry succeeded the remounted `<img>` came back
- * under `data-reorienting="true"` — opacity: 0, an empty card until the user
- * rotated the device again.
+ * What this pins: the effect guards on a signature ref BEFORE it checks whether
+ * a bitmap is on screen. If `isBitmapShown` falls to false with the veil up (an
+ * art-directed crop 404s right after a rotation, so the slide renders its alt
+ * text instead), teardown kills the fail-open timer while the re-run returns
+ * immediately on the unchanged signature — so `isVeiled` would stay true for
+ * good, and a successful retry would remount the `<img>` under
+ * `data-reorienting="true"`: opacity 0, an empty card until the next rotation.
+ * Hence the veil is lowered in teardown.
  */
 
 let host: HTMLDivElement;

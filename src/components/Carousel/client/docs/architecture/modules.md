@@ -61,10 +61,9 @@ onto the main thread for the rest of the ride, dragging a full paint lifecycle
 through every frame. (Per-frame follow writes hit the same transition from the
 other side: each write would be *eased* into over the transition's duration, so
 the strip would smear behind the finger.) So `usePaginationFade` sets
-`transition: none` on every dot it paints, for as long as it paints it — a large
-measured main-frame reduction on a weak device. The cascade still picks the
-animation so the picture stays correct, which is exactly why the cost is
-invisible until measured. Do not remove it.
+`transition: none` on every dot it paints, for as long as it paints it. The
+cascade still picks the animation either way, so the picture stays correct and
+the cost is invisible from the outside. Do not remove it.
 
 **Ownership is one thing.** The inline look and the suppressed transition are
 taken together and handed back together, and only at settle — never between two

@@ -9,14 +9,11 @@ describe("slideVisibilityFlags", () => {
   });
 
   /**
-   * The catch-and-hold regression this guards: a press brakes the strip at a
-   * FRACTIONAL position (say 0.3) and the reducer sits in "dragging" with
-   * current = previous = 0.3. When the transition flag was false there, the
-   * active band collapsed to [0.3, 1.3) — the on-screen LEFT slide (0) fell
-   * out and went inert under the user's finger: hit-testing died, and the
-   * browser's long-press menu gave its haptic but refused to open. Always the
-   * left slide, in both scroll directions, one and two slides visible —
-   * measured on device.
+   * The catch-and-hold case: a press brakes the strip at a FRACTIONAL position
+   * (say 0.3) and the reducer sits in "dragging" with current = previous = 0.3.
+   * With the transition flag false the active band collapses to [0.3, 1.3) —
+   * the on-screen LEFT slide (0) falls out and goes inert under the finger, so
+   * hit-testing dies and the browser's long-press menu refuses to open.
    *
    * With the flag true, `wasVisible` floors/ceils the fractional band, so
    * every slide actually on screen stays interactive.

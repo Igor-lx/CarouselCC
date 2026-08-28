@@ -99,10 +99,10 @@ parts:
   and a page scroll started on the surface are indistinguishable, so the engine
   waits. Vertical intent inside the window hands the gesture to the browser
   untouched; horizontal intent activates ahead of it; a quick lift stays a clean
-  tap. Measured on device: a finger intending to scroll rests 100–250ms on the
-  glass before its first move; a catch-and-hold rests far longer (the OS
-  long-press is ~500ms). Click suppression is tied to a completed DRAG, never to
-  ownership — so interactive children keep their clicks.
+  tap. The window is sized against human timings: a finger intending to scroll
+  rests 100–250ms on the glass before its first move, while a catch-and-hold
+  rests far longer (the OS long-press is ~500ms). Click suppression is tied to a
+  completed DRAG, never to ownership — so interactive children keep their clicks.
 
 - **Event-time clock.** Velocities are computed from `event.timeStamp` (hardware
   side), not handler time: on a congested main thread events queue before they
@@ -135,16 +135,15 @@ parts:
   negative `pointerReleaseVelocity`: one call, two contradictory answers, and a
   consumer aligning speed to travel would zero it and launch from a standstill.
 
-- **`launchVelocity` on the slow law — the ride-crawl fix.** The continuity
-  launch must NOT read the per-frame UI-velocity EMA: that zeroes after a ~2-frame
-  stick, and a deliberate slow swipe ends with exactly such a terminal micro-hold.
-  The ride then launched from a standstill and crawled through its whole
-  acceleration ramp — a hitch the eye reads mid-ride that no frame counter can
-  see (every frame is on time; the CURVE stalls). So `launchVelocity` is the
-  UI-domain twin of the flick memory: same slow law, pause-protected (grace +
-  half-life), captured BEFORE the terminal sample so a last-instant twitch can't
-  wipe it. A genuinely long hold still decays it and the ride correctly starts at
-  rest.
+- **`launchVelocity` on the slow law.** CONSTRAINT — the continuity launch must
+  NOT read the per-frame UI-velocity EMA. That EMA zeroes after a ~2-frame stick,
+  and a deliberate slow swipe ends with exactly such a terminal micro-hold; the
+  ride would then launch from a standstill and crawl through its whole
+  acceleration ramp. Nothing detects this: every frame is delivered on time, the
+  CURVE stalls. So `launchVelocity` is the UI-domain twin of the flick memory —
+  same slow law, pause-protected (grace + half-life), captured BEFORE the
+  terminal sample so a last-instant twitch cannot wipe it. A genuinely long hold
+  still decays it, and the ride then correctly starts at rest.
 
 ## Release model (`inertia/`)
 

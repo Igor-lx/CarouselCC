@@ -13,8 +13,7 @@ import type { Slide } from "../../public-api/types";
  * The padded entries are the SAME slide shown twice, so they must not be the
  * same React element: a duplicate `key` makes React reuse one mounted node for
  * two lanes, and the deck starts showing the wrong picture in the wrong slot —
- * intermittently, only when the padding is in the render window, i.e. exactly
- * the bug nobody can reproduce on demand.
+ * intermittently, only when the padding is inside the render window.
  */
 
 const deck = (slideCount: number): Slide[] =>

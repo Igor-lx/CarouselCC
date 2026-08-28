@@ -4,10 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { getMediaQueryStore } from "../useMediaQuery";
 
 /**
- * Lifecycle regression tests for the shared media-query store. Each case
- * pins a defect that once made dev/StrictMode resolve every query to `false`
- * (the deck rendered the MOBILE tier on desktop):
- *  1. render-time snapshot read BEFORE any subscription must be live;
+ * Lifecycle contract of the shared media-query store. Break any of the three
+ * and dev/StrictMode resolves every query to `false` — a deck rendering the
+ * MOBILE tier on desktop, with nothing reported:
+ *  1. the render-time snapshot read BEFORE any subscription must be live;
  *  2. a re-subscribe after a full teardown must re-attach the listener;
  *  3. a teardown must never poison a later consumer of the same query.
  */

@@ -8,7 +8,8 @@ import type { MediaState } from "../useMedia";
 import type { MediaAxes } from "../internal/canonicalMedia";
 
 /**
- * The reactive half of the media facade — only its pure derivation was covered.
+ * The reactive half of the media facade (its pure derivation is covered next
+ * door, in `useMedia.test.ts`).
  *
  * Two things here are load-bearing and neither is obvious from the signature.
  * `signature` is the ONE value consumers compare to decide whether anything

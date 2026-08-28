@@ -115,10 +115,10 @@ describe("resolveSwipeDirection", () => {
  * The two commit ways read DIFFERENT quantities for the direction: a flick goes
  * where the finger was going, a distance swipe goes where the content ended up.
  * They only disagree on a late reversal — pull one way, flick back the other
- * without crossing the origin — and taking the offset there returned a direction
- * that contradicted the release velocity handed back with it. A consumer
- * aligning speed to travel (`sameDirectionSpeed`) then zeroed it, so a visibly
- * fast gesture launched its ride from a standstill.
+ * without crossing the origin — and taking the offset there yields a direction
+ * that contradicts the release velocity handed back with it. A consumer
+ * aligning speed to travel (`sameDirectionSpeed`) then zeroes it, and a visibly
+ * fast gesture launches its ride from a standstill.
  */
 describe("resolveSwipeDirection — a late reversal", () => {
   const reversal = (offsetSign: 1 | -1) =>

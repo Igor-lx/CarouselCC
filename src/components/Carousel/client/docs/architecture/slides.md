@@ -25,7 +25,7 @@ on settle**, persisted across renders so a slide is never unmounted mid-flight.
 Its buffer (`RENDER_WINDOW_BUFFER_MULTIPLIER`) covers the full span a single
 click or a repeated-click lookahead can reveal, so every reachable slide is
 mounted while idle and its `<img>` fetches long before motion starts — this is
-why there is no separate predecode machinery.
+why there is no separate preload machinery.
 
 The window rides on a STABLE `layoutOrigin` that recenters only after a whole
 band of one-way drift (`LAYOUT_ORIGIN_BAND_SLOTS`), so a per-settle window shift
@@ -37,12 +37,11 @@ math is in [motion.md](./motion.md).
 [`slides/useSlideFetchReach.ts`](../../slides/useSlideFetchReach.ts): the buffer's
 off-band `<img>`s do not fetch until the visible band has reported an outcome
 **and the deck is standing still**. The second condition is not politeness: the
-band settles about a second after mount, which on a real device is inside the
-user's first ride, so opening on the band alone put the whole buffer's commit,
-fetch and decode into the frames of the very first movement. Measured with
-`npm run perf:first-ride`: seven images decoded inside ride 0 before the rule,
-three after — and those three are the page being ridden to, which no amount of
-scheduling can pre-warm when the user rides before it has been fetched.
+band settles about a second after mount, which falls inside a user's first ride,
+so opening on the band alone puts the whole buffer's commit, fetch and decode
+into the frames of the very first movement. What remains unavoidable is the page
+being ridden to — no scheduling can pre-warm a slide the user reaches before it
+has been fetched.
 
 The reach never shrinks once granted: unmounting the buffer mid-ride costs the
 same commit and throws its in-flight bytes away with it.

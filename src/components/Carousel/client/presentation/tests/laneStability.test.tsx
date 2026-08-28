@@ -12,8 +12,7 @@ import { useCarouselPresentation } from "../useCarouselPresentation";
  * on it. A slide's LANE does not: it is a function of its own virtualIndex
  * and the layout origin. If the style objects were rebuilt along with the
  * array, every mounted SlideItem would receive a fresh `style` prop and
- * re-render in exactly the two frames where the animation starts and settles
- * — the click-time stutter this guards against.
+ * re-render in exactly the two frames where the animation starts and settles.
  */
 
 let host: HTMLDivElement;

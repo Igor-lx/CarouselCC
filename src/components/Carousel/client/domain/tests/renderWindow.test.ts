@@ -17,8 +17,7 @@ import type { Slide } from "../../public-api/types";
  * the deck's most expensive kind of bug because it only shows on a real device.
  *
  * The arithmetic is `Math.floor` / `Math.ceil` over a fractional position plus
- * `+ visibleSlidesCount - 1`, i.e. off-by-one on every line, and none of it was
- * executed by any test.
+ * `+ visibleSlidesCount - 1` — off-by-one on every line.
  */
 
 const layoutOf = (

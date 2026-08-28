@@ -31,9 +31,12 @@ export interface SlotSizeSource {
 
 /**
  * THE slot measurement of a carousel: one ResizeObserver, one `resize` listener
- * and one `getComputedStyle` read for every consumer. Three independent copies
- * of this used to observe the same element, and two of them disagreed on the
- * answer (rounded vs raw) — see docs/architecture/geometry.md.
+ * and one `getComputedStyle` read for every consumer.
+ *
+ * CONSTRAINT — exactly one measurement per carousel. Several observers of the
+ * same element can disagree on the answer (rounded vs raw), and the gesture
+ * would then be calibrated against one number while the track paints with
+ * another. See docs/architecture/geometry.md.
  */
 export function useSlotSizeSource({
   viewportRef,
@@ -135,12 +138,13 @@ export function useSlotSizeSource({
     };
   }, [remeasure, viewportRef]);
 
-  // Memoised so the source is safe to put in a dependency array: a fresh object
-  // per render made a consumer's subscribe effect re-run on every render, and
-  // React tears down ALL effects of a commit before it runs any of them — so a
-  // notification emitted from inside a commit landed on an empty listener set.
-  // `getSlotSize` and `subscribe` are permanently stable, so only a real slot
-  // move re-identifies this.
+  // CONSTRAINT — the returned object must stay referentially stable, so it is
+  // safe in a dependency array. A fresh object per render makes a consumer's
+  // subscribe effect re-run every render, and React tears down ALL effects of a
+  // commit before running any of them — a notification emitted from inside a
+  // commit then lands on an empty listener set and the consumer never hears the
+  // slot move. `getSlotSize` and `subscribe` are permanently stable, so only a
+  // real slot move re-identifies this.
   return useMemo(
     () => ({ getSlotSize, slotPx, subscribe }),
     [getSlotSize, slotPx, subscribe],

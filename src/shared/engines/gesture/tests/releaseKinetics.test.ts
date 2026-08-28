@@ -7,8 +7,8 @@ import {
 
 /**
  * The fused release kinetics: one call answers "how fast does this release
- * ride" — flick judgment + continuity launch, the recipe consumers used to
- * assemble from the two primitives by hand.
+ * ride" — flick judgment + continuity launch, so a consumer does not assemble
+ * the recipe from the two primitives by hand.
  */
 describe("resolveReleaseKinetics", () => {
   const BASE = 0.6; // the consumer's cruise, units/ms

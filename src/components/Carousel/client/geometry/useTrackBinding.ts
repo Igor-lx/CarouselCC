@@ -63,9 +63,9 @@ export function useTrackBinding({
   layoutOriginRef.current = layoutOrigin;
   visibleSlidesCountRef.current = visibleSlidesCount;
 
-  // Both are permanently stable (the source memoises them), so the effects
-  // below key on THEM and not on the source object — a consumer that depends on
-  // the object re-subscribes every render, and a notification emitted during a
+  // CONSTRAINT — key the effects below on THESE, never on the source object.
+  // Both are permanently stable (the source memoises them); depending on the
+  // object re-subscribes every render, and a notification emitted during a
   // commit then arrives after its own listener was torn down.
   const readSlotSize = slotSize.getSlotSize;
   const subscribeSlotSize = slotSize.subscribe;
@@ -243,10 +243,11 @@ export function useTrackBinding({
   );
 
   // Which flavour of per-frame ride is running. Judged by the PLAN, exactly as
-  // the dots and the widget judge it — `isWaapiSupported()` is a different
-  // question and the two answers diverge whenever the compositor declines a
+  // the dots and the widget judge it.
+  // CONSTRAINT — do not judge this by `isWaapiSupported()`: that answers a
+  // different question, and the two diverge whenever the compositor declines a
   // ride for any other reason (an unmeasurable slot, an `animate()` that
-  // throws). One rule, three consumers, one signal.
+  // throws). One rule, three consumers, one signal — or they desync.
   useIsomorphicLayoutEffect(
     () =>
       motionPlan.subscribe((plan) => {

@@ -21,21 +21,17 @@ interface UseSlideFetchReachInput {
 /**
  * The band, then — once the deck is loaded AND STILL — the whole buffer.
  *
- * The second condition is the one that matters. Opening the buffer mounts an
- * `<img>` into every buffered slide at once (two dozen on the demo's desktop
- * layout), which then fetch and decode. The band settles roughly a second
- * after mount, which on a real device is INSIDE the user's first ride, so all
- * of that used to land in the frames of the very first movement — the whole
- * "first pass stutters, the rest is smooth" report.
+ * CONSTRAINT — the buffer must not open while the deck moves. Opening it mounts
+ * an `<img>` into every buffered slide at once (two dozen on a desktop layout),
+ * so their commit, fetch and decode all land in frames that are being animated.
+ * The band settles roughly a second after mount, which falls inside a user's
+ * first ride: gating on "the band reported" alone is therefore not enough.
  *
- * Measured alternative, rejected: granting one page of reach immediately, so
- * the page being ridden to would be warm. On a weak link it made things WORSE
- * (image decodes inside ride 0 went 6 -> 14 and began leaking into ride 1),
- * because six more concurrent fetches push the band and its neighbours past
- * the moment the user clicks. Bandwidth is the scarce thing early, not reach.
+ * CONSTRAINT — the reach never shrinks once granted. Withdrawing it mid-ride
+ * costs the same commit a second time and discards the in-flight bytes with it.
  *
- * The reach never shrinks: taking images away mid-ride would cost the same
- * commit and throw the bytes out with it.
+ * Bandwidth, not reach, is the scarce resource early: opening wider ahead of
+ * the band puts more concurrent fetches against the slides being looked at.
  */
 export function useSlideFetchReach({
   virtualSlides,

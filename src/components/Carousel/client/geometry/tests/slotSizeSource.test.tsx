@@ -10,12 +10,13 @@ import { useSlotSizeSource, type SlotSizeSource } from "../useSlotSizeSource";
  *
  * It carries a real obligation — "a compositor ride was keyframed in the old
  * pixel scale, tear it down" — and it is invisible: nothing about the deck
- * looks wrong in a unit test if the notification is silently dropped. It was
- * dropped, for a while: the source returned a fresh object each render, the
- * track kept that object in a dependency array and so re-subscribed on every
- * render, and React tears down ALL effects of a commit before running any of
- * them — so a notification emitted from inside a commit arrived after its own
- * listener had gone.
+ * looks wrong in a unit test if the notification is silently dropped.
+ *
+ * It IS dropped whenever the source returns a fresh object each render: the
+ * track keeps that object in a dependency array and re-subscribes every render,
+ * and React tears down ALL effects of a commit before running any of them, so a
+ * notification emitted from inside a commit arrives after its own listener has
+ * gone.
  *
  * These two cases pin both halves: the source stays referentially stable
  * (the cause), and a consumer wired the way the track is wired actually hears

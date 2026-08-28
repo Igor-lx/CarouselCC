@@ -74,10 +74,10 @@ input, so the status booleans cannot drift apart from the phase.
 
 `useDiagnosticContextValue` builds the diagnostic value the same way (raw props
 plus observable layout/slot facts, independently memoised sub-views), with one
-production optimisation. Since the render policy stopped attaching Diagnostic in
-production, nothing reads this context there — but building the value anyway
-meant a fresh object and a re-identified provider on every dispatch, twice per
-ride, in the two frames the carousel can least afford it. So in production the
+production optimisation. The render policy does not attach Diagnostic in
+production, so nothing reads this context there — and building the value anyway
+would mean a fresh object and a re-identified provider on every dispatch, twice
+per ride, in the two frames the carousel can least afford it. So in production the
 hook returns one frozen, shape-complete stand-in that is never read; the real
 sub-views are built only under `IS_DEV`, and their object literals drop out of
 the production bundle with that branch.

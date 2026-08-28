@@ -22,10 +22,11 @@ avoidable motion while the viewport is unsettled — this hook is that signal (a
 scheduler gate for autoplay checks it before firing a tick).
 
 **Non-reactive by design.** The result is a stable getter, never React state.
-Flipping state inside the `touchstart` handler would re-render the consumer at
-the exact moment a finger lands — which on a weak device hitches an in-flight
-ride (the very artifact this hook prevents). Internals are refs + timestamps
-only; nothing re-renders on touch.
+
+CONSTRAINT — nothing about a touch may re-render the consumer. Flipping state
+inside the `touchstart` handler re-renders at the exact moment a finger lands,
+which hitches an in-flight ride: the artifact this hook exists to avoid.
+Internals are refs + timestamps only.
 
 **Self-extending quiet window.** `quietDelayMs` is measured from the LAST
 activity signal, and every signal refreshes it — so the window always covers the
