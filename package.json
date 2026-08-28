@@ -11,10 +11,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "gen:carousel": "tsx src/components/Carousel/data-gen/cli.ts carousel-data.config1.json && tsx src/components/Carousel/data-gen/cli.ts carousel-data.config2.json",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist",
-    "perf:first-ride": "npm run build && node scripts/perf/first-ride.mjs"
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -23,16 +26,24 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^6.0.3",
     "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.5",
     "gh-pages": "^6.3.0",
+    "globals": "^17.11.0",
     "jsdom": "^29.1.1",
+    "prettier": "^3.9.6",
     "sass-embedded": "^1.89.2",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3",
+    "typescript-eslint": "^8.68.0",
     "vite": "^8.1.3",
     "vitest": "^4.1.10"
   },
