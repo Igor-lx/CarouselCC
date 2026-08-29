@@ -668,47 +668,79 @@ gesture: комментарий `:2-3` — «в клике и автоплее �
 
 ---
 
-## I. Presentation / context / policy / report
+## I. Presentation / context / render-policy / host-report
 
-### `client/presentation/useCarouselPresentation.ts` (90) — fx (кэш в рефе)
-`laneCacheRef` — кэш стилей полосы, чтобы проп `style` у `SlideItem` оставался
-`===` между двумя перестроениями `virtualSlides` за поездку. Ключ кэша —
-`origin:virtualIndex`, поэтому смена `layoutOrigin` не требует синхронного
-сброса: старые записи просто перестают попадаться.
-- Чтение и запись — из `useCallback`, чистка — из эффекта после коммита.
-  Прежнее замечание «кэш чистится внутри `useMemo`, скрытая мутация в
-  мемоизации» снято: мутации в мемо больше нет.
+Слой представления: как состояние доезжает до модулей и до DOM, ничего при этом
+не решая. Логики движения здесь нет — только формы, контракты и ворота.
 
-### `client/presentation/cssVars.ts` (30) — pure, SSOT контракта JS→CSS
-3 корневые переменные + 1 на слайд.
-### `client/presentation/domPayload.ts` (19) — pure
-`buildSlideClassMap` подставляет `""` вместо `undefined` (иначе React снимет
-атрибут). `buildFlagAttributes` — `data-<flag>="true"` только для активных.
+### Контексты: **раздельные половины — главный приём слоя**
 
-### `client/context/useModuleContextValue.ts` (129) — pure (мемо-каскад)
-**Разделение контекста на два**: `stable` (низкочастотный) и `motion`
-(переидентифицируется на каждом переходе). 6 вложенных `useMemo`.
-### `client/context/types.ts` (96) — pure. Три вью-контракта + диагностический.
-### `client/context/useDiagnosticContextValue.ts` (143) — pure
-Все 4 подвью гейтятся `IS_DEV`; в проде — `SILENT_SUBVIEW = null as never`
-(`:19`) и замороженный `SILENT_VALUE`.
-- `?` `as unknown as CarouselDiagnosticContextValue` (`:16`) и `null as never`
-  (`:19`) — **тип лжёт** в проде: потребитель, обратившийся к `.state` в
-  production, получит `null` вместо заявленного `CarouselState`. Защита —
-  только соглашение «Diagnostic не рендерится в проде». Кандидат в RISK/ARCH.
+`context/types.ts` (96) объявляет две ценности вместо одной, и это не стиль:
+- **`CarouselStableContextValue`** — низкочастотная: раскладка, навигация,
+  источники позиции и плана, ссылка на трек, ворота предзагрузки. Переживает
+  всю поездку без пере-идентификации;
+- **`CarouselMotionContextValue`** — высокочастотная: фаза и цель, меняется на
+  каждом переходе.
+
+Модуль подписывается на ту половину, которая ему нужна, и не перерисовывается от
+чужой. Тест на этом стоит отдельный («survives a MOTION transition — the whole
+reason for the split»).
+
+### `client/context/useModuleContextValue.ts` (129) — fx
+Собирает обе половины из состояния: четыре промежуточных `useMemo`
+(статус, раскладка, намерение, навигация) и два финальных.
+- Зависимости расписаны **по полям**, а не по объектам: `state.layout.pageCount`,
+  `state.layout.isFinite` и так далее. Так половина остаётся стабильной, когда
+  меняется несущественное для неё поле состояния.
+- `visualPosition` и `motionPlan` объявлены как `| null`: **под reduced motion
+  их не публикуют вовсе** — модулю нечего слушать, а не «источник, который молчит».
+
 ### `client/context/CarouselModuleContext.ts` (24), `CarouselDiagnosticContext.ts` (12)
-`createContext(null)` + хук, бросающий при отсутствии провайдера. Корректно.
-`CarouselDiagnosticContext.ts:14` — нет финального перевода строки.
+Три контекста и три хука-читателя. Отсутствие провайдера — **исключение с
+понятным текстом**, а не тихий `null`: «module must render inside a `<Carousel>`».
 
-### `client/render-policy/useModuleRenderPolicy.ts` (76) — pure
-Гейт слотов: `controls`/`pagination` требуют ещё и `canSlide`;
-`diagnostic` — только `IS_DEV`.
-### `client/host-report/useCarouselStatusReporter.ts` (44) + `statusSnapshot.ts` (12)
-Дедуп по мелкому сравнению 5 полей перед вызовом хостового колбэка.
+### `client/context/useDiagnosticContextValue.ts` (143) — fx, dev-only
+Зеркало входов для дев-слота: сырые пропы как есть (`unknown`), раскладка до и
+после клампа, состояние слотов. Существует, чтобы диагностика сверяла **то, что
+хост передал**, с тем, что карусель поняла.
 
-### `client/viewport/useSlideViewport.ts` (5) — одна строка поверх `useMedia`.
-### `client/slots/slotNames.ts` (14) — SSOT имён слотов + тип-брендирование
-`CarouselSlotComponent<C, Name> = C & { slot: Name }`.
+### `client/render-policy/useModuleRenderPolicy.ts` (76) — fx, ворота модулей
+Единственное место, где решается, рендерить ли модуль. Два разных вопроса,
+которые легко спутать: `hasXSlot` — «слот вообще передан» (по нему диагностика
+судит о проводке хоста) и `slots.x` — «его сейчас показывать». Контролы и
+пагинация гасятся ещё и по `canSlide`; диагностика — **только в dev**
+(`isDiagnosticAttached`), и это записано прямо в коде.
+
+### `client/presentation/useCarouselPresentation.ts` (91) — fx
+Классы, корневые переменные, флаги и **геттер стиля полосы**.
+- `slideStyleFor` — именно геттер, а не параллельный массив: комментарий `:28-31`
+  объясняет, что позиционное соответствие с `virtualSlides` было бы инвариантом,
+  который может подтвердить только комментарий.
+- Кэш полос — в рефе с ключом `origin:virtualIndex`, поэтому смена опоры не
+  требует синхронного сброса, а чистка ушла в эффект после коммита.
+
+### `client/presentation/cssVars.ts` (30) — pure, контракт JS→CSS
+**Единственное место, где объявляются кастомные свойства.** Корневых три
+(два тайминга вуали и число видимых слайдов), на слайд — ровно одно:
+`--slide-lane`. Всё остальное CSS выводит сам.
+
+### `client/presentation/domPayload.ts` (19) — pure
+`buildSlideClassMap` подставляет `""` вместо отсутствующего класса — `undefined`
+уронил бы атрибут целиком. `buildFlagAttributes` ставит `data-<flag>="true"`
+только для активных флагов: выключенный флаг — это **отсутствующий атрибут**, а
+не `"false"`.
+
+### `client/host-report/useCarouselStatusReporter.ts` (44) — fx
+Единственный канал наружу к хосту. Дедуп по значению
+(`areStatusSnapshotsEqual`), поэтому колбэк хоста не вызывается на каждый кадр
+поездки — только когда снимок реально изменился.
+
+### `client/host-report/statusSnapshot.ts` (12) — pure
+Поверхностное сравнение пяти полей. Тест перебирает **каждое** поле — новое поле
+в снимке без строчки здесь молча выключило бы дедуп для него.
+
+### `client/viewport/useSlideViewport.ts` (5) — fx, одна строка
+Один вызов фасада `useMedia` над осями из конфига. Вся оконная логика — в полке.
 
 ---
 

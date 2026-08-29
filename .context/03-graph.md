@@ -43,6 +43,27 @@ shared/** ─ полки, импортируются откуда угодно, 
 разом: он сверяет опубликованные значения, поэтому при переименовании любой
 константы падает он, а не потребитель.
 
+## I. `client/{presentation,context,render-policy,host-report,viewport}/**`
+
+Здесь связь идёт **не импортом, а контекстом**: модули (`client/modules/**`) не
+импортируют ни состояние, ни движение — они читают две половины контекста.
+
+```
+state + motion + geometry ──> useModuleContextValue ──> CarouselStableContext ──┐
+                                                   └──> CarouselMotionContext ──┤
+                                                                                v
+                                    modules: Controls, Pagination, Diagnostic, ResponsiveImages
+```
+
+Следствие для рефактора: **переименование поля в состоянии не задевает модули
+напрямую** — задевает вид (`CarouselLayoutView`, `CarouselStatusView`), а вид
+обязан оставаться стабильным по идентичности. Ломается всё разом именно на
+уровне вида, не на уровне состояния.
+
+`render-policy` — единственные ворота рендера модулей; `host-report` —
+единственный канал наружу к хосту; `presentation/cssVars` — единственное
+объявление кастомных свойств CSS.
+
 ## H. `client/{gesture,navigation,autoplay,focus}/**`
 
 Четыре входа команд. Все четыре кончаются `dispatch`, и ни один не держит
