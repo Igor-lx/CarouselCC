@@ -5,6 +5,18 @@
 
 **Заполняется послойно.** Ниже — разобранные слои.
 
+## A. Точка входа, публичный контракт, граница коробки
+
+| Файл | Что закреплено |
+| --- | --- |
+| `client/tests/areCarouselPropsEqual.test.tsx` | структурное сравнение детей: тот же слот с теми же пропами равен, смена типа/ключа/пропа — нет, глубина за предохранителем считается изменением |
+| `client/tests/carouselContract.test.tsx` | публичный контракт компонента целиком, включая `REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES` вместе с зависящим от него поведением |
+| `client/tests/{layoutCssVarsSync,measurementContractSync,slideHeightSync,styleLayerContract}.test.ts` | синхронность JS и SCSS: переменные раскладки, контракт измерения, высота слайда, порядок слоёв стилей — то, что иначе расходится молча |
+| `public-api/tests/schemas.test.ts` (110) | Zod-схемы для хоста: строка, число и React-элемент как валидный `content`; форма `image` |
+| `boundary/tests/slide-contract.test.ts` (28) | **компиляционная** проверка: `GeneratedSlide` присваивается в `Slide` — дрейф роняет `tsc` |
+| `boundary/tests/boundaries.test.ts` (72) | изоляция генератора: `data-gen` не импортирует `client` и наоборот — проверено чтением исходников |
+| `data-gen/tests/{buildSlide,generateSlides}.test.ts` (77+121) | сборка слайда из вариантов и **идемпотентность** документа |
+
 ## L3–L5. `client/modules/{ResponsiveImages,Diagnostic}/**/tests/**` — 6 файлов / ~790 строк
 
 | Файл | Что закреплено |
