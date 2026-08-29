@@ -1,9 +1,15 @@
 # Domain
 
-The carousel's pure core: plain functions, no React, no DOM, no state. Every
-piece of geometry and arithmetic the higher layers rely on lives here as a
-testable function of its inputs. If a rule can be expressed without a hook or an
-element, it belongs in this folder.
+The carousel's pure core: plain functions, no React, no state. Every piece of
+geometry and arithmetic the higher layers rely on lives here as a testable
+function of its inputs. If a rule can be expressed without a hook or an element,
+it belongs in this folder.
+
+One function breaks the purity on purpose: `measureSlotSize` reads the computed
+style and box of an element it is handed. The measurement has to happen
+somewhere, and putting it here keeps the arithmetic around it — gap fallbacks,
+the divide, the degenerate cases — testable. Who calls it, and how often, is
+owned by `geometry/useSlotSizeSource.ts`: the read forces layout.
 
 Two coordinate systems run through the domain:
 

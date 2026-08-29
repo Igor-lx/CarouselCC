@@ -111,78 +111,119 @@ Zod-схемы. `ReactElementSchema` (`:7`) проверяет `$$typeof` про
 
 ## C. Domain (чистая логика, без React и DOM)
 
-### `client/domain/index.ts` (42) — бочка
-`export *` из `math`/`types` + поимённо из остальных. Смешение двух стилей.
+Нижний слой: чистые функции над числами, записями и раскладкой. React здесь не
+импортируется нигде, DOM — ровно в одном месте (`measureSlotSize`).
+**34 файла импортируют domain** — это самый широко потребляемый слой проекта,
+поэтому смена сигнатуры здесь дороже всего: см. `03-graph.md`.
 
-### `client/domain/types.ts` (41) — pure
-`CarouselLayout` (7 полей), `CarouselSlideRecord`, `VirtualSlide`,
-`RenderWindow`, `SlideAriaProps`, `PageBoundaryState`.
-- `VirtualSlide.virtualIndex` (`:30-32`): **ключевой инвариант** — абсолютная
-  виртуальная координата, фиксированная на весь mounted-lifetime слайда; на ней
-  держится то, что монтирование соседа не двигает слайд.
-- `:41` нет финального перевода строки.
+Две вещи ходят мимо бочки `index.ts`, прямо в файл: `DRAG_RELEASE_EPSILON`
+(`config/resolve/buildConfig.ts`, `modules/Diagnostic/checks/constantChecks.ts`)
+и `clampedVisibleSlidesCount` (реэкспортирован, но и импортируется напрямую из
+`layout.ts` внутри слоя).
+
+### `client/domain/index.ts` (42) — бочка
+`export *` из `math` и `types`, поимённо — из остальных пяти файлов. Смешение
+двух стилей осознанным нигде не объявлено. `DRAG_RELEASE_EPSILON` в бочку не
+попал, отсюда два импорта мимо неё.
+
+### `client/domain/types.ts` (41) — pure, SSOT формы данных слоя
+`CarouselLayout` (7 полей), `CarouselSlideRecord`, `SlideAriaProps`,
+`VirtualSlide`, `RenderWindow`, `PageBoundaryState`. Формы отсюда расходятся по
+всему клиенту: `CarouselLayout` лежит в состоянии редьюсера, `VirtualSlide` —
+в модели рендера слайдов, `RenderWindow` — в `useSlideRenderModel`.
+- `:29-32` `/** The slide's absolute virtual coordinate — fixed for its mounted
+  lifetime. */` — **несущий инвариант**: на нём держится то, что монтирование
+  или размонтирование соседа не двигает слайд. Полоса считается от него
+  (`slideLane`), а не от позиции в массиве.
 
 ### `client/domain/math.ts` (9) — pure
-`mod` (истинный модуль, `total<=0 → 0`), `clamp`, `normalizePageIndex`.
-Все три защищены от вырожденных входов.
+`mod` — истинный модуль (`((v % t) + t) % t`), закрывает поведение JS `%` на
+отрицательных; `total <= 0 → 0`. `clamp`. `normalizePageIndex` = `mod` с той же
+защитой. Весь цикличный режим стоит на этих девяти строках.
 
 ### `client/domain/layout.ts` (112) — pure, SSOT геометрии страниц
-`buildCarouselLayout` (`:28`): `canSlide = length > effectiveVisible`;
-`pageCount = ceil(length/effectiveVisible)`; `virtualLength` = полное покрытие
-страниц только в цикле, иначе `length`.
-`alignedVirtualIndex` (`:52`) — приводит страницу на ту же цикличную «полосу»,
-что и опорный индекс, через `Math.round(...)`.
-`pageContaining` (floor) против `nearestPageIndex` (round) — комментарий `:64-65`
-явно фиксирует разницу; это два разных вопроса к одной координате.
-`reconciledPageIndex` (`:93`) — пропорциональный перенос страницы при смене
-раскладки.
-- `buildDataKey` (`:15-23`) `?` строит строку конкатенацией по всей колоде на
-  каждый пересчёт раскладки. Для 12 слайдов ничто, для тысяч — O(n) строка и
-  мусор в куче. PERF-кандидат, severity зависит от заявленного масштаба.
-- `slideContentKey` (`:7-13`) `?` для React-элемента возвращает константу
-  `"react-element"` — два разных JSX-слайда неразличимы в `dataKey`. Значит смена
-  React-контента **не** триггерит hardReset в `reconcile`. Кандидат в LOGIC.
+`buildCarouselLayout` (`:31` `export const buildCarouselLayout`) выводит всю
+геометрию: `visibleSlidesCount` **клампится к длине колоды**,
+`canSlide = length > effectiveVisible`, `pageCount = ceil(length/effectiveVisible)`,
+`virtualLength` — полное покрытие страниц только в цикличном режиме с прокруткой,
+иначе `length`.
+- **Два разных вопроса к одной координате**: `pageContaining` (floor — на какой
+  странице позиция сейчас) против `nearestPageIndex` (round — к какой странице
+  она притянется). Комментарий `:74-75` фиксирует это явно; путаница даёт
+  отпускание пальца «на страницу назад».
+- `alignedVirtualIndex` (`:62`) приводит страницу на ту же цикличную полосу, что
+  и опорный индекс, через `Math.round((reference - start) / virtualLength)` —
+  отсюда «шаг никогда не едет через весь цикл».
+- `reconciledPageIndex` (`:105`) — пропорциональный перенос страницы при смене
+  раскладки; вызывается только из `state/reconcile.ts`.
+- `buildDataKey` (`:20` `let key = ""`) `?` конкатенация по всей колоде на каждый
+  пересчёт раскладки: O(n) строка и мусор. Для 12 слайдов ничто, для тысяч —
+  PERF-кандидат.
+- `slideContentKey` (`:11-17`) `?` для React-элемента возвращает константу
+  `"react-element"`: два разных JSX-слайда неразличимы в `dataKey`, значит смена
+  React-контента **не** вызывает `hardReset` в `state/reconcile.ts`. LOGIC-кандидат,
+  на сегодняшнем стенде не проявляется — стенд подаёт строки.
 
 ### `client/domain/slides.ts` (96) — pure
-`buildSlideRecords`, `padDeckToFullPage` (доклад колоды до целых страниц
-клонами), `resolveRenderedImageSrc` — «одно правило, которое рендерер и стор
-ресурсов обязаны разделять» (`:77-78`), это явный контракт.
-- `buildKey` (`:8-11`) `?` не-клон ключ = `slide:${id}` без индекса. **Дубликаты
-  `id` во входных данных дают одинаковые React-ключи.** Ничем не защищено.
-- `resolveLargestImageCandidate` (`:65-75`) `?` `best as { url: string }` (`:74`)
-  — каст ради обхода сужения типов TS; сигнатура честная, но реализация
-  выглядит как борьба с компилятором.
-- `:70` комментарий фиксирует инвариант «строго больше сохраняет первый при
-  равенстве» — намеренный порядок приоритета.
+Записи колоды, доклад до целых страниц и **общее правило выбора URL картинки**.
+- `resolveRenderedImageSrc` (`:86-95`) — контракт, а не удобство: комментарий
+  `:84-85` «The one rule the renderer and the resource store share — they must
+  key on the same URL». Расходятся `SlideItem` и `imageResource/*` — предзагрузка
+  греет не тот файл, который потом покажут.
+- `buildKey` (`:10-17`) `?` ключ не-клона = `slide:${id}` без индекса:
+  **дубликаты `id` во входных данных дают одинаковые React-ключи**. Ничем не
+  защищено; ADR-002 объявляет входы caller-owned, то есть это осознанно.
+- `padDeckToFullPage` (`:34`) возвращает **тот же массив**, если колода уже
+  целая, — идентичность важна, на ней висят мемо потребителей (закреплено
+  тестом `deckPadding.test.ts`).
+- `resolveLargestImageCandidate` (`:76-88`) `?` `best as { url: string }` (`:87`)
+  — каст ради обхода сужения типов. Комментарий `:80` фиксирует намеренный
+  приоритет: строгое «больше» сохраняет первого при равной ширине.
 
-### `client/domain/track.ts` (56) — pure, но `measureSlotSize` читает DOM
-`trackPixelTransform`/`trackCssTransform` — два способа выразить одно смещение
-(px для компоузитора, calc() для CSS-пути).
-- `measureSlotSize` (`:40-54`) `?` вызывает `window.getComputedStyle` и читает
-  `offsetWidth` — **принудительный layout/style recalc**. Частота вызова решает,
-  PERF это или нет; проверить в `useSlotSizeSource`.
-- `:47-51` каскад из 4 CSS-переменных (`--slides-gap`→`--gap`→`gap`→`column-gap`)
-  `?` три из четырёх — легаси-подстраховка? Кандидат в DEAD/IMPL.
+### `client/domain/track.ts` (56) — pure, кроме `measureSlotSize`
+Всё, что превращает виртуальную позицию в пиксели и обратно.
+- `trackPixelTransform` (`:12`) и `trackCssTransform` (`:23`) — два выражения
+  одного смещения: px для компоузитора, `calc()` для CSS-пути до первого замера.
+- `slideLane` (`:31`) — «SCSS владеет правилом, JS только числом».
+- `measureSlotSize` (`:44`) **читает DOM**: `getComputedStyle` + `offsetWidth` →
+  принудительный recalc. Единственная нечистая функция слоя; частоту вызова
+  задаёт `geometry/useSlotSizeSource.ts`, там же и оценивать цену.
+- `:47-52` каскад из четырёх источников зазора
+  (`--slides-gap` → `--gap` → `gap` → `column-gap`) `?` три из четырёх ничем не
+  объяснены — кандидат в DEAD/IMPL.
+- `pointerVelocityToVirtual` (`:55`) — знак минус зашит здесь: «движение пальца
+  вправо уменьшает виртуальный индекс».
 
 ### `client/domain/visibility.ts` (41) — pure
-`slideVisibilityFlags` — `isActual` (в полосе сейчас) против `isActive`
-(+ то, что было видно на старте сегмента). `laneDistanceFromBand` — расстояние в
-полосах наружу от полосы, 0 внутри.
-`buildSlideAriaProps` — `aria-label` = `"N of M"`, `aria-current="step"` только
-для `isActual`.
+`slideVisibilityFlags` — `isActual` (в полосе сейчас) против `isActive` (плюс
+то, что было видно на старте сегмента). Разница держит два поведения: `isActual`
+задаёт `aria-current`, `isActive` — интерактивность и `inert`.
+- `:16-24` при `isMoving` активной остаётся и стартовая полоса: без этого слайд
+  под пальцем становится `inert` на дробной позиции и перестаёт откликаться
+  (закреплено `visibility.test.ts` для N = 1…6).
+- `laneDistanceFromBand` (`:27`) — расстояние в полосах наружу от полосы, 0
+  внутри. Два потребителя: `Carousel.tsx` и `slides/useSlideFetchReach.ts`
+  (порог предзагрузки).
 
 ### `client/domain/renderWindow.ts` (53) — pure
-`buildRenderWindow` с буфером `visibleSlidesCount * multiplier`; в finite —
-клампится в `[0, length-1]`, в цикле не клампится вовсе.
-`buildSegmentWindow` — минимальное окно без буфера (для проверки «буфер
-покрывает сегмент»). `windowContains`, `expandWindow`.
+`buildRenderWindow` — окно с буфером `visibleSlidesCount * multiplier`: в finite
+клампится в `[0, length-1]`, в цикле не клампится вовсе (отрицательные полосы —
+это и есть способ нарисовать петлю). `buildSegmentWindow` — минимальное окно без
+буфера, нужно ровно для проверки «буфер ещё покрывает сегмент».
+`windowContains` включает края. `expandWindow` только расширяет — на этом
+держится «слайд не размонтируется посреди поездки» (`useSlideRenderModel`).
 
 ### `client/domain/dragRelease.ts` (52) — pure
-`resolveDragRelease` — решает, куда сесть после отпускания пальца.
-Три ветки: явное направление (left/right) → соседняя страница; иначе —
-`nearestPageIndex` от позиции, либо, при перехвате летящей поездки,
-`pressedPageIndex ?? dragOriginPageIndex` (намерение вместо геометрии, `:36-38`).
-`isSnap` = «вернулись туда же». `DRAG_RELEASE_EPSILON = 0.001` (`:8`).
+`resolveDragRelease` решает, куда сесть после отпускания пальца, и различает три
+случая: явное направление (соседняя страница от **опоры**, не от позиции),
+перехват летящей поездки (`pressedPageIndex ?? dragOriginPageIndex` — намерение
+вместо геометрии, комментарий `:22-23`), обычное отпускание (`nearestPageIndex`).
+`isSnap` означает «вернулись туда же» и выбирает кривую отката вместо шага.
+- `DRAG_RELEASE_EPSILON = 0.001` (`:9`) объявлен здесь, но **не используется в
+  этом файле**: его читают `config/resolve/buildConfig.ts` (кладёт в конфиг как
+  `dragReleaseEpsilon`) и `modules/Diagnostic/checks/constantChecks.ts`
+  (сверяет опубликованное значение). Комментарий на месте: «implementation
+  constant, not a knob».
 
 ---
 
