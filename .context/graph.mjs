@@ -1,7 +1,9 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = "C:/dev/CarouselCC/src";
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.join(HERE, "..", "src").split(path.sep).join("/");
 
 const files = [];
 (function walk(dir) {
@@ -165,4 +167,74 @@ if (mode === "cycles") {
     console.log("");
   }
   console.log(`${seen.size} distinct cycles.`);
+}
+
+// --- verify: покрытие карты и живость якорей --------------------------------
+if (mode === "verify") {
+  const BASE = HERE;
+  const NEWLINE = String.fromCharCode(10);
+  const mapText = readFileSync(path.join(BASE, "00-map.md"), "utf8");
+
+  // 1. каждый файл кода упомянут в карте
+  // Ambient-объявления описывать нечем: в них нет ни поведения, ни связей.
+  const code = files.filter((f) => !isTest(f) && !f.endsWith(".d.ts"));
+  // Карта пишет и полными именами, и группами вида {a,b}.ts — поэтому
+  // засчитывается имя как с расширением, так и без него.
+  const mentioned = (f) => {
+    const base = rel(f).split("/").pop();
+    const stem = base.slice(0, base.lastIndexOf("."));
+    return mapText.includes(base) || mapText.includes(stem);
+  };
+  const missing = code.filter((f) => !mentioned(f));
+  console.log("=== Покрытие карты ===");
+  console.log(
+    `  файлов кода (без тестов): ${code.length}, не упомянуто: ${missing.length}`,
+  );
+  for (const f of missing) console.log("    " + rel(f));
+
+  // 2. якоря вида `путь:строка` указывают на существующий файл и живую строку
+  const expand = (q) => {
+    if (q.startsWith("src/")) return path.join(BASE, "..", q);
+    if (q.startsWith("client/"))
+      return path.join(BASE, "..", "src/components/Carousel", q);
+    if (q.startsWith("docs/"))
+      return path.join(BASE, "..", "src/components/Carousel/client", q);
+    if (q.startsWith("shared/")) return path.join(BASE, "..", "src", q);
+    if (q.startsWith("boundary/") || q.startsWith("data-gen/"))
+      return path.join(BASE, "..", "src/components/Carousel", q);
+    return null;
+  };
+
+  let checked = 0;
+  const broken = [];
+  for (const name of readdirSync(BASE)) {
+    if (!name.endsWith(".md")) continue;
+    const text = readFileSync(path.join(BASE, name), "utf8");
+    const spans = text.split("`").filter((_, i) => i % 2 === 1);
+    for (const span of spans) {
+      const at = span.lastIndexOf(":");
+      if (at < 1) continue;
+      const file = span.slice(0, at);
+      const tail = span.slice(at + 1).split("-")[0];
+      if (tail === "" || Number.isNaN(Number(tail))) continue;
+      if (!file.includes("/") || !file.includes(".")) continue;
+      const full = expand(file);
+      if (full === null) continue;
+      checked++;
+      if (!existsSync(full)) {
+        broken.push(`${name}: ${span} — файла нет`);
+        continue;
+      }
+      const body = readFileSync(full, "utf8");
+      const lines = body.split(NEWLINE).length;
+      if (Number(tail) > lines) {
+        broken.push(`${name}: ${span} — в файле ${lines} строк`);
+      }
+    }
+  }
+  console.log("=== Якоря ===");
+  console.log(`  проверено: ${checked}, битых: ${broken.length}`);
+  for (const b of broken) console.log("    " + b);
+
+  if (missing.length || broken.length) process.exitCode = 1;
 }
