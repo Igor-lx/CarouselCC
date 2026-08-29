@@ -108,14 +108,22 @@ solution-style, `files: []`. `tsc --noEmit` в корне проверяет **�
 | `useCarouselPresentation` | кэш полос переехал в ref с ключом `origin:index`, поэтому синхронная инвалидация не нужна вовсе; чистка — в эффекте после коммита |
 | `useCarouselState` | контекст редьюсера (`layout`, `config`, `isInstantMode`) переехал **в состояние**, конверт `ReducerEnvelope` удалён, фиксация — командой `SYNC_CONTEXT` во время рендера. Рефов в файле не осталось. См. `docs/adr/0004-reducer-owns-its-context.md`; он же поправляет ADR-001 (границ согласования теперь одна, а не две) |
 
-Два кэша идентичности (`slideCache` в `useSlideRenderModel`,
-`laneCacheRef` в `useCarouselPresentation`) сохранены намеренно, с точечными
-`eslint-disable` и объяснением на месте: правило считает любую мутацию внешнего
-значения запретной, а без этих кэшей вся колода перерисовывается на каждом
-диспатче — это записано в самом коде как CONSTRAINT.
+**Точечные `eslint-disable` — все восемь, посчитаны грепом:**
 
-**Разбор группы React Compiler (выполнен, кроме PENDING).** Было 110
-срабатываний, осталось 59, и все они — в шести названных файлах:
+| Файл | Правило | Почему |
+| --- | --- | --- |
+| `slides/useSlideRenderModel.ts` ×2 | `react-hooks/immutability` | кэш идентичности `VirtualSlide`: без него вся колода перерисовывается дважды за поездку (CONSTRAINT в коде) |
+| `slides/imageResource/useImageResourceStoreInstance.ts` ×2 | `react-hooks/refs` | документированная React ленивая инициализация рефа; условное создание не выражается через `useState`, а создание из эффекта отдало бы `null` на рендер |
+| `clientState/media/useMedia/useMedia.ts` | `react-hooks/rules-of-hooks` | хук на каждое условие в цикле по **статическим** осям — контракт объявлен в README полки |
+| `clientState/media/useMedia/useMedia.ts` | `react-hooks/exhaustive-deps` | вердикты полностью закодированы в `signature`, оси — модульная константа |
+| `clientState/media/library/useBreakpoint.ts` | `react-hooks/rules-of-hooks` | тот же контракт статической таблицы |
+| `modules/Pagination/basic/tests/usePaginationFade.test.tsx` | `@typescript-eslint/unbound-method` | сохранение метода прототипа для восстановления; jsdom не имеет `Element.animate`, поэтому `vi.spyOn` не подходит |
+
+Кэш полос в `useCarouselPresentation` в этом списке **больше нет**: после
+переноса в ref с ключом `origin:index` исключение стало не нужно.
+
+**Разбор группы React Compiler — выполнен целиком.** Было 110 срабатываний,
+осталось **0**; правила включены во всём репозитории.
 
 | Правило | Было | Стало | Чем закрыто |
 | --- | --- | --- | --- |
@@ -123,12 +131,12 @@ solution-style, `files: []`. `tsc --noEmit` в корне проверяет **�
 | `set-state-in-effect` | 3 | **0** | «нечего ждать» считается в рендере (`useSlideFetchReach`), защёлка буфера — правкой состояния во время рендера, сброс hover-паузы — тем же приёмом (`useAutoplay`) |
 | `refs` (зеркала значений) | 20 | **0** | запись перенесена в эффект: `useMotionPaint`, `useKineticValue`, `usePointerSwipe`, `useViewportBusy` (все — оба форка, где есть) и в layout-эффект: `useTrackBinding`, `useSlotSizeSource`, `useVisualPosition`, `usePaginationFade` |
 | `refs` (ленивый синглтон) | 6 | **2** | `useMotionController` переведён на инициализатор `useState` (оба форка); `useImageResourceStoreInstance` оставлен с точечным `eslint-disable` и обоснованием — условное создание нельзя выразить через `useState` |
-| `refs` (состояние в ref из рендера) | 53 | 53 | **PENDING**, это задача 3(b) |
-| `globals` | 24 | 24 | все в тестах, правило там выключено |
+| `refs` (состояние в ref из рендера) | 53 | **0** | окно рендера и опора — в состояние (`useSlideRenderModel`); ссылка на URL полосы — в состояние (`useSlideFetchReach`); кэш полос — в ref с ключом `origin:index` (`useCarouselPresentation`); райдер — в состояние (`compositedRide`, оба форка); контекст редьюсера — в состояние (`useCarouselState`, ADR-004) |
+| `globals` | 24 | 24 | все в тестах, правило там выключено с обоснованием |
 
-Ключевой факт для 3(b): **React Compiler в проекте не включён** (React 19,
-`@vitejs/plugin-react` без `babel-plugin-react-compiler`). Правила группы —
-готовность к компилятору и гигиена конкурентного рендера, а не сегодняшние
+**React Compiler в проекте не включён** (React 19, `@vitejs/plugin-react` без
+`babel-plugin-react-compiler`) — решение разработчика, H3. Правила группы дают
+готовность к нему и гигиену конкурентного рендера, а не чинят сегодняшние
 падения.
 
 ---
