@@ -43,6 +43,22 @@ shared/** ─ полки, импортируются откуда угодно, 
 разом: он сверяет опубликованные значения, поэтому при переименовании любой
 константы падает он, а не потребитель.
 
+## G. `client/geometry/**`
+
+Мост в DOM: сюда сходятся обе шины движения и отсюда идёт единственная запись
+`transform`. Потребителей мало, но связи несущие:
+
+| Кто | Что берёт |
+| --- | --- |
+| `Carousel.tsx` | оба хука; передаёт `slotSize` в жест и в модули, `TrackBindingApi` — в исполнение движения |
+| `motion/useMotionRunner` | тип `TrackBindingApi` и две функции из него — `startCompositorMotion`, `cancelCompositorMotion` |
+| `slides/SlideItem` и модули картинок | `resolveImageSizes` поверх опубликованного `slotPx` |
+| `gesture/useCarouselGesture` | `slotPx` для калибровки порогов |
+
+**Направление зависимостей внутри слоя одностороннее:** `useTrackBinding`
+подписывается на `useSlotSizeSource`, обратной связи нет. Второго измерителя в
+проекте быть не должно — это `CONSTRAINT` в коде.
+
 ## E–F. `client/motion/**` и `client/visual-position/**`
 
 **Motion: 22 потребителя, visual-position: 10.** Но связь здесь не «импорт
