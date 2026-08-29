@@ -16,8 +16,9 @@ import { makeLayout } from "./layoutBuilder";
  * Two obligations live here. `dispatch` must never change identity — the
  * autoplay timer, the gesture callbacks and the navigation handlers all hang
  * off it, and a new function each render re-arms the timer forever. And the
- * reducer context is refreshed DURING render, so a dispatch fired in the same
- * commit as a prop change reads the new config rather than the previous one.
+ * reducer's context is committed DURING render (ADR-004), so a dispatch fired
+ * in the same commit as a prop change reads the new config, not the previous
+ * one.
  */
 
 const layout = makeLayout(12, 3, false);
@@ -92,8 +93,9 @@ describe("useCarouselState — the reducer context", () => {
     render(layout, slow);
 
     act(() => dispatch({ type: "MOVE", step: 1, moveReason: "click" }));
-    // The reducer read the config off the envelope; if it had captured the
-    // first render's value the step would have been planned against 1000.
+    // The reducer read the config out of its own state, synced during this
+    // render; had the hook captured the first render's value the step would
+    // have been planned against 1000.
     expect(seenStepDuration.at(-1)).toBe(9000);
     expect(state.targetPageIndex).toBe(1);
   });

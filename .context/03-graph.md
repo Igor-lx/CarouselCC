@@ -43,6 +43,24 @@ shared/** ─ полки, импортируются откуда угодно, 
 разом: он сверяет опубликованные значения, поэтому при переименовании любой
 константы падает он, а не потребитель.
 
+## D. `client/state/**`
+
+**Зависят 17 файлов**, и зависимость двух разных сортов:
+
+| Что берут | Кто |
+| --- | --- |
+| `dispatch` (нужна **неизменная идентичность**) | `autoplay/useCarouselAutoplay`, `gesture/useCarouselGesture`, `navigation/useCarouselNavigation`, `motion/useCarouselMotionExecution` |
+| `state` / `motionStatus` (чтение) | `Carousel.tsx`, `context/*` (значения контекстов модулей), `motion/segmentFactory`, `motion/duration`, `motion/useMotionRunner`, `modules/Diagnostic/checks/stateChecks` |
+
+Наружу (`state/index.ts`) выходит узко: `useCarouselState`, `motionStatus` и
+четыре типа. `carouselReducer`, `buildInitialState`, `resolveStepTransition`,
+`validateCarouselState` берут прямым путём — тесты, диагностика и мотор.
+
+**Зависимость вверх, единственная в слое:** `transitions.ts` импортирует
+`resolveGoToPlan` из `motion/timing`. Планирование телепорта живёт в motion, а
+решение о нём принимается здесь — при переносе любого из двух файлов это первое,
+что порвётся.
+
 ## C. `client/domain/**`
 
 **Импортируют: 34 файла** — самый широко потребляемый слой. Смена сигнатуры
