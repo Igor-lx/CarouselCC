@@ -6,6 +6,22 @@
 
 **Заполняется послойно.** Ниже — разобранные слои.
 
+## E–F. `client/motion/**`, `client/visual-position/**` — состояние вне React
+
+Здесь живёт то, что React не видит и не перерисовывает.
+
+| Что | Где | Кто пишет | Время жизни |
+| --- | --- | --- | --- |
+| **видимая позиция** (SSOT) | контроллер движения, создан в `useVisualPosition` инициализатором `useState` полки | `useMotionRunner` (`start`/`snap`), `applyImmediatePosition` (палец) | жизнь компонента; `destroy` мягкий, переезд StrictMode переиспользует |
+| **последний испущенный кадр** | `lastFrameRef` | `emit` в `useVisualPosition` | тот же |
+| **серия `running`** | `runningStreakRef` | там же, при штамповке кадра | сбрасывается на любом кадре покоя |
+| **набор слушателей кадров** | `listenersRef` (`Set`) | `subscribe`/`unsubscribe` | тот же |
+| **текущий план + счётчик `planId`** | замыкание `createMotionPlanChannel` | `publish` из `useMotionRunner` | жизнь канала |
+| **ключ последнего плана** | `lastKeyRef` в `useMotionRunner` | сам эффект | тот же |
+
+Ни одно из этого не вызывает ре-рендер — в том и смысл: за поездку React не
+обновляется ни разу, а трек, точки и виджет красятся по подписке.
+
 ## D. `client/state/**` — единственное логическое состояние карусели
 
 `useReducer` в `useCarouselState`. Владелец один, писателей ноль кроме редьюсера,
