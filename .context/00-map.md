@@ -69,43 +69,88 @@ Zod-схемы. `ReactElementSchema` (`:7`) проверяет `$$typeof` про
 
 ## B. Config
 
-### `client/config/index.ts` (58) — pure
-Бочка из 8 файлов + типы. Плоский реэкспорт 30+ констант.
+Настройки и их сборка в один рантайм-объект. Логики здесь нет нигде, кроме
+`resolve/**`; всё остальное — константы с ссылкой на `docs/config/*`.
 
-### `client/config/types.ts` (123) — pure
-Формы настроек. `CarouselSwipeConfig` (`:43-46`) = `Required<PointerSwipeConfig>`
-**минус** `minSwipeDistance` и `swipeThresholdRatio`, плюс `commit` —
-т.е. карусель сознательно отказывается от двух полей движка и заменяет их своей
-`SwipeCommitConfig`. Проверить, что движок эти два поля действительно не требует.
-- `:41-42` двойная пустая строка, `:60-61` тоже — косметика.
-- `RawConfigInput` (`:132-138`): все поля `unknown`.
+**Два пути от константы до места применения, и это главное, что нужно знать
+перед правкой:**
+
+1. **Через `CarouselRuntimeConfig`** — собирается в `buildCarouselConfig`,
+   попадает в состояние редьюсера (ADR-004) и расходится оттуда. Так живут доли
+   профилей движения, геометрия GO_TO, свайп, инерция, интервалы автоплея,
+   буфер окна рендера, пять пропо-зависимых значений.
+2. **Прямым импортом, мимо рантайм-конфига** — константа читается там, где
+   применяется:
+
+| Константа | Кто читает |
+| --- | --- |
+| `FALLBACK_DROP_EVERY_NTH_FRAME` | `visual-position/fallbackPacing.ts` |
+| `REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES` | `state/transitions.ts`, `modules/Pagination/widget/stepTarget.ts` |
+| `IMAGE_RETRY` | `slides/imageResource/createImageResourceStore.ts` |
+| `SLIDE_REORIENT_VEIL` | `presentation/cssVars.ts`, `slides/useOrientationSwapVeil.ts` |
+| `SLIDE_VIEWPORT_AXES` | `viewport/useSlideViewport.ts`, `app/App.tsx` |
+| `SLIDE_CANONICAL_SOURCE_MEDIA` | `modules/Diagnostic/checks/viewportChecks.ts` |
+| булевы из `CAROUSEL_DEFAULTS` | `Carousel.tsx` |
+
+Всё перечисленное дополнительно читает `modules/Diagnostic/checks/constantChecks.ts`
+— он сверяет опубликованные значения; при переименовании константы падает он, а
+не потребитель.
+
+**Три значения рантайм-конфига живут вне `config/`** и втягиваются в
+`buildConfig` из своих слоёв: `MOTION_EPSILON` (`motion/tolerances`),
+`DRAG_RELEASE_EPSILON` (`domain/dragRelease`), `GESTURE_COAST_MAX_MS`
+(`gesture/coast`). Каждое — «implementation constant, not a knob»: живёт рядом с
+алгоритмом, который его толкует, а в конфиг попадает только для публикации.
+
+### `client/config/index.ts` (58) — бочка
+Плоский реэкспорт 30+ констант, типов и двух функций сборки. Комментарий `:1-2`
+задаёт критерий отбора: «значение, изменение которого требует понимания
+окружающего алгоритма, сюда не относится» — отсюда и три константы вне папки.
+
+### `client/config/types.ts` (123) — pure, SSOT формы настроек
+- `CarouselSwipeConfig` (`:44-47` `Omit<Required<PointerSwipeConfig>, ...>`) —
+  `Required` от конфига движка **минус** `minSwipeDistance` и
+  `swipeThresholdRatio`, плюс собственный `commit`. Прежняя пометка «проверить,
+  нужны ли движку эти два поля» **снята**: движок их использует
+  (`shared/engines/gesture/swipe/internals/resolveSwipeDirection.ts:40-45`), но
+  имеет дефолты `20` и `0.2` — карусель их просто не переопределяет, заменяя
+  порог коммита своей тройкой `slotShare`/`minPx`/`maxPx`.
+- `RawConfigInput` (`:117-123`) — все пять полей `unknown`: граница доверия
+  проходит здесь, валидации нет по ADR-002.
+- Почти каждое поле несёт `@see` на константу-источник — это и есть связь между
+  формой и значением, единственная в проекте.
 
 ### `client/config/defaults.ts` (19) — pure, SSOT дефолтов пропов
-14 значений `as const`. Из них булевы используются в `Carousel.tsx`,
-числовые/строковые — в `buildConfig`. Разделение по потребителю, не по смыслу.
+14 значений `as const`. Разделены по потребителю, а не по смыслу: пять
+числовых/строковых читает `buildConfig`, девять булевых — `Carousel.tsx`.
 
 ### `client/config/{gesture,interaction,layout,legacyPaint,motion,slides}.ts`
-Плоские константы, каждая с ссылкой на `docs/config/*`. Без логики.
-`gesture.ts` (31) — 13 полей свайпа + 4 инерции; `motion.ts` (19) — 15 долей
-профилей и геометрия GO_TO; `slides.ts` (13) — тайминги вуали и ретрая картинок;
-`interaction.ts` (6), `layout.ts` (3), `legacyPaint.ts` (2) — по 1-4 константы.
+Плоские константы: `gesture.ts` (31) — 13 полей свайпа и 4 инерции;
+`motion.ts` (19) — 15 долей профилей и геометрия GO_TO; `slides.ts` (13) —
+тайминги вуали поворота и политика ретрая картинок; `interaction.ts` (6),
+`layout.ts` (3), `legacyPaint.ts` (2).
 
 ### `client/config/viewport.ts` (23) — pure, SSOT осей вьюпорта
-3 брейкпоинта + 1 флаг `short-landscape`. `SLIDE_CANONICAL_SOURCE_MEDIA`
-вычисляется на модульном уровне через `canonicalMediaQueries(...)` (`:30-31`) —
-работа при импорте модуля, не при использовании.
+Три брейкпоинта (`desktop` 1024, `tablet` 768, `mobile` 0) и один флаг
+`short-landscape`. `SLIDE_CANONICAL_SOURCE_MEDIA` (`:31`) вычисляется
+`canonicalMediaQueries(...)` **на модульном уровне** — работа при импорте, не при
+использовании; см. `04-state.md`.
 
 ### `client/config/resolve/buildConfig.ts` (104) — pure
-Собирает `CarouselRuntimeConfig` из констант + 5 пропов.
-- `:36-37` `withDefault = (value: unknown, fallback: T) => typeof value === "undefined" ? fallback : (value as T)`
-  `?` **Слепой каст.** Валидации нет: `visibleSlidesNr: -1 | 0 | NaN | "3"`
-  проходит насквозь. Дальше `clampedVisibleSlidesCount` = `Math.min(v, length)`,
-  т.е. отрицательное/NaN не отсекается. Кандидат в RISK.
-- `:99-103` `swipeConfig`/`releaseConfig` копируются поверхностно (spread +
-  вложенный spread `commit`) — защита от мутации потребителем, но только на 2 уровня.
+Собирает `CarouselRuntimeConfig`: константы плюс пять пропов через `withDefault`.
+- `withDefault` (`:36-37`) `?` подставляет дефолт **только для `undefined`** и
+  кастует остальное: `visibleSlidesNr: -1 | 0 | NaN | "3"` проходит насквозь.
+  Ниже `clampedVisibleSlidesCount` = `Math.min(v, length)` отрицательное и `NaN`
+  не отсекает. По ADR-002 это осознанно — входы caller-owned, ломаться должно
+  видимо на границе; RISK остаётся при чужом хосте.
+- `:99-103` `swipeConfig` и `releaseConfig` копируются поверхностно со вложенным
+  `commit` — защита модульной константы от мутации потребителем, на два уровня.
 
 ### `client/config/resolve/useCarouselConfig.ts` (28) — pure
-`useMemo` над `buildCarouselConfig` с 5 зависимостями. Корректно.
+`useMemo` над `buildCarouselConfig` по пяти сырым пропам. **На этой мемоизации
+держится сверка по идентичности в `useCarouselState`**: конфиг — стабильная
+ссылка, пока не менялся проп, поэтому `SYNC_CONTEXT` не срабатывает на каждый
+рендер (ADR-004, `06-timing.md`).
 
 ---
 
