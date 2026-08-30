@@ -18,6 +18,20 @@ const waapiPlan = (targetKey: number) =>
   }) as const;
 
 describe("createMotionPlanChannel", () => {
+  it("a listener subscribing during a publish does not receive that publish", () => {
+    const channel = createMotionPlanChannel();
+    const late = vi.fn();
+    channel.source.subscribe(() => {
+      channel.source.subscribe(late);
+    });
+
+    channel.publish({ kind: "follow", isFallback: false });
+    expect(late).not.toHaveBeenCalled();
+
+    channel.publish({ kind: "idle" });
+    expect(late).toHaveBeenCalledTimes(1);
+  });
+
   it("starts idle with planId 0", () => {
     const { source } = createMotionPlanChannel();
     expect(source.getSnapshot()).toEqual({ kind: "idle", planId: 0 });

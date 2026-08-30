@@ -6,7 +6,12 @@ let mediaQuery: MediaQueryList | null = null;
 const listeners = new Set<() => void>();
 
 const notify = () => {
-  listeners.forEach((l) => l());
+  // Snapshot + membership: a listener that subscribes during this
+  // notification must not receive it, and one that unsubscribes during it
+  // must not be called after the fact.
+  for (const listener of [...listeners]) {
+    if (listeners.has(listener)) listener();
+  }
 };
 
 /** Live read of the coarse-pointer signal; the MediaQueryList is made once. */

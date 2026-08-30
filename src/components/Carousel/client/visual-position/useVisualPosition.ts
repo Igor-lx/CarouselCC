@@ -75,7 +75,13 @@ export function useVisualPosition({
 
   const emit = useCallback((frame: VisualPositionFrame) => {
     lastFrameRef.current = frame;
-    listenersRef.current.forEach((listener) => listener(frame));
+    const listeners = listenersRef.current;
+    // Snapshot + membership: a listener that subscribes during this
+    // notification must not receive it, and one that unsubscribes during it
+    // must not be called after the fact.
+    for (const listener of [...listeners]) {
+      if (listeners.has(listener)) listener(frame);
+    }
   }, []);
 
   useEffect(() => {

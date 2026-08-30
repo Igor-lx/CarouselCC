@@ -97,7 +97,12 @@ export function createMotionPlanChannel(): MotionPlanChannel {
       }
       current = { ...plan, planId: nextId };
       nextId += 1;
-      listeners.forEach((listener) => listener(current));
+      // Snapshot + membership: a listener that subscribes during this
+      // notification must not receive it, and one that unsubscribes during it
+      // must not be called after the fact.
+      for (const listener of [...listeners]) {
+        if (listeners.has(listener)) listener(current);
+      }
     },
   };
 }

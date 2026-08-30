@@ -127,3 +127,15 @@ describe("padDeckToFullPage", () => {
     expect(records.map((r) => r.slideKey)).toEqual(before);
   });
 });
+
+describe("a page size that is not a positive number", () => {
+  it("pads nothing and keeps the very same array", () => {
+    const records = buildSlideRecords(deck(5));
+    // visibleSlidesNr is caller-owned (ADR-002): 0 and NaN both arrive here.
+    // Padding on them would hand every consumer a fresh array each render.
+    for (const size of [0, Number.NaN]) {
+      expect(hasPartialPageLayout(records.length, size)).toBe(false);
+      expect(padDeckToFullPage(records, size)).toBe(records);
+    }
+  });
+});

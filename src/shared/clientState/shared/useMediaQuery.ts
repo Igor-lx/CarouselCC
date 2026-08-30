@@ -23,7 +23,12 @@ const createStore = (query: string): MediaQueryStore => {
   const onChange = (event: MediaQueryListEvent) => {
     if (matches === event.matches) return;
     matches = event.matches;
-    listeners.forEach((listener) => listener());
+    // Snapshot + membership: a listener that subscribes during this
+    // notification must not receive it, and one that unsubscribes during it
+    // must not be called after the fact.
+    for (const listener of [...listeners]) {
+      if (listeners.has(listener)) listener();
+    }
   };
 
   return {

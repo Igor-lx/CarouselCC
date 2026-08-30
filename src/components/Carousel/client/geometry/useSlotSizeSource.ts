@@ -101,7 +101,13 @@ export function useSlotSizeSource({
   const remeasure = useCallback(
     (viewportWidth?: number) => {
       if (!measure(viewportWidth)) return;
-      listenersRef.current.forEach((listener) => listener());
+      const listeners = listenersRef.current;
+      // Snapshot + membership: a listener that subscribes during this
+      // notification must not receive it, and one that unsubscribes during it
+      // must not be called after the fact.
+      for (const listener of [...listeners]) {
+        if (listeners.has(listener)) listener();
+      }
     },
     [measure],
   );

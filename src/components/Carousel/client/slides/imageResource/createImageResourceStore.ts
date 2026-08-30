@@ -33,7 +33,12 @@ export function createImageResourceStore(): ImageResourceStore {
   const notify = (url: string): void => {
     const set = listeners.get(url);
     if (!set) return;
-    set.forEach((listener) => listener());
+    // Snapshot + membership: a listener that subscribes during this
+    // notification must not receive it, and one that unsubscribes during it
+    // must not be called after the fact.
+    for (const listener of [...set]) {
+      if (set.has(listener)) listener();
+    }
   };
 
   const createEntry = (): ImageEntry => ({

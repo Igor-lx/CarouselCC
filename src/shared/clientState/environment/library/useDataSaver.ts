@@ -20,7 +20,14 @@ let reducedDataQuery: MediaQueryList | null = null;
 let connection: NetworkInformationLike | null = null;
 const listeners = new Set<() => void>();
 
-const notify = (): void => listeners.forEach((listener) => listener());
+const notify = (): void => {
+  // Snapshot + membership: a listener that subscribes during this
+  // notification must not receive it, and one that unsubscribes during it
+  // must not be called after the fact.
+  for (const listener of [...listeners]) {
+    if (listeners.has(listener)) listener();
+  }
+};
 
 // Live read of both signals; handles made once, saveData recomputed each time.
 const read = (): void => {

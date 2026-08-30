@@ -143,6 +143,37 @@ describe("subscribe", () => {
     expect(silent).toBe(0);
   });
 
+  // The engine is copied into projects whose consumers it cannot see, so an
+  // emit that reaches a listener registered mid-emit — or one that has just
+  // left — is a defect of the emitter, not of the consumer.
+  it("a listener subscribing during an emit does not receive that emit", () => {
+    const controller = createMotionController<string>(0, "idle");
+    const late = vi.fn();
+    controller.subscribe(
+      () => {
+        controller.subscribe(late, { emitCurrent: false });
+      },
+      { emitCurrent: false },
+    );
+
+    controller.set(10);
+    expect(late).not.toHaveBeenCalled();
+
+    controller.set(20);
+    expect(late).toHaveBeenCalledTimes(1);
+  });
+
+  it("a listener unsubscribing during an emit is not called after it", () => {
+    const controller = createMotionController<string>(0, "idle");
+    const second = vi.fn();
+    const stopSecond = { current: () => {} };
+    controller.subscribe(() => stopSecond.current(), { emitCurrent: false });
+    stopSecond.current = controller.subscribe(second, { emitCurrent: false });
+
+    controller.set(10);
+    expect(second).not.toHaveBeenCalled();
+  });
+
   it("unsubscribe stops further emissions", () => {
     const controller = createMotionController<string>(0, "idle");
     let emits = 0;

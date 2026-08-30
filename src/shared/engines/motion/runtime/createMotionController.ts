@@ -72,7 +72,12 @@ export function createMotionController<Strategy extends string = string>(
   const emit = (next: MotionSample<Strategy>) => {
     sample = next;
     emittedSample = next;
-    subscribers.forEach((listener) => listener(next));
+    // Snapshot + membership: a listener that subscribes during this
+    // notification must not receive it, and one that unsubscribes during it
+    // must not be called after the fact.
+    for (const listener of [...subscribers]) {
+      if (subscribers.has(listener)) listener(next);
+    }
   };
 
   const sampleActive = (timestamp: number): MotionSample<Strategy> => {
