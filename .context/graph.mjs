@@ -228,6 +228,14 @@ if (mode === "verify") {
     for (const candidate of prefix === null ? [q] : [q, prefix + q]) {
       const expanded = expand(candidate);
       if (expanded !== null && existsSync(expanded)) return norm(expanded);
+      // Полки база пишет и без ведущего `shared/` — `engines/motion/tests/…`.
+      // Только для путей с папкой: голое имя обязано разрешаться префиксом
+      // раздела, иначе `index.ts` уедет в `shared/index.ts`.
+      if (candidate.includes("/")) {
+        const atShelf = path.join(REPO, "src/shared", candidate);
+        if (existsSync(atShelf) && statSync(atShelf).isFile())
+          return norm(atShelf);
+      }
       const atRepo = path.join(REPO, candidate);
       if (existsSync(atRepo) && statSync(atRepo).isFile()) return norm(atRepo);
     }
@@ -278,7 +286,11 @@ if (mode === "verify") {
       const shapes = [];
       for (const pattern of variants(raw)) {
         const head = pattern.split("*")[0];
-        const root = expand(head);
+        // Тот же сокращённый вид полки, что понимает `locate`.
+        const shelf = path.join(REPO, "src/shared", head);
+        const root =
+          expand(head) ??
+          (head.includes("/") && existsSync(shelf) ? shelf : null);
         if (root === null) continue;
         const slash = head.endsWith("/") ? "/" : "";
         shapes.push(asRegExp(norm(root) + slash + pattern.slice(head.length)));
@@ -296,43 +308,6 @@ if (mode === "verify") {
     if (found === null) return null;
     const hits = found.hits.filter((f) => isTest(f) === found.wantTests);
     return hits.length ? hits : null;
-  };
-
-  // Группы раскрываются и в тексте базы: иначе `{a,b}.test.ts` читался бы как
-  // неупомянутый, а это ровно та форма, которой база пользуется.
-  const withGroups = (text) => {
-    const extra = [];
-    for (const piece of text.split(String.fromCharCode(96))) {
-      if (piece.includes("{")) extra.push(...variants(piece));
-    }
-    return text + extra.join(" ");
-  };
-  // Файл засчитывается упомянутым только по хвосту пути, который однозначно
-  // указывает на него. Иначе `widget/defaults.ts` прошёл бы за счёт
-  // `config/defaults.ts` — одно имя, разные файлы, а описан один.
-  const suffixCache = new Map();
-  const uniqueSuffix = (f) => {
-    const cached = suffixCache.get(f);
-    if (cached !== undefined) return cached;
-    const parts = rel(f).split("/");
-    let answer = rel(f);
-    for (let i = parts.length - 1; i >= 0; i--) {
-      const suffix = parts.slice(i).join("/");
-      const hits = files.filter(
-        (g) => rel(g) === suffix || rel(g).endsWith("/" + suffix),
-      ).length;
-      if (hits === 1) {
-        answer = suffix;
-        break;
-      }
-    }
-    suffixCache.set(f, answer);
-    return answer;
-  };
-  const namedIn = (text, f) => {
-    const suffix = uniqueSuffix(f);
-    const stem = suffix.slice(0, suffix.lastIndexOf("."));
-    return text.includes(suffix) || text.includes(stem);
   };
 
   // 3, 4 и 5. якоря, объявленные размеры и радиус поражения слоя — одним

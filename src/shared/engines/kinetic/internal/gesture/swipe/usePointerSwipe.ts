@@ -70,7 +70,7 @@ interface InternalSample {
    * judges the GESTURE, not its last (decelerating) segment. */
   flickVelocity: number;
   /** Continuity-launch speed on the flick's slow law (not the fast per-frame
-   * EMA). See shared/gesture/README.md § Recognition internals (the ride-crawl fix). */
+   * EMA). See shared/gesture/README.md § Recognition internals. */
   launchVelocity: number;
   width: number;
   timestamp: number;

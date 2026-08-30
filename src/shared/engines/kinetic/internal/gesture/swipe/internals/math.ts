@@ -41,7 +41,7 @@ export const frameAdjustedAlpha = (alpha: number, dt: number) => {
 };
 
 /** Human-scale pause decay: a hold under `graceMs` costs nothing, beyond it the
- * velocity halves every `halfLifeMs`. See shared/gesture/README.md (the ride-crawl fix). */
+ * velocity halves every `halfLifeMs`. See shared/gesture/README.md. */
 export const pauseDecayedVelocity = (
   velocity: number,
   pauseMs: number,
