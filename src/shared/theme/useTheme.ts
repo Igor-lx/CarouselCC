@@ -1,3 +1,4 @@
+// See ./README.md
 import { useContext } from "react";
 import { ThemeContext } from "./internal/ThemeContext";
 

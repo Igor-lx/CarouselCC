@@ -1,3 +1,4 @@
+// See docs/adr/0002-trusted-runtime-inputs.md — входы caller-owned, тут их не чинят.
 import { CAROUSEL_DEFAULTS } from "../defaults";
 import { RENDER_WINDOW_BUFFER_MULTIPLIER } from "../layout";
 import { MOTION_EPSILON } from "../../motion/tolerances";

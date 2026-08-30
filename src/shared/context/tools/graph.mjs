@@ -61,6 +61,23 @@ const docFiles = [];
 
 const isTest = (f) => /\/tests\//.test(f) || /\.test\.tsx?$/.test(f);
 
+// Ссылка на документацию — любой путь `*.md`, названный в КОММЕНТАРИИ. Форма
+// у неё разная и это нормально: и отдельная строка `// See docs/x.md`, и
+// оговорка в середине фразы «(see docs/x.md)». Проверять надо ссылку, а не
+// её оформление, иначе половина остаётся без присмотра.
+// Голое имя без слэша — продолжение фразы, а не путь: одноимённых документов
+// в проекте бывает несколько, и разрешать такое имя значило бы гадать.
+// Проверяются пути; проза остаётся прозой.
+const docRefsIn = (body) => {
+  const out = [];
+  for (const line of body.split(String.fromCharCode(10))) {
+    if (!/^\s*(\/\/|\*|\/\*)/.test(line)) continue;
+    for (const t of line.match(/[\w./-]+\.md/g) ?? [])
+      if (t.includes("/")) out.push(t);
+  }
+  return out;
+};
+
 const rel = (f) => f.replace(ROOT + "/", "");
 
 // --- разрешение спецификатора импорта в файл ---------------------------------
@@ -83,6 +100,7 @@ const importsOf = new Map(); // файл -> набор файлов, котор�
 const importedNames = new Map(); // файл -> имена, которые из него утащили
 const exportsOf = new Map(); // файл -> имена, которые он экспортирует
 const specsOf = new Map(); // файл -> спецификаторы как написаны, включая пакеты
+const namesPulledBy = new Map(); // файл -> имена, которые он сам тянет откуда угодно
 
 const NAME_RE = /^[A-Za-z_$][\w$]*$/;
 
@@ -103,8 +121,10 @@ for (const f of files) {
     importsOf.get(f).add(target);
     if (!importedNames.has(target)) importedNames.set(target, new Set());
     const set = importedNames.get(target);
+    if (!namesPulledBy.has(f)) namesPulledBy.set(f, new Set());
+    const mine = namesPulledBy.get(f);
     if (clause.includes("*")) {
-      set.add("*");
+      (set.add("*"), mine.add("*"));
       continue;
     }
     const braces = clause.match(/\{([\s\S]*)\}/);
@@ -113,7 +133,7 @@ for (const f of files) {
         part = part.trim().replace(/^type\s+/, "");
         if (!part) continue;
         const name = part.split(/\s+as\s+/)[0].trim();
-        if (NAME_RE.test(name)) set.add(name);
+        if (NAME_RE.test(name)) (set.add(name), mine.add(name));
       }
     }
     const def = clause
@@ -121,7 +141,7 @@ for (const f of files) {
       .replace(/^type\s+/, "")
       .split(",")[0]
       .trim();
-    if (def && NAME_RE.test(def)) set.add("default");
+    if (def && NAME_RE.test(def)) (set.add("default"), mine.add("default"));
   }
 
   // экспорты, объявленные в самом файле
@@ -263,6 +283,28 @@ if (mode === "open") {
       stack.push(d);
     }
   }
+  // Документация про файл есть, а сам файл на неё не ссылается: «почему»
+  // существует, но при чтении кода его не видно. Это список работ, а не
+  // приговор — поэтому здесь, а не в `verify`: совпадение по имени бывает
+  // случайным, и превращать его в красный прогон значило бы завести
+  // проверку, которая врёт.
+  const surface = (f) => /\/index\.tsx?$/.test(f) || /types\.tsx?$/.test(f);
+  const docBodies = docFiles
+    .filter((d) => !d.includes("/context/"))
+    .map((d) => [rel(d), readFileSync(d, "utf8")]);
+  const unanchored = [];
+  for (const f of files) {
+    if (isTest(f) || surface(f)) continue;
+    if (docRefsIn(readFileSync(f, "utf8")).length) continue;
+    const base = f.slice(f.lastIndexOf("/") + 1);
+    const named = docBodies.filter(([, body]) => body.includes(base));
+    if (named.length) unanchored.push([rel(f), named.map(([d]) => d)]);
+  }
+  console.log("=== Документация есть, якоря `// See` в коде нет ===");
+  for (const [f, docs] of unanchored)
+    console.log(`  ${f}${NEWLINE}      → ${docs.join(", ")}`);
+  console.log(`  всего: ${unanchored.length}`);
+
   const code = files.filter((f) => !isTest(f) && !f.endsWith(".d.ts"));
   const cold = code.filter((f) => !reached.has(f));
   console.log("=== Файлы, до которых не дотягивается ни один тест ===");
@@ -434,15 +476,27 @@ if (mode === "brief") {
             : "  никто — точка входа, бочка или мёртвое",
         );
 
-        // Прямой импорт и транзитивная достижимость — РАЗНЫЕ ответы.
-        // Через бочку слоя до файла дотягивается половина проекта, и это не
-        // значит, что хоть один из тех тестов его проверяет. Ловит правку
-        // почти всегда тот, кто взял файл сам.
+        // Три РАЗНЫХ ответа, и путать их нельзя.
+        // Напрямую — тест сам назвал файл. Через бочку — тест взял имя из
+        // `index.ts`, а бочка это реэкспорт, а не потребитель: такой тест
+        // файл всё-таки гоняет. Транзитивно — тест дотянулся через обычные
+        // модули, и это почти всегда не про него.
         const all = reach.get(target) ?? [];
+        // Средний уровень считается ПО ИМЕНАМ, а не по форме пути. Тест,
+        // взявший `useImageResourceStore` из бочки слоя, гоняет файл, который
+        // это имя определяет; тест, взявший из той же бочки соседнее имя, —
+        // нет. Ни «только прямой импорт», ни «сквозь любую бочку» этого не
+        // различают: первое врёт вниз, второе вверх.
+        const exported = exportsOf.get(target) ?? new Set();
         const direct = all.filter((t) =>
           (importsOf.get(t) ?? new Set()).has(target),
         );
-        console.log("--- тесты, берущие файл напрямую (эти и поймают) ---");
+        const byName = all.filter(
+          (t) =>
+            !direct.includes(t) &&
+            [...(namesPulledBy.get(t) ?? [])].some((n) => exported.has(n)),
+        );
+        console.log("--- тесты, называющие файл сами ---");
         console.log(
           direct.length
             ? "  " +
@@ -450,11 +504,28 @@ if (mode === "brief") {
                   .map(rel)
                   .sort()
                   .join(NEWLINE + "  ")
-            : "  НИ ОДНОГО — правку проверять руками, ей нечему упасть",
+            : "  нет",
         );
         console.log(
-          `--- дотягиваются транзитивно: ${all.length - direct.length}` +
-            " (через бочки; проверяют его вряд ли) ---",
+          "--- тесты, тянущие его экспорты через бочку (тоже гоняют) ---",
+        );
+        console.log(
+          byName.length
+            ? "  " +
+                byName
+                  .map(rel)
+                  .sort()
+                  .join(NEWLINE + "  ")
+            : "  нет",
+        );
+        if (direct.length + byName.length === 0)
+          console.log(
+            "  ВНИМАНИЕ: файл не гоняет ни один тест — правку проверять руками",
+          );
+        console.log(
+          `--- дотягиваются транзитивно, через обычные модули: ${
+            all.length - direct.length - byName.length
+          } ---`,
         );
 
         const exact = BASE_LINES.filter(([, , line]) =>
@@ -462,9 +533,22 @@ if (mode === "brief") {
             (t) => t === r || r.endsWith("/" + t) || t === base,
           ),
         );
+        // Строка, которая в кавычках называет ДРУГОЙ существующий файл, — про
+        // него, а не про этот: иначе короткое имя вроде `Diagnostic` собирает
+        // весь модуль и топит настоящие попадания.
+        const namesOther = (line) =>
+          quoted(line).some(
+            (t) =>
+              /[.](tsx?|scss)$/.test(t) &&
+              t !== base &&
+              !r.endsWith("/" + t) &&
+              files.some((f) => rel(f) === t || rel(f).endsWith("/" + t)),
+          );
         const loose = BASE_LINES.filter(
           ([, , line]) =>
-            line.includes(bare) && !exact.some((e) => e[2] === line),
+            line.includes(bare) &&
+            !exact.some((e) => e[2] === line) &&
+            !namesOther(line),
         );
         console.log("--- записи базы: назван путём (точно) ---");
         for (const [n, i, line] of exact.slice(0, 40))
@@ -984,19 +1068,12 @@ if (mode === "verify") {
   for (const t of toolDrift) console.log("    " + t);
 
   // 10. якорь на документацию в коде указывает на существующий файл
-  // Строка-якорь целиком, потом все пути в ней: одна строка часто называет
-  // два документа («See A and B»), и ловить только первый значит не
-  // проверять второй.
-  const DOC_LINE_RE = /\/\/ See [^\n]*/g;
-  const DOC_PATH_RE = /[\w./-]+\.md/g;
-  // docFiles собран верхним обходом
+  // Ссылки собирает общий помощник docRefsIn (см. его шапку).
   const deadAnchors = [];
   let anchorCount = 0;
   for (const f of files) {
     const body = readFileSync(f, "utf8");
-    const specs = (body.match(DOC_LINE_RE) ?? []).flatMap(
-      (line) => line.match(DOC_PATH_RE) ?? [],
-    );
+    const specs = docRefsIn(body);
     for (const spec of specs) {
       anchorCount++;
       // Якорь пишут относительно файла (`./README.md`), относительно корня

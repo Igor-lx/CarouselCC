@@ -1,4 +1,4 @@
-// Portable theme STATE (no browser-chrome). See ../../README.md
+// Portable theme STATE (no browser-chrome). See ./README.md
 import {
   useCallback,
   useEffect,

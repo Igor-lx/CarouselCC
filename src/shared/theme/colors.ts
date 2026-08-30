@@ -1,3 +1,4 @@
+// See ./README.md § Colors.
 // The mobile browser-chrome (bar) colors — CHANGE THEM HERE. index.html mirrors
 // them (pre-paint boot can't import); bootSync.test.ts guards the drift.
 import { ON_SCREEN_MODES } from "./internal/constants";

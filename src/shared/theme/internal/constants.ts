@@ -1,3 +1,4 @@
+// See ../README.md § Colors.
 // index.html mirrors THEME_STORAGE_KEY (pre-paint boot, can't import); bootSync.test.ts guards the drift.
 export const THEME_STORAGE_KEY = "theme-mode";
 

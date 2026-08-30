@@ -1,3 +1,4 @@
+// See ./README.md — оси это данные, а не константа.
 import { useMemo } from "react";
 
 import { useMediaQuerySet } from "../../sharedStore/useMediaQuerySet";
