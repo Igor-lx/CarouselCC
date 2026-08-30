@@ -20,6 +20,12 @@ describe("mod", () => {
     expect(mod(3, 0)).toBe(0);
     expect(mod(3, -2)).toBe(0);
   });
+
+  // The deck size is caller-owned (ADR-002), so a non-number reaches here.
+  // `total <= 0` is FALSE for NaN and would let it through into the result.
+  it("returns 0 for a total that is not a number at all", () => {
+    expect(mod(3, Number.NaN)).toBe(0);
+  });
 });
 
 describe("normalizePageIndex", () => {
@@ -29,5 +35,8 @@ describe("normalizePageIndex", () => {
   });
   it("returns 0 when there are no pages", () => {
     expect(normalizePageIndex(3, 0)).toBe(0);
+  });
+  it("returns 0 for a page count that is not a number", () => {
+    expect(normalizePageIndex(3, Number.NaN)).toBe(0);
   });
 });

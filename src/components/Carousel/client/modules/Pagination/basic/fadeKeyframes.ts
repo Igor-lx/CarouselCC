@@ -28,7 +28,7 @@ export const offsetDistance = (
   isFinite: boolean,
 ): number => {
   const raw = Math.abs(index - offset);
-  if (isFinite || pageCount <= 0) return raw;
+  if (isFinite || !(pageCount > 0)) return raw;
   const wrapped = raw % pageCount;
   return Math.min(wrapped, pageCount - wrapped);
 };
@@ -41,7 +41,7 @@ export const resolveOffsetTarget = (
   direction: number,
   isFinite: boolean,
 ): number => {
-  if (isFinite || pageCount <= 0) return targetPageIndex;
+  if (isFinite || !(pageCount > 0)) return targetPageIndex;
   const base = Math.round(from);
   const forward = mod(targetPageIndex - base, pageCount);
   if (forward === 0) return base;

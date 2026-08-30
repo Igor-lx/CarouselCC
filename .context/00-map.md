@@ -217,7 +217,7 @@
 отрицательных; `total <= 0 → 0`. `clamp`. `normalizePageIndex` = `mod` с той же
 защитой. Весь цикличный режим стоит на этих девяти строках.
 
-### `client/domain/layout.ts` (112) — pure, SSOT геометрии страниц
+### `client/domain/layout.ts` (115) — pure, SSOT геометрии страниц
 `buildCarouselLayout` (`:32` `export const buildCarouselLayout`) выводит всю
 геометрию: `visibleSlidesCount` **клампится к длине колоды**,
 `canSlide = length > effectiveVisible`, `pageCount = ceil(length/effectiveVisible)`,
@@ -1458,7 +1458,7 @@ star-экспортов нет — бочки собраны аккуратно.
 
 ---
 
-## Q. Тесты — `src/**/tests/**` (112 файлов, 14708)
+## Q. Тесты — `src/**/tests/**` (112 файлов, 14746)
 
 Прочитаны полностью. Общая характеристика: это **не покрытие ради покрытия**.
 Почти каждый файл начинается с блока «что именно этот тест удерживает» —

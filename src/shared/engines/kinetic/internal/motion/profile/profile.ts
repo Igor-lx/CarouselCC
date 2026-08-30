@@ -60,7 +60,7 @@ const pushZone = (
     distance: number;
   },
 ) => {
-  if (input.share <= 0) return input.distanceProgress;
+  if (!(input.share > 0)) return input.distanceProgress;
   const startTime =
     zones.length > 0
       ? zones[zones.length - 1]!.startTime + zones[zones.length - 1]!.duration

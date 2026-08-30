@@ -34,6 +34,22 @@ describe("createMotionProfile", () => {
     ).toBeCloseTo(1);
   });
 
+  // A share that is not a number would otherwise build a zone of NaN
+  // duration, and one such zone makes the whole profile's duration NaN —
+  // the ride then never settles. The zone is skipped instead.
+  it("skips a zone whose share is not a number", () => {
+    const profile = createMotionProfile({
+      distance: 300,
+      startSpeed: 0,
+      peakSpeed: 1,
+      endSpeed: 0,
+      accelerationDistanceShare: Number.NaN,
+      decelerationDistanceShare: 0.3,
+    });
+    expect(profile.duration).toBeGreaterThan(0);
+    expect(Number.isFinite(profile.duration)).toBe(true);
+  });
+
   it("drops zero-share zones (pure deceleration profile keeps one zone)", () => {
     const profile = createMotionProfile({
       distance: 300,

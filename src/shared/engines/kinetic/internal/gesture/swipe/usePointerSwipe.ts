@@ -218,7 +218,7 @@ export function usePointerSwipe({
     (target: HTMLElement, pointerId: number) => {
       clearCatchTimer();
       const cfg = settingsRef.current;
-      if (cfg.catchDelayMs <= 0) {
+      if (!(cfg.catchDelayMs > 0)) {
         activateOwnership(target, pointerId);
         return;
       }

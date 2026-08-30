@@ -65,7 +65,7 @@ export const alignedVirtualIndex = (
 ) => {
   const normalized = normalizePageIndex(pageIndex, layout.pageCount);
   const start = pageStart(normalized, layout.visibleSlidesCount);
-  if (layout.isFinite || layout.virtualLength <= 0) return start;
+  if (layout.isFinite || !(layout.virtualLength > 0)) return start;
   const lane = Math.round(
     (referenceVirtualIndex - start) / layout.virtualLength,
   );
@@ -78,7 +78,7 @@ export const pageContaining = (
   virtualIndex: number,
   layout: CarouselLayout,
 ) => {
-  if (layout.pageCount <= 0 || layout.visibleSlidesCount <= 0) return 0;
+  if (!(layout.pageCount > 0) || !(layout.visibleSlidesCount > 0)) return 0;
   const raw = Math.floor(Math.floor(virtualIndex) / layout.visibleSlidesCount);
   return layout.isFinite
     ? clamp(raw, 0, layout.pageCount - 1)
@@ -89,7 +89,7 @@ export const nearestPageIndex = (
   virtualIndex: number,
   layout: CarouselLayout,
 ) => {
-  if (layout.pageCount <= 0 || layout.visibleSlidesCount <= 0) return 0;
+  if (!(layout.pageCount > 0) || !(layout.visibleSlidesCount > 0)) return 0;
   const raw = Math.round(virtualIndex / layout.visibleSlidesCount);
   return layout.isFinite
     ? clamp(raw, 0, layout.pageCount - 1)
@@ -101,6 +101,9 @@ export const carouselBoundaryState = (
   layout: CarouselLayout,
 ): PageBoundaryState => {
   if (!layout.isFinite) return { isAtStart: false, isAtEnd: false };
+  // Plain comparisons on purpose: this reports a boundary, it does not guard
+  // one. A non-number must answer "not at the edge" — the negated form would
+  // claim the deck IS at the start.
   return {
     isAtStart: targetPageIndex <= 0,
     isAtEnd: targetPageIndex >= layout.pageCount - 1,
