@@ -194,6 +194,42 @@ if (mode === "verify") {
   );
   for (const f of missing) console.log("    " + rel(f));
 
+  // 1b. каждый тестовый файл назван в 08-tests.md
+  // Группы вида `{a,b}.test.ts` раскрываются, иначе они читались бы как
+  // неупомянутые — а это ровно та форма, которой база пользуется.
+  const expandGroups = (text) => {
+    const grow = (q) => {
+      const group = /\{([^}]*)\}/.exec(q);
+      if (group === null) return [q];
+      const head = q.slice(0, group.index);
+      const tail = q.slice(group.index + group[0].length);
+      return group[1]
+        .split(",")
+        .flatMap((one) => grow(head + one.trim() + tail));
+    };
+    const extra = [];
+    for (const piece of text.split("`")) {
+      if (!piece.includes("{")) continue;
+      extra.push(...grow(piece));
+    }
+    return text + extra.join(" ");
+  };
+  const testsText = expandGroups(
+    readFileSync(path.join(BASE, "08-tests.md"), "utf8"),
+  );
+  const testFiles = files.filter(isTest);
+  const namedInTests = (f) => {
+    const base = rel(f).split("/").pop();
+    const stem = base.slice(0, base.lastIndexOf("."));
+    return testsText.includes(base) || testsText.includes(stem);
+  };
+  const unnamed = testFiles.filter((f) => !namedInTests(f));
+  console.log("=== Покрытие тестов ===");
+  console.log(
+    `  тестовых файлов: ${testFiles.length}, не названо: ${unnamed.length}`,
+  );
+  for (const f of unnamed) console.log("    " + rel(f));
+
   // 2. якоря вида `путь:строка` указывают на существующий файл и живую строку
   const expand = (q) => {
     if (q.startsWith("src/")) return path.join(BASE, "..", q);
@@ -202,6 +238,16 @@ if (mode === "verify") {
     if (q.startsWith("docs/"))
       return path.join(BASE, "..", "src/components/Carousel/client", q);
     if (q.startsWith("shared/")) return path.join(BASE, "..", "src", q);
+    if (q.startsWith("modules/"))
+      return path.join(BASE, "..", "src/components/Carousel/client", q);
+    if (q.startsWith("basic/") || q.startsWith("widget/"))
+      return path.join(
+        BASE,
+        "..",
+        "src/components/Carousel/client/modules/Pagination",
+        q,
+      );
+    if (q.startsWith("app/")) return path.join(BASE, "..", "src", q);
     if (q.startsWith("boundary/") || q.startsWith("data-gen/"))
       return path.join(BASE, "..", "src/components/Carousel", q);
     return null;
@@ -238,5 +284,162 @@ if (mode === "verify") {
   console.log(`  проверено: ${checked}, битых: ${broken.length}`);
   for (const b of broken) console.log("    " + b);
 
-  if (missing.length || broken.length) process.exitCode = 1;
+  // 3. объявленные размеры: `путь.ts` (N), `папка/` (N файлов, M) и та же
+  // папка в форме заголовка — `папка/**` — N файлов / M строк.
+  // N — непустых строк, как требует README базы. Папка считается по коду без
+  // тестов; путь, в котором есть `tests`, — наоборот, только по тестам.
+  const everyFile = [];
+  (function walkAll(dir) {
+    for (const e of readdirSync(dir)) {
+      const full = path.join(dir, e);
+      if (statSync(full).isDirectory()) walkAll(full);
+      else if (/\.(tsx?|scss)$/.test(e))
+        everyFile.push(full.split(path.sep).join("/"));
+    }
+  })(path.join(BASE, "..", "src").split(path.sep).join("/"));
+
+  const nonEmpty = (f) =>
+    readFileSync(f, "utf8")
+      .split(NEWLINE)
+      .filter((l) => l.trim() !== "").length;
+
+  const norm = (p) => p.split(path.sep).join("/").replace(/[/]+$/, "");
+  const bare = (q) => q.replace(/[*]+$/, "").replace(/[/]+$/, "");
+
+  // База пишет группы вида `{a,b}/tests`: раскрываем их в отдельные пути.
+  const variants = (q) => {
+    const group = /\{([^}]*)\}/.exec(q);
+    if (group === null) return [q];
+    const head = q.slice(0, group.index);
+    const tail = q.slice(group.index + group[0].length);
+    return group[1]
+      .split(",")
+      .flatMap((one) => variants(head + one.trim() + tail));
+  };
+
+  const locate = (q, prefix) => {
+    const tries = prefix === null ? [q] : [q, prefix + q];
+    for (const candidate of tries.map(expand)) {
+      if (candidate !== null && everyFile.includes(norm(candidate)))
+        return norm(candidate);
+    }
+    const hits = everyFile.filter((f) => f.endsWith("/" + q));
+    return hits.length === 1 ? hits[0] : null;
+  };
+
+  // Звёздочки трактуются как «что угодно между»; первый кусок обязан быть
+  // началом пути, иначе `motion/` поймал бы и `visual-position/motion/`.
+  const matches = (file, pattern) => {
+    const head = pattern.split("*")[0];
+    const root = expand(head);
+    if (root === null) return null;
+    const slash = head.endsWith("/") ? "/" : "";
+    const parts = (norm(root) + slash + pattern.slice(head.length)).split("**");
+    let at = 0;
+    for (let i = 0; i < parts.length; i++) {
+      if (parts[i] === "") continue;
+      const found = file.indexOf(parts[i], at);
+      if (found < 0 || (i === 0 && found !== 0)) return false;
+      at = found + parts[i].length;
+    }
+    return true;
+  };
+
+  const under = (q, prefix) => {
+    const tries = prefix === null ? [q] : [q, prefix + q];
+    for (const raw of tries) {
+      const patterns = variants(raw);
+      const wantTests = raw.includes("tests");
+      let resolvable = false;
+      const hits = everyFile.filter((f) => {
+        if (isTest(f) !== wantTests) return false;
+        for (const pattern of patterns) {
+          const verdict = matches(f, pattern);
+          if (verdict === null) continue;
+          resolvable = true;
+          if (verdict) return true;
+        }
+        return false;
+      });
+      if (resolvable && hits.length) return hits;
+    }
+    return null;
+  };
+
+  // Все три формы читаются только из бэктиков, поэтому проза с числами и
+  // якоря вида `file:line` под проверку не попадают.
+  const FILE_RE = /`([\w./{},*-]+\.(?:tsx|ts|scss))`\s*\((\d+)\)/g;
+  const DIR_RE =
+    /`([\w./*{},-]+\/(?:\*\*)?)`\s*\((\d+) файл[а-я]*(?:, (\d+))?\)/g;
+  const DASH_RE =
+    /`([\w./*{},-]+\/(?:\*\*)?)`[^`\n]*— (\d+) файл[а-я]* \/ (\d+) стро[а-я]*/g;
+  const HEAD_RE = /^#{2,4}[^`]*`([^`]+)`/;
+
+  let sized = 0;
+  const unresolved = [];
+  const wrong = [];
+  const claimDir = (name, q, prefix, filesClaim, linesClaim) => {
+    const hits = under(q, prefix);
+    if (hits === null) {
+      unresolved.push(name + ": " + q);
+      return;
+    }
+    sized++;
+    if (hits.length !== Number(filesClaim))
+      wrong.push(
+        `${name}: ${q} — записано ${filesClaim} файлов, на диске ${hits.length}`,
+      );
+    if (linesClaim === undefined) return;
+    const total = hits.reduce((s, f) => s + nonEmpty(f), 0);
+    if (total !== Number(linesClaim))
+      wrong.push(
+        `${name}: ${q} — записано ${linesClaim} строк, на диске ${total}`,
+      );
+  };
+
+  for (const name of readdirSync(BASE)) {
+    if (!name.endsWith(".md")) continue;
+    // Заголовок раздела задаёт префикс: внутри него пути пишутся коротко.
+    let prefix = null;
+    const body = readFileSync(path.join(BASE, name), "utf8");
+    for (const line of body.split(NEWLINE)) {
+      const head = HEAD_RE.exec(line);
+      if (head !== null) {
+        const token = head[1];
+        prefix = !token.includes("/")
+          ? null
+          : /\.(tsx?|scss)$/.test(token)
+            ? token.slice(0, token.lastIndexOf("/") + 1)
+            : bare(token) + "/";
+      }
+      let m;
+      FILE_RE.lastIndex = 0;
+      while ((m = FILE_RE.exec(line)) !== null) {
+        const file = locate(m[1], prefix);
+        if (file === null) {
+          unresolved.push(name + ": " + m[1]);
+          continue;
+        }
+        sized++;
+        const real = nonEmpty(file);
+        if (real !== Number(m[2]))
+          wrong.push(`${name}: ${m[1]} — записано ${m[2]}, на диске ${real}`);
+      }
+      DIR_RE.lastIndex = 0;
+      while ((m = DIR_RE.exec(line)) !== null)
+        claimDir(name, m[1], prefix, m[2], m[3]);
+      DASH_RE.lastIndex = 0;
+      while ((m = DASH_RE.exec(line)) !== null)
+        claimDir(name, m[1], prefix, m[2], m[3]);
+    }
+  }
+  console.log("=== Объявленные размеры ===");
+  console.log(
+    `  сверено: ${sized}, разошлось: ${wrong.length}, не разобрано: ${unresolved.length}`,
+  );
+  for (const w of wrong) console.log("    " + w);
+  for (const u of unresolved) console.log("    ? " + u);
+
+  if (missing.length || unnamed.length || broken.length || wrong.length)
+    process.exitCode = 1;
 }
