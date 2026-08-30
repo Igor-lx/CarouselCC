@@ -1590,11 +1590,20 @@ rider-defaults и собственный `useMotionPaint`. Помечено ко
 `src/shared/**`, ни `.tsx`, так что отчёт считает по всему, что уезжает в бандл
 (4695 операторов вместо 2506). Числа — в базовой линии, `01-facts.md`, §A.
 
-- Нет тестов на: `Carousel.tsx` как единицу (кроме интеграционного),
-  `useCarouselNavigation`, `useModuleRenderPolicy`, `Diagnostic.tsx`,
-  `useCarouselStatusReporter` (есть только на его компаратор),
-  `resolveImageSizes`, `useSlideViewport`, `Controls`/`NavigationZone`,
-  `data-gen/runDataGen` (файловый драйвер), `useCarouselMotionExecution`.
+- **Кто чем закрыт — считается, а не перечисляется.** Здесь стоял рукописный
+  список «нет тестов на», и он устарел молча дважды: `Controls` и
+  `useCarouselMotionExecution` тесты получили, а список продолжал числить их
+  непокрытыми. Спрашивать надо инструмент:
+
+  ```
+  node .context/graph.mjs brief <путь>   # две верхние секции — что поймает правку
+  node .context/graph.mjs open           # файлы, до которых не дотягивается ни один тест
+  ```
+
+  Здесь остаётся только то, чего команда не скажет, — **почему** узел не закрыт:
+  `data-gen/runDataGen` трогает диск и закрыт прогоном генератора, а не
+  юнит-тестом; `Diagnostic.tsx` — dev-слой, его проверки закрыты поимённо, а
+  сама сборка слота нет.
 
 ---
 

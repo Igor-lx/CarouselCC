@@ -1,3 +1,4 @@
+// See ../README.md
 import { useMediaQuery } from "../../sharedStore/useMediaQuery";
 
 export function useIsReducedMotion(): boolean {

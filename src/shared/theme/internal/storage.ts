@@ -1,3 +1,4 @@
+// See ../README.md
 import { THEME_STORAGE_KEY } from "./constants";
 import { asThemeMode } from "./resolve";
 import type { ThemeMode } from "./types";

@@ -50,12 +50,16 @@ const files = [];
 // Документация лежит рядом с кодом и адресуется из него якорями `// See`,
 // поэтому собирается тем же обходом.
 const docFiles = [];
+// Стили в граф импортов не входят — их подключает сборщик, а не разбор, —
+// но адрес у них такой же, и досье обязано о них отвечать.
+const styleFiles = [];
 (function walk(dir) {
   for (const e of readdirSync(dir)) {
     const full = norm(path.join(dir, e));
     if (statSync(full).isDirectory()) walk(full);
     else if (/\.tsx?$/.test(e)) files.push(full);
     else if (/\.md$/.test(e)) docFiles.push(full);
+    else if (/\.scss$/.test(e)) styleFiles.push(full);
   }
 })(ROOT);
 
@@ -300,7 +304,15 @@ if (mode === "open") {
     if (isTest(f) || surface(f)) continue;
     if (docRefsIn(readFileSync(f, "utf8")).length) continue;
     const base = f.slice(f.lastIndexOf("/") + 1);
-    const named = docBodies.filter(([, body]) => body.includes(base));
+    // Документация называет файл и с расширением, и без него — README полок
+    // Имя без расширения засчитывается, только если документация называет его
+    // КАК КОД, в обратных кавычках: голое слово вроде resolve встречается в
+    // прозе трёх десятков документов и топит сигнал.
+    const bare = base.replace(/[.](tsx?|scss)$/, "");
+    const asCode = "`" + bare + "`";
+    const named = docBodies.filter(
+      ([, body]) => body.includes(base) || body.includes(asCode),
+    );
     if (named.length) unanchored.push([rel(f), named.map(([d]) => d)]);
   }
   console.log("=== Документация есть, якоря `// See` в коде нет ===");
@@ -405,7 +417,7 @@ if (mode === "brief") {
   } else {
     // Не-тестовые впереди: спрашивают обычно про сам файл, а его тест
     // попадает в выборку по имени и оттесняет ответ вниз.
-    const hits = files
+    const hits = [...files, ...styleFiles]
       .filter((f) => rel(f).includes(arg))
       .sort((x, y) => Number(isTest(x)) - Number(isTest(y)));
     if (hits.length === 0) {
@@ -460,76 +472,120 @@ if (mode === "brief") {
         console.log(`${NEWLINE}=== ${r} ===`);
 
         const down = [...(importsOf.get(target) ?? [])].map(rel).sort();
-        console.log("--- импортирует (что надо понять, чтобы понять его) ---");
-        console.log(
-          down.length ? "  " + down.join(NEWLINE + "  ") : "  ничего своего",
-        );
-
-        const up = files.filter((f) =>
-          (importsOf.get(f) ?? new Set()).has(target),
-        );
-        const upCode = up
-          .filter((f) => !isTest(f))
-          .map(rel)
-          .sort();
-        console.log("--- импортируют (радиус поражения) ---");
-        console.log(
-          upCode.length
-            ? "  " + upCode.join(NEWLINE + "  ")
-            : "  никто — точка входа, бочка или мёртвое",
-        );
-
-        // Три РАЗНЫХ ответа, и путать их нельзя.
-        // Напрямую — тест сам назвал файл. Через бочку — тест взял имя из
-        // `index.ts`, а бочка это реэкспорт, а не потребитель: такой тест
-        // файл всё-таки гоняет. Транзитивно — тест дотянулся через обычные
-        // модули, и это почти всегда не про него.
-        const all = reach.get(target) ?? [];
-        // Средний уровень считается ПО ИМЕНАМ, а не по форме пути. Тест,
-        // взявший `useImageResourceStore` из бочки слоя, гоняет файл, который
-        // это имя определяет; тест, взявший из той же бочки соседнее имя, —
-        // нет. Ни «только прямой импорт», ни «сквозь любую бочку» этого не
-        // различают: первое врёт вниз, второе вверх.
-        const exported = exportsOf.get(target) ?? new Set();
-        const direct = all.filter((t) =>
-          (importsOf.get(t) ?? new Set()).has(target),
-        );
-        const byName = all.filter(
-          (t) =>
-            !direct.includes(t) &&
-            [...(namesPulledBy.get(t) ?? [])].some((n) => exported.has(n)),
-        );
-        console.log("--- тесты, называющие файл сами ---");
-        console.log(
-          direct.length
-            ? "  " +
-                direct
-                  .map(rel)
-                  .sort()
-                  .join(NEWLINE + "  ")
-            : "  нет",
-        );
-        console.log(
-          "--- тесты, тянущие его экспорты через бочку (тоже гоняют) ---",
-        );
-        console.log(
-          byName.length
-            ? "  " +
-                byName
-                  .map(rel)
-                  .sort()
-                  .join(NEWLINE + "  ")
-            : "  нет",
-        );
-        if (direct.length + byName.length === 0)
+        // У теста спрашивать «что его накрывает» бессмысленно: он и есть
+        // проверка. Тревога «его не гоняет ни один тест» на тестовом файле —
+        // не предупреждение, а шум, который учит не читать эту строку.
+        if (isTest(target)) {
+          console.log("--- это тестовый файл ---");
           console.log(
-            "  ВНИМАНИЕ: файл не гоняет ни один тест — правку проверять руками",
+            "  накрывать нечем и незачем; что он гоняет — секция импортов выше, что закрепляет — записи базы ниже",
           );
-        console.log(
-          `--- дотягиваются транзитивно, через обычные модули: ${
-            all.length - direct.length - byName.length
-          } ---`,
-        );
+        } else if (r.endsWith(".scss")) {
+          const base = r.slice(r.lastIndexOf("/") + 1);
+          // По тексту, а не по разобранным спецификаторам: стиль часто
+          // подключают побочным импортом `import "./x.scss";` без `from`, и
+          // разбор импортов такие строки не видит вовсе.
+          const needle = "/" + base;
+          const users = files.filter(
+            (f) => !isTest(f) && readFileSync(f, "utf8").includes(needle),
+          );
+          console.log("--- подключают (модули, называющие путь в импорте) ---");
+          console.log(
+            users.length
+              ? "  " +
+                  users
+                    .map(rel)
+                    .sort()
+                    .join(NEWLINE + "  ")
+              : "  никто — стиль не подключён ни из одного модуля",
+          );
+          const named = files.filter(
+            (f) => isTest(f) && readFileSync(f, "utf8").includes(base),
+          );
+          console.log("--- тесты, называющие файл (читают его текстом) ---");
+          console.log(
+            named.length
+              ? "  " +
+                  named
+                    .map(rel)
+                    .sort()
+                    .join(NEWLINE + "  ")
+              : "  ВНИМАНИЕ: ни один тест на него не смотрит",
+          );
+        } else {
+          console.log(
+            "--- импортирует (что надо понять, чтобы понять его) ---",
+          );
+          console.log(
+            down.length ? "  " + down.join(NEWLINE + "  ") : "  ничего своего",
+          );
+
+          const up = files.filter((f) =>
+            (importsOf.get(f) ?? new Set()).has(target),
+          );
+          const upCode = up
+            .filter((f) => !isTest(f))
+            .map(rel)
+            .sort();
+          console.log("--- импортируют (радиус поражения) ---");
+          console.log(
+            upCode.length
+              ? "  " + upCode.join(NEWLINE + "  ")
+              : "  никто — точка входа, бочка или мёртвое",
+          );
+
+          // Три РАЗНЫХ ответа, и путать их нельзя.
+          // Напрямую — тест сам назвал файл. Через бочку — тест взял имя из
+          // `index.ts`, а бочка это реэкспорт, а не потребитель: такой тест
+          // файл всё-таки гоняет. Транзитивно — тест дотянулся через обычные
+          // модули, и это почти всегда не про него.
+          const all = reach.get(target) ?? [];
+          // Средний уровень считается ПО ИМЕНАМ, а не по форме пути. Тест,
+          // взявший `useImageResourceStore` из бочки слоя, гоняет файл, который
+          // это имя определяет; тест, взявший из той же бочки соседнее имя, —
+          // нет. Ни «только прямой импорт», ни «сквозь любую бочку» этого не
+          // различают: первое врёт вниз, второе вверх.
+          const exported = exportsOf.get(target) ?? new Set();
+          const direct = all.filter((t) =>
+            (importsOf.get(t) ?? new Set()).has(target),
+          );
+          const byName = all.filter(
+            (t) =>
+              !direct.includes(t) &&
+              [...(namesPulledBy.get(t) ?? [])].some((n) => exported.has(n)),
+          );
+          console.log("--- тесты, называющие файл сами ---");
+          console.log(
+            direct.length
+              ? "  " +
+                  direct
+                    .map(rel)
+                    .sort()
+                    .join(NEWLINE + "  ")
+              : "  нет",
+          );
+          console.log(
+            "--- тесты, тянущие его экспорты через бочку (тоже гоняют) ---",
+          );
+          console.log(
+            byName.length
+              ? "  " +
+                  byName
+                    .map(rel)
+                    .sort()
+                    .join(NEWLINE + "  ")
+              : "  нет",
+          );
+          if (direct.length + byName.length === 0)
+            console.log(
+              "  ВНИМАНИЕ: файл не гоняет ни один тест — правку проверять руками",
+            );
+          console.log(
+            `--- дотягиваются транзитивно, через обычные модули: ${
+              all.length - direct.length - byName.length
+            } ---`,
+          );
+        }
 
         const exact = BASE_LINES.filter(([, , line]) =>
           quoted(line).some(

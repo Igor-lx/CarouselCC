@@ -1,3 +1,4 @@
+// See docs/architecture/overview.md
 import { useMemo } from "react";
 
 import { buildCarouselConfig } from "./buildConfig";

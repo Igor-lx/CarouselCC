@@ -1,3 +1,4 @@
+// See ./README.md
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { resolveReleaseLaunch, usePointerSwipe } from "./internal/gesture";
