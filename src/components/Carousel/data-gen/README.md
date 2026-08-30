@@ -138,8 +138,6 @@ default set, wide 16:9 behind the compact-landscape condition.
   slide set and order.
 - `sources` — optional art-directed groups (e.g. an orientation crop).
 
-## Idempotent
-
 ## What `default` actually controls (read before debugging crops)
 
 `default` designates the SINGLE-SET asset — the one candidate a slide
@@ -156,6 +154,8 @@ media condition puts it.
 (Runtime rule: `resolveRenderedImageSrc` — responsive mode returns the
 canonical URL, single-set mode returns `defaultSrc` → widest candidate →
 content.)
+
+## Idempotent
 
 Re-running merges against the existing `output`: a slide is matched by its slug,
 so its `id` and hand-written `alt` are preserved, new assets get a fresh id, and

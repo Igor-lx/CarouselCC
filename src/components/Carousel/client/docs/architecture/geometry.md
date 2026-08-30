@@ -112,13 +112,17 @@ never a DOM read:
 
 ### Re-baselining on geometry change
 
-`syncGeometry` re-bases the transform math, tearing down any compositor
+`rebaseTrack` re-bases the transform math, tearing down any compositor
 animation built on the old baseline and re-pinning the track — and the position
 is read BEFORE the teardown, because afterwards `readCurrentPosition` would
 answer for a JS track that never painted those frames.
 
-It runs on exactly two triggers: a new `layoutOrigin` (its own layout effect),
-and a slot that actually MOVED (the measurement source's notification). Judging
+It runs on exactly two triggers, and each has its own door.
+`rebaseForLayoutOrigin` guards the first — a new `layoutOrigin`, in its own
+layout effect, and it returns early when the origin did not actually move, so
+the common settle-time window shift costs nothing. The second is a slot that
+actually MOVED (the measurement source's notification), which calls
+`rebaseTrack` directly. Judging
 the second through the SLOT rather than raw pixels is what keeps a height-only
 viewport change — a mobile URL bar collapsing — from tearing down a healthy
 compositor ride.

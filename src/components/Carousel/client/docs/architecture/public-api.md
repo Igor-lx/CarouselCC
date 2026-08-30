@@ -62,7 +62,7 @@ surfaced by the `Diagnostic` slot but never repaired — see
 | --- | --- | --- |
 | `slidesData` | `Slide[]` | **Required.** `content` (a trimmed-non-empty string, number, or React element) is the slide's **identity** — it alone with `id` feeds `dataKey`. `image` is optional render-only responsive variants (below). |
 | `visibleSlidesNr` | `number` | Slides sharing the viewport. Drives lane width, slot measurement, `pageCount = ceil(length / visibleSlidesNr)`, and the widget projection. |
-| `isFullPagesOn` | `boolean` | Clones tail slides so the last page is never partial (see [slides.md](./slides.md)). |
+| `isFullPagesOn` | `boolean` | Repeats slides from the HEAD of the deck so the last page is never partial (see [slides.md](./slides.md)). The clones carry the same data under a distinct key, so they are extra lanes, not extra slides. |
 | `isContentImg` | `boolean` | Treats string `content` as an `<img src>`; errors fall back to `alt` / `errAltPlaceholder`. |
 | `errAltPlaceholder` | `string` | Placeholder text when an image fails and the slide has no `alt`. |
 
@@ -146,6 +146,27 @@ that keeps Zod out of the app bundle. Hosts opt in with an explicit deep import
 
 Resolution is by the shared `resolveSlots` against `CAROUSEL_SLOTS`. Non-tagged
 children are dropped (with a dev warning when a Diagnostic slot is present).
+
+## What the host owns: prop identity
+
+The component is memoised behind `areCarouselPropsEqual`, which compares every
+prop by identity and only `children` structurally. That makes referential
+stability part of the contract rather than an optimisation detail:
+
+| Prop | If a fresh value arrives every host render |
+| --- | --- |
+| `slidesData` | records, layout and `dataKey` are rebuilt, and an unchanged deck still reconciles |
+| `className` | the merged class map and every slide's class prop re-identify |
+| `userEnvironment` | reduced-motion / touch / data-saver are re-read and the context half that carries them re-identifies |
+| `onSlideClick`, `onCarouselStatusChange` | the navigation view re-identifies, and the status reporter re-runs its effect |
+
+None of this is a crash — it is the deck reconciling for a reason that has
+nothing to do with the deck. Hold these five in `useMemo` / `useCallback` (or as
+module constants), exactly as the recommended `useUserEnvironment` hook already
+does for its own result.
+
+Slot children are the deliberate exception: inline JSX is a fresh object every
+render, which is why the comparator walks them structurally instead.
 
 ## DOM contract
 

@@ -196,6 +196,8 @@ provider.
 
 ## SSR note
 
-`core/` is SSR-safe (guarded `localStorage` / `matchMedia`, isomorphic layout
-effect). `chrome/` touches `document` in effects only, so it no-ops during server
-render; the hydrated mobile bar tint is seeded by the boot snippet (Mode A).
+`ThemeStateProvider.tsx` and everything under `internal/` except the chrome
+sync are SSR-safe (guarded `localStorage` / `matchMedia`, isomorphic layout
+effect). `internal/BrowserChromeSync.tsx` touches `document` in effects only, so
+it no-ops during server render; the hydrated mobile bar tint is seeded by the
+boot snippet (Mode A).

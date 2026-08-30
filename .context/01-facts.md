@@ -267,30 +267,19 @@ client/motion/index.ts
 
 ---
 
-## E. Дрейф документации (код — источник истины; доку чинить)
+## E. Дрейф документации — пусто
 
-Найдено сверкой доков с кодом. По правилу репозитория это дефекты **доки**.
+Здесь был список из пяти мест, где документация описывала не тот код:
+несуществующая функция `syncGeometry` в geometry.md, «клонируются хвостовые
+слайды» вместо головных в public-api.md, папки `core/` и `chrome/`, которых нет
+в полке темы, и осиротевший заголовок в README генератора. **Все исправлены**,
+а не описаны: список известной неправды — та же парковка для дефектов, что и
+«известный мусор» (см. `CLAUDE.md`, «Найденный дефект чинится, а не
+описывается»).
 
-1. **`docs/architecture/geometry.md:115,120`** — описывает функцию
-   **`syncGeometry`**. Такой функции нет: в
-   `geometry/useTrackBinding.ts:225,238` это `rebaseTrack` и
-   `rebaseForLayoutOrigin`.
-2. **`docs/architecture/public-api.md:65`** — «`isFullPagesOn` … Clones **tail**
-   slides». Код клонирует **головные**: `domain/slides.ts:35`
-   `records[offset % length]` при `offset` с нуля. `domain.md:51` и
-   `docs/architecture/slides.md:16` говорят «head» — правы они,
-   `public-api.md` нет.
-   (Тест `deckPadding.test.ts:73` тоже фиксирует «wraps back to slide 0».)
-3. ~~**`docs/architecture/slides.md:29`** — «no separate **predecode**
-   machinery» против предекод-менеджера в `modules.md:132`.~~
-   **ИСПРАВЛЕНО** — заменено на «no separate **preload** machinery».
-4. **`shared/theme/README.md:199-201`** — «`core/` is SSR-safe … `chrome/`
-   touches `document`». Папок `core/` и `chrome/` нет: это
-   `ThemeStateProvider.tsx` и `internal/BrowserChromeSync.tsx`.
-5. **`data-gen/README.md:141`** — осиротевший заголовок `## Idempotent` без
-   тела; его текст лежит ниже (`data-gen/README.md:160-162`), под чужим разделом.
-
----
+Раздел остаётся как место для находок **текущего захода**: нашёл расхождение —
+чинится в этом же заходе, а сюда попадает только то, что почему-то отложено, и
+тогда причина обязана быть названа.
 
 ## F. Утверждения доков, которые код не выражает сам
 
