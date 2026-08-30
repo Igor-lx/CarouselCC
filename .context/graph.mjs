@@ -390,6 +390,14 @@ if (mode === "brief") {
       // Строки базы, где адрес назван в обратных кавычках, — это её
       // собственный формат записи, поэтому попадание точное.
       const BASE_LINES = [];
+      // Документация отвечает на другой вопрос, чем база: не «что и где», а
+      // «почему так». Для рефактора это половина, без которой ломают
+      // концепцию, ничего не нарушив формально.
+      const DOC_LINES = [];
+      for (const d of docFiles) {
+        const body = readFileSync(d, "utf8").split(NEWLINE);
+        body.forEach((line, i) => DOC_LINES.push([rel(d), i + 1, line]));
+      }
       for (const name of readdirSync(HERE).filter((n) => n.endsWith(".md"))) {
         const body = readFileSync(path.join(HERE, name), "utf8").split(NEWLINE);
         body.forEach((line, i) => BASE_LINES.push([name, i + 1, line]));
@@ -468,6 +476,31 @@ if (mode === "brief") {
         for (const [n, i, line] of loose.slice(0, 20))
           console.log(`  ${n}:${i}  ${line.trim().slice(0, 110)}`);
         if (!loose.length) console.log("  нет");
+
+        // Якорь в самом файле — точная ссылка, написанная его же автором.
+        const anchors = [
+          ...new Set(
+            (
+              readFileSync(target, "utf8").match(/\/\/ See [^\n]*/g) ?? []
+            ).flatMap((line) => line.match(/[\w./-]+\.md/g) ?? []),
+          ),
+        ];
+        console.log("--- документация: на что ссылается сам файл ---");
+        console.log(
+          anchors.length
+            ? "  " + anchors.join(NEWLINE + "  ")
+            : "  якоря нет — «почему» этого файла нигде не объявлено",
+        );
+
+        const docHits = DOC_LINES.filter(([, , line]) =>
+          quoted(line).some(
+            (t) => t === r || r.endsWith("/" + t) || t === base || t === bare,
+          ),
+        );
+        console.log("--- документация: где он назван ---");
+        for (const [n, i, line] of docHits.slice(0, 20))
+          console.log(`  ${n}:${i}  ${line.trim().slice(0, 110)}`);
+        if (!docHits.length) console.log("  нет");
       }
       if (hits.length > 12)
         console.log(
