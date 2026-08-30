@@ -183,8 +183,10 @@ render, which is why the comparator walks them structurally instead.
 
 Stable hooks for external code: `[data-carousel-root]`,
 `[data-carousel-viewport]`, `[data-carousel-track]` (the animated element),
-`data-touch` / `data-reduced-motion` (mirror `userEnvironment`), and `[inert]`
-on out-of-band slides. The root also stamps `data-breakpoint` /
+`data-touch` / `data-reduced-motion` (mirror `userEnvironment`),
+`data-responsive-images` (the `<ResponsiveImages />` slot is attached, so slides
+carry `<picture>` rather than a bare `<img>`), and `[inert]` on out-of-band
+slides. The root also stamps `data-breakpoint` /
 `data-orientation` / `data-<flag>` (see [viewport.md](./viewport.md)).
 
 ## Slide data and responsive images

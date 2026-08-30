@@ -30,6 +30,6 @@ visible position, not a stale logical one.
   to tapping a slide; that is the product's call.
 - **Referential stability.** All handlers are memoised (against `dispatch`,
   `enabled`, `readCurrentPosition`, and the two intents) and returned as one
-  frozen `CarouselNavigation` object, because they flow into the dependency
+  memoised `CarouselNavigation` object, because they flow into the dependency
   arrays of autoplay and the modules — a fresh identity per render would churn
   those consumers' effects.

@@ -76,9 +76,12 @@ handoff.
 
 A **cold start** splits deliberately: origin from the reducer
 (`state.fromVirtualIndex`, passed at dispatch), residual velocity from
-`captureHandoff`. A **gesture release** is canonical from the reducer payload
-(origin `fromVirtualIndex`, velocity `state.gesture.uiVelocity`, bound to the
-same END_DRAG). On completion the runner dispatches
+`captureHandoff`. A **gesture release** does not start from the logical origin at all: between
+the finger's last write and the runner's takeover the deck would otherwise stand
+still for the commit, so `resolveCoastedLaunchPosition` extrapolates the live
+handoff position over that gap at the release velocity (bounded by
+`GESTURE_COAST_MAX_MS`, never past the target) and the result is the segment's
+origin. The velocity is `state.gesture.uiVelocity`, bound to the same END_DRAG. On completion the runner dispatches
 `MOTION_SETTLED { settledPosition }`; if a newer target already replaced the
 logical one, the reducer re-anchors to the actual settled position.
 

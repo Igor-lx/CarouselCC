@@ -70,9 +70,12 @@ whatever reads the state reads the same context the reducer used. See
 ## Reconciliation
 
 `CarouselLayout` is derived from props that can change without any command
-firing. The reconcile rule (`reconcileStateToLayout`) runs at two boundaries —
-render projection and the top of every command — so a layout change collapses
-cleanly to an instant snap and no stale state/layout pair ever reaches a
-consumer. This is the component's load-bearing state invariant; the full
-rationale and its idempotency contract are in
-[ADR-001](../adr/0001-layout-reconciliation.md).
+firing. The reconcile rule (`reconcileStateToLayout`) runs at exactly ONE boundary:
+the `SYNC_CONTEXT` command, which `useCarouselState` issues during render when
+the host's layout, config or reduced-motion flag changes identity. Every other
+command therefore decides against a layout the state already owns, so a layout
+change collapses to an instant snap before the next command is read and no stale
+state/layout pair can reach a consumer. This is the component's load-bearing
+state invariant; the rule and its idempotency contract are in
+[ADR-001](../adr/0001-layout-reconciliation.md), narrowed from two boundaries to
+this one by [ADR-004](../adr/0004-reducer-owns-its-context.md).

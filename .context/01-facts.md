@@ -196,25 +196,33 @@ client/motion/index.ts
 
 ## C. Радиус поражения: что ломает больше всего
 
-Число не-тестовых импортёров. Правка в верхних строках задевает много мест.
+Числа здесь не переписываются руками — они считаются:
 
-| Импортёров | Файл |
-| --- | --- |
-| 31 | `shared/index.ts` |
-| 20 | `client/domain/index.ts` |
-| 16 | `client/config/index.ts` |
-| 15 | `client/public-api/types.ts` |
-| 11 | `client/context/index.ts`, `client/state/index.ts` |
-| 10 | `client/modules/Diagnostic/types.ts` |
-| 8 | `client/motion/index.ts`, `shared/clientState/shared/useMediaQuery.ts` |
-| 7 | `client/state/types.ts`, `widget/types.ts`, `shared/theme/internal/constants.ts` |
-| 6 | `domain/types.ts`, `imageResource/types.ts`, `slots/index.ts`, `visual-position/index.ts`, оба `motion/runtime/types.ts` |
+```
+node .context/graph.mjs blast              # весь список, по убыванию
+node .context/graph.mjs blast domain/index # кто именно зависит от одного файла
+```
+
+Раньше в этом месте лежала таблица, скопированная из вывода команды. Она
+устарела молча (у `config/index.ts` было записано 16 импортёров при 17 на диске)
+и не покрывалась ни одной проверкой `verify`. Дублировать вычислимое — заводить
+второй источник истины, который расходится первым; поэтому осталась только
+команда и то, что из вывода не следует, — **почему** точка горячая:
+
+- `shared/index.ts` (первое место с большим отрывом) — единственная дверь
+  наружу из полок. Ширина здесь не дефект: барьер форка держится именно тем,
+  что компонент не знает внутренней раскладки полки.
+- Бочки `domain`, `config`, `state`, `context`, `motion` — намеренные швы слоёв.
+  Правка **внутри** такой папки радиус не имеет; радиус имеет правка её
+  публичной поверхности, и это ровно тот случай, когда сначала смотрят `blast`.
+- `public-api/types.ts` и `Diagnostic/types.ts` — типы, а не код: их радиус
+  проверяет компилятор, и он же его чинит.
 
 **Файлы, которые не импортирует никто (не-тестовый код):**
 
 | Файл | Статус |
 | --- | --- |
-| `data-gen/index.ts` | **мёртвая бочка** — `cli.ts` берёт `runDataGen` напрямую |
+| `data-gen/index.ts` | программный API папки, объявленный в её шапке (`runDataGen` / `generateSlides` / `buildSlide`); по графу мёртв, существует ради переноса — тот же случай, что барьер форка |
 | `data-gen/cli.ts` | точка входа npm-скрипта — ожидаемо |
 | `main.tsx` | точка входа приложения — ожидаемо |
 | `shared/viewportObservation/useIsomorphicLayoutEffect.ts` | «спящая» копия, помечена в коде и README — ожидаемо |

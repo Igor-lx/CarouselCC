@@ -101,16 +101,25 @@ the stale release point. It clamps AT the ride target (never overshoots),
 launches from the release point on snap-backs and calm releases, and bounds the
 interval by `GESTURE_COAST_MAX_MS` so a stalled commit cannot teleport the deck.
 
-## The two release velocities
+## The three release velocities
 
-Stored on the snapshot, read by `useMotionRunner` when it builds the release
-segment (the continuity launch, matching native scroll physics):
+Stored on the snapshot, read when the release segment is built (the continuity
+launch, matching native scroll physics):
 
-- **`uiReleaseVelocity`** — the visual speed the eye saw at lift-off — is the
-  segment's START speed.
+- **`launchVelocity`** — the visual speed at lift-off, protected against a
+  terminal micro-hold: a finger that stalls for a few frames before letting go
+  still launches at the speed the eye was tracking.
+- **`uiReleaseVelocity`** (`state.gesture.uiVelocity`) — the raw visual reading.
+  It is what the runner receives as its handoff, and what the coast extrapolates
+  over the commit gap to place the launch.
 - **`pointerReleaseVelocity`** — the flick-memory intent, boosted — is the CRUISE
   target the profile accelerates to over
   `CAROUSEL_INERTIAL_RELEASE_CONFIG.accelerationDistanceShare`.
+
+The segment's START speed is `resolveReleaseLaunch`'s max of the first two,
+each taken only in the direction of travel: whichever of the protected reading
+and the live handoff is faster wins, and a velocity pointing away from the target
+contributes nothing rather than subtracting.
 
 Content never jumps above its visible speed; a fast lift-off makes start ≈ cruise
 and the ramp collapses. A **duration floor** (`minRideDurationMs`) keeps a

@@ -62,7 +62,10 @@ frames where the animation starts and settles, the two frames the carousel can
 least afford it. Reusing the cached object keeps the prop `===`, so only slides
 whose OWN flags changed re-render.
 
-The cache is kept correct and bounded by two rules: a change in `layoutOrigin`
-(a recenter) re-bases every lane, so the whole cache is dropped; otherwise the
-map is pruned to the live render window each pass, so it cannot grow without
-bound.
+Correctness and bounded memory are separate mechanisms, deliberately. Every
+entry is keyed `layoutOrigin:virtualIndex`, so a recenter — which re-bases every
+lane — cannot serve a stale style: the old keys become unreachable rather than
+wrong, and nothing has to be invalidated synchronously in the middle of a render.
+Bounding it is then an effect that runs after the commit and drops every key that
+is not a live lane at the current origin, which covers a window shift and a
+recenter with one rule.
