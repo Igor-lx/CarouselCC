@@ -8,8 +8,20 @@ correct first-render read and an SSR-safe fallback.
 const isWide = useMediaQuery("(min-width: 1024px)");
 ```
 
-`getMediaQueryStore(query)` is the raw store behind it — exposed by deep import
-only (not the shared barrel) for non-React consumers and the lifecycle tests.
+`useMediaQuerySet(queries)` → one bit per query, as a string. Use it whenever
+the NUMBER of conditions is data rather than a constant. Calling
+`useMediaQuery` in a loop would tie the hook count to the length of that data,
+and a list that grows between renders then breaks React's hook order — with an
+error that names neither the hook nor the list. The set store subscribes to the
+same per-query stores underneath, so nothing is watched twice.
+
+```ts
+const bits = useMediaQuerySet(tierQueries); // "010" — changes iff a verdict does
+```
+
+`getMediaQueryStore(query)` and `getMediaQuerySetStore(queries)` are the raw
+stores behind them — deep import only (not the shared barrel), for non-React
+consumers and the lifecycle tests.
 
 ## Why it lives here, alone
 

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { useMediaQuery } from "../../shared/useMediaQuery";
+import { useMediaQuerySet } from "../../shared/useMediaQuerySet";
 
 // See ../README.md
 /** Tier names → `min-width` px; resolution is purely numeric (largest matching wins). */
@@ -49,19 +49,47 @@ export interface BreakpointState {
   ) => T | undefined;
 }
 
-// The `table` MUST be a static module constant (one hook subscribed per tier).
-export function useBreakpoint(table: BreakpointTable): BreakpointState {
+/**
+ * Everything a table resolves to, worked out once per table SHAPE and handed
+ * back as one stable object — so a caller may rebuild its table every render.
+ */
+interface TierPlan {
+  readonly entries: ReadonlyArray<readonly [string, number]>;
+  readonly queries: readonly string[];
+}
+
+const plans = new Map<string, TierPlan>();
+
+const resolveTierPlan = (table: BreakpointTable): TierPlan => {
   const entries = sortedBreakpointEntries(table);
-  const matched = entries.map(([, px]) =>
-    // eslint-disable-next-line react-hooks/rules-of-hooks -- static table contract
-    useMediaQuery(breakpointMinWidthQuery(px)),
-  );
-  const verdict = new Map(
-    entries.map(([, px], i) => [breakpointMinWidthQuery(px), matched[i]!]),
-  );
-  const name = resolveActiveBreakpoint(table, (q) => verdict.get(q) ?? false);
-  return useMemo<BreakpointState>(
-    () => ({ name, pick: (values) => values[name] ?? values.DEFAULT }),
-    [name],
-  );
+  const key = entries.map(([name, px]) => `${name}:${px}`).join(",");
+  let plan = plans.get(key);
+  if (!plan) {
+    plan = {
+      entries,
+      queries: entries.map(([, px]) => breakpointMinWidthQuery(px)),
+    };
+    plans.set(key, plan);
+  }
+  return plan;
+};
+
+/**
+ * The active tier of `table`, live.
+ *
+ * The table may be built however the caller likes: every tier is watched
+ * through ONE subscription, so the number of tiers never reaches React's hook
+ * counter (see `shared/useMediaQuerySet.ts`).
+ */
+export function useBreakpoint(table: BreakpointTable): BreakpointState {
+  const plan = resolveTierPlan(table);
+  const signature = useMediaQuerySet(plan.queries);
+
+  return useMemo<BreakpointState>(() => {
+    const hit = plan.entries.findIndex((_, i) => signature[i] === "1");
+    const active =
+      hit >= 0 ? plan.entries[hit] : plan.entries[plan.entries.length - 1];
+    const name = active?.[0] ?? "";
+    return { name, pick: (values) => values[name] ?? values.DEFAULT };
+  }, [plan, signature]);
 }

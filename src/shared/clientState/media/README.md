@@ -8,6 +8,11 @@ tiers, orientation, arbitrary queries. Two ways to take it:
 | `library/` | You want ONE thing: a breakpoint, orientation, or a single media query. Grab that hook. |
 | `useMedia/` | You want a whole SET resolved at once (tiers + orientation + flags) behind one call and one change signal. |
 
-Both sit on `../shared/useMediaQuery`. The facade keeps its own copies of the
-library hooks (so it lifts out independently), but a project still runs one
-store.
+Both sit on `../shared/` — `useMediaQuery` for a single condition,
+`useMediaQuerySet` for a whole set behind one subscription. The facade keeps its
+own copies of the library hooks (so it lifts out independently), but a project
+still runs one store.
+
+Neither hook cares how its table or axes are built: tiers and flags are watched
+through a single subscription, so their COUNT never reaches React's hook
+counter. Build them inline, from state, from a fetched config.

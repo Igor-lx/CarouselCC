@@ -15,10 +15,9 @@ import type { MediaAxes } from "../internal/canonicalMedia";
  * `signature` is the ONE value consumers compare to decide whether anything
  * moved; a signature that changes when nothing did re-runs every dependent
  * effect on the page, and one that fails to change when a tier flips leaves
- * the deck styled for the wrong breakpoint. And the hook calls
- * `useSyncExternalStore` in a LOOP over the axes, so the axes object has to be
- * a stable module constant — a fresh one per render changes the hook count
- * between renders, which React cannot survive.
+ * the deck styled for the wrong breakpoint. And the whole set rides ONE
+ * subscription, which is what lets the axes be data: their count never reaches
+ * React's hook counter, so a caller may rebuild or resize them freely.
  */
 
 const AXES: MediaAxes = {
@@ -86,15 +85,15 @@ const queryFor = (name: string): string => {
   throw new Error(`no registered query mentions "${name}"`);
 };
 
-function Probe() {
+function Probe({ axes = AXES }: { axes?: MediaAxes }) {
   renders += 1;
-  seen = useMedia(AXES);
+  seen = useMedia(axes);
   return null;
 }
 
-const render = () =>
+const render = (axes?: MediaAxes) =>
   act(() => {
-    root.render(<Probe />);
+    root.render(axes ? <Probe axes={axes} /> : <Probe />);
   });
 
 beforeEach(() => {
@@ -220,5 +219,57 @@ describe("useMedia — teardown", () => {
       0,
     );
     expect(left).toBe(0);
+  });
+});
+
+describe("useMedia — the axes are data", () => {
+  it("survives a fresh axes object on every render", () => {
+    // The literal is rebuilt each time, exactly what a caller assembling axes
+    // from props or config would do.
+    const build = (): MediaAxes => ({
+      breakpoints: { desktop: 1024, mobile: 0 },
+      flags: { tall: "(orientation: portrait)" },
+    });
+    render(build());
+    render(build());
+    expect(seen.breakpoint).toBe("mobile");
+    expect(seen.flags["tall"]).toBe(false);
+  });
+
+  it("accepts a set that GROWS between renders", () => {
+    // The case the old loop could not survive: one more condition meant one
+    // more hook, and React answered with an error naming neither.
+    render({
+      breakpoints: { d: 900, m: 0 },
+      flags: { a: "(min-height: 400px)" },
+    });
+    expect(Object.keys(seen.flags)).toEqual(["a"]);
+
+    render({
+      breakpoints: { d: 900, m: 0 },
+      flags: { a: "(min-height: 400px)", b: "(min-height: 800px)" },
+    });
+    expect(Object.keys(seen.flags)).toEqual(["a", "b"]);
+  });
+
+  it("resolves the new set, not a remembered one", () => {
+    render({ breakpoints: { wide: 1200, narrow: 0 } });
+    flip(queryFor("1200"), true);
+    expect(seen.breakpoint).toBe("wide");
+
+    // Same shape of question, different thresholds: the answer must follow the
+    // axes it was just handed.
+    render({ breakpoints: { huge: 4000, small: 0 } });
+    expect(seen.breakpoint).toBe("small");
+  });
+
+  it("drops the listeners of a set it no longer watches", () => {
+    render({ breakpoints: { d: 1500, m: 0 } });
+    const query = queryFor("1500");
+    expect(entryOf(query).listeners.size).toBe(1);
+
+    render({ breakpoints: { d: 1600, m: 0 } });
+    expect(entryOf(query).listeners.size).toBe(0);
+    expect(entryOf(queryFor("1600")).listeners.size).toBe(1);
   });
 });

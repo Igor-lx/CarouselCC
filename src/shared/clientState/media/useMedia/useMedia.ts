@@ -1,15 +1,16 @@
 import { useMemo } from "react";
 
-import { useMediaQuery } from "../../shared/useMediaQuery";
+import { useMediaQuerySet } from "../../shared/useMediaQuerySet";
+import {
+  resolveAxesDescriptor,
+  type MediaAxesDescriptor,
+} from "./internal/axesDescriptor";
 import { resolveActiveBreakpoint } from "./internal/resolveActiveBreakpoint";
 import {
   PORTRAIT_ORIENTATION_QUERY,
   type ViewportOrientation,
 } from "./internal/useOrientation";
-import {
-  canonicalMediaQueries,
-  type MediaAxes,
-} from "./internal/canonicalMedia";
+import type { MediaAxes } from "./internal/canonicalMedia";
 
 export interface MediaState {
   /** Active width-tier NAME (from the axes' breakpoint table). */
@@ -26,35 +27,46 @@ export interface MediaState {
   signature: string;
 }
 
-// See ./README.md — `axes` MUST be a static module constant: one hook is
-// subscribed per tracked condition, so its size/order may not change per render.
-export function useMedia(axes: MediaAxes): MediaState {
-  const queries = canonicalMediaQueries(axes);
-  const bits = queries.map((query) =>
-    // eslint-disable-next-line react-hooks/rules-of-hooks -- static axes contract (documented above)
-    useMediaQuery(query),
+/** Pure in its two arguments — which is why the memo below needs no exception:
+ * the descriptor already stands for the axes, one object per shape. */
+const buildMediaState = (
+  axes: MediaAxesDescriptor,
+  signature: string,
+): MediaState => {
+  const verdicts = new Map(
+    axes.queries.map((query, i) => [query, signature[i] === "1"]),
   );
-  const signature = bits.map((bit) => (bit ? "1" : "0")).join("");
+  const matches = (media: string): boolean =>
+    verdicts.has(media)
+      ? verdicts.get(media)!
+      : typeof window !== "undefined"
+        ? window.matchMedia(media).matches
+        : false;
+  return {
+    breakpoint: resolveActiveBreakpoint(axes.breakpoints, matches),
+    orientation: matches(PORTRAIT_ORIENTATION_QUERY) ? "portrait" : "landscape",
+    flags: Object.fromEntries(
+      axes.flags.map(([name, query]) => [name, matches(query)]),
+    ),
+    matches,
+    signature,
+  };
+};
 
-  return useMemo(() => {
-    const map = new Map(queries.map((query, i) => [query, bits[i]!]));
-    const matches = (media: string): boolean =>
-      map.has(media)
-        ? map.get(media)!
-        : typeof window !== "undefined"
-          ? window.matchMedia(media).matches
-          : false;
-    const breakpoint = resolveActiveBreakpoint(axes.breakpoints, matches);
-    const orientation: ViewportOrientation = matches(PORTRAIT_ORIENTATION_QUERY)
-      ? "portrait"
-      : "landscape";
-    const flags = Object.fromEntries(
-      Object.entries(axes.flags ?? {}).map(([name, query]) => [
-        name,
-        matches(query),
-      ]),
-    );
-    return { breakpoint, orientation, flags, matches, signature };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- verdicts fully encoded in signature; axes is a static constant
-  }, [signature]);
+/**
+ * Resolve a whole set of media axes in ONE subscription.
+ *
+ * `axes` may be built however the caller likes — inline, from state, from a
+ * fetched config. The set is folded into a single external store, so the hook
+ * count here is 1 no matter how many conditions the set holds (see
+ * `shared/useMediaQuerySet.ts` for why that matters).
+ */
+export function useMedia(axes: MediaAxes): MediaState {
+  const descriptor = resolveAxesDescriptor(axes);
+  const signature = useMediaQuerySet(descriptor.queries);
+
+  return useMemo(
+    () => buildMediaState(descriptor, signature),
+    [descriptor, signature],
+  );
 }
