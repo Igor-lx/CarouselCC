@@ -410,6 +410,10 @@ if (mode === "verify") {
       );
   };
 
+  // Куда указывают якоря каталога ограничений — по ним сверяются пометки
+  // CONSTRAINT в коде.
+  const invariantAnchors = [];
+
   for (const name of readdirSync(BASE)) {
     if (!name.endsWith(".md")) continue;
     // Заголовок раздела задаёт префикс путей и, если называет ровно один файл,
@@ -453,6 +457,8 @@ if (mode === "verify") {
         const last = Number(numbers[numbers.length - 1]);
         if (last > lines)
           broken.push(`${name}: ${span} — в файле ${lines} строк`);
+        if (name === "07-invariants.md")
+          invariantAnchors.push({ file, from: Number(numbers[0]), to: last });
       }
 
       let m;
@@ -493,6 +499,34 @@ if (mode === "verify") {
     }
   }
 
+  // 6. каждая пометка CONSTRAINT в коде описана в каталоге ограничений
+  // Соответствие — по якорю, указывающему в тот же файл рядом с пометкой:
+  // формулировка ограничения живёт в 07-invariants.md, а не в комментарии.
+  const CONSTRAINT_SLACK = 8;
+  const uncovered = [];
+  let constraints = 0;
+  for (const f of files) {
+    if (isTest(f)) continue;
+    const body = readFileSync(f, "utf8").split(NEWLINE);
+    body.forEach((line, index) => {
+      if (!line.includes("CONSTRAINT —")) return;
+      constraints++;
+      const at = index + 1;
+      const covered = invariantAnchors.some(
+        (a) =>
+          a.file === f &&
+          at >= a.from - CONSTRAINT_SLACK &&
+          at <= a.to + CONSTRAINT_SLACK,
+      );
+      if (!covered) uncovered.push(`${rel(f)}:${at}`);
+    });
+  }
+  console.log("=== Пометки CONSTRAINT ===");
+  console.log(
+    `  в коде: ${constraints}, без записи в 07-invariants: ${uncovered.length}`,
+  );
+  for (const u of uncovered) console.log("    " + u);
+
   console.log("=== Якоря ===");
   console.log(
     `  проверено: ${anchors}, из них с цитатой: ${cited}, битых: ${broken.length}`,
@@ -511,6 +545,7 @@ if (mode === "verify") {
   if (
     missing.length ||
     unnamed.length ||
+    uncovered.length ||
     broken.length ||
     wrong.length ||
     unresolved.length
