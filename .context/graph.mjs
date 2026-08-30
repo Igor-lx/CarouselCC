@@ -513,13 +513,16 @@ if (mode === "verify") {
       if (!covered) uncovered.push(`${rel(f)}:${at}`);
     });
   }
-  // 1. каждый файл кода упомянут в карте
+  // 1. каждый файл кода и каждый стиль упомянуты в карте
   // Ambient-объявления описывать нечем: в них нет ни поведения, ни связей.
-  const code = files.filter((f) => !isTest(f) && !f.endsWith(".d.ts"));
+  const code = [
+    ...files.filter((f) => !isTest(f) && !f.endsWith(".d.ts")),
+    ...everyFile.filter((f) => f.endsWith(".scss")),
+  ];
   const missing = code.filter((f) => !mapMentions.has(f));
   console.log("=== Покрытие карты ===");
   console.log(
-    `  файлов кода (без тестов): ${code.length}, не упомянуто: ${missing.length}`,
+    `  файлов кода и стилей (без тестов): ${code.length}, не упомянуто: ${missing.length}`,
   );
   for (const f of missing) console.log("    " + rel(f));
 
