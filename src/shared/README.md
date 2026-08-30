@@ -19,6 +19,7 @@ own README with the detail.
 | [`icons/`](./icons/README.md) | Inline SVG icon components. |
 | [`math/`](./math/README.md) | Numeric type guards for validating config/props/constants. |
 | [`hooks/`](./hooks/README.md) | Generic cross-cutting React helpers (`useIsomorphicLayoutEffect`). |
+| [`context/`](./context/README.md) | **Not code.** The working rules and the graph tool, planted in a new project before its first line: the quality bar, the workflow loop, and how to keep a knowledge base alongside the code. Written in the language this repo uses for documents outside `src` — see its README. |
 
 **Conventions.** Each blank keeps its own copies of the hooks it uses (duplicating
 a pure function costs nothing); the one thing never duplicated is a store — see
