@@ -172,11 +172,13 @@ if (mode === "cycles") {
 }
 
 // --- verify: сверка базы с кодом ---------------------------------------------
-// Четыре проверки, и все механические: покрытие карты, покрытие тестов, живость
-// якорей и объявленные размеры. Ненулевой код возврата означает, что база
-// отстала от кода.
+// Шесть проверок, и все механические: покрытие карты, покрытие тестов, пометки
+// CONSTRAINT, живость якорей с их цитатами, объявленные размеры и радиусы.
+// Ненулевой код возврата означает, что база отстала от кода.
 if (mode === "verify") {
   const BASE = HERE;
+  const MAP = "00-map.md";
+  const TESTS = "08-tests.md";
   const NEWLINE = String.fromCharCode(10);
   const REPO = path.join(BASE, "..");
 
@@ -305,36 +307,33 @@ if (mode === "verify") {
     }
     return text + extra.join(" ");
   };
-  const namedIn = (text, f) => {
-    const base = rel(f).split("/").pop();
-    const stem = base.slice(0, base.lastIndexOf("."));
-    return text.includes(base) || text.includes(stem);
+  // Файл засчитывается упомянутым только по хвосту пути, который однозначно
+  // указывает на него. Иначе `widget/defaults.ts` прошёл бы за счёт
+  // `config/defaults.ts` — одно имя, разные файлы, а описан один.
+  const suffixCache = new Map();
+  const uniqueSuffix = (f) => {
+    const cached = suffixCache.get(f);
+    if (cached !== undefined) return cached;
+    const parts = rel(f).split("/");
+    let answer = rel(f);
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const suffix = parts.slice(i).join("/");
+      const hits = files.filter(
+        (g) => rel(g) === suffix || rel(g).endsWith("/" + suffix),
+      ).length;
+      if (hits === 1) {
+        answer = suffix;
+        break;
+      }
+    }
+    suffixCache.set(f, answer);
+    return answer;
   };
-
-  // 1. каждый файл кода упомянут в карте
-  // Ambient-объявления описывать нечем: в них нет ни поведения, ни связей.
-  const mapText = withGroups(
-    readFileSync(path.join(BASE, "00-map.md"), "utf8"),
-  );
-  const code = files.filter((f) => !isTest(f) && !f.endsWith(".d.ts"));
-  const missing = code.filter((f) => !namedIn(mapText, f));
-  console.log("=== Покрытие карты ===");
-  console.log(
-    `  файлов кода (без тестов): ${code.length}, не упомянуто: ${missing.length}`,
-  );
-  for (const f of missing) console.log("    " + rel(f));
-
-  // 2. каждый тестовый файл назван в 08-tests.md
-  const testsText = withGroups(
-    readFileSync(path.join(BASE, "08-tests.md"), "utf8"),
-  );
-  const testFiles = files.filter(isTest);
-  const unnamed = testFiles.filter((f) => !namedIn(testsText, f));
-  console.log("=== Покрытие тестов ===");
-  console.log(
-    `  тестовых файлов: ${testFiles.length}, не названо: ${unnamed.length}`,
-  );
-  for (const f of unnamed) console.log("    " + rel(f));
+  const namedIn = (text, f) => {
+    const suffix = uniqueSuffix(f);
+    const stem = suffix.slice(0, suffix.lastIndexOf("."));
+    return text.includes(suffix) || text.includes(stem);
+  };
 
   // 3, 4 и 5. якоря, объявленные размеры и радиус поражения слоя — одним
   // проходом по строкам: все три читают контекст заголовка, он задаёт и префикс
@@ -348,6 +347,7 @@ if (mode === "verify") {
   // а не по папке, поэтому и живёт в проверке, а не в тексте.
   const IMPORTERS_RE =
     /`([\w./*{},-]+\/(?:\*\*)?)`[^`\n]*?(\d+) импортёр[а-я]*(?: \(\+(\d+) тест[а-я]*\))?/g;
+  const PATH_RE = /`([\w./{},*-]+\.(?:tsx|ts|scss))`/g;
   const HEAD_RE = /^#{2,4}[^`]*`([^`]+)`/;
   const HEAD_FILES_RE = /`([\w./{},*-]+\.(?:tsx|ts|scss))`/g;
   const ANCHOR_TAIL = /\.(tsx?|scss|md|json|html)$/;
@@ -369,6 +369,9 @@ if (mode === "verify") {
       return;
     }
     sized++;
+    // Заявленная папка описывает то, что в ней лежит; у тестов такого зачёта
+    // нет — 08-tests.md обязан называть каждый файл поимённо.
+    if (name === MAP) for (const hit of hits) mapMentions.add(hit);
     if (hits.length !== Number(filesClaim))
       wrong.push(
         `${name}: ${q} — записано ${filesClaim} файлов, на диске ${hits.length}`,
@@ -413,6 +416,11 @@ if (mode === "verify") {
   // Куда указывают якоря каталога ограничений — по ним сверяются пометки
   // CONSTRAINT в коде.
   const invariantAnchors = [];
+
+  // Пути, разобранные из текста базы: покрытие считается по ним, а не по
+  // совпадению имени файла — иначе одноимённые файлы засчитывают друг друга.
+  const mapMentions = new Set();
+  const testMentions = new Set();
 
   for (const name of readdirSync(BASE)) {
     if (!name.endsWith(".md")) continue;
@@ -496,6 +504,15 @@ if (mode === "verify") {
       IMPORTERS_RE.lastIndex = 0;
       while ((m = IMPORTERS_RE.exec(line)) !== null)
         claimImporters(name, m[1], prefix, m[2], m[3]);
+      PATH_RE.lastIndex = 0;
+      while ((m = PATH_RE.exec(line)) !== null) {
+        for (const one of variants(m[1])) {
+          const hit = locate(one, prefix);
+          if (hit === null) continue;
+          if (name === MAP) mapMentions.add(hit);
+          if (name === TESTS) testMentions.add(hit);
+        }
+      }
     }
   }
 
@@ -521,6 +538,25 @@ if (mode === "verify") {
       if (!covered) uncovered.push(`${rel(f)}:${at}`);
     });
   }
+  // 1. каждый файл кода упомянут в карте
+  // Ambient-объявления описывать нечем: в них нет ни поведения, ни связей.
+  const code = files.filter((f) => !isTest(f) && !f.endsWith(".d.ts"));
+  const missing = code.filter((f) => !mapMentions.has(f));
+  console.log("=== Покрытие карты ===");
+  console.log(
+    `  файлов кода (без тестов): ${code.length}, не упомянуто: ${missing.length}`,
+  );
+  for (const f of missing) console.log("    " + rel(f));
+
+  // 2. каждый тестовый файл назван в 08-tests.md — поимённо, папкой не зачесть
+  const testFiles = files.filter(isTest);
+  const unnamed = testFiles.filter((f) => !testMentions.has(f));
+  console.log("=== Покрытие тестов ===");
+  console.log(
+    `  тестовых файлов: ${testFiles.length}, не названо: ${unnamed.length}`,
+  );
+  for (const f of unnamed) console.log("    " + rel(f));
+
   console.log("=== Пометки CONSTRAINT ===");
   console.log(
     `  в коде: ${constraints}, без записи в 07-invariants: ${uncovered.length}`,
