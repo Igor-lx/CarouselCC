@@ -17,7 +17,7 @@
 
 ## A. Точка входа и публичный контракт
 
-### `client/Carousel.tsx` (408) — композиционный корень
+### `client/Carousel.tsx` — композиционный корень
 Единственный файл, который знает всех. Порядок в нём — не стиль, а зависимость:
 окружение → слоты → конфиг → колода и раскладка → состояние → границы → рефы DOM
 и **измерение слота** → SSOT видимой позиции → модель рендера → канал плана →
@@ -52,28 +52,30 @@
   именно из-за этого `ИЛИ` — привязка к одной только целевой полосе гасила бы
   его на время движения.
 
-### `client/areCarouselPropsEqual.ts` (87) — мемо-компаратор
+### `client/areCarouselPropsEqual.ts` — мемо-компаратор
 Разобран отдельно, в разделе **J**: там же записано следствие, которого нет в
 типах, — стабильность компонента держится на том, что **хост** мемоизирует
 `slidesData`, `className`, `userEnvironment` и колбэки.
 
-### `client/index.ts` (15), `public-api/**` (138), `slides/SlideItem.types.ts` (29)
+### `client/index.ts`, `public-api/**` (138), `slides/SlideItem.types.ts`
 Публичная поверхность коробки: типы пропов и данных плюс оба набора ключей
 классов (`CLASS_NAME_KEYS`, `SLIDE_CLASS_KEYS`) — карту нельзя требовать
 заполнить, не отдав её ключи.
-- `public-api/types.ts` (79) — `SLIDE_CLASS_KEYS` и `CLASS_NAME_KEYS` как SSOT
+- `public-api/types.ts` — `SLIDE_CLASS_KEYS` и `CLASS_NAME_KEYS` как SSOT
   ключей классов; `Slide`, `SlideImageVariants`, `CarouselStatusSnapshot`,
   `UserEnvironment`, `CarouselHandle` — императивная ручка только со
   «шаг вперёд / шаг назад».
-- `public-api/schemas.ts` (39) — **Zod-схемы для хоста**, не для карусели:
+- `public-api/schemas.ts` — **Zod-схемы для хоста**, не для карусели:
   компонент их не вызывает (ADR-002, входы caller-owned). `ContentSchema` —
   строка, число **или React-элемент**, отсюда и стражи в стенде.
+- `public-api/index.ts` — бочка контракта: оба набора ключей, оба типа ключа и
+  типы пропов; ровно то же, что уходит через `client/index.ts`.
 - **Схемы намеренно не реэкспортируются из бочки** (`public-api/index.ts:13-19`):
   бочка лежит на рантайм-пути импорта, и значение-реэкспорт затянул бы Zod в
   бандл приложения. Сегодня Zod живёт ровно в одном значении — самом
   `schemas.ts`, — а `types.ts` берёт его `import type`, который стирается.
 
-### `client/slots/slotNames.ts` (14) + `index.ts` (2)
+### `client/slots/slotNames.ts` + `index.ts`
 Имена четырёх слотов и тип `CarouselSlotComponent<Component, SlotName>` —
 `Component & { slot }`. Именно эта форма не отслеживается Fast Refresh, из-за
 чего в конфиге линта есть отдельное исключение.
@@ -131,12 +133,12 @@
 (`gesture/coast`). Каждое — «implementation constant, not a knob»: живёт рядом с
 алгоритмом, который его толкует, а в конфиг попадает только для публикации.
 
-### `client/config/index.ts` (58) — бочка
+### `client/config/index.ts` — бочка
 Плоский реэкспорт 30+ констант, типов и двух функций сборки. Комментарий `:1-2`
 задаёт критерий отбора: «значение, изменение которого требует понимания
 окружающего алгоритма, сюда не относится» — отсюда и три константы вне папки.
 
-### `client/config/types.ts` (123) — pure, SSOT формы настроек
+### `client/config/types.ts` — pure, SSOT формы настроек
 - `CarouselSwipeConfig` (`:42-45` `export type CarouselSwipeConfig = Omit<`) —
   `Required` от конфига движка **минус** `minSwipeDistance` и
   `swipeThresholdRatio`, плюс собственный `commit`. Прежняя пометка «проверить,
@@ -149,25 +151,25 @@
 - Почти каждое поле несёт `@see` на константу-источник — это и есть связь между
   формой и значением, единственная в проекте.
 
-### `client/config/defaults.ts` (19) — pure, SSOT дефолтов пропов
+### `client/config/defaults.ts` — pure, SSOT дефолтов пропов
 14 значений `as const`. Разделены по потребителю, а не по смыслу: пять
 числовых/строковых читает `buildConfig`, девять булевых — `Carousel.tsx`.
 
 ### `client/config/{gesture,interaction,layout,legacyPaint,motion,slides}.ts`
-Плоские константы: `gesture.ts` (31) — 13 полей свайпа и 4 инерции;
-`motion.ts` (19) — 17 констант: десять долей профиля, два скоростных
+Плоские константы: `gesture.ts` — 13 полей свайпа и 4 инерции;
+`motion.ts` — 17 констант: десять долей профиля, два скоростных
 множителя, четыре числа геометрии GO_TO вместе с её выключателем и одна
-длительность отката; `slides.ts` (13) —
-тайминги вуали поворота и политика ретрая картинок; `interaction.ts` (6),
-`layout.ts` (3), `legacyPaint.ts` (2).
+длительность отката; `slides.ts` —
+тайминги вуали поворота и политика ретрая картинок; `interaction.ts`,
+`layout.ts`, `legacyPaint.ts`.
 
-### `client/config/viewport.ts` (23) — pure, SSOT осей вьюпорта
+### `client/config/viewport.ts` — pure, SSOT осей вьюпорта
 Три брейкпоинта (`desktop` 1024, `tablet` 768, `mobile` 0) и один флаг
 `short-landscape`. `SLIDE_CANONICAL_SOURCE_MEDIA` (`:31`) вычисляется
 `canonicalMediaQueries(...)` **на модульном уровне** — работа при импорте, не при
 использовании; см. `04-state.md`.
 
-### `client/config/resolve/buildConfig.ts` (104) — pure
+### `client/config/resolve/buildConfig.ts` — pure
 Собирает `CarouselRuntimeConfig`: константы плюс пять пропов через `withDefault`.
 - `withDefault` (`:36-37`) подставляет дефолт **только для `undefined`** и
   кастует остальное: `visibleSlidesNr: -1 | 0 | NaN | "3"` проходит насквозь.
@@ -179,7 +181,7 @@
 - `:99-103` `swipeConfig` и `releaseConfig` копируются поверхностно со вложенным
   `commit` — защита модульной константы от мутации потребителем, на два уровня.
 
-### `client/config/resolve/useCarouselConfig.ts` (28) — pure
+### `client/config/resolve/useCarouselConfig.ts` — pure
 `useMemo` над `buildCarouselConfig` по пяти сырым пропам. **На этой мемоизации
 держится сверка по идентичности в `useCarouselState`**: конфиг — стабильная
 ссылка, пока не менялся проп, поэтому `SYNC_CONTEXT` не срабатывает на каждый
@@ -199,13 +201,13 @@
 и `clampedVisibleSlidesCount` (реэкспортирован, но и импортируется напрямую из
 `layout.ts` внутри слоя).
 
-### `client/domain/index.ts` (39) — бочка
+### `client/domain/index.ts` — бочка
 `export *` из `math` и `types`, поимённо — из остальных шести файлов. Смешение
 двух стилей осознанным нигде не объявлено. Мимо бочки ходят четыре имени:
 `DRAG_RELEASE_EPSILON` (в ней его нет), `clampedVisibleSlidesCount` и два
 разбора кандидатов картинки — их берут прямым путём и внутри слоя, и снаружи.
 
-### `client/domain/types.ts` (41) — pure, SSOT формы данных слоя
+### `client/domain/types.ts` — pure, SSOT формы данных слоя
 `CarouselLayout` (7 полей), `CarouselSlideRecord`, `SlideAriaProps`,
 `VirtualSlide`, `RenderWindow`, `PageBoundaryState`. Формы отсюда расходятся по
 всему клиенту: `CarouselLayout` лежит в состоянии редьюсера, `VirtualSlide` —
@@ -215,12 +217,12 @@
   или размонтирование соседа не двигает слайд. Полоса считается от него
   (`slideLane`), а не от позиции в массиве.
 
-### `client/domain/math.ts` (9) — pure
+### `client/domain/math.ts` — pure
 `mod` — истинный модуль (`((v % t) + t) % t`), закрывает поведение JS `%` на
 отрицательных; `total <= 0 → 0`. `clamp`. `normalizePageIndex` = `mod` с той же
 защитой. Весь цикличный режим стоит на этих девяти строках.
 
-### `client/domain/layout.ts` (115) — pure, SSOT геометрии страниц
+### `client/domain/layout.ts` — pure, SSOT геометрии страниц
 `buildCarouselLayout` (`:32` `export const buildCarouselLayout`) выводит всю
 геометрию: `visibleSlidesCount` **клампится к длине колоды**,
 `canSlide = length > effectiveVisible`, `pageCount = ceil(length/effectiveVisible)`,
@@ -247,7 +249,7 @@
   сравнить, — идентичность такого слайда несёт `id`, и хост обязан его менять
   вместе с контентом. Стенд подаёт строки, поэтому вживую не проявляется.
 
-### `client/domain/slides.ts` (101) — pure
+### `client/domain/slides.ts` — pure
 Записи колоды, доклад до целых страниц и **общее правило выбора URL картинки**.
 - `resolveRenderedImageSrc` (`:91-99`) — контракт, а не удобство: комментарий
   `:89-90` «The one rule the renderer and the resource store share — they must
@@ -270,7 +272,7 @@
   прежний. Комментарий фиксирует намеренный приоритет: строгое «больше»
   сохраняет первого при равной ширине.
 
-### `client/domain/track.ts` (56) — pure, кроме `measureSlotSize`
+### `client/domain/track.ts` — pure, кроме `measureSlotSize`
 Всё, что превращает виртуальную позицию в пиксели и обратно.
 - `trackPixelTransform` (`:12`) и `trackCssTransform` (`:22`) — два выражения
   одного смещения: px для компоузитора, `calc()` для CSS-пути до первого замера.
@@ -286,7 +288,7 @@
 - `pointerVelocityToVirtual` (`:57`) — знак минус зашит здесь: «движение пальца
   вправо уменьшает виртуальный индекс».
 
-### `client/domain/visibility.ts` (41) — pure
+### `client/domain/visibility.ts` — pure
 `slideVisibilityFlags` — `isActual` (в полосе сейчас) против `isActive` (плюс
 то, что было видно на старте сегмента). Разница держит два поведения: `isActual`
 задаёт `aria-current`, `isActive` — интерактивность и `inert`.
@@ -297,7 +299,7 @@
   внутри. Два потребителя: `Carousel.tsx` и `slides/useSlideFetchReach.ts`
   (порог предзагрузки).
 
-### `client/domain/renderWindow.ts` (53) — pure
+### `client/domain/renderWindow.ts` — pure
 `buildRenderWindow` — окно с буфером `visibleSlidesCount * multiplier`: в finite
 клампится в `[0, length-1]`, в цикле не клампится вовсе (отрицательные полосы —
 это и есть способ нарисовать петлю). `buildSegmentWindow` — минимальное окно без
@@ -305,7 +307,7 @@
 `windowContains` включает края. `expandWindow` только расширяет — на этом
 держится «слайд не размонтируется посреди поездки» (`useSlideRenderModel`).
 
-### `client/domain/dragRelease.ts` (52) — pure
+### `client/domain/dragRelease.ts` — pure
 `resolveDragRelease` решает, куда сесть после отпускания пальца, и различает три
 случая: явное направление (соседняя страница от **опоры**, не от позиции),
 перехват летящей поездки (`pressedPageIndex ?? dragOriginPageIndex` — намерение
@@ -331,7 +333,7 @@
 Единственный источник этих ответов — редьюсер; всё, что выше, читает состояние и
 шлёт команды.
 
-`client/state/**` — 12 импортёров (+5 тестовых). Важны два вида зависимости —
+`client/state/**` — 12 импортёров (+6 тестовых). Важны два вида зависимости —
 те, кто держит `dispatch` (автоплей, жесты, навигация, исполнение движения), и
 те, кто читает `state`/`motionStatus` (контексты модулей, фабрика сегментов,
 длительности, диагностика). Первым важна **идентичность** `dispatch`: она не
@@ -344,7 +346,7 @@
 `modules/Diagnostic/checks/stateChecks.ts`. Остальные три вне слоя не нужны
 никому, кроме его собственных тестов.
 
-### `client/state/types.ts` (117) — pure, SSOT формы состояния
+### `client/state/types.ts` — pure, SSOT формы состояния
 `CarouselState` — 12 полей, включая **сам контекст** (`layout`, `config`,
 `isInstantMode`): с ADR-004 редьюсер владеет тем, чем решает. `MotionPhase` — 6
 значений, `MoveReason` — 3 плюс `null` до первого движения. Пять публичных команд
@@ -357,22 +359,22 @@
   строится именно от `virtualIndex`.
 
 ### Бочки слоёв, о которых нечего сказать сверх состава
-`client/context/index.ts` (22), `client/gesture/index.ts` (2),
-`client/navigation/index.ts` (2), `client/presentation/index.ts` (3),
-`client/slides/index.ts` (7) — плоские реэкспорты своего слоя. Единственное,
+`client/context/index.ts`, `client/gesture/index.ts`,
+`client/navigation/index.ts`, `client/presentation/index.ts`,
+`client/slides/index.ts` — плоские реэкспорты своего слоя. Единственное,
 что в них стоит знать, живёт в `01-facts.md`, D1: `presentation/index.ts` и
 `slides/index.ts` отдают имена, которые никто через них не берёт.
 
-### `client/state/index.ts` (9) — бочка
+### `client/state/index.ts` — бочка
 Пять типов и две функции. Всё остальное в слое — внутреннее.
 
-### `client/state/initial.ts` (28) — pure
+### `client/state/initial.ts` — pure
 `buildInitialState(layout, config, isInstantMode?)` — начальное состояние вместе
 с контекстом. `motionStatus` — четыре булевых из одной фазы
 (`isIdle`/`isMoving`/`isDragging`/`isJumping`); это то, что читает половина
 потребителей вместо самой фазы.
 
-### `client/state/reducer.ts` (230) — pure
+### `client/state/reducer.ts` — pure
 Шесть веток: `SYNC_CONTEXT` первой, затем пять команд.
 - **`SYNC_CONTEXT` — граница согласования.** Он и сводит раскладку
   (`reconcileStateToLayout`), и кладёт `config`/`isInstantMode` в состояние.
@@ -386,7 +388,7 @@
   дальше), преflight сел (разрезать середину, начать подход), обычная посадка в
   `idle`. Ветка `direction === 0` названа «вырожденной» и садится в `idle`.
 
-### `client/state/transitions.ts` (162) — pure
+### `client/state/transitions.ts` — pure
 Вся арифметика шага.
 - `stepOrigin` (`:21`) выбирает опорную страницу: при повторном клике в ту же
   сторону — от **визуальной** позиции (`floor`/`ceil` по направлению), иначе — от
@@ -404,7 +406,7 @@
 - `isSameDirectionRepeat` (`:160`) — только вне `idle`/`dragging` и только когда
   знак текущего движения совпадает со знаком клика.
 
-### `client/state/reconcile.ts` (47) — pure
+### `client/state/reconcile.ts` — pure
 `sameLayout` — четыре поля (`dataKey`, `visibleSlidesCount`, `isFinite`,
 `pageCount`), комментарий утверждает полноту: остальное держит `dataKey`.
 Три исхода: та же раскладка по значению → только подмена ссылки; смена `dataKey`
@@ -412,7 +414,7 @@
 пропорциональный перенос страницы и `motionPhase: "step-instant"`.
 **Идемпотентность — контракт ADR-001**, закреплена тестом.
 
-### `client/state/validateState.ts` (69) — pure, dev-only
+### `client/state/validateState.ts` — pure, dev-only
 Три структурных инварианта: `targetPageIndex` в границах; `teleportVirtualIndex`
 и `isTeleportApproach` — только в фазе `step-jump`. Каждый дефект несёт
 `expected` и `consequence` — текст уходит в дев-слот Diagnostic.
@@ -421,7 +423,7 @@
   же мысль стала основанием ADR-004 для `config` и `isInstantMode`.
 - Редьюсер валидатор **не спрашивает** — это диагностика, не защита.
 
-### `client/state/useCarouselState.ts` (36) — fx (`useReducer`)
+### `client/state/useCarouselState.ts` — fx (`useReducer`)
 Одно состояние, никакой проекции поверх. Контекст фиксируется `SYNC_CONTEXT`
 **во время рендера**, под сверкой идентичностей: `layout` и `config`
 мемоизированы выше по дереву, поэтому правка проходит за один проход и только
@@ -455,18 +457,18 @@
 Канал — обычная наблюдаемая **вне React**: публикация не вызывает ре-рендер.
 `client/motion/**` — 14 импортёров (+4 тестовых).
 
-### `client/motion/index.ts` (24) — бочка
+### `client/motion/index.ts` — бочка
 Своё плюс **реэкспорт пяти функций из полки** `shared/engines/motion`
 (`isWaapiSupported`, `keyframesAlongStops`, `positionAtNow`,
 `sampleProgressStops`, `startPinnedAnimation`): комментарий `:10-11` объясняет —
 у модулей карусели один корень импорта для всего, что касается движения.
 
-### `client/motion/types.ts` (24) — pure
+### `client/motion/types.ts` — pure
 `CarouselMotionStrategy` (5 значений, из них `idle` исключён в сегменте) и
 `CarouselMotionIntent` — **10 намерений**, по которым фабрика выбирает профиль.
 Намерение выводится из состояния, а не передаётся: см. `segmentFactory.ts`.
 
-### `client/motion/tolerances.ts` (3) и `sampler.ts` (4), `speed.ts` (10)
+### `client/motion/tolerances.ts` и `sampler.ts`, `speed.ts`
 `MOTION_EPSILON = 0.0001` — «implementation constant, not a knob», уходит в
 рантайм-конфиг через `buildConfig`. `sampleCarouselSegment` — псевдоним
 семплера полки. `speed.ts` берёт `alignSpeed` из **motion**-полки, а не из
@@ -474,7 +476,7 @@ gesture («в клике и автоплее пальца нет»), и оста
 одноимённый `sameDirectionSpeed` из gesture-полки жив, и алиас превращал бы
 каждый вызов в вопрос, какой импорт победил.
 
-### `client/motion/duration.ts` (61) — pure
+### `client/motion/duration.ts` — pure
 Длительность для «авторских по времени» движений: снап — фиксированная,
 мгновенное — 0, клик и жест — пропорционально пройденным страницам
 (`durationByVirtualSpan`), автоплей — всегда `autoplayDuration` независимо от
@@ -484,7 +486,7 @@ gesture («в клике и автоплее пальца нет»), и оста
   движения — и отдаёт **длительность автоплея**, а не шага. Через фабрику
   сегментов сюда приходит намерение `unknown-step`.
 
-### `client/motion/timing.ts` (123) — pure, SSOT геометрии GO_TO
+### `client/motion/timing.ts` — pure, SSOT геометрии GO_TO
 Единственный источник, из которого **и редьюсер, и фабрика сегментов** берут
 числа перелёта — «чтобы посадки и профиль не разъехались» (`:1-2`).
 - `resolveGoToPlan` (`:51` `export const resolveGoToPlan`) решает, лететь или
@@ -499,7 +501,7 @@ gesture («в клике и автоплее пальца нет»), и оста
   здесь **не срезается**, а уходит в Diagnostic — «over-budget is a Diagnostic,
   not a cap».
 
-### `client/motion/segmentFactory.ts` (355) — pure, ядро планирования
+### `client/motion/segmentFactory.ts` — pure, ядро планирования
 `buildCarouselSegment` — единственная точка, где состояние превращается в кривую.
 - `intentFromState` (`:31`) — порядок проверок и есть приоритет: мгновенное →
   преflight → подход → снап → прыжок → повторный клик → причина движения.
@@ -516,7 +518,7 @@ gesture («в клике и автоплее пальца нет»), и оста
   медленнее, чем перелёт на большее расстояние; если профиль вышел длиннее
   времени перелёта — пиковая скорость поднимается.
 
-### `client/motion/planChannel.ts` (95) — fx (наблюдаемая, вне React)
+### `client/motion/planChannel.ts` — fx (наблюдаемая, вне React)
 Четыре варианта плана, монотонный `planId`. Дедуп в `publish` только для `idle`
 и одинакового по флагу `follow`.
 - `:88` `publish` объявлен **свойством-функцией**, а не методом: его отцепляют
@@ -527,7 +529,7 @@ gesture («в клике и автоплее пальца нет»), и оста
   нотификации её не получит, отписавшийся — не будет вызван. Так во всех
   одиннадцати эмиттерах проекта; для полки это часть контракта, а не деталь.
 
-### `client/motion/useMotionRunner.ts` (286) — fx, исполнитель
+### `client/motion/useMotionRunner.ts` — fx, исполнитель
 Один layout-эффект, который решает всё: отменить, снапнуть, начать поездку.
 - **`replanInputs` (`:50`) — единый список полей, от которых зависит перепланирование.**
   `CONSTRAINT` в комментарии `:45-48`: список кормит и массив зависимостей, и
@@ -554,7 +556,7 @@ gesture («в клике и автоплее пальца нет»), и оста
   записанная точка отпускания; холодный старт — позиция из редьюсера, скорость
   из контроллера («намеренное разделение, а не смешанный перехват», `:290-291`).
 
-### `client/motion/useCarouselMotionExecution.ts` (23) — fx, тонкая обёртка
+### `client/motion/useCarouselMotionExecution.ts` — fx, тонкая обёртка
 Заменяет `onSettle` раннера на диспатч `MOTION_SETTLED`. Тип входа — `Omit`
 входа раннера, поэтому новое поле раннера расширяет обёртку автоматически.
 
@@ -571,7 +573,7 @@ gesture («в клике и автоплее пальца нет»), и оста
 четыре: трек (`geometry/useTrackBinding`), точки и виджет пагинации,
 `Carousel.tsx` (раздача в контексты).
 
-### `client/visual-position/types.ts` (29) — pure, форма кадра
+### `client/visual-position/types.ts` — pure, форма кадра
 `VisualPositionFrame` — 10 полей: позиция и та же позиция в страницах, скорость,
 цель, стратегия, время, фаза, прогресс и `runningFrameIndex` (индекс внутри
 текущей серии `running`, ноль на любом кадре покоя).
@@ -582,7 +584,7 @@ gesture («в клике и автоплее пальца нет»), и оста
 - `wake()` — вернуть краску на JS-цикл, когда владелец пассивного сегмента исчез;
 - `subscribe(listener, { emitCurrent })`.
 
-### `client/visual-position/useVisualPosition.ts` (143) — fx, SSOT
+### `client/visual-position/useVisualPosition.ts` — fx, SSOT
 - Контроллер создаётся здесь и живёт всю жизнь компонента; наружу отдаётся и он,
   и источник кадров — раннер работает с контроллером, потребители краски с
   источником.
@@ -599,12 +601,12 @@ gesture («в клике и автоплее пальца нет»), и оста
   сейчас» (палец): ставит значение, цель и нулевую скорость со стратегией
   `gesture`.
 
-### `client/visual-position/fallbackPacing.ts` (9) — pure
+### `client/visual-position/fallbackPacing.ts` — pure
 Одно общее правило сброса кадров в JS-фолбэке: роняются только кадры `running` и
 только каждый N-й, первый кадр серии красится всегда. Чистая функция от кадра —
 поэтому трек, точки и виджет роняют **одни и те же** кадры и не расходятся.
 
-### `client/visual-position/index.ts` (7) — бочка
+### `client/visual-position/index.ts` — бочка
 Хук, правило сброса и три типа.
 
 ---
@@ -617,10 +619,10 @@ gesture («в клике и автоплее пальца нет»), и оста
 Два независимых узла: измерение слота (одно на карусель) и привязка трека
 (владение `transform`). Между ними — подписка, а не вызов.
 
-### `client/geometry/index.ts` (8) — бочка
+### `client/geometry/index.ts` — бочка
 Оба хука, тип API привязки и `resolveImageSizes`.
 
-### `client/geometry/useSlotSizeSource.ts` (147) — fx, SSOT измерения
+### `client/geometry/useSlotSizeSource.ts` — fx, SSOT измерения
 **`CONSTRAINT` в шапке (`:36-39`): ровно одно измерение на карусель.** Несколько
 наблюдателей одного элемента могут ответить по-разному (округлённо против
 сырого), и тогда жест откалиброван по одному числу, а трек красит по другому.
@@ -647,7 +649,7 @@ gesture («в клике и автоплее пальца нет»), и оста
   Это парная половина к `CONSTRAINT` в `useTrackBinding`: там не ключуются на
   объекте, здесь объект не пересоздают.
 
-### `client/geometry/useTrackBinding.ts` (277) — fx, владелец `transform`
+### `client/geometry/useTrackBinding.ts` — fx, владелец `transform`
 Самый плотный файл слоя: решает, кто сейчас красит ленту — компоузитор, JS-кадры
 или ре-базировка геометрии.
 - **Два `CONSTRAINT` прямо в коде.** Первый (`:73-76`): эффекты кеятся на
@@ -671,7 +673,7 @@ gesture («в клике и автоплее пальца нет»), и оста
   сдвиг окна рендера с тем же origin — не должен стоить ничего.
 - Размонтирование отменяет анимацию само: она привязана к уходящему элементу.
 
-### `client/geometry/resolveImageSizes.ts` (17) — pure
+### `client/geometry/resolveImageSizes.ts` — pure
 Намеренно **не хук** (комментарий `:2-3`): читает уже опубликованный слот и
 своего состояния не держит. До первого измерения отдаёт долю `vw`, после —
 пиксели.
@@ -684,7 +686,7 @@ gesture («в клике и автоплее пальца нет»), и оста
 таймер и клавиатура. Все четыре кончаются одним и тем же — `dispatch` в редьюсер;
 собственного состояния колоды ни один не держит.
 
-### `client/gesture/useCarouselGesture.ts` (273) — fx, адаптер движка жестов
+### `client/gesture/useCarouselGesture.ts` — fx, адаптер движка жестов
 Переводит события полки `usePointerSwipe` в команды редьюсера и в записи трека.
 Самый насыщенный узел слоя: восемь рефов, три отложенных пути и один таймер.
 - **Отложенный `START_DRAG`.** Захват трека синхронный (палец обязан владеть
@@ -705,7 +707,7 @@ gesture («в клике и автоплее пальца нет»), и оста
 - Наружу отдаётся только `hostProps` — ref, слушатели и стили движка одним
   пакетом.
 
-### `client/gesture/coast.ts` (35) — pure
+### `client/gesture/coast.ts` — pure
 `resolveCoastedLaunchPosition` — доводка позиции за время коммита: между
 `END_DRAG` и стартом поездки проходит реальное время, и лента должна тронуться с
 того места, где палец её оставил бы. Экстраполяция ограничена
@@ -714,7 +716,7 @@ gesture («в клике и автоплее пальца нет»), и оста
 Скорость берётся **только по направлению к цели** (`sameDirectionSpeed`), поэтому
 откат и спокойное отпускание доводки не получают.
 
-### `client/gesture/slotAdaptiveSwipe.ts` (44) — pure
+### `client/gesture/slotAdaptiveSwipe.ts` — pure
 Перевод «контент-относительной» настройки свайпа в абсолютные пиксели движка под
 измеренный слот. `SWIPE_REFERENCE_SLOT_PX = 400` — **запись о калибровке**, а не
 кноб: при этой ширине резина настраивалась руками.
@@ -726,13 +728,13 @@ gesture («в клике и автоплее пальца нет»), и оста
 - До первого замера отдаётся пол дистанции коммита: настоящий жест всегда
   переживает первое измерение.
 
-### `client/navigation/useCarouselNavigation.ts` (74) — fx, тонкий
+### `client/navigation/useCarouselNavigation.ts` — fx, тонкий
 Шесть обработчиков поверх `dispatch`. Существенно одно: `fromVirtualIndex`
 берётся **из живой визуальной позиции** (`readCurrentPosition()`), а не из
 состояния — клик во время поездки считается от того, что видно, а не от того,
 куда колода едет. Выключатель `enabled` гасит и `move`, и `goTo`.
 
-### `client/autoplay/useAutoplay.ts` (94) — fx, чистый таймер
+### `client/autoplay/useAutoplay.ts` — fx, чистый таймер
 Механика без карусели: интервал, пауза по ховеру с задержкой, отложенный тик.
 - Таймер **перевзводится сам** при занятом вьюпорте (`shouldDeferTick`), и цена
   промаха — полный интервал; `AUTOPLAY_RESETTLE_DELAY_MS` управляет «тишиной»
@@ -743,14 +745,14 @@ gesture («в клике и автоплее пальца нет»), и оста
   `shouldDeferTick`: смена идентичности любого **перезапускает таймер с нуля**,
   поэтому стабильность этих колбэков — обязанность вызывающего.
 
-### `client/autoplay/useCarouselAutoplay.ts` (54) — fx, склейка
+### `client/autoplay/useCarouselAutoplay.ts` — fx, склейка
 Сводит три сигнала в один `isPaused`: видимость вьюпорта
 (`useViewportVisibility` с порогом из конфига), палец на ленте, собственная
 поездка. Плюс `getIsViewportBusy` из полки как отложенный тик и `isTouch` как
 `ignoreHover`. Шаг и возврат к началу — через `navigation`, то есть автоплей
 ходит теми же дверьми, что и пользователь.
 
-### `client/focus/useFocusRecovery.ts` (28) — fx
+### `client/focus/useFocusRecovery.ts` — fx
 Решает **когда** просить полку спасти фокус, а не куда его девать (это
 `manageFocusShift`). Условие: колода в покое **и** (страница сменилась либо
 только что закончилось движение). Прошлый триггер хранится в рефе, чтобы не
@@ -765,7 +767,7 @@ gesture («в клике и автоплее пальца нет»), и оста
 
 ### Контексты: **раздельные половины — главный приём слоя**
 
-`context/types.ts` (98) объявляет две ценности вместо одной, и это не стиль:
+`context/types.ts` объявляет две ценности вместо одной, и это не стиль:
 - **`CarouselStableContextValue`** — низкочастотная: раскладка, навигация,
   источники позиции и плана, ссылка на трек, ворота предзагрузки. Переживает
   всю поездку без пере-идентификации;
@@ -776,7 +778,7 @@ gesture («в клике и автоплее пальца нет»), и оста
 чужой. Тест на этом стоит отдельный («survives a MOTION transition — the whole
 reason for the split»).
 
-### `client/context/useModuleContextValue.ts` (129) — fx
+### `client/context/useModuleContextValue.ts` — fx
 Собирает обе половины из состояния: четыре промежуточных `useMemo`
 (статус, раскладка, намерение, навигация) и два финальных.
 - Зависимости расписаны **по полям**, а не по объектам: `state.layout.pageCount`,
@@ -785,23 +787,23 @@ reason for the split»).
 - `visualPosition` и `motionPlan` объявлены как `| null`: **под reduced motion
   их не публикуют вовсе** — модулю нечего слушать, а не «источник, который молчит».
 
-### `client/context/CarouselModuleContext.ts` (24), `CarouselDiagnosticContext.ts` (12)
+### `client/context/CarouselModuleContext.ts`, `CarouselDiagnosticContext.ts`
 Три контекста и три хука-читателя. Отсутствие провайдера — **исключение с
 понятным текстом**, а не тихий `null`: «module must render inside a `<Carousel>`».
 
-### `client/context/useDiagnosticContextValue.ts` (147) — fx, dev-only
+### `client/context/useDiagnosticContextValue.ts` — fx, dev-only
 Зеркало входов для дев-слота: сырые пропы как есть (`unknown`), раскладка до и
 после клампа, состояние слотов. Существует, чтобы диагностика сверяла **то, что
 хост передал**, с тем, что карусель поняла.
 
-### `client/render-policy/useModuleRenderPolicy.ts` (76) — fx, ворота модулей
+### `client/render-policy/useModuleRenderPolicy.ts` — fx, ворота модулей
 Единственное место, где решается, рендерить ли модуль. Два разных вопроса,
 которые легко спутать: `hasXSlot` — «слот вообще передан» (по нему диагностика
 судит о проводке хоста) и `slots.x` — «его сейчас показывать». Контролы и
 пагинация гасятся ещё и по `canSlide`; диагностика — **только в dev**
 (`isDiagnosticAttached`), и это записано прямо в коде.
 
-### `client/presentation/useCarouselPresentation.ts` (87) — fx
+### `client/presentation/useCarouselPresentation.ts` — fx
 Классы, корневые переменные, флаги и **геттер стиля полосы**.
 - `slideStyleFor` — именно геттер, а не параллельный массив: комментарий `:28-30`
   объясняет, что позиционное соответствие с `virtualSlides` было бы инвариантом,
@@ -809,34 +811,34 @@ reason for the split»).
 - Кэш полос — в рефе с ключом `origin:virtualIndex`, поэтому смена опоры не
   требует синхронного сброса, а чистка ушла в эффект после коммита.
 
-### `client/presentation/cssVars.ts` (30) — pure, контракт JS→CSS
+### `client/presentation/cssVars.ts` — pure, контракт JS→CSS
 **Единственное место, где объявляются кастомные свойства.** Корневых три
 (два тайминга вуали и число видимых слайдов), на слайд — ровно одно:
 `--slide-lane`. Всё остальное CSS выводит сам.
 
-### `client/presentation/domPayload.ts` (19) — pure
+### `client/presentation/domPayload.ts` — pure
 `buildSlideClassMap` подставляет `""` вместо отсутствующего класса — `undefined`
 уронил бы атрибут целиком. `buildFlagAttributes` ставит `data-<flag>="true"`
 только для активных флагов: выключенный флаг — это **отсутствующий атрибут**, а
 не `"false"`.
 
-### `client/host-report/useCarouselStatusReporter.ts` (44) — fx
+### `client/host-report/useCarouselStatusReporter.ts` — fx
 Единственный канал наружу к хосту. Дедуп по значению
 (`areStatusSnapshotsEqual`), поэтому колбэк хоста не вызывается на каждый кадр
 поездки — только когда снимок реально изменился.
 
-### `client/host-report/statusSnapshot.ts` (12) — pure
+### `client/host-report/statusSnapshot.ts` — pure
 Поверхностное сравнение пяти полей. Тест перебирает **каждое** поле — новое поле
 в снимке без строчки здесь молча выключило бы дедуп для него.
 
-### `client/viewport/useSlideViewport.ts` (5) — fx, одна строка
+### `client/viewport/useSlideViewport.ts` — fx, одна строка
 Один вызов фасада `useMedia` над осями из конфига. Вся оконная логика — в полке.
 
 ---
 
 ## J. Мемо-компаратор
 
-### `client/areCarouselPropsEqual.ts` (87) — pure
+### `client/areCarouselPropsEqual.ts` — pure
 Все пропы сравниваются по `Object.is`, **кроме `children`** — те структурно
 (тип + key + мелкое сравнение пропов, глубина ≤ 4, `:16`).
 Комментарий `:1-4` объясняет причину: инлайновые JSX-дети — свежие объекты на
@@ -856,13 +858,13 @@ reason for the split»).
 Колода: из данных хоста рождаются записи и раскладка, из состояния — модель
 рендера, а из неё — сами элементы. Плюс отдельный SSOT загрузки картинок.
 
-### `client/slides/useCarouselSlideDeck.ts` (62) — fx
+### `client/slides/useCarouselSlideDeck.ts` — fx
 Три мемо-ступени: записи из данных → доклад до целых страниц (только если
 `isFullPagesOn` **и** последняя страница рваная) → раскладка. Здесь же считается
 `perfectPageLayoutInfo` — не для рендера, а для диагностики: сырая длина,
 расширенная, признак расширения.
 
-### `client/slides/useSlideRenderModel.ts` (154) — fx
+### `client/slides/useSlideRenderModel.ts` — fx
 Что вообще существует в DOM и с какими флагами. Три вещи живут между
 рендерами, и ни одна не держится в рефе, записанном из рендера: две — явное
 состояние, третья — `Map` во владении `useMemo` без зависимостей:
@@ -874,7 +876,7 @@ reason for the split»).
   диспатч плодит N слайдов, N `ariaProps` и N строк `aria-label`, и вся колода
   перерисовывается в те два кадра, где поездка начинается и садится.
 
-### `client/slides/useSlideFetchReach.ts` (97) — fx, ворота пропускной способности
+### `client/slides/useSlideFetchReach.ts` — fx, ворота пропускной способности
 Две волны загрузки: сперва видимая полоса, буфер — потом. Ворота открываются по
 «отчитался хоть раз» (успех **или** ошибка), иначе ретрай открывал бы и закрывал
 их циклически.
@@ -886,7 +888,7 @@ reason for the split»).
   иначе пересобирались бы постоянно.
 - Реач **никогда не сжимается**: открыв буфер, он остаётся открытым.
 
-### `client/slides/SlideItem.tsx` (134) — fx, мемоизированный элемент
+### `client/slides/SlideItem.tsx` — fx, мемоизированный элемент
 - **Ворота пропускной способности физические**: при `isFetchOn === false`
   `<img>` не монтируется вовсе. Комментарий объясняет почему — смонтированный
   `<img>` без `src` внутри `<picture>` всё равно выберет кандидата из
@@ -900,7 +902,7 @@ reason for the split»).
 - `inert` вешается на **всё, что вне `isActive`**, поэтому уехавший слайд не
   ловит фокус и попадания.
 
-### `client/slides/useOrientationSwapVeil.ts` (70) — fx
+### `client/slides/useOrientationSwapVeil.ts` — fx
 Маскирует гонку перерисовки старого кропа при повороте — **вид, а не забота
 стора ресурсов**. Реагирует на смену «подписи вьюпорта», которую читают **один
 раз в корне** и передают вниз: комментарий `:12-18` объясняет цену альтернативы —
@@ -913,22 +915,22 @@ N медиа-подписок и пересборка `MediaState` на кажд
 
 ### `client/slides/imageResource/**` (7 файлов) — SSOT загрузки
 Отдельный маленький мир: фреймворко-независимый стор плюс три хука-моста.
-- `createImageResourceStore.ts` (135) — карта записей по URL: статус, поколение,
+- `createImageResourceStore.ts` — карта записей по URL: статус, поколение,
   счётчик неудач, таймер ретрая. Снимки **замораживаются** и подменяются только
   при реальном изменении, поэтому `useSyncExternalStore` не дёргает подписчиков
   впустую. Неизвестный URL читается как `loading` — оптимистичный дефолт, чтобы
   слайд отрисовал `<img>` и дал браузеру начать.
 - Ретрай: дедуп (один таймер на URL), экспоненциальная задержка с потолком,
   предел попыток. Успех **обнуляет** счётчик неудач.
-- `useImageResource.ts` (65) — мост в React через `useSyncExternalStore`;
+- `useImageResource.ts` — мост в React через `useSyncExternalStore`;
   колбэки стабильны по `(store, url)`, а не по статусу. Неотслеживаемый слайд
   получает «вечно готовый» замороженный снимок.
-- `useImageResourceStore.ts` (26) — единственная точка, владеющая жизненным
+- `useImageResourceStore.ts` — единственная точка, владеющая жизненным
   циклом стора и удержанием.
-- `useImageResourceRetention.ts` (41) — чистка по данным: собирает URL **тем же
+- `useImageResourceRetention.ts` — чистка по данным: собирает URL **тем же
   правилом**, что и рендерер (`resolveRenderedImageSrc`), иначе живой URL был бы
   выброшен вместе с таймером.
-- `useImageResourceStoreInstance.ts` (27) — ленивое создание с точечным
+- `useImageResourceStoreInstance.ts` — ленивое создание с точечным
   `eslint-disable`: условная инициализация не выражается через `useState`, а
   создание из эффекта отдало бы потребителям `null` на один рендер.
 
@@ -942,7 +944,7 @@ N медиа-подписок и пересборка `MediaState` на кажд
 
 Пагинация существует в двух реализациях **одного слота**, и подключается ровно
 одна: `basic` — фиксированные точки, `widget` — скользящая лента; выбор между
-ними делает `modules/Pagination/index.ts` (6), отдающий обе.
+ними делает `modules/Pagination/index.ts`, отдающий обе.
 
 **Общей бочки у модулей нет, и это правильно.** Хост берёт каждый слот глубоким
 путём, и в первую очередь диагностику: один корень импорта на все модули втянул
@@ -954,16 +956,16 @@ N медиа-подписок и пересборка `MediaState` на кажд
 Точки — только указатель для глаза: обёртка `aria-hidden`, роль в доступности
 несёт полоса слайдов через `aria-current`.
 
-#### `basic/Pagination.tsx` (56), `PaginationDot.tsx` (52)
-Плюс `basic/types.ts` (13) — карта классов и единственный проп — и
-`basic/index.ts` (2).
+#### `basic/Pagination.tsx`, `PaginationDot.tsx`
+Плюс `basic/types.ts` — карта классов и единственный проп — и
+`basic/index.ts`.
 
 React флипает активную точку **сразу**, а плавность накладывает биндинг поверх —
 поэтому в компоненте нет ни анимации, ни состояния. Точка — `<button>`, когда
 клики разрешены, иначе `<div>`: интерактивность решается пропом, а не CSS.
 `disabled` на активной и `tabIndex={-1}` — точки не участвуют в табуляции.
 
-#### `basic/fadeKeyframes.ts` (129) — pure, математика внешнего вида
+#### `basic/fadeKeyframes.ts` — pure, математика внешнего вида
 Одна **бегущая точка отсчёта** (offset) владеет всей лентой: вид каждой точки
 считается от её расстояния до offset. Отсюда следует главное: смена режима
 (WAAPI-шаг, покадровое следование, покой) меняет **кто красит**, но не **где
@@ -975,7 +977,7 @@ React флипает активную точку **сразу**, а плавно
 - `reachedDotIndexes` — только те точки, которые за поездку хоть что-то покажут;
   остальные не анимируются вовсе.
 
-#### `basic/usePaginationFade.ts` (561) — fx, третий потребитель плана
+#### `basic/usePaginationFade.ts` — fx, третий потребитель плана
 Самый большой файл модуля. Три режима письма и одна функция вида.
 - **Внешний вид принадлежит CSS**: `readDotStates` читает те же переменные
   (`--pagination-dot-opacity` и пр.), которыми пользуются классы, — иначе
@@ -1001,12 +1003,12 @@ React флипает активную точку **сразу**, а плавно
 Другая модель: лента из фиксированного числа слотов, по которой **едет offset**,
 а точки перепроецируются. Собственная математика в `math/`.
 
-#### `widget/math/spatialField.ts` (53) — pure
+#### `widget/math/spatialField.ts` — pure
 Геометрия ленты: масштабы по расстоянию от центра (`scaleFactor^distance`) и
 позиции слотов, посчитанные **накопительно от центра** — расстояние между
 соседями зависит от их масштабов, а не константа.
 
-#### `widget/math/projection.ts` (84) — pure
+#### `widget/math/projection.ts` — pure
 Проекция одной точки на ленту: положение, масштаб, прозрачность, сила
 активности. Прозрачность считается по трём зонам — плато, спад до
 `EDGE_DOT_RESTING_OPACITY` в краевом слоте, затем передача за один **полный**
@@ -1015,12 +1017,12 @@ React флипает активную точку **сразу**, а плавно
 экспоненте (`EDGE_DOT_DRIFT_FACTOR`), а не обрываются.
 `writeDotProjection` пишет в переданный объект — на кадре аллокаций нет.
 
-#### `widget/math/trajectory.ts` (85) — pure
+#### `widget/math/trajectory.ts` — pure
 Складывает **временные стопы плана** и **пространственный путь точки** в один
 список ключевых кадров: функции сглаживания нет вовсе, кривая уже внутри стопов.
 Скретч-объект переиспользуется по той же причине.
 
-#### `widget/stepTarget.ts` (54) — pure, ограничитель убегания
+#### `widget/stepTarget.ts` — pure, ограничитель убегания
 `WIDGET_STEP_LOOKAHEAD = 2` — насколько шаг может уйти вперёд живого offset.
 Комментарий `:9-20` объясняет связку: покрытие элементов в биндинге
 (`DOT_COVERAGE_MARGIN_SLOTS = 2 * WIDGET_STEP_LOOKAHEAD`) **выведено из этого
@@ -1028,7 +1030,7 @@ React флипает активную точку **сразу**, а плавно
 точки. И само значение совпадает с `REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES`
 колоды: индикатор уходит вперёд ровно настолько же, насколько уходит колода.
 
-#### `widget/usePaginationWidgetBinding.ts` (562) — fx
+#### `widget/usePaginationWidgetBinding.ts` — fx
 - **Покрытие выведено, а не выбрано**: `DOT_COVERAGE_MARGIN_SLOTS` и
   `ACTIVE_DOT_COUNT` считаются из `WIDGET_STEP_LOOKAHEAD` — они не могут
   разъехаться.
@@ -1044,14 +1046,14 @@ React флипает активную точку **сразу**, а плавно
 - Три эпсилона (позиция, масштаб, прозрачность) гасят бессмысленные записи в
   стиль на каждом кадре.
 
-#### `widget/types.ts` (41), `widget/defaults.ts` (11), `widget/index.ts` (2)
+#### `widget/types.ts`, `widget/defaults.ts`, `widget/index.ts`
 Типы ленты (конфиг геометрии, состояние точки, публичные пропы), четыре числа
 внешнего вида по умолчанию (`visibleDots` 5, `dotSize` 24, `dotGap` 30,
 `scaleFactor` 0.585) плюс два коэффициента края — и бочка из двух строк.
 Значения — пропы виджета с дефолтами, а не рантайм-конфиг карусели: этот модуль
 настраивается хостом напрямую.
 
-#### `widget/PaginationWidget.tsx` (128), `PaginationWidgetDot.tsx` (19)
+#### `widget/PaginationWidget.tsx`, `PaginationWidgetDot.tsx`
 Компонент рисует либо **связанные** слоты (биндинг красит их сам), либо
 **статический снимок** (`projectDot`) — под reduced motion или когда потоков
 нет. Точка стартует невидимой (`scale(0)`, `opacity: 0`), чтобы не мигнуть до
@@ -1062,8 +1064,8 @@ React флипает активную точку **сразу**, а плавно
 
 ### L3. `modules/Controls` — навигационные зоны
 
-`Controls/Controls.tsx` (38), `Controls/NavigationZone.tsx` (30),
-`Controls/types.ts` (11), `Controls/index.ts` (2) и один стиль. Ничего не
+`Controls/Controls.tsx`, `Controls/NavigationZone.tsx`,
+`Controls/types.ts`, `Controls/index.ts` и один стиль. Ничего не
 решает: берёт из стабильной половины контекста `isAtStart`/`isAtEnd` и два
 обработчика.
 - Зона **не рендерится вовсе** на своей границе (finite-режим), а не гасится
@@ -1076,7 +1078,7 @@ React флипает активную точку **сразу**, а плавно
 
 ### L4. `modules/ResponsiveImages` — безголовый слот
 
-`ResponsiveImages.tsx` (96) ничего не рисует (`return null`). **Само присутствие
+`ResponsiveImages.tsx` ничего не рисует (`return null`). **Само присутствие
 модуля включает респонсив-стек** в слайдах: `srcSet`, `<source>`, `sizes`.
 - Тело модуля — предекодер, и он **выключен по умолчанию**
   (`isPredecodeOn = false`, «default `false`, measure»).
@@ -1091,7 +1093,7 @@ React флипает активную точку **сразу**, а плавно
   Провал декода снимает URL с учёта — ретраями владеет слайд.
 - `decodedRef` чистится по живому буферу на каждом проходе, поэтому набор не
   растёт бесконечно.
-- `ResponsiveImages/types.ts` (5) и `ResponsiveImages/index.ts` (2) — один
+- `ResponsiveImages/types.ts` и `ResponsiveImages/index.ts` — один
   необязательный проп и бочка из двух строк.
 
 ### L5. `modules/Diagnostic` — dev-only слой (~1560 строк)
@@ -1100,39 +1102,39 @@ React флипает активную точку **сразу**, а плавно
 закрыто `IS_DEV` (`import.meta.env.DEV`), поэтому и ветки, и импорты коллекторов
 выпадают из бандла.
 
-- `Diagnostic.tsx` (98) — шесть групп проверок, каждая мемоизирована **только на
+- `Diagnostic.tsx` — шесть групп проверок, каждая мемоизирована **только на
   своих входах**; аудит таблиц стилей отложен в `requestAnimationFrame` после
   монтирования (стили должны быть уже прикреплены). Компонент рендерит `null`.
-- `useGroupedWarnings.ts` (23) — вывод в `console.warn` с дедупом по подписи:
+- `useGroupedWarnings.ts` — вывод в `console.warn` с дедупом по подписи:
   один и тот же набор предупреждений не печатается дважды.
-- `checks/constantChecks.ts` (851) — **61 проверка** руками написанных констант:
+- `checks/constantChecks.ts` — **61 проверка** руками написанных констант:
   диапазоны, целочисленность, положительность, плюс отношения между долями
   профилей (сумма разгона и торможения) и вложенность бюджетов GO_TO. Правила
   строятся **внутри функции** (`buildNumericRules`), а не на модульном уровне —
   иначе бандлер не докажет чистоту и оставит их в проде.
-- `checks/viewportChecks.ts` (231) — оси вьюпорта: пустой набор брейкпоинтов,
+- `checks/viewportChecks.ts` — оси вьюпорта: пустой набор брейкпоинтов,
   нефинитные и отрицательные значения, **дубли по пикселям**, парсимость
   канонических медиа-строк, живые `<source media>` слайдов и имена состояний в
   CSS. Наборы для поиска тоже строятся по вызову.
-- `checks/propChecks.ts` (161) — публичные пропы, и **только явно переданные**:
+- `checks/propChecks.ts` — публичные пропы, и **только явно переданные**:
   `undefined` — это дефолт, а не ошибка. Плюс единственная проверка, которая
   смотрит не на число, а на **данные**: уникальность `id` слайдов, потому что
   `id` — это React-ключ (`domain/slides.ts`, `buildKey`).
-- `checks/layoutChecks.ts` (128) — раскладка и проводка слотов; явно отказывается
+- `checks/layoutChecks.ts` — раскладка и проводка слотов; явно отказывается
   ругаться на пустую колоду, «иначе читатель приучается игнорировать канал».
-- `checks/stateChecks.ts` (24) — тонкий адаптер над чистым
+- `checks/stateChecks.ts` — тонкий адаптер над чистым
   `validateCarouselState`: структурные нарушения состояния всегда `CRITICAL`.
-- `checks/widgetChecks.ts` (70) — пропы виджета пагинации, вызывается из самого
+- `checks/widgetChecks.ts` — пропы виджета пагинации, вызывается из самого
   виджета через `useWidgetDiagnostic`.
-- `Diagnostic/types.ts` (11) — форма одного наблюдения: две степени тяжести и
+- `Diagnostic/types.ts` — форма одного наблюдения: две степени тяжести и
   шесть полей, из которых `layer`+`field` опознают источник. На этой форме
   сходятся все шесть коллекторов.
-- `checks/index.ts` (13) — бочка коллекторов; `Diagnostic/index.ts` (3) отдаёт
+- `checks/index.ts` — бочка коллекторов; `Diagnostic/index.ts` отдаёт
   наружу компонент, `useWidgetDiagnostic` и типы.
-- `useWidgetDiagnostic.ts` (24) — **единственный случай, когда модуль зовёт
+- `useWidgetDiagnostic.ts` — **единственный случай, когда модуль зовёт
   модуль**: виджет пагинации вызывает его сам. Ключуется по четырём числам, а
   не по объекту входа — вызывающий пересобирает его на каждый рендер.
-- `formatter.ts` (56) — одна строка предупреждения; несериализуемое значение
+- `formatter.ts` — одна строка предупреждения; несериализуемое значение
   описывается, а не приводится к `"[object Object]"` (см. `docs/architecture/diagnostics.md`).
 
 ---
@@ -1142,10 +1144,10 @@ React флипает активную точку **сразу**, а плавно
 Три файла и один контракт. Правило одно: **числа считает JS, правила пишет CSS**,
 а стык между ними — четыре кастомных свойства и набор `data`-атрибутов.
 
-- `Carousel.module.scss` (197) в `@layer baseStyles`; модули — в
-  `@layer components`: `Pagination.module.scss` (92),
-  `Controls/Controls.module.scss` (123),
-  `widget/PaginationWidget.module.scss` (103). Порядок слоёв объявлен в
+- `Carousel.module.scss` в `@layer baseStyles`; модули — в
+  `@layer components`: `Pagination.module.scss`,
+  `Controls/Controls.module.scss`,
+  `widget/PaginationWidget.module.scss`. Порядок слоёв объявлен в
   `globals.scss:1` (`reset, baseStyles, components`) и закреплён тестом.
 - **Сброс дефолтов `<button>` повторяется дословно в каждом файле, который
   рисует контрол** (`Carousel.module.scss:83-96`, тот же блок в стилях
@@ -1174,7 +1176,7 @@ React флипает активную точку **сразу**, а плавно
 
 ## N. App / стенд
 
-`App.tsx` (202) — не продукт, а витрина: две коллекции слайдов, переключение
+`App.tsx` — не продукт, а витрина: две коллекции слайдов, переключение
 набора через `?slides=1|2`, тумблеры автоплея, темы и вида пагинации.
 
 - Читает `?slides` **на модульном уровне** (`App.tsx:35-40`) — SSR-враждебно, для
@@ -1189,10 +1191,10 @@ React флипает активную точку **сразу**, а плавно
   тюнинг хоста, а вот ключи таблицы — контракт компонента.
 - `openSlide` открывает `content` как URL и отсекает React-элемент: публичная
   схема допускает его третьим вариантом.
-- `App.module.scss` (104) — сырые `@media` вместо осей: это хост, у него свои
+- `App.module.scss` — сырые `@media` вместо осей: это хост, у него свои
   оси, формально допустимо.
-- `globals.scss` (108) — токены темы, `@layer reset`, объявление порядка слоёв.
-- `main.tsx` (16) — точка входа: `createRoot` под `StrictMode` и `ThemeProvider`
+- `globals.scss` — токены темы, `@layer reset`, объявление порядка слоёв.
+- `main.tsx` — точка входа: `createRoot` под `StrictMode` и `ThemeProvider`
   над `App`. `StrictMode` здесь не деталь стенда: двойное монтирование в dev —
   это то, ради чего мягкий `dispose` стора картинок и переиспользование
   контроллера движения вообще существуют.
@@ -1205,7 +1207,7 @@ React флипает активную точку **сразу**, а плавно
 осознанный выбор, не нарушение DRY. Ниже фиксируется факт и его цена, без
 предложения «объединить».
 
-### `shared/index.ts` (12)
+### `shared/index.ts`
 `export *` из `clientState`, `viewportObservation`, `engines/{motion,kinetic,gesture}`
 и `math/numeric`, плюс поимённо `useIsomorphicLayoutEffect`, `manageFocusShift`,
 `resolveSlots`, `mergeStyleMaps` и `ChevronIcon`. Это самый широкий импорт
@@ -1223,16 +1225,16 @@ star-экспортов нет — бочки собраны аккуратно.
   `client/motion/speed.ts` снят, и по имени на месте вызова видно, из какого
   движка пришла функция.
 
-### `shared/math/numeric.ts` (34) — pure
+### `shared/math/numeric.ts` — pure
 10 гардов, все `(value: unknown) => value is number`, все подразумевают
 конечность. Это и есть фундамент диагностики.
 
-### `shared/engines/motion/` (12 файлов, 1167) — движок движения
+### `shared/engines/motion/` (12 файлов) — движок движения
 
 Самостоятельный продукт: React только в трёх файлах-мостах, всё остальное —
 чистые функции и одна фабрика. Карусель — лишь один из возможных потребителей.
 
-- `runtime/types.ts` (88) — контракт целиком. Две вещи объявлены **раздельно и
+- `runtime/types.ts` — контракт целиком. Две вещи объявлены **раздельно и
   намеренно**: `captureHandoff` («атомарная точка продолжения: позиция и
   скорость из одного сэмпла, без эмита») и `getSnapshot` («последний
   **испущенный** кадр — для UI, не для передачи движения»). Смешать их —
@@ -1241,7 +1243,7 @@ star-экспортов нет — бочки собраны аккуратно.
   объявлены как
   `?: T | undefined`: под `exactOptionalPropertyTypes` прокидывание чужого
   опционального насквозь иначе не типизируется.
-- `runtime/createMotionController.ts` (262) — SSOT позиции.
+- `runtime/createMotionController.ts` — SSOT позиции.
   - **Пассивный сегмент** (`isPassive`): кадрового цикла нет вовсе, вместо него
     один таймер на конец; посадка считается от `endTime`, а не от момента
     срабатывания таймера, поэтому финальный сэмпл — точный конец кривой.
@@ -1254,22 +1256,22 @@ star-экспортов нет — бочки собраны аккуратно.
   - Отцепить от объекта можно **любой** метод, включая `destroy`: тело отмены
     вынесено в локальную функцию, `this` не используется нигде. Закреплено
     тестом.
-- `profile/profile.ts` (183) — зоны разгона, круиза и торможения; скорость внутри
+- `profile/profile.ts` — зоны разгона, круиза и торможения; скорость внутри
   зоны интерполируется `smoothstep`, расстояние — его интегралом, поэтому
   скорость и путь согласованы.
   **Доли берутся как есть** (`profile/profile.ts:92-93`): перерасход даёт
   отрицательный круиз, и зона просто пропускается — это ADR-002 в действии,
   никакой нормализации.
-- `profile/progressCurve.ts` (157) — плотность стопов выводится из кривой, а не
+- `profile/progressCurve.ts` — плотность стопов выводится из кривой, а не
   задаётся константой; `resolvePeakSpeedForDuration` — корень квадратного
   уравнения; `isWaapiSupported` кэширует ответ на процесс.
-- `compositor/pinnedAnimation.ts` (27) — `fill: "both"` держит начало, пока часы
+- `compositor/pinnedAnimation.ts` — `fill: "both"` держит начало, пока часы
   не догнали; два `try/catch` на капризные движки, и они **не одинаковые**:
   первый (`animate()` бросил) возвращает `null`, и вызывающий уходит на
   JS-краску; второй (движок отверг явный `startTime`) только глотает
   исключение — анимация уже создана и отдаётся как есть, play-pending. То есть
   отказ пина не роняет поездку на JS, а лишь снимает с неё общие часы.
-- `compositor/compositedRide.ts` (268) — «под ключ» путь для ОДНОГО элемента.
+- `compositor/compositedRide.ts` — «под ключ» путь для ОДНОГО элемента.
   Райдер живёт в состоянии, а не в ref из рендера: он владеет живой ручкой
   анимации. Комментарий `compositor/compositedRide.ts:18-21` отделяет этот
   случай от «раздать многим» — там композируют примитивы напрямую.
@@ -1281,13 +1283,13 @@ star-экспортов нет — бочки собраны аккуратно.
   во втором форке. Для рантайма это ровно то, что нужно (ответ не меняется),
   для теста — ловушка: подменять `Element.prototype.animate` можно только до
   первого вызова. В шапке `pinnedAnimation.test.ts` это записано прямо.
-- `runtime/clock.ts` (4) — `motionNow` — **единственные часы движения**
+- `runtime/clock.ts` — `motionNow` — **единственные часы движения**
   (`performance.now` с SSR-фолбэком). Всё, что сверяет фазу, обязано брать время
   отсюда, иначе компоузитор и контроллер разъедутся.
 
-### `shared/engines/gesture/` (11 файлов, 1122) — движок жестов
+### `shared/engines/gesture/` (11 файлов) — движок жестов
 
-- `swipe/usePointerSwipe.ts` (587) — распознавание: фазы
+- `swipe/usePointerSwipe.ts` — распознавание: фазы
   `idle → press → dragging → cooldown`, окно перехвата 250 мс
   (`swipe/usePointerSwipe.ts:50-51`: «пропускает настоящую прокрутку, ловит
   удержание»), три скорости по EMA,
@@ -1300,7 +1302,7 @@ star-экспортов нет — бочки собраны аккуратно.
   - `touchmove` отменяется **избирательно**: в фазе `dragging` всегда, в фазе
     `press` — только когда горизонтальное смещение перевесило вертикальное.
     Это и есть граница «наш жест против прокрутки страницы».
-- `swipe/internals/resolveSwipeDirection.ts` (66) — коммит по флику **или** по
+- `swipe/internals/resolveSwipeDirection.ts` — коммит по флику **или** по
   дистанции, с порогом, адаптированным к сопротивлению.
   **`CONSTRAINT` в коде (`swipe/internals/resolveSwipeDirection.ts:50-59`)**:
   во флик-ветке нельзя читать смещение. На
@@ -1308,25 +1310,25 @@ star-экспортов нет — бочки собраны аккуратно.
   смещение скажет «вправо», а возвращаемая скорость будет отрицательной — два
   противоречивых ответа из одного вызова, и `sameDirectionSpeed` ниже по потоку
   обнулит скорость, запустив поездку с места после быстрого жеста.
-- `swipe/internals/math.ts` (61) — чистая арифметика: прогрессивное
+- `swipe/internals/math.ts` — чистая арифметика: прогрессивное
   сопротивление, EMA и **поправка веса EMA на переменный кадровый интервал**
   (`frameAdjustedAlpha`): при пропущенных кадрах вес применяется столько раз,
   сколько кадров прошло. Плюс `pauseDecayedVelocity` — распад скорости за
   человеческую паузу: удержание короче `graceMs` не стоит ничего, дальше
   скорость делится пополам каждые `halfLifeMs`. Это он превращает «замер перед
   отрывом» в честный ноль, а не в память о прошлом движении.
-- `inertia/releaseLaunch.ts` (48) — политика **непрерывного запуска**: старт с
+- `inertia/releaseLaunch.ts` — политика **непрерывного запуска**: старт с
   той скорости, которую глаз видел на отрыве, разгон до скорости намерения.
   `startSpeed` — больший из двух источников (усреднённая по жесту и мгновенная),
   поэтому быстрый отрыв не теряется, а медленный не перебивает живое движение.
-- `inertia/releaseKinetics.ts` (96) — одна дверь для потребителя: намерение
+- `inertia/releaseKinetics.ts` — одна дверь для потребителя: намерение
   флика и непрерывный запуск за один вызов; базовый темп принимается **скоростью**,
   а потребителю с длительностью показано, как перевести.
 - `inertia/{inertialRelease,speed}.ts`, `swipe/internals/interactiveTarget.ts` —
   чистые: усиление флика, выравнивание скорости по направлению, распознавание
   интерактивной цели под пальцем.
 
-### `shared/engines/kinetic/` (26 файлов, 2301) — фасад-сборка
+### `shared/engines/kinetic/` (26 файлов) — фасад-сборка
 
 Собственной физики не добавляет. Это **фасад над двумя внутренними форками**
 (`internal/gesture` + `internal/motion`), который один раз сшивает все швы,
@@ -1338,16 +1340,16 @@ star-экспортов нет — бочки собраны аккуратно.
 `keyframe` (как значение **выглядит**) и, по желанию, политику приземления
 `resolveTarget`.
 
-- `useKineticValue.ts` (168) — сам фасад. Все поездки идут через один `rideTo`,
+- `useKineticValue.ts` — сам фасад. Все поездки идут через один `rideTo`,
   поэтому глайд, `flyTo` и снап строят профиль одинаково. Перехват на лету
   выражен в связке `value.read()`: чтение **отменяет** летящую поездку и
   возвращает живую позицию, поэтому палец подхватывает значение без шва.
   Отпускание без цели (`to === null` или «уже там») — это всё равно посадка:
   `snap` с `completion: "immediate"`, потому что анимировать нечего, но сигнал
   «пришло в покой» потребитель обязан получить.
-- `internal/defaults.ts` (14) — пять значений с объяснением каждого прямо в
+- `internal/defaults.ts` — пять значений с объяснением каждого прямо в
   комментарии; окно моментум-глайда и порог «дрожания» — здесь.
-- `internal/types.ts` (58) — контракт фасада: `KineticRelease` (что оставил
+- `internal/types.ts` — контракт фасада: `KineticRelease` (что оставил
   палец), `KineticConfig` (включая сквозную настройку встроенного жеста).
 - **Снято:** `useCompositedRide(controller)` вызывается без `defaults`, и его
   собственный `useMotionPaint` внутри — инертная подписка. **Гипотеза снята**
@@ -1387,13 +1389,13 @@ star-экспортов нет — бочки собраны аккуратно.
 Три полки под одной крышей, и деление между ними — **по источнику сигнала**, а
 не по удобству.
 
-- `shared/useMediaQuery.ts` (72) — **единственное, что не дублируется во всём
+- `shared/useMediaQuery.ts` — **единственное, что не дублируется во всём
   `shared`**: один стор на строку медиа-запроса, подписка со счётчиком, и
   «уснул → следующий потребитель перечитывает живое значение». Первый
   подписчик пере-синхронизирует, последний отписавшийся сбрасывает
   инициализацию: без этого дремлющий стор отдал бы устаревший ответ после
   возвращения на вкладку.
-- `media/useMedia/useMedia.ts` (56) — фасад осей: **по хуку на каждое
+- `media/useMedia/useMedia.ts` — фасад осей: **по хуку на каждое
   отслеживаемое условие**, отсюда `eslint-disable rules-of-hooks` и контракт
   «оси обязаны быть статической модульной константой». Контракт объявлен в
   README полки и **ничем не проверяется** — размер и порядок осей меняться между
@@ -1418,7 +1420,7 @@ star-экспортов нет — бочки собраны аккуратно.
   обе ветки, получит два независимых стора и два глобальных слушателя. Это цена
   изоляции, а не дефект DRY: разобрано и закрыто в `01-facts.md`, H2.
 
-### `shared/viewportObservation/` (4 файла, 115)
+### `shared/viewportObservation/` (4 файла)
 - `useViewportVisibility` — `IntersectionObserver` плюс `visibilitychange`, и
   главное здесь — **сторона деградации**: без `IntersectionObserver` элемент
   считается видимым. Комментарий `useViewportVisibility.ts:27-30` объясняет
@@ -1431,7 +1433,7 @@ star-экспортов нет — бочки собраны аккуратно.
   репозиторий импортирует общую из `shared/hooks`. Помечена «НЕ УДАЛЯТЬ» и
   числится среди файлов без импортёров (`01-facts.md`, C).
 
-### `shared/theme/` (11 файлов, 219)
+### `shared/theme/` (11 файлов)
 `ThemeProvider.tsx` = `ThemeStateProvider.tsx` + `internal/BrowserChromeSync.tsx`;
 `useTheme.ts` — потребительский хук, `internal/ThemeContext.ts` — сам контекст,
 `internal/{storage,resolve,constants}.ts` и `colors.ts` — хранилище, разрешение
@@ -1441,9 +1443,9 @@ star-экспортов нет — бочки собраны аккуратно.
 тестом.
 
 ### `shared/{math,slots,styles,focus,hooks,icons}` — маленькие чистые полки
-- `math/numeric.ts` (34) — десять гардов вида `(value: unknown) => value is
+- `math/numeric.ts` — десять гардов вида `(value: unknown) => value is
   number`, **все подразумевают конечность**. На них стоит вся диагностика.
-- `slots/resolveSlots.ts` (33) — раскладка детей по слотам: неизвестный слот и
+- `slots/resolveSlots.ts` — раскладка детей по слотам: неизвестный слот и
   дубль слота предупреждаются **только в dev**, побеждает последний.
 - `icons/ChevronIcon.tsx` — единственная иконка проекта, инлайновый SVG.
 - `focus/manageFocusShift.ts` — куда девать фокус, когда слайд под ним ушёл из
@@ -1460,12 +1462,12 @@ star-экспортов нет — бочки собраны аккуратно.
 
 6 файлов, 381 строка. Полностью изолирован: `node:*` + собственные типы,
 **ни одного импорта из компонента** (проверяется тестом `boundaries.test.ts`).
-`data-gen/buildSlide.ts` (75) — конвенции одного слайда;
-`data-gen/generateSlides.ts` (90) — идемпотентное слияние с прошлым документом
+`data-gen/buildSlide.ts` — конвенции одного слайда;
+`data-gen/generateSlides.ts` — идемпотентное слияние с прошлым документом
 (сохраняет `id` и рукописный `alt` по стабильному слагу);
-`data-gen/runDataGen.ts` (131) — единственный файл, трогающий диск;
-`cli.ts` (30) — точка входа; `data-gen/types.ts` (33) — собственные типы
-генератора; `data-gen/index.ts` (35) — бочка. По графу она мертва, но её шапка
+`data-gen/runDataGen.ts` — единственный файл, трогающий диск;
+`cli.ts` — точка входа; `data-gen/types.ts` — собственные типы
+генератора; `data-gen/index.ts` — бочка. По графу она мертва, но её шапка
 объявляет её программным API папки («call `runDataGen(config)` /
 `generateSlides(...)` / `buildSlide(...)`»), то есть это тот же случай, что
 барьер форка: поверхность существует ради переноса, а не ради текущих
@@ -1475,7 +1477,7 @@ star-экспортов нет — бочки собраны аккуратно.
 
 ---
 
-## Q. Тесты — `src/**/tests/**` (112 файлов, 14851)
+## Q. Тесты — `src/**/tests/**` (114 файлов)
 
 Прочитаны полностью. Общая характеристика: это **не покрытие ради покрытия**.
 Почти каждый файл начинается с блока «что именно этот тест удерживает» —
@@ -1500,15 +1502,15 @@ star-экспортов нет — бочки собраны аккуратно.
 неслоёный класс хоста побеждает слоёное правило компонента.
 
 ### Интеграционный
-`carouselContract.test.tsx` (288) — единственный, кто монтирует реальный
+`carouselContract.test.tsx` — единственный, кто монтирует реальный
 `<Carousel>` и проверяет проводку 20 хуков между собой. Комментарий
 `carouselContract.test.tsx:22-26` честно говорит, что именно этого не видел
 никто из остальных.
 
 ### Крупнейшие
-`reducer.test.ts` (556), `segmentFactory.test.ts` (436),
-`usePaginationFade.test.tsx` (395), `useMotionRunner.test.tsx` (304),
-`trackBinding.test.tsx` (353), `createMotionController.test.ts` (345 в
+`reducer.test.ts`, `segmentFactory.test.ts`,
+`usePaginationFade.test.tsx`, `useMotionRunner.test.tsx`,
+`trackBinding.test.tsx`, `createMotionController.test.ts` (345 в
 `kinetic/internal/motion`, 337 в `engines/motion`).
 
 ### Тесты-форки — проверено механическим диффом

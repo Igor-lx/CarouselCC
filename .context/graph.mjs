@@ -230,6 +230,25 @@ if (mode === "open") {
 // CONSTRAINT и пометки решений, правила направления импортов, живость якорей
 // с их цитатами, объявленные размеры и радиусы. Ненулевой код возврата
 // означает, что база отстала от кода.
+// Объём файлов — по запросу. В базе этих чисел нет намеренно: строка меняется
+// от любой правки, и записанный объём превращает каждый коммит в правку базы.
+if (mode === "sizes") {
+  const NEWLINE = String.fromCharCode(10);
+  const size = (f) =>
+    readFileSync(f, "utf8")
+      .split(NEWLINE)
+      .filter((l) => l.trim() !== "").length;
+  const arg = process.argv[3];
+  const rows = files
+    .filter((f) => (arg ? rel(f).includes(arg) : true))
+    .map((f) => [rel(f), size(f)])
+    .sort((a, b) => b[1] - a[1]);
+  console.log("=== Непустых строк на файл ===" + NEWLINE);
+  for (const [f, n] of rows) console.log(String(n).padStart(5) + "  " + f);
+  const total = rows.reduce((sum, r) => sum + r[1], 0);
+  console.log(NEWLINE + `Файлов: ${rows.length}, непустых строк: ${total}.`);
+}
+
 if (mode === "verify") {
   const BASE = HERE;
   const MAP = "00-map.md";
@@ -298,11 +317,6 @@ if (mode === "verify") {
     return hits.length === 1 ? hits[0] : null;
   };
 
-  const nonEmpty = (f) =>
-    readFileSync(f, "utf8")
-      .split(NEWLINE)
-      .filter((l) => l.trim() !== "").length;
-
   // База пишет группы вида `{a,b}/tests`: раскрываем их в отдельные пути.
   const variants = (q) => {
     const group = /\{([^}]*)\}/.exec(q);
@@ -365,14 +379,14 @@ if (mode === "verify") {
     return hits.length ? hits : null;
   };
 
-  // 3, 4 и 5. якоря, объявленные размеры и радиус поражения слоя — одним
+  // 3, 4 и 5. якоря, состав объявленных папок и радиус поражения слоя —
   // проходом по строкам: все три читают контекст заголовка, он задаёт и префикс
   // пути, и файл, к которому относятся якоря вида `:120`.
-  const FILE_RE = /`([\w./{},*-]+\.(?:tsx|ts|scss))`\s*\((\d+)\)/g;
-  const DIR_RE =
-    /`([\w./*{},-]+\/(?:\*\*)?)`\s*\((\d+) файл[а-я]*(?:, (\d+))?\)/g;
-  const DASH_RE =
-    /`([\w./*{},-]+\/(?:\*\*)?)`[^`\n]*— (\d+) файл[а-я]* \/ (\d+) стро[а-я]*/g;
+  // Заявляется СОСТАВ папки, а не её объём: число файлов меняется, только
+  // когда файл появился или исчез, — и это ровно то событие, которое база
+  // обязана заметить. Объём строк не заявляется нигде (см. режим `sizes`).
+  const DIR_RE = /`([\w./*{},-]+\/(?:\*\*)?)`\s*\((\d+) файл[а-я]*\)/g;
+  const DASH_RE = /`([\w./*{},-]+\/(?:\*\*)?)`[^`\n]*— (\d+) файл[а-я]*/g;
   // Радиус поражения слоя: «22 импортёра (+12 тестовых)». Считается по графу,
   // а не по папке, поэтому и живёт в проверке, а не в тексте.
   const IMPORTERS_RE =
@@ -387,30 +401,24 @@ if (mode === "verify") {
 
   let anchors = 0;
   let cited = 0;
-  let sized = 0;
+  let dirs = 0;
   const broken = [];
   const wrong = [];
   const unresolved = [];
 
-  const claimDir = (name, q, prefix, filesClaim, linesClaim) => {
+  const claimDir = (name, q, prefix, filesClaim) => {
     const hits = under(q, prefix);
     if (hits === null) {
       unresolved.push(`${name}: ${q}`);
       return;
     }
-    sized++;
+    dirs++;
     // Заявленная папка описывает то, что в ней лежит; у тестов такого зачёта
     // нет — 08-tests.md обязан называть каждый файл поимённо.
     if (name === MAP) for (const hit of hits) mapMentions.add(hit);
     if (hits.length !== Number(filesClaim))
       wrong.push(
         `${name}: ${q} — записано ${filesClaim} файлов, на диске ${hits.length}`,
-      );
-    if (linesClaim === undefined) return;
-    const total = hits.reduce((s, f) => s + nonEmpty(f), 0);
-    if (total !== Number(linesClaim))
-      wrong.push(
-        `${name}: ${q} — записано ${linesClaim} строк, на диске ${total}`,
       );
   };
 
@@ -536,24 +544,12 @@ if (mode === "verify") {
             `${name}: ${m[1]}:${m[2]} — цитаты «${m[4]}» на этих строках нет`,
           );
       }
-      FILE_RE.lastIndex = 0;
-      while ((m = FILE_RE.exec(line)) !== null) {
-        const file = locate(m[1], prefix);
-        if (file === null) {
-          unresolved.push(`${name}: ${m[1]}`);
-          continue;
-        }
-        sized++;
-        const real = nonEmpty(file);
-        if (real !== Number(m[2]))
-          wrong.push(`${name}: ${m[1]} — записано ${m[2]}, на диске ${real}`);
-      }
       DIR_RE.lastIndex = 0;
       while ((m = DIR_RE.exec(line)) !== null)
-        claimDir(name, m[1], prefix, m[2], m[3]);
+        claimDir(name, m[1], prefix, m[2]);
       DASH_RE.lastIndex = 0;
       while ((m = DASH_RE.exec(line)) !== null)
-        claimDir(name, m[1], prefix, m[2], m[3]);
+        claimDir(name, m[1], prefix, m[2]);
       IMPORTERS_RE.lastIndex = 0;
       while ((m = IMPORTERS_RE.exec(line)) !== null)
         claimImporters(name, m[1], prefix, m[2], m[3]);
@@ -691,9 +687,9 @@ if (mode === "verify") {
     `  проверено: ${anchors}, из них с цитатой: ${cited}, битых: ${broken.length}`,
   );
   for (const b of broken) console.log("    " + b);
-  console.log("=== Объявленные размеры и радиусы ===");
+  console.log("=== Объявленный состав папок и радиусы ===");
   console.log(
-    `  размеров: ${sized}, радиусов: ${radii}, разошлось: ${wrong.length}`,
+    `  папок: ${dirs}, радиусов: ${radii}, разошлось: ${wrong.length}`,
   );
   for (const w of wrong) console.log("    " + w);
   if (unresolved.length) {

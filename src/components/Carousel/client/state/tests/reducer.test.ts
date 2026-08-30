@@ -267,6 +267,33 @@ describe("MOTION_SETTLED", () => {
     expect(done.virtualIndex).toBe(15);
   });
 
+  /**
+   * The cut computes its approach from `sign(teleport - settled)`. Today the
+   * preflight bound guarantees a gap, so this case is unreachable through the
+   * reducer's own transitions and the state is built by hand. It is pinned
+   * because the guard is what stands between a re-tuned bound and a deck that
+   * settles onto its own teleport target: without it `direction` is 0, the
+   * approach origin equals the destination, and the ride never ends.
+   */
+  it("lands idle when the teleport target coincides with the landing", () => {
+    const stuck = {
+      ...initialState(layout),
+      virtualIndex: 6,
+      fromVirtualIndex: 0,
+      teleportVirtualIndex: 6,
+      motionPhase: "step-jump" as const,
+    };
+    const done = reduce(stuck, {
+      type: "MOTION_SETTLED",
+      settledPosition: 6,
+    });
+    expect(done.motionPhase).toBe("idle");
+    expect(done.teleportVirtualIndex).toBeNull();
+    expect(done.isTeleportApproach).toBe(false);
+    expect(done.virtualIndex).toBe(6);
+    expect(done.fromVirtualIndex).toBe(6);
+  });
+
   it("re-anchors instead of stopping when a newer target replaced the old one", () => {
     const moving = reduce(initialState(layout), {
       type: "MOVE",

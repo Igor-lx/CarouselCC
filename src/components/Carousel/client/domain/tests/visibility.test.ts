@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { slideVisibilityFlags } from "../visibility";
+import { laneDistanceFromBand, slideVisibilityFlags } from "../visibility";
 
 describe("slideVisibilityFlags", () => {
   it("idle at an integer position: the visible band only", () => {
@@ -94,5 +94,43 @@ describe("slideVisibilityFlags — any visible-slide count", () => {
           .isActive,
       ).toBe(false);
     }
+  });
+});
+
+/**
+ * The distance drives two very different consumers: the fetch reach (how far
+ * outside the band an image may load) and the slide's own priority hints. Both
+ * read 0 as "on screen", so an off-by-one here either loads the whole deck
+ * eagerly or starves the slide the user is about to see.
+ *
+ * The band is INCLUSIVE of its last lane, and fractional positions round
+ * outward: a slide half a lane out is a whole lane out, because it is either
+ * on screen or it is not.
+ */
+describe("laneDistanceFromBand", () => {
+  it("is 0 for every lane inside the band, including both edges", () => {
+    expect(laneDistanceFromBand(2, 2, 3)).toBe(0);
+    expect(laneDistanceFromBand(3, 2, 3)).toBe(0);
+    expect(laneDistanceFromBand(4, 2, 3)).toBe(0);
+  });
+
+  it("counts whole lanes on each side of the band", () => {
+    expect(laneDistanceFromBand(1, 2, 3)).toBe(1);
+    expect(laneDistanceFromBand(0, 2, 3)).toBe(2);
+    expect(laneDistanceFromBand(5, 2, 3)).toBe(1);
+    expect(laneDistanceFromBand(7, 2, 3)).toBe(3);
+  });
+
+  it("rounds a fractional band outward, so a partly visible lane counts as out", () => {
+    // Mid-ride the band start is fractional; a slide 0.5 lanes past the edge
+    // is off screen, and rounding down would let it claim to be inside.
+    expect(laneDistanceFromBand(1, 2.5, 3)).toBe(2);
+    expect(laneDistanceFromBand(5, 2.5, 3)).toBe(1);
+  });
+
+  it("treats a single-slide band as one lane, not none", () => {
+    expect(laneDistanceFromBand(4, 4, 1)).toBe(0);
+    expect(laneDistanceFromBand(5, 4, 1)).toBe(1);
+    expect(laneDistanceFromBand(3, 4, 1)).toBe(1);
   });
 });

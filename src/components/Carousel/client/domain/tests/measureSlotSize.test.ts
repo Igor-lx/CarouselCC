@@ -83,4 +83,25 @@ describe("measureSlotSize", () => {
     const element = mount(600, { "--gap": "30px" });
     expect(measureSlotSize(element, 3)).toBeCloseTo((600 + 30) / 3, 10);
   });
+
+  it("falls back to the gap shorthand when no custom property is set", () => {
+    const element = mount(600, { gap: "24px" });
+    expect(measureSlotSize(element, 3)).toBeCloseTo((600 + 24) / 3, 10);
+  });
+
+  it("falls back to column-gap, the axis the stride is actually made of", () => {
+    const element = mount(600, { "column-gap": "12px" });
+    expect(measureSlotSize(element, 3)).toBeCloseTo((600 + 12) / 3, 10);
+  });
+
+  it("prefers the nearest rung when several are set at once", () => {
+    // The cascade is an order, not a merge: a host that styles `gap` and a
+    // theme that publishes `--slides-gap` must not add up.
+    const element = mount(600, {
+      "--slides-gap": "20px",
+      "--gap": "30px",
+      gap: "24px",
+    });
+    expect(measureSlotSize(element, 3)).toBeCloseTo((600 + 20) / 3, 10);
+  });
 });
