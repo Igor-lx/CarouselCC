@@ -74,16 +74,18 @@ export const resolveLargestSrcSetCandidate = (
 export const resolveLargestImageCandidate = (
   image: Slide["image"],
 ): string | null => {
+  // Default set first, then the art-directed ones in declaration order.
+  const sets = [image?.srcSet, ...(image?.sources ?? []).map((s) => s.srcSet)];
+
   let best: { url: string; width: number } | null = null;
-  const consider = (srcSet: string | undefined) => {
+  for (const srcSet of sets) {
     const largest = resolveLargestSrcSetCandidate(srcSet);
     // Strictly-greater keeps the earliest (default srcSet first) on ties.
-    if (largest && (best === null || largest.width > best.width))
+    if (largest !== null && (best === null || largest.width > best.width)) {
       best = largest;
-  };
-  consider(image?.srcSet);
-  for (const source of image?.sources ?? []) consider(source.srcSet);
-  return best === null ? null : (best as { url: string }).url;
+    }
+  }
+  return best === null ? null : best.url;
 };
 
 // The one rule the renderer and the resource store share — they must key on

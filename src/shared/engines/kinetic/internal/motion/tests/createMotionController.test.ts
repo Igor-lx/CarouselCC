@@ -245,6 +245,19 @@ describe("soft lifecycle", () => {
     expect(controller.isActive()).toBe(true);
     expect(controller.captureHandoff(500).position).toBeCloseTo(100);
   });
+
+  it("tears down just as well detached from the controller object", () => {
+    const controller = createMotionController<string>(0, "idle");
+    controller.start({ segment: segment(), sampler: linearSampler });
+
+    // Every other method survives being pulled off the object; teardown has to
+    // as well, or a caller holding `const { destroy } = controller` gets a
+    // TypeError at the one moment it must not fail.
+    const { destroy } = controller;
+    destroy();
+
+    expect(controller.isActive()).toBe(false);
+  });
 });
 
 /**

@@ -26,12 +26,15 @@ export interface GestureRelease {
   releasedAt: number;
 }
 
-export const ZERO_GESTURE_RELEASE: GestureRelease = {
+/** One object handed by reference into every initial state and every gesture
+ * reset, so it is frozen: a mutation here would travel to every carousel on
+ * the page at once. */
+export const ZERO_GESTURE_RELEASE: GestureRelease = Object.freeze({
   pointerVelocity: 0,
   uiVelocity: 0,
   launchVelocity: 0,
   releasedAt: 0,
-};
+});
 
 export interface CarouselState {
   /** The context the reducer decides with — see adr/0004-reducer-owns-its-context.md.

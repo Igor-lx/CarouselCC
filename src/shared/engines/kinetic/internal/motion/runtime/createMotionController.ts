@@ -154,6 +154,21 @@ export function createMotionController<Strategy extends string = string>(
       Math.max(0, endTime - now()),
     );
 
+  // Отменить и заморозить на живой точке. Вынесено из литерала, чтобы
+  // `destroy` не звал `this`: методы контроллера отцепляют от объекта.
+  const cancelActive = () => {
+    const latest = active ? sampleActive(now()) : sample;
+    cancelTick();
+    cancelCompletion();
+    active = null;
+    emit({
+      ...latest,
+      progress: 1,
+      timestamp: now(),
+      phase: "idle",
+    });
+  };
+
   return {
     captureHandoff(timestamp = now()): MotionHandoff<Strategy> {
       // Position + velocity from the SAME sample; no emit/cancel/notify.
@@ -274,22 +289,11 @@ export function createMotionController<Strategy extends string = string>(
       }
     },
 
-    cancel() {
-      const latest = active ? sampleActive(now()) : sample;
-      cancelTick();
-      cancelCompletion();
-      active = null;
-      emit({
-        ...latest,
-        progress: 1,
-        timestamp: now(),
-        phase: "idle",
-      });
-    },
+    cancel: cancelActive,
 
     /** Soft, idempotent teardown — the controller stays usable (StrictMode-safe). */
     destroy() {
-      this.cancel();
+      cancelActive();
       subscribers.clear();
     },
   };
