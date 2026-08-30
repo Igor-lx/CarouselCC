@@ -19,6 +19,5 @@ takes ONE subscription, so their count never reaches React's hook counter.
 (the breakpoint resolver, orientation queries) plus its glue: `axesDescriptor`
 resolves a set of axes once per shape, which is what lets the caller rebuild
 its axes object freely. `useMedia.ts` is the one facade hook; `index.ts` is the
-public surface. Copying this folder leaves nothing behind — except the store:
-it imports `../../shared/useMediaQuerySet`, which stays single per project
-(take that folder along).
+public surface. Copying this folder leaves nothing behind — except the store
+layer: take `../../shared/` along, whole and unedited (its README says why).

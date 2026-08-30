@@ -1,4 +1,4 @@
-# shared — the one store
+# shared — the store layer
 
 `useMediaQuery(query)` → live `boolean`. A single reactive `matchMedia` store:
 one browser listener per distinct query string, shared by every consumer, with a
@@ -23,15 +23,32 @@ const bits = useMediaQuerySet(tierQueries); // "010" — changes iff a verdict d
 stores behind them — deep import only (not the shared barrel), for non-React
 consumers and the lifecycle tests.
 
-## Why it lives here, alone
+## Taking it: the folder, whole, always
 
-Every other blank duplicates its hooks so it can travel independently. A store
-cannot: a second copy keeps its own listener registry, so the same query would
-be watched twice and "one listener per query" would hold only per copy. Keep
-exactly **one** `useMediaQuery.ts` in a project — this visible folder is the
-reminder to take it along and not clone it. Not machine-enforced: it is a
-copying convention, and nothing here breaks until someone actually clones the
-file.
+**The unit here is the FOLDER, not the file.** Whatever you take from
+`clientState` — one hook or all of them — copy this folder next to it, entire.
+There is no case analysis to do, and nothing inside it is optional: cherry-pick
+`useMediaQuery.ts` because your hook "only needs a boolean" and the day someone
+reaches for `useBreakpoint` or `useMedia` you are missing a file.
+
+Deliberately, the price of that is small and one-directional. `useMediaQuerySet`
+imports `useMediaQuery`; nothing imports the other way. So a project that never
+watches a set carries one unused module, which any bundler drops — while a
+project that does watch one never discovers a missing dependency.
+
+**Why a store cannot be duplicated the way the hooks are.** Every other blank
+copies its hooks so it can travel independently. A store cannot: a second copy
+keeps its own listener registry, so the same query would be watched twice and
+"one listener per query" would hold only per copy. That is why the sets fold
+over the per-query stores in here rather than opening their own `matchMedia` —
+two different sets naming the same condition still share one browser listener.
+
+**What is machine-checked and what is not.** That this folder depends on
+NOTHING but React and itself — the property that makes "copy the folder" work —
+is a direction rule in `.context/03-graph.md`, verified by
+`node .context/graph.mjs verify`. That a project keeps exactly one copy is not:
+it is a copying convention, and nothing breaks until someone actually clones the
+folder.
 
 ## Lifecycle contract
 
