@@ -72,6 +72,8 @@ export interface CarouselMotionContextValue {
 export interface CarouselDiagnosticContextValue {
   state: CarouselState;
   props: {
+    /** The deck as the host passed it — audited for identity, never repaired. */
+    slidesData: unknown;
     visibleSlidesNr: unknown;
     durationAutoplay: unknown;
     durationStep: unknown;

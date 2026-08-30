@@ -9,6 +9,7 @@ type DiagnosticProps = CarouselDiagnosticContextValue["props"];
 const baseProps = (
   overrides: Partial<DiagnosticProps> = {},
 ): DiagnosticProps => ({
+  slidesData: [{ id: "a" }, { id: "b" }],
   visibleSlidesNr: undefined,
   durationAutoplay: undefined,
   durationStep: undefined,
@@ -104,5 +105,38 @@ describe("collectPropWarnings — environment wiring", () => {
       (w) => w.field === "userEnvironment.reducedMotion",
     );
     expect(reducedMotion?.consequence.toLowerCase()).toContain("accessibility");
+  });
+});
+
+describe("slide identity", () => {
+  // The id IS the React key: a repeat makes React reuse one node for two
+  // lanes. ADR-002 keeps the deck as it came, so being SEEN is the whole
+  // guarantee the host gets.
+  it("reports a repeated id, naming the value that repeats", () => {
+    const warnings = collectPropWarnings(
+      baseProps({
+        slidesData: [{ id: "a" }, { id: "b" }, { id: "a" }],
+      }),
+    );
+    const duplicate = warnings.filter((w) => w.field === "slidesData");
+    expect(duplicate).toHaveLength(1);
+    expect(duplicate[0]!.severity).toBe("CRITICAL");
+    expect(duplicate[0]!.actual).toEqual(["a"]);
+  });
+
+  it("counts slides with no id at all as sharing one key", () => {
+    const warnings = collectPropWarnings(baseProps({ slidesData: [{}, {}] }));
+    expect(warnings.some((w) => w.field === "slidesData")).toBe(true);
+  });
+
+  it("stays silent on a unique deck, and on a deck that is not an array", () => {
+    expect(
+      collectPropWarnings(baseProps()).some((w) => w.field === "slidesData"),
+    ).toBe(false);
+    expect(
+      collectPropWarnings(baseProps({ slidesData: null })).some(
+        (w) => w.field === "slidesData",
+      ),
+    ).toBe(false);
   });
 });

@@ -20,6 +20,7 @@ const SILENT_SUBVIEW = null as never;
 
 interface UseDiagnosticContextValueInput {
   state: CarouselState;
+  slidesData: unknown;
   visibleSlidesNr: number | undefined;
   durationAutoplay: number | undefined;
   durationStep: number | undefined;
@@ -46,6 +47,7 @@ interface UseDiagnosticContextValueInput {
 
 export function useDiagnosticContextValue({
   state,
+  slidesData,
   visibleSlidesNr,
   durationAutoplay,
   durationStep,
@@ -71,6 +73,7 @@ export function useDiagnosticContextValue({
     () =>
       IS_DEV
         ? {
+            slidesData,
             visibleSlidesNr,
             durationAutoplay,
             durationStep,
@@ -84,6 +87,7 @@ export function useDiagnosticContextValue({
       durationStep,
       errAltPlaceholder,
       intervalAutoplay,
+      slidesData,
       userEnvironment,
       visibleSlidesNr,
     ],

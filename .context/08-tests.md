@@ -117,13 +117,13 @@
 | `boundary/tests/boundaries.test.ts` (72) | изоляция генератора: `data-gen` не импортирует `client` и наоборот — проверено чтением исходников |
 | `data-gen/tests/{buildSlide,generateSlides}.test.ts` (77+121) | сборка слайда из вариантов и **идемпотентность** документа |
 
-## L3–L5. `client/modules/{ResponsiveImages,Diagnostic}/**/tests/**` — 6 файлов / 787 строк
+## L3–L5. `client/modules/{ResponsiveImages,Diagnostic}/**/tests/**` — 6 файлов / 818 строк
 
 | Файл | Что закреплено |
 | --- | --- |
 | `ResponsiveImages/tests/ResponsiveImages.test.tsx` (191) | предекодер: очередь идёт только в покое, картинка подхватывается по `load` (до него `currentSrc` пуст), уже декодированные не повторяются, очередь останавливается при уходе колоды в движение, слушатели снимаются при размонтировании |
 | `Diagnostic/checks/tests/viewportChecks.test.ts` (197) | аудит осей: пустой набор, нефинитные и отрицательные брейкпоинты, дубли по пикселям, парсимость канонических медиа, живые `<source media>` слайдов |
-| `Diagnostic/checks/tests/propChecks.test.ts` (97) | публичные пропы: `undefined` — дефолт, а не ошибка; каждое нарушение несёт `expected` и `consequence` |
+| `Diagnostic/checks/tests/propChecks.test.ts` (128) | публичные пропы: `undefined` — дефолт, а не ошибка; каждое нарушение несёт `expected` и `consequence`. Отдельным блоком — **идентичность колоды**: повторившийся `id` назван по значению, слайды вовсе без `id` считаются делящими один ключ, а уникальная колода и не-массив молчат |
 | `Diagnostic/tests/layoutChecks.test.ts` (127) | раскладка и проводка слотов, включая явный отказ ругаться на пустую колоду |
 | `Diagnostic/tests/shippedConstants.test.ts` (77) | **опубликованные значения совпадают с реальными** — тот самый тест, который падает при переименовании константы |
 | `Diagnostic/tests/formatter.test.ts` (98) | форма строки предупреждения и описание несериализуемого `actual` |

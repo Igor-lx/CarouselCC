@@ -323,6 +323,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   // --- diagnostic context ---------------------------------------------------
   const diagnosticContextValue = useDiagnosticContextValue({
     state,
+    slidesData,
     visibleSlidesNr,
     durationAutoplay,
     durationStep,

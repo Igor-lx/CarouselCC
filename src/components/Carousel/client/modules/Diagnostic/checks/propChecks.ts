@@ -87,9 +87,44 @@ export const collectPropWarnings = (
     });
   }
 
+  out.push(...collectSlideIdentityWarnings(props.slidesData));
   out.push(...collectEnvironmentWarnings(props.userEnvironment));
 
   return out;
+};
+
+/**
+ * A slide's `id` IS its React key (`domain/slides.ts`, `buildKey`). Two slides
+ * sharing one — including two that both lack an `id` — share a DOM node.
+ * ADR-002 keeps the input as it came; what it promises is that the mistake is
+ * SEEN, and this is where it is seen.
+ */
+const collectSlideIdentityWarnings = (
+  slidesData: unknown,
+): CarouselDiagnosticWarning[] => {
+  if (!Array.isArray(slidesData)) return [];
+
+  const seen = new Set<string>();
+  const duplicated = new Set<string>();
+  for (const slide of slidesData as ReadonlyArray<{ id?: unknown }>) {
+    const id = String(slide?.id);
+    if (seen.has(id)) duplicated.add(id);
+    seen.add(id);
+  }
+  if (duplicated.size === 0) return [];
+
+  return [
+    {
+      severity: "CRITICAL",
+      layer: LAYER,
+      field: "slidesData",
+      actual: [...duplicated],
+      expected:
+        "Expected every slide id to be unique — it is the React key of the slide",
+      consequence:
+        "React reuses one node for two lanes: the wrong slide renders in the wrong slot, intermittently and only once the duplicate enters the render window",
+    },
+  ];
 };
 
 const ENVIRONMENT_LAYER = "Environment";
