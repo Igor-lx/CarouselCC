@@ -262,11 +262,12 @@ node .context/graph.mjs blast domain/index # кто именно зависит 
 
 ### D3. Публичная поверхность — не трогать
 
-- `client/index.ts` → `SLIDE_CLASS_KEYS`, `public-api/index.ts` →
-  `CLASS_NAME_KEYS`. Значения живут (через `../public-api/types` напрямую),
-  реэкспорты — контракт для хоста.
-  **Но асимметрия реальна:** `CLASS_NAME_KEYS` отдан из `public-api/index.ts`
-  и НЕ отдан из `client/index.ts`, хотя `ClassNameMap` ключуется именно им.
+- `client/index.ts` и `public-api/index.ts` отдают оба набора ключей
+  (`CLASS_NAME_KEYS`, `SLIDE_CLASS_KEYS`) и оба типа ключа. Значения живут
+  через `public-api/types` напрямую, реэкспорты — контракт для хоста. Асимметрия
+  (`CLASS_NAME_KEYS` был только в `public-api`, хотя `ClassNameMap` ключуется
+  именно им) снята: точка входа пакета обязана отдавать ключи той карты, которую
+  требует заполнить.
 - `shared/theme/index.ts` → `ThemeStateProvider`, `THEME_MODES` — заявленный
   публичный API коробки (README описывает «Mode B» на `ThemeStateProvider`).
 - Экспортируемые типы без потребителей (`GoToPlan`, `ModuleRenderPolicy`,

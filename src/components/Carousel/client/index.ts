@@ -7,7 +7,9 @@ export type {
   SlideImageVariants,
   SlideImageSource,
   ClassNameMap,
+  ClassNameKey,
   SlideClassMap,
+  SlideClassKey,
   UserEnvironment,
 } from "./public-api";
-export { SLIDE_CLASS_KEYS } from "./public-api";
+export { CLASS_NAME_KEYS, SLIDE_CLASS_KEYS } from "./public-api";

@@ -57,8 +57,10 @@
 типах, — стабильность компонента держится на том, что **хост** мемоизирует
 `slidesData`, `className`, `userEnvironment` и колбэки.
 
-### `client/index.ts` (13), `public-api/**` (138), `slides/SlideItem.types.ts` (29)
-Публичная поверхность коробки: типы пропов и данных плюс `SLIDE_CLASS_KEYS`.
+### `client/index.ts` (15), `public-api/**` (138), `slides/SlideItem.types.ts` (29)
+Публичная поверхность коробки: типы пропов и данных плюс оба набора ключей
+классов (`CLASS_NAME_KEYS`, `SLIDE_CLASS_KEYS`) — карту нельзя требовать
+заполнить, не отдав её ключи.
 - `public-api/types.ts` (79) — `SLIDE_CLASS_KEYS` и `CLASS_NAME_KEYS` как SSOT
   ключей классов; `Slide`, `SlideImageVariants`, `CarouselStatusSnapshot`,
   `UserEnvironment`, `CarouselHandle` — императивная ручка только со
@@ -66,8 +68,6 @@
 - `public-api/schemas.ts` (39) — **Zod-схемы для хоста**, не для карусели:
   компонент их не вызывает (ADR-002, входы caller-owned). `ContentSchema` —
   строка, число **или React-элемент**, отсюда и стражи в стенде.
-- Асимметрия экспорта: `CLASS_NAME_KEYS` отдан из `public-api/index.ts`, но не
-  из `client/index.ts` — записано в `01-facts.md`, D3.
 - **Схемы намеренно не реэкспортируются из бочки** (`public-api/index.ts:13-19`):
   бочка лежит на рантайм-пути импорта, и значение-реэкспорт затянул бы Zod в
   бандл приложения. Сегодня Zod живёт ровно в одном значении — самом
@@ -466,11 +466,13 @@
 `CarouselMotionIntent` — **10 намерений**, по которым фабрика выбирает профиль.
 Намерение выводится из состояния, а не передаётся: см. `segmentFactory.ts`.
 
-### `client/motion/tolerances.ts` (3) и `sampler.ts` (4), `speed.ts` (7)
+### `client/motion/tolerances.ts` (3) и `sampler.ts` (4), `speed.ts` (10)
 `MOTION_EPSILON = 0.0001` — «implementation constant, not a knob», уходит в
 рантайм-конфиг через `buildConfig`. `sampleCarouselSegment` — псевдоним
 семплера полки. `speed.ts` берёт `alignSpeed` из **motion**-полки, а не из
-gesture: комментарий `speed.ts:2-3` — «в клике и автоплее пальца нет».
+gesture («в клике и автоплее пальца нет»), и оставляет ему имя полки:
+одноимённый `sameDirectionSpeed` из gesture-полки жив, и алиас превращал бы
+каждый вызов в вопрос, какой импорт победил.
 
 ### `client/motion/duration.ts` (61) — pure
 Длительность для «авторских по времени» движений: снап — фиксированная,
@@ -1212,13 +1214,14 @@ React флипает активную точку **сразу**, а плавно
 (`useKineticValue`, `KINETIC_DEFAULTS` + 3 типа), внутренние форки наружу не
 выходят; `motion` и `gesture` не пересекаются по именам. Неоднозначных
 star-экспортов нет — бочки собраны аккуратно.
-- Но `gesture` отдаёт `sameDirectionSpeed`, а `motion` — `alignSpeed`:
-  **две байт-идентичные функции под разными именами**
+- `gesture` отдаёт `sameDirectionSpeed`, а `motion` — `alignSpeed`: **две
+  байт-идентичные функции под разными именами**
   (`shared/engines/gesture/inertia/speed.ts:3` vs
-  `shared/engines/motion/profile/profileSegment.ts:53`).
-  Сверх того `client/motion/speed.ts:4` реэкспортит `alignSpeed as
-  sameDirectionSpeed` — то есть в коде живут ДВА разных импорта одного имени.
-  Кандидат в IMPL (читаемость), не в DRY.
+  `shared/engines/motion/profile/profileSegment.ts:53`). Так и остаётся: полки
+  обязаны быть самодостаточны, общего предка у них нет. Одного имени из двух
+  разных импортов больше нет — алиас `alignSpeed as sameDirectionSpeed` в
+  `client/motion/speed.ts` снят, и по имени на месте вызова видно, из какого
+  движка пришла функция.
 
 ### `shared/math/numeric.ts` (34) — pure
 10 гардов, все `(value: unknown) => value is number`, все подразумевают

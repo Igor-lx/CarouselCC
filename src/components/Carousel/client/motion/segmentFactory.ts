@@ -15,7 +15,7 @@ import type {
 } from "../config";
 import type { CarouselState } from "../state";
 import { durationByVirtualSpan, resolveStepDuration } from "./duration";
-import { sameDirectionSpeed, signedVelocity } from "./speed";
+import { alignSpeed, signedVelocity } from "./speed";
 import {
   resolveGoToFlightDuration,
   resolveGoToProfileZones,
@@ -82,7 +82,7 @@ const buildStepProfile = (
   shares: MotionProfileSharesSettings,
 ): CarouselSegment => {
   const distance = state.virtualIndex - start.position;
-  const startSpeed = sameDirectionSpeed(start.velocity, distance);
+  const startSpeed = alignSpeed(start.velocity, distance);
   const peakSpeed = resolvePeakSpeedForDuration({
     distance,
     duration,
@@ -124,7 +124,7 @@ const buildRepeatedProfile = (
   const profile = buildProfile({
     from: start.position,
     to: state.virtualIndex,
-    startSpeed: sameDirectionSpeed(start.velocity, distance),
+    startSpeed: alignSpeed(start.velocity, distance),
     peakSpeed: Math.abs(peakVelocity),
     endSpeed: 0,
     accelerationDistanceShare: repeated.accelerationDistanceShare,
@@ -205,7 +205,7 @@ const buildGoToProfile = (
 ): CarouselSegment => {
   const distance = state.virtualIndex - start.position;
   const absDistance = Math.abs(distance);
-  const startSpeed = sameDirectionSpeed(start.velocity, distance);
+  const startSpeed = alignSpeed(start.velocity, distance);
 
   let accelerationDistanceShare: number;
   let decelerationDistanceShare: number;

@@ -164,10 +164,11 @@ DOM**: один файл пишет атрибут или переменную, 
 Всё остальное байт-идентично, включая два самых больших файла проекта
 (`usePointerSwipe` 651 и `createMotionController` 297).
 
-**Одно имя, две функции:** `gesture` отдаёт `sameDirectionSpeed`, `motion` —
-`alignSpeed`, и это байт-идентичные функции; `client/motion/speed.ts` вдобавок
-реэкспортит `alignSpeed as sameDirectionSpeed`. Кандидат в IMPL по читаемости,
-но **не** в DRY: полки обязаны быть самодостаточны.
+**Две функции, два имени:** `gesture` отдаёт `sameDirectionSpeed`, `motion` —
+`alignSpeed`, и это байт-идентичные функции. Сливать их не будем — полки обязаны
+быть самодостаточны. Компонент их больше не смешивает: алиас
+`alignSpeed as sameDirectionSpeed` в `client/motion/speed.ts` снят, так что имя
+на месте вызова говорит, из какого движка пришла функция.
 
 ## L. `client/modules/**` — слоты
 
