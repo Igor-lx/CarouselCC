@@ -174,6 +174,57 @@ if (mode === "cycles") {
   console.log(`Различных циклов: ${seen.size}.`);
 }
 
+// --- open: что в проекте открыто --------------------------------------------
+// Три сводки, каждая считается заново. Написанные рукой, они бы устарели первыми
+// — а нужны они именно тому, кто садится за рефактор с чистого листа.
+if (mode === "open") {
+  const BASE = HERE;
+  const NEWLINE = String.fromCharCode(10);
+  const TICK = String.fromCharCode(96);
+
+  const scan = (title, test) => {
+    console.log(`=== ${title} ===`);
+    let count = 0;
+    for (const name of readdirSync(BASE).filter((n) => n.endsWith(".md"))) {
+      const lines = readFileSync(path.join(BASE, name), "utf8").split(NEWLINE);
+      lines.forEach((line, i) => {
+        if (!test(line)) return;
+        count++;
+        console.log(`  ${name}:${i + 1}  ${line.trim().slice(0, 96)}`);
+      });
+    }
+    console.log(`  всего: ${count}`);
+  };
+
+  // Гипотезы базы: помечаются `?` в начале пункта (README, «Формат записи»).
+  scan("Гипотезы — проверить, прежде чем на них опираться", (line) =>
+    line.includes(TICK + "?" + TICK),
+  );
+  // Записанные дыры в тестовой сети.
+  scan("Записано «не закреплено»", (line) =>
+    /не закреплен|Чего в слое не|Чего не закреплено/i.test(line),
+  );
+
+  // Файлы, до которых не дотягивается ни один тест — даже транзитивно. Это не
+  // «нет своего теста»: `useTrackBinding` покрыт `trackBinding.test.tsx`, имена
+  // не совпадают, и считать по именам было бы враньём.
+  const reached = new Set();
+  const stack = files.filter(isTest);
+  while (stack.length > 0) {
+    const f = stack.pop();
+    for (const d of importsOf.get(f) ?? []) {
+      if (reached.has(d)) continue;
+      reached.add(d);
+      stack.push(d);
+    }
+  }
+  const code = files.filter((f) => !isTest(f) && !f.endsWith(".d.ts"));
+  const cold = code.filter((f) => !reached.has(f));
+  console.log("=== Файлы, до которых не дотягивается ни один тест ===");
+  for (const f of cold) console.log("  " + rel(f));
+  console.log(`  всего: ${cold.length} из ${code.length}`);
+}
+
 // --- verify: сверка базы с кодом ---------------------------------------------
 // Восемь проверок, и все механические: покрытие карты, покрытие тестов, пометки
 // CONSTRAINT и пометки решений, правила направления импортов, живость якорей

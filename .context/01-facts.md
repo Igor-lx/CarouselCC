@@ -450,7 +450,8 @@ client/motion/index.ts
 node .context/graph.mjs cycles   # циклические импорты
 node .context/graph.mjs blast    # радиус поражения + файлы без импортёров
 node .context/graph.mjs dead     # экспорты, которые никто не импортирует
-node .context/graph.mjs verify   # сверка базы с кодом, все четыре проверки
+node .context/graph.mjs verify   # сверка базы с кодом, все восемь проверок
+node .context/graph.mjs open     # гипотезы, дыры в тестах, недостижимые файлы
 ```
 
 Два ограничения инструмента, оба честные и оба видны в выводе:
