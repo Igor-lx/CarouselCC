@@ -327,41 +327,44 @@ if (mode === "verify") {
     return hits.length === 1 ? hits[0] : null;
   };
 
-  // Звёздочки трактуются как «что угодно между»; первый кусок обязан быть
-  // началом пути, иначе `motion/` поймал бы и `visual-position/motion/`.
-  const matches = (file, pattern) => {
-    const head = pattern.split("*")[0];
-    const root = expand(head);
-    if (root === null) return null;
-    const slash = head.endsWith("/") ? "/" : "";
-    const parts = (norm(root) + slash + pattern.slice(head.length)).split("**");
-    let at = 0;
-    for (let i = 0; i < parts.length; i++) {
-      if (parts[i] === "") continue;
-      const found = file.indexOf(parts[i], at);
-      if (found < 0 || (i === 0 && found !== 0)) return false;
-      at = found + parts[i].length;
-    }
-    return true;
+  // Звёздочки трактуются как «сколько угодно сегментов, в том числе ноль»,
+  // и путь без звёздочек означает «всё, что лежит под ним».
+  const BACKSLASH = String.fromCharCode(92);
+  const MID = String.fromCharCode(1);
+  const TAIL = String.fromCharCode(2);
+  const esc = (s) =>
+    [...s].map((c) => (/[\w-]/.test(c) ? c : BACKSLASH + c)).join("");
+  const asRegExp = (full) => {
+    const marked = (full.includes("*") ? full : full + "**")
+      .split("/**/")
+      .join(MID)
+      .split("**")
+      .join(TAIL);
+    const body = esc(marked)
+      .split(esc(MID))
+      .join("/(?:[^]*/)?")
+      .split(esc(TAIL))
+      .join("(?:[^]*)?");
+    return new RegExp("^" + body + "$");
   };
 
   const under = (q, prefix) => {
     const tries = prefix === null ? [q] : [q, prefix + q];
     for (const raw of tries) {
-      const patterns = variants(raw);
       const wantTests = raw.includes("tests");
-      let resolvable = false;
-      const hits = everyFile.filter((f) => {
-        if (isTest(f) !== wantTests) return false;
-        for (const pattern of patterns) {
-          const verdict = matches(f, pattern);
-          if (verdict === null) continue;
-          resolvable = true;
-          if (verdict) return true;
-        }
-        return false;
-      });
-      if (resolvable && hits.length) return hits;
+      const shapes = [];
+      for (const pattern of variants(raw)) {
+        const head = pattern.split("*")[0];
+        const root = expand(head);
+        if (root === null) continue;
+        const slash = head.endsWith("/") ? "/" : "";
+        shapes.push(asRegExp(norm(root) + slash + pattern.slice(head.length)));
+      }
+      if (!shapes.length) continue;
+      const hits = everyFile.filter(
+        (f) => isTest(f) === wantTests && shapes.some((rx) => rx.test(f)),
+      );
+      if (hits.length) return hits;
     }
     return null;
   };
