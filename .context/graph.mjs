@@ -256,6 +256,139 @@ if (mode === "open") {
 // возврата означает, что база отстала от кода.
 // Объём файлов — по запросу. В базе этих чисел нет намеренно: строка меняется
 // от любой правки, и записанный объём превращает каждый коммит в правку базы.
+// Досье на файл или папку: всё, что известно про этот адрес, собранное из
+// графа и из базы разом. Существует потому, что база организована ПО ТЕМАМ, а
+// задача всегда приходит ПО АДРЕСУ: без этой сборки знание об одном файле
+// приходится обходить по девяти файлам базы вручную.
+if (mode === "brief") {
+  const NEWLINE = String.fromCharCode(10);
+  const TICK = String.fromCharCode(96);
+  const arg = process.argv[3];
+  if (!arg) {
+    console.log(
+      "Укажи путь: node .context/graph.mjs brief <путь или его хвост>",
+    );
+    process.exitCode = 1;
+  } else {
+    // Не-тестовые впереди: спрашивают обычно про сам файл, а его тест
+    // попадает в выборку по имени и оттесняет ответ вниз.
+    const hits = files
+      .filter((f) => rel(f).includes(arg))
+      .sort((x, y) => Number(isTest(x)) - Number(isTest(y)));
+    if (hits.length === 0) {
+      console.log(`Ничего не нашлось по ${TICK}${arg}${TICK}.`);
+      process.exitCode = 1;
+    } else {
+      // Обратная достижимость: какой тест дотягивается до файла по графу, а
+      // не по совпадению имён. Имена врут — `useTrackBinding` закрыт
+      // `trackBinding.test.tsx`.
+      const reach = new Map();
+      for (const t of files.filter(isTest)) {
+        const seen = new Set();
+        const stack = [t];
+        while (stack.length > 0) {
+          for (const d of importsOf.get(stack.pop()) ?? []) {
+            if (seen.has(d)) continue;
+            seen.add(d);
+            stack.push(d);
+          }
+        }
+        for (const d of seen) {
+          if (!reach.has(d)) reach.set(d, []);
+          reach.get(d).push(t);
+        }
+      }
+
+      // Строки базы, где адрес назван в обратных кавычках, — это её
+      // собственный формат записи, поэтому попадание точное.
+      const BASE_LINES = [];
+      for (const name of readdirSync(HERE).filter((n) => n.endsWith(".md"))) {
+        const body = readFileSync(path.join(HERE, name), "utf8").split(NEWLINE);
+        body.forEach((line, i) => BASE_LINES.push([name, i + 1, line]));
+      }
+      const quoted = (line) =>
+        line
+          .split(TICK)
+          .filter((_, i) => i % 2 === 1)
+          .flatMap((t) => t.split(",").map((x) => x.trim()));
+
+      for (const target of hits.slice(0, 12)) {
+        const r = rel(target);
+        const base = r.slice(r.lastIndexOf("/") + 1);
+        const bare = base.replace(/\.(tsx?|scss)$/, "");
+        console.log(`${NEWLINE}=== ${r} ===`);
+
+        const down = [...(importsOf.get(target) ?? [])].map(rel).sort();
+        console.log("--- импортирует (что надо понять, чтобы понять его) ---");
+        console.log(
+          down.length ? "  " + down.join(NEWLINE + "  ") : "  ничего своего",
+        );
+
+        const up = files.filter((f) =>
+          (importsOf.get(f) ?? new Set()).has(target),
+        );
+        const upCode = up
+          .filter((f) => !isTest(f))
+          .map(rel)
+          .sort();
+        console.log("--- импортируют (радиус поражения) ---");
+        console.log(
+          upCode.length
+            ? "  " + upCode.join(NEWLINE + "  ")
+            : "  никто — точка входа, бочка или мёртвое",
+        );
+
+        // Прямой импорт и транзитивная достижимость — РАЗНЫЕ ответы.
+        // Через бочку слоя до файла дотягивается половина проекта, и это не
+        // значит, что хоть один из тех тестов его проверяет. Ловит правку
+        // почти всегда тот, кто взял файл сам.
+        const all = reach.get(target) ?? [];
+        const direct = all.filter((t) =>
+          (importsOf.get(t) ?? new Set()).has(target),
+        );
+        console.log("--- тесты, берущие файл напрямую (эти и поймают) ---");
+        console.log(
+          direct.length
+            ? "  " +
+                direct
+                  .map(rel)
+                  .sort()
+                  .join(NEWLINE + "  ")
+            : "  НИ ОДНОГО — правку проверять руками, ей нечему упасть",
+        );
+        console.log(
+          `--- дотягиваются транзитивно: ${all.length - direct.length}` +
+            " (через бочки; проверяют его вряд ли) ---",
+        );
+
+        const exact = BASE_LINES.filter(([, , line]) =>
+          quoted(line).some(
+            (t) => t === r || r.endsWith("/" + t) || t === base,
+          ),
+        );
+        const loose = BASE_LINES.filter(
+          ([, , line]) =>
+            line.includes(bare) && !exact.some((e) => e[2] === line),
+        );
+        console.log("--- записи базы: назван путём (точно) ---");
+        for (const [n, i, line] of exact.slice(0, 40))
+          console.log(`  ${n}:${i}  ${line.trim().slice(0, 110)}`);
+        if (!exact.length) console.log("  нет");
+        console.log(
+          "--- записи базы: упомянут по имени (может промахнуться) ---",
+        );
+        for (const [n, i, line] of loose.slice(0, 20))
+          console.log(`  ${n}:${i}  ${line.trim().slice(0, 110)}`);
+        if (!loose.length) console.log("  нет");
+      }
+      if (hits.length > 12)
+        console.log(
+          `${NEWLINE}...и ещё ${hits.length - 12} файлов подходит под запрос.`,
+        );
+    }
+  }
+}
+
 if (mode === "sizes") {
   const NEWLINE = String.fromCharCode(10);
   const size = (f) =>

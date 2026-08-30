@@ -477,6 +477,7 @@ node .context/graph.mjs blast domain/index # кто именно зависит 
 корня репозитория (`c:\dev\CarouselCC`):
 
 ```
+node .context/graph.mjs brief X  # досье на адрес: связи, тесты, все записи базы
 node .context/graph.mjs cycles   # циклические импорты
 node .context/graph.mjs blast    # радиус поражения + файлы без импортёров
 node .context/graph.mjs dead     # экспорты, которые никто не импортирует
