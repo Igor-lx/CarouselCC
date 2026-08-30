@@ -41,7 +41,7 @@ import {
 } from "../../../config";
 // Implementation constants imported from their subsystem homes (audited here).
 import { MOTION_EPSILON } from "../../../motion/tolerances";
-import { DRAG_RELEASE_EPSILON } from "../../../domain/dragRelease";
+import { DRAG_RELEASE_EPSILON } from "../../../domain";
 import { GESTURE_COAST_MAX_MS } from "../../../gesture/coast";
 import { SWIPE_REFERENCE_SLOT_PX } from "../../../gesture/slotAdaptiveSwipe";
 import type { CarouselDiagnosticWarning } from "../types";

@@ -1,5 +1,12 @@
-export * from "./math";
-export * from "./types";
+export { mod, clamp, normalizePageIndex } from "./math";
+export type {
+  CarouselLayout,
+  CarouselSlideRecord,
+  SlideAriaProps,
+  VirtualSlide,
+  RenderWindow,
+  PageBoundaryState,
+} from "./types";
 export {
   buildSlideRecords,
   hasPartialPageLayout,
@@ -35,5 +42,5 @@ export {
   measureSlotSize,
   pointerVelocityToVirtual,
 } from "./track";
-export { resolveDragRelease } from "./dragRelease";
+export { resolveDragRelease, DRAG_RELEASE_EPSILON } from "./dragRelease";
 export type { DragReleaseTarget } from "./dragRelease";

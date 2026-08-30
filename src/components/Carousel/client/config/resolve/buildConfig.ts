@@ -1,7 +1,7 @@
 import { CAROUSEL_DEFAULTS } from "../defaults";
 import { RENDER_WINDOW_BUFFER_MULTIPLIER } from "../layout";
 import { MOTION_EPSILON } from "../../motion/tolerances";
-import { DRAG_RELEASE_EPSILON } from "../../domain/dragRelease";
+import { DRAG_RELEASE_EPSILON } from "../../domain";
 import { GESTURE_COAST_MAX_MS } from "../../gesture/coast";
 import {
   CAROUSEL_SWIPE_CONFIG,
