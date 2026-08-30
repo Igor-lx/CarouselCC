@@ -8,8 +8,12 @@
   testable without global mocks, one environment source. The cost is lost
   zero-config: a host that fails to wire `useUserEnvironment` gets full motion,
   desktop behaviour, no data-saver skip — made loud by Diagnostic, not silently
-  repaired. If ever extracted for unknown hosts, reinstate an internal
-  `prefers-reduced-motion` fallback for that accessibility-critical signal.
+  repaired. Reduced motion is the one signal where that trade is not settled:
+  in dev the host hears about it, in production nobody does, and the reader who
+  asked their OS for less motion gets all of it. The open decision — required
+  prop, internal fallback, or fallback with an explicit opt-out — is written up
+  with its costs in `.context/02-todo.md`, and it changes the public contract,
+  so it lands as its own ADR rather than as an edit here.
 - **Per-frame DOM mutation** in the track binding and PaginationWidget bypasses
   React deliberately. The alternative — state/context per frame — would re-render
   every consumer at 60 Hz for purely visual data. Contained: both hooks own their
