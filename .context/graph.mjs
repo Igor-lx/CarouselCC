@@ -171,140 +171,72 @@ if (mode === "cycles") {
   console.log(`Различных циклов: ${seen.size}.`);
 }
 
-// --- verify: покрытие карты и живость якорей --------------------------------
+// --- verify: сверка базы с кодом ---------------------------------------------
+// Четыре проверки, и все механические: покрытие карты, покрытие тестов, живость
+// якорей и объявленные размеры. Ненулевой код возврата означает, что база
+// отстала от кода.
 if (mode === "verify") {
   const BASE = HERE;
   const NEWLINE = String.fromCharCode(10);
-  const mapText = readFileSync(path.join(BASE, "00-map.md"), "utf8");
+  const REPO = path.join(BASE, "..");
 
-  // 1. каждый файл кода упомянут в карте
-  // Ambient-объявления описывать нечем: в них нет ни поведения, ни связей.
-  const code = files.filter((f) => !isTest(f) && !f.endsWith(".d.ts"));
-  // Карта пишет и полными именами, и группами вида {a,b}.ts — поэтому
-  // засчитывается имя как с расширением, так и без него.
-  const mentioned = (f) => {
-    const base = rel(f).split("/").pop();
-    const stem = base.slice(0, base.lastIndexOf("."));
-    return mapText.includes(base) || mapText.includes(stem);
-  };
-  const missing = code.filter((f) => !mentioned(f));
-  console.log("=== Покрытие карты ===");
-  console.log(
-    `  файлов кода (без тестов): ${code.length}, не упомянуто: ${missing.length}`,
-  );
-  for (const f of missing) console.log("    " + rel(f));
+  const norm = (p) => p.split(path.sep).join("/").replace(/[/]+$/, "");
+  const bare = (q) => q.replace(/[*]+$/, "").replace(/[/]+$/, "");
 
-  // 1b. каждый тестовый файл назван в 08-tests.md
-  // Группы вида `{a,b}.test.ts` раскрываются, иначе они читались бы как
-  // неупомянутые — а это ровно та форма, которой база пользуется.
-  const expandGroups = (text) => {
-    const grow = (q) => {
-      const group = /\{([^}]*)\}/.exec(q);
-      if (group === null) return [q];
-      const head = q.slice(0, group.index);
-      const tail = q.slice(group.index + group[0].length);
-      return group[1]
-        .split(",")
-        .flatMap((one) => grow(head + one.trim() + tail));
-    };
-    const extra = [];
-    for (const piece of text.split("`")) {
-      if (!piece.includes("{")) continue;
-      extra.push(...grow(piece));
-    }
-    return text + extra.join(" ");
-  };
-  const testsText = expandGroups(
-    readFileSync(path.join(BASE, "08-tests.md"), "utf8"),
-  );
-  const testFiles = files.filter(isTest);
-  const namedInTests = (f) => {
-    const base = rel(f).split("/").pop();
-    const stem = base.slice(0, base.lastIndexOf("."));
-    return testsText.includes(base) || testsText.includes(stem);
-  };
-  const unnamed = testFiles.filter((f) => !namedInTests(f));
-  console.log("=== Покрытие тестов ===");
-  console.log(
-    `  тестовых файлов: ${testFiles.length}, не названо: ${unnamed.length}`,
-  );
-  for (const f of unnamed) console.log("    " + rel(f));
-
-  // 2. якоря вида `путь:строка` указывают на существующий файл и живую строку
+  // Пути в базе сокращены и лежат на разной глубине — таблица в 01-facts.md.
   const expand = (q) => {
-    if (q.startsWith("src/")) return path.join(BASE, "..", q);
-    if (q.startsWith("client/"))
-      return path.join(BASE, "..", "src/components/Carousel", q);
-    if (q.startsWith("docs/"))
-      return path.join(BASE, "..", "src/components/Carousel/client", q);
-    if (q.startsWith("shared/")) return path.join(BASE, "..", "src", q);
-    if (q.startsWith("modules/"))
-      return path.join(BASE, "..", "src/components/Carousel/client", q);
+    if (q.startsWith("src/")) return path.join(REPO, q);
+    if (
+      q.startsWith("client/") ||
+      q.startsWith("boundary/") ||
+      q.startsWith("data-gen/")
+    )
+      return path.join(REPO, "src/components/Carousel", q);
+    if (q.startsWith("docs/") || q.startsWith("modules/"))
+      return path.join(REPO, "src/components/Carousel/client", q);
     if (q.startsWith("basic/") || q.startsWith("widget/"))
       return path.join(
-        BASE,
-        "..",
+        REPO,
         "src/components/Carousel/client/modules/Pagination",
         q,
       );
-    if (q.startsWith("app/")) return path.join(BASE, "..", "src", q);
-    if (q.startsWith("boundary/") || q.startsWith("data-gen/"))
-      return path.join(BASE, "..", "src/components/Carousel", q);
+    if (q.startsWith("shared/") || q.startsWith("app/"))
+      return path.join(REPO, "src", q);
     return null;
   };
 
-  let checked = 0;
-  const broken = [];
-  for (const name of readdirSync(BASE)) {
-    if (!name.endsWith(".md")) continue;
-    const text = readFileSync(path.join(BASE, name), "utf8");
-    const spans = text.split("`").filter((_, i) => i % 2 === 1);
-    for (const span of spans) {
-      const at = span.lastIndexOf(":");
-      if (at < 1) continue;
-      const file = span.slice(0, at);
-      const tail = span.slice(at + 1).split("-")[0];
-      if (tail === "" || Number.isNaN(Number(tail))) continue;
-      if (!file.includes("/") || !file.includes(".")) continue;
-      const full = expand(file);
-      if (full === null) continue;
-      checked++;
-      if (!existsSync(full)) {
-        broken.push(`${name}: ${span} — файла нет`);
-        continue;
-      }
-      const body = readFileSync(full, "utf8");
-      const lines = body.split(NEWLINE).length;
-      if (Number(tail) > lines) {
-        broken.push(`${name}: ${span} — в файле ${lines} строк`);
-      }
-    }
-  }
-  console.log("=== Якоря ===");
-  console.log(`  проверено: ${checked}, битых: ${broken.length}`);
-  for (const b of broken) console.log("    " + b);
-
-  // 3. объявленные размеры: `путь.ts` (N), `папка/` (N файлов, M) и та же
-  // папка в форме заголовка — `папка/**` — N файлов / M строк.
-  // N — непустых строк, как требует README базы. Папка считается по коду без
-  // тестов; путь, в котором есть `tests`, — наоборот, только по тестам.
+  // Два списка, и смешивать их нельзя: размеры папок считаются по коду
+  // (`everyFile`), а якоря указывают ещё и на доки (`everyPath`).
   const everyFile = [];
+  const everyPath = [];
   (function walkAll(dir) {
     for (const e of readdirSync(dir)) {
       const full = path.join(dir, e);
       if (statSync(full).isDirectory()) walkAll(full);
-      else if (/\.(tsx?|scss)$/.test(e))
-        everyFile.push(full.split(path.sep).join("/"));
+      else if (/\.(tsx?|scss|md)$/.test(e)) {
+        everyPath.push(full.split(path.sep).join("/"));
+        if (!e.endsWith(".md")) everyFile.push(everyPath[everyPath.length - 1]);
+      }
     }
-  })(path.join(BASE, "..", "src").split(path.sep).join("/"));
+  })(norm(path.join(REPO, "src")));
+
+  // Файл ищется по сокращению, по префиксу раздела и, последним, по уникальному
+  // хвосту пути: база пишет и `client/domain/track.ts`, и просто `track.ts`.
+  const locate = (q, prefix) => {
+    for (const candidate of prefix === null ? [q] : [q, prefix + q]) {
+      const expanded = expand(candidate);
+      if (expanded !== null && existsSync(expanded)) return norm(expanded);
+      const atRepo = path.join(REPO, candidate);
+      if (existsSync(atRepo) && statSync(atRepo).isFile()) return norm(atRepo);
+    }
+    const hits = everyPath.filter((f) => f.endsWith("/" + q));
+    return hits.length === 1 ? hits[0] : null;
+  };
 
   const nonEmpty = (f) =>
     readFileSync(f, "utf8")
       .split(NEWLINE)
       .filter((l) => l.trim() !== "").length;
-
-  const norm = (p) => p.split(path.sep).join("/").replace(/[/]+$/, "");
-  const bare = (q) => q.replace(/[*]+$/, "").replace(/[/]+$/, "");
 
   // База пишет группы вида `{a,b}/tests`: раскрываем их в отдельные пути.
   const variants = (q) => {
@@ -317,18 +249,8 @@ if (mode === "verify") {
       .flatMap((one) => variants(head + one.trim() + tail));
   };
 
-  const locate = (q, prefix) => {
-    const tries = prefix === null ? [q] : [q, prefix + q];
-    for (const candidate of tries.map(expand)) {
-      if (candidate !== null && everyFile.includes(norm(candidate)))
-        return norm(candidate);
-    }
-    const hits = everyFile.filter((f) => f.endsWith("/" + q));
-    return hits.length === 1 ? hits[0] : null;
-  };
-
-  // Звёздочки трактуются как «сколько угодно сегментов, в том числе ноль»,
-  // и путь без звёздочек означает «всё, что лежит под ним».
+  // Звёздочки — «сколько угодно сегментов, в том числе ноль»; путь без них
+  // означает «всё, что лежит под ним».
   const BACKSLASH = String.fromCharCode(92);
   const MID = String.fromCharCode(1);
   const TAIL = String.fromCharCode(2);
@@ -349,8 +271,7 @@ if (mode === "verify") {
   };
 
   const under = (q, prefix) => {
-    const tries = prefix === null ? [q] : [q, prefix + q];
-    for (const raw of tries) {
+    for (const raw of prefix === null ? [q] : [q, prefix + q]) {
       const wantTests = raw.includes("tests");
       const shapes = [];
       for (const pattern of variants(raw)) {
@@ -369,22 +290,72 @@ if (mode === "verify") {
     return null;
   };
 
-  // Все три формы читаются только из бэктиков, поэтому проза с числами и
-  // якоря вида `file:line` под проверку не попадают.
+  // Группы раскрываются и в тексте базы: иначе `{a,b}.test.ts` читался бы как
+  // неупомянутый, а это ровно та форма, которой база пользуется.
+  const withGroups = (text) => {
+    const extra = [];
+    for (const piece of text.split(String.fromCharCode(96))) {
+      if (piece.includes("{")) extra.push(...variants(piece));
+    }
+    return text + extra.join(" ");
+  };
+  const namedIn = (text, f) => {
+    const base = rel(f).split("/").pop();
+    const stem = base.slice(0, base.lastIndexOf("."));
+    return text.includes(base) || text.includes(stem);
+  };
+
+  // 1. каждый файл кода упомянут в карте
+  // Ambient-объявления описывать нечем: в них нет ни поведения, ни связей.
+  const mapText = withGroups(
+    readFileSync(path.join(BASE, "00-map.md"), "utf8"),
+  );
+  const code = files.filter((f) => !isTest(f) && !f.endsWith(".d.ts"));
+  const missing = code.filter((f) => !namedIn(mapText, f));
+  console.log("=== Покрытие карты ===");
+  console.log(
+    `  файлов кода (без тестов): ${code.length}, не упомянуто: ${missing.length}`,
+  );
+  for (const f of missing) console.log("    " + rel(f));
+
+  // 2. каждый тестовый файл назван в 08-tests.md
+  const testsText = withGroups(
+    readFileSync(path.join(BASE, "08-tests.md"), "utf8"),
+  );
+  const testFiles = files.filter(isTest);
+  const unnamed = testFiles.filter((f) => !namedIn(testsText, f));
+  console.log("=== Покрытие тестов ===");
+  console.log(
+    `  тестовых файлов: ${testFiles.length}, не названо: ${unnamed.length}`,
+  );
+  for (const f of unnamed) console.log("    " + rel(f));
+
+  // 3 и 4. якоря и объявленные размеры — одним проходом по строкам: обе
+  // проверки читают контекст заголовка, он задаёт и префикс пути, и файл, к
+  // которому относятся якоря вида `:120`.
   const FILE_RE = /`([\w./{},*-]+\.(?:tsx|ts|scss))`\s*\((\d+)\)/g;
   const DIR_RE =
     /`([\w./*{},-]+\/(?:\*\*)?)`\s*\((\d+) файл[а-я]*(?:, (\d+))?\)/g;
   const DASH_RE =
     /`([\w./*{},-]+\/(?:\*\*)?)`[^`\n]*— (\d+) файл[а-я]* \/ (\d+) стро[а-я]*/g;
   const HEAD_RE = /^#{2,4}[^`]*`([^`]+)`/;
+  const HEAD_FILES_RE = /`([\w./{},*-]+\.(?:tsx|ts|scss))`/g;
+  const ANCHOR_TAIL = /\.(tsx?|scss|md|json|html)$/;
+  // Якорь с цитатой: (`:31` `export const buildCarouselLayout`). Номер съедет
+  // от любой вставки выше, цитата — нет, поэтому проверяется именно она.
+  const CITED_RE = /\(`([^`]*):(\d+)(?:-(\d+))?` `([^`]+)`\)/g;
 
+  let anchors = 0;
+  let cited = 0;
   let sized = 0;
-  const unresolved = [];
+  const broken = [];
   const wrong = [];
+  const unresolved = [];
+
   const claimDir = (name, q, prefix, filesClaim, linesClaim) => {
     const hits = under(q, prefix);
     if (hits === null) {
-      unresolved.push(name + ": " + q);
+      unresolved.push(`${name}: ${q}`);
       return;
     }
     sized++;
@@ -402,10 +373,13 @@ if (mode === "verify") {
 
   for (const name of readdirSync(BASE)) {
     if (!name.endsWith(".md")) continue;
-    // Заголовок раздела задаёт префикс: внутри него пути пишутся коротко.
+    // Заголовок раздела задаёт префикс путей и, если называет ровно один файл,
+    // адресата относительных якорей.
     let prefix = null;
-    const body = readFileSync(path.join(BASE, name), "utf8");
-    for (const line of body.split(NEWLINE)) {
+    let current = null;
+    for (const line of readFileSync(path.join(BASE, name), "utf8").split(
+      NEWLINE,
+    )) {
       const head = HEAD_RE.exec(line);
       if (head !== null) {
         const token = head[1];
@@ -414,13 +388,53 @@ if (mode === "verify") {
           : /\.(tsx?|scss)$/.test(token)
             ? token.slice(0, token.lastIndexOf("/") + 1)
             : bare(token) + "/";
+        const named = line.match(HEAD_FILES_RE) ?? [];
+        current =
+          named.length === 1
+            ? locate(named[0].split(String.fromCharCode(96)).join(""), prefix)
+            : null;
       }
+
+      for (const span of line
+        .split(String.fromCharCode(96))
+        .filter((_, i) => i % 2 === 1)) {
+        const at = span.lastIndexOf(":");
+        if (at < 0) continue;
+        const numbers = span.slice(at + 1).split("-");
+        if (!numbers.every((n) => /^[0-9]+$/.test(n))) continue;
+        const where = span.slice(0, at);
+        if (where !== "" && !ANCHOR_TAIL.test(where)) continue;
+        const file = where === "" ? current : locate(where, prefix);
+        if (file === null) {
+          unresolved.push(`${name}: ${span}`);
+          continue;
+        }
+        anchors++;
+        const lines = readFileSync(file, "utf8").split(NEWLINE).length;
+        const last = Number(numbers[numbers.length - 1]);
+        if (last > lines)
+          broken.push(`${name}: ${span} — в файле ${lines} строк`);
+      }
+
       let m;
+      CITED_RE.lastIndex = 0;
+      while ((m = CITED_RE.exec(line)) !== null) {
+        const file = m[1] === "" ? current : locate(m[1], prefix);
+        if (file === null) continue;
+        cited++;
+        const body = readFileSync(file, "utf8").split(NEWLINE);
+        const from = Number(m[2]);
+        const to = Number(m[3] ?? m[2]);
+        if (!body.slice(from - 1, to).some((l) => l.includes(m[4])))
+          broken.push(
+            `${name}: ${m[1]}:${m[2]} — цитаты «${m[4]}» на этих строках нет`,
+          );
+      }
       FILE_RE.lastIndex = 0;
       while ((m = FILE_RE.exec(line)) !== null) {
         const file = locate(m[1], prefix);
         if (file === null) {
-          unresolved.push(name + ": " + m[1]);
+          unresolved.push(`${name}: ${m[1]}`);
           continue;
         }
         sized++;
@@ -436,13 +450,26 @@ if (mode === "verify") {
         claimDir(name, m[1], prefix, m[2], m[3]);
     }
   }
-  console.log("=== Объявленные размеры ===");
-  console.log(
-    `  сверено: ${sized}, разошлось: ${wrong.length}, не разобрано: ${unresolved.length}`,
-  );
-  for (const w of wrong) console.log("    " + w);
-  for (const u of unresolved) console.log("    ? " + u);
 
-  if (missing.length || unnamed.length || broken.length || wrong.length)
+  console.log("=== Якоря ===");
+  console.log(
+    `  проверено: ${anchors}, из них с цитатой: ${cited}, битых: ${broken.length}`,
+  );
+  for (const b of broken) console.log("    " + b);
+  console.log("=== Объявленные размеры ===");
+  console.log(`  сверено: ${sized}, разошлось: ${wrong.length}`);
+  for (const w of wrong) console.log("    " + w);
+  if (unresolved.length) {
+    console.log("=== Не разобрано (проверкой не покрыто) ===");
+    for (const u of unresolved) console.log("    " + u);
+  }
+
+  if (
+    missing.length ||
+    unnamed.length ||
+    broken.length ||
+    wrong.length ||
+    unresolved.length
+  )
     process.exitCode = 1;
 }

@@ -254,7 +254,8 @@ client/motion/index.ts
 2. **`docs/architecture/public-api.md:65`** — «`isFullPagesOn` … Clones **tail**
    slides». Код клонирует **головные**: `domain/slides.ts:35`
    `records[offset % length]` при `offset` с нуля. `domain.md:51` и
-   `slides.md:16` говорят «head» — правы они, `public-api.md` нет.
+   `docs/architecture/slides.md:16` говорят «head» — правы они,
+   `public-api.md` нет.
    (Тест `deckPadding.test.ts:73` тоже фиксирует «wraps back to slide 0».)
 3. ~~**`docs/architecture/slides.md:29`** — «no separate **predecode**
    machinery» против предекод-менеджера в `modules.md:132`.~~
@@ -263,7 +264,7 @@ client/motion/index.ts
    touches `document`». Папок `core/` и `chrome/` нет: это
    `ThemeStateProvider.tsx` и `internal/BrowserChromeSync.tsx`.
 5. **`data-gen/README.md:141`** — осиротевший заголовок `## Idempotent` без
-   тела; его текст лежит ниже (`:160-162`), под чужим разделом.
+   тела; его текст лежит ниже (`data-gen/README.md:160-162`), под чужим разделом.
 
 ---
 
@@ -295,7 +296,8 @@ client/motion/index.ts
 - **`shared/engines/gesture/README.md:21`** — «**Touch pointers only** (mouse/pen
   ignored)» — принцип движка, задокументирован. В `public-api.md` карусели этого
   нет (см. `00-map.md § S`).
-- **`viewport.md:36-41`** — `useSlideViewport` вызывается **только корнем**, это
+- **`docs/architecture/viewport.md:36-41`** — `useSlideViewport` вызывается
+  **только корнем**, это
   правило: каждый лишний `useMedia` добавляет по подписке на условие и пересборку
   `MediaState` на каждом экземпляре. Листья получают значение пропом.
 - **`diagnostics.md:29-33`** — в файлах `checks/` **запрещены модульные
@@ -441,7 +443,7 @@ client/motion/index.ts
 node .context/graph.mjs cycles   # циклические импорты
 node .context/graph.mjs blast    # радиус поражения + файлы без импортёров
 node .context/graph.mjs dead     # экспорты, которые никто не импортирует
-node .context/graph.mjs verify   # сверка базы с кодом: покрытие карты + живость якорей
+node .context/graph.mjs verify   # сверка базы с кодом, все четыре проверки
 ```
 
 Ограничение инструмента: файл, из которого делают `export *`, из анализа
