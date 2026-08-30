@@ -4,10 +4,7 @@ export {
   buildSlideRecords,
   hasPartialPageLayout,
   padDeckToFullPage,
-  clampedVisibleSlidesCount,
   deckCarriesImageSets,
-  resolveLargestImageCandidate,
-  resolveLargestSrcSetCandidate,
   resolveRenderedImageSrc,
 } from "./slides";
 export {

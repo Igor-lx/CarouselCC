@@ -201,21 +201,18 @@ client/motion/index.ts
 
 Разделены по смыслу — не всё «мёртвое» подлежит удалению.
 
-### D1. Настоящий мусор — транзитные реэкспорты, которыми никто не пользуется
+### D1. Пусто — и это не случайность
 
-- `client/motion/index.ts` → `isWaapiSupported`, `sampleProgressStops`.
-  Проверено: в `client/**` не встречаются нигде. (`keyframesAlongStops`,
-  `positionAtNow`, `startPinnedAnimation` — живые, их берут модули пагинации.)
-- `client/presentation/index.ts` → `buildRootCssVars`, `buildSlideCssVars`,
-  `buildSlideClassMap`, `buildFlagAttributes` — тесты и `useCarouselPresentation`
-  импортируют из `../cssVars` / `../domPayload` напрямую.
-- `client/slides/index.ts` → `useImageResource` — `SlideItem` берёт из
-  `./imageResource`.
-- `client/domain/index.ts` → `clampedVisibleSlidesCount`,
-  `resolveLargestImageCandidate`, `resolveLargestSrcSetCandidate` — используются,
-  но всегда из `../slides` напрямую.
-- `client/modules/index.ts` → все 4 экспорта (бочка мертва целиком).
-- `data-gen/index.ts` → все 4 экспорта (бочка мертва целиком).
+Здесь был список транзитных реэкспортов, которые никто не импортировал: два в
+`motion`, четыре в `presentation`, один в `slides`, три в `domain` и дубль
+`default` в бочке диагностики. **Они удалены, а не описаны.** Раздел оставлен
+пустым намеренно: место, куда можно положить известный дефект, рано или поздно
+им наполняется. Найденное чинится, а сюда попадает только то, что осталось
+жить по причине — и тогда ему место в D2 или D3.
+
+Одно исключение ждёт решения разработчика: `client/modules/index.ts` — бочка
+мёртвая **и** неполная, `ResponsiveImages` в ней нет вовсе. Удаление файла — не
+уборка, а вопрос; пока висит здесь.
 
 ### D2. Мёртвое внутри форка
 

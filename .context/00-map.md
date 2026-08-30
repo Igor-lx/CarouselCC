@@ -197,10 +197,11 @@
 и `clampedVisibleSlidesCount` (реэкспортирован, но и импортируется напрямую из
 `layout.ts` внутри слоя).
 
-### `client/domain/index.ts` (42) — бочка
+### `client/domain/index.ts` (39) — бочка
 `export *` из `math` и `types`, поимённо — из остальных шести файлов. Смешение
-двух стилей осознанным нигде не объявлено. `DRAG_RELEASE_EPSILON` в бочку не
-попал, отсюда два импорта мимо неё.
+двух стилей осознанным нигде не объявлено. Мимо бочки ходят четыре имени:
+`DRAG_RELEASE_EPSILON` (в ней его нет), `clampedVisibleSlidesCount` и два
+разбора кандидатов картинки — их берут прямым путём и внутри слоя, и снаружи.
 
 ### `client/domain/types.ts` (41) — pure, SSOT формы данных слоя
 `CarouselLayout` (7 полей), `CarouselSlideRecord`, `SlideAriaProps`,
@@ -346,8 +347,8 @@
 
 ### Бочки слоёв, о которых нечего сказать сверх состава
 `client/context/index.ts` (22), `client/gesture/index.ts` (2),
-`client/navigation/index.ts` (2), `client/presentation/index.ts` (5),
-`client/slides/index.ts` (11) — плоские реэкспорты своего слоя. Единственное,
+`client/navigation/index.ts` (2), `client/presentation/index.ts` (3),
+`client/slides/index.ts` (7) — плоские реэкспорты своего слоя. Единственное,
 что в них стоит знать, живёт в `01-facts.md`, D1: `presentation/index.ts` и
 `slides/index.ts` отдают имена, которые никто через них не берёт.
 
@@ -443,7 +444,7 @@
 Канал — обычная наблюдаемая **вне React**: публикация не вызывает ре-рендер.
 `client/motion/**` — 14 импортёров (+4 тестовых).
 
-### `client/motion/index.ts` (25) — бочка
+### `client/motion/index.ts` (24) — бочка
 Своё плюс **реэкспорт пяти функций из полки** `shared/engines/motion`
 (`isWaapiSupported`, `keyframesAlongStops`, `positionAtNow`,
 `sampleProgressStops`, `startPinnedAnimation`): комментарий `:10-11` объясняет —
