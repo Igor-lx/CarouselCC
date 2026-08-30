@@ -15,15 +15,23 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // Coverage measures everything the component ships: the carousel AND the
+    // shelves it stands on. Excluding either -- or excluding `.tsx`, which
+    // silently drops every component and hook that touches JSX -- produces a
+    // number that describes a fraction of the code while reading like the
+    // whole. Only files with nothing to execute are left out.
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
-      include: ["src/components/Carousel/**/*.{ts,tsx}"],
+      include: [
+        "src/components/Carousel/**/*.{ts,tsx}",
+        "src/shared/**/*.{ts,tsx}",
+      ],
       exclude: [
         "src/**/*.{test,spec}.{ts,tsx}",
         "src/**/index.ts",
         "src/**/*.types.ts",
-        "src/components/Carousel/**/*.tsx",
+        "src/**/*.d.ts",
       ],
     },
   },

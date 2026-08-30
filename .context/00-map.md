@@ -1536,10 +1536,10 @@ rider-defaults и собственный `useMotionPaint`. Помечено ко
 `(Fork trims flyTo/dragBinding.)`.
 
 ### Что тестами НЕ покрыто
-- `vitest.config.ts:26` исключает `src/components/Carousel/**/*.tsx` из
-  **покрытия** — измерения по всем компонентам нет (сами тесты на них есть).
-- Вне `src/components/Carousel/**` покрытие не собирается вообще: `shared/`
-  тестируется, но в отчёт не попадает (`include` — только Carousel).
+Само измерение чинено: `vitest.config.ts` больше не выбрасывает из покрытия ни
+`src/shared/**`, ни `.tsx`, так что отчёт считает по всему, что уезжает в бандл
+(4695 операторов вместо 2506). Числа — в базовой линии, `01-facts.md`, §A.
+
 - Нет тестов на: `Carousel.tsx` как единицу (кроме интеграционного),
   `useCarouselNavigation`, `useModuleRenderPolicy`, `Diagnostic.tsx`,
   `useCarouselStatusReporter` (есть только на его компаратор),
