@@ -43,6 +43,63 @@ shared/** ─ полки, импортируются откуда угодно, 
 разом: он сверяет опубликованные значения, поэтому при переименовании любой
 константы падает он, а не потребитель.
 
+## Связи через DOM и CSS — граф, которого нет в импортах
+
+`graph.mjs` видит только импорты. Между тем часть слоёв связана **именами в
+DOM**: один файл пишет атрибут или переменную, другой читает — и переименование
+не роняет ни сборку, ни типы. Радиус такой правки считается только этой
+таблицей.
+
+### Атрибуты, которые пишет карусель
+
+| Имя | Кто пишет | Кто читает |
+| --- | --- | --- |
+| `data-carousel-root` / `-viewport` / `-track` | `Carousel.tsx` | никто в коде — опоры для хоста и e2e |
+| `data-breakpoint`, `data-orientation`, `data-<flag>` | `Carousel.tsx` из `useSlideViewport` | `Carousel.module.scss`, стили модулей; имена состояний сверяет `checks/viewportChecks.ts` |
+| `data-moving` | `Carousel.tsx` | `Carousel.module.scss` — гасит переход обводки на время поездки |
+| `data-touch`, `data-reduced-motion` | `Carousel.tsx` | `Carousel.module.scss` — hover только на не-тач, вуаль без анимации |
+| `data-responsive-images` | `Carousel.tsx` | **никто**; см. `00-map.md`, § A |
+| `data-active-zone` | `SlideItem.tsx` | `modules/ResponsiveImages` — `querySelectorAll('[data-active-zone="false"] img')` |
+| `data-image-status` | `SlideItem.tsx` | никто в коде — крючок для хоста |
+| `data-reorienting`, `data-awaiting-image` | `SlideItem.tsx` | `Carousel.module.scss` — вуаль поворота и медленная проявка |
+| `data-drag-ignore` | хост | полка жеста (`DRAG_IGNORE_ATTRIBUTE`) |
+| `inert` | `SlideItem.tsx` | браузер; на нём же стоит спасение фокуса |
+
+Самая хрупкая строка здесь — `data-active-zone`: её пишет слой слайдов, а
+читает **другой модуль**, селектором в строке. Переименование ломает предекодер
+молча.
+
+### Переменные CSS: JS → CSS
+
+| Переменная | Объявляет | Читает |
+| --- | --- | --- |
+| `--visible-slides` | `presentation/cssVars.ts` | `Carousel.module.scss` — формула ширины слота |
+| `--slide-reorient-fade-in` / `-out` | `presentation/cssVars.ts` из `config/slides` | `Carousel.module.scss` — длительности вуали |
+| `--slide-lane` | `presentation/cssVars.ts` на каждый слайд | `Carousel.module.scss` — сдвиг полосы |
+| `--visible-dots-count`, `--dot-size`, `--dots-gap` | `PaginationWidget.tsx` | `PaginationWidget.module.scss` — вся геометрия ленты |
+| `--dot-active-strength` | `PaginationWidget.tsx` на точку | `PaginationWidget.module.scss` |
+
+### Переменные CSS: CSS → JS (обратное направление)
+
+Тут стороны меняются местами, и это единственные два места, где **стиль
+управляет числом в коде**:
+
+| Переменная | Объявляет | Читает |
+| --- | --- | --- |
+| `--pagination-dot-opacity`, `-opacity-active`, `-scale-active` | `Pagination.module.scss` | `usePaginationFade.readDotStates` через `getComputedStyle`; фолбэки в коде обязаны их зеркалить (`07-invariants.md`, § L1) |
+| `--slides-gap` (с каскадом `--gap` → `gap` → `column-gap`) | `Carousel.module.scss` | `domain/measureSlotSize` — из него берётся ширина слота |
+
+Отсюда правило, которого не видно ни в одном файле по отдельности: **сменить
+`--slides-gap` или `--pagination-dot-*` в стилях — это правка кода**, потому что
+на другом конце их читает JS.
+
+### Чем это закреплено
+
+Контрактные тесты читают **сами файлы** стилей и разметки, а не поведение:
+`layoutCssVarsSync`, `measurementContractSync`, `slideHeightSync`,
+`styleLayerContract`, `orientationMediaSync`, `bootSync`. Они и есть проверка
+этого графа — всё, что не покрыто ими, расходится молча.
+
 ## O. `shared/**` — полки
 
 Полки импортируются откуда угодно и **сами не импортируют клиент**. Внутри
