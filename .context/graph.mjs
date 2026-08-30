@@ -175,10 +175,10 @@ if (mode === "cycles") {
 }
 
 // --- verify: сверка базы с кодом ---------------------------------------------
-// Семь проверок, и все механические: покрытие карты, покрытие тестов, пометки
-// CONSTRAINT, правила направления импортов, живость якорей с их цитатами,
-// объявленные размеры и радиусы. Ненулевой код возврата означает, что база
-// отстала от кода.
+// Восемь проверок, и все механические: покрытие карты, покрытие тестов, пометки
+// CONSTRAINT и пометки решений, правила направления импортов, живость якорей
+// с их цитатами, объявленные размеры и радиусы. Ненулевой код возврата
+// означает, что база отстала от кода.
 if (mode === "verify") {
   const BASE = HERE;
   const MAP = "00-map.md";
@@ -395,6 +395,8 @@ if (mode === "verify") {
   // Куда указывают якоря каталога ограничений — по ним сверяются пометки
   // CONSTRAINT в коде.
   const invariantAnchors = [];
+  // То же для реестра решений.
+  const decisionAnchors = [];
 
   // Пути, разобранные из текста базы: покрытие считается по ним, а не по
   // совпадению имени файла — иначе одноимённые файлы засчитывают друг друга.
@@ -465,6 +467,8 @@ if (mode === "verify") {
           broken.push(`${name}: ${span} — в файле ${lines} строк`);
         if (name === "07-invariants.md")
           invariantAnchors.push({ file, from: Number(numbers[0]), to: last });
+        if (name === "09-decisions.md")
+          decisionAnchors.push({ file, from: Number(numbers[0]), to: last });
       }
 
       let m;
@@ -536,6 +540,36 @@ if (mode === "verify") {
       if (!covered) uncovered.push(`${rel(f)}:${at}`);
     });
   }
+
+  // 8. каждая пометка решения в коде описана в реестре степеней свободы
+  // Ищется только в комментарии: те же слова встречаются внутри строк, которые
+  // диагностика печатает пользователю, и решением проекта не являются.
+  const DECISION_RE =
+    /do not remove|by design|deliberat|intentional|on purpose/i;
+  const inComment = (line, at) => {
+    const before = line.slice(0, at);
+    return before.includes("//") || /^\s*(\*|\/\*)/.test(line);
+  };
+  const undecided = [];
+  let decisions = 0;
+  for (const f of [...files, ...everyFile.filter((x) => x.endsWith(".scss"))]) {
+    if (isTest(f)) continue;
+    const body = readFileSync(f, "utf8").split(NEWLINE);
+    body.forEach((line, index) => {
+      const hit = DECISION_RE.exec(line);
+      if (hit === null || !inComment(line, hit.index)) return;
+      decisions++;
+      const at = index + 1;
+      const covered = decisionAnchors.some(
+        (a) =>
+          a.file === f &&
+          at >= a.from - CONSTRAINT_SLACK &&
+          at <= a.to + CONSTRAINT_SLACK,
+      );
+      if (!covered) undecided.push(`${rel(f)}:${at}`);
+    });
+  }
+
   // 1. каждый файл кода и каждый стиль упомянуты в карте
   // Ambient-объявления описывать нечем: в них нет ни поведения, ни связей.
   const code = [
@@ -595,6 +629,11 @@ if (mode === "verify") {
     `  в коде: ${constraints}, без записи в 07-invariants: ${uncovered.length}`,
   );
   for (const u of uncovered) console.log("    " + u);
+  console.log("=== Пометки решений ===");
+  console.log(
+    `  в коде: ${decisions}, без записи в 09-decisions: ${undecided.length}`,
+  );
+  for (const u of undecided) console.log("    " + u);
 
   console.log("=== Якоря ===");
   console.log(
@@ -615,6 +654,7 @@ if (mode === "verify") {
     missing.length ||
     unnamed.length ||
     uncovered.length ||
+    undecided.length ||
     broken7.length ||
     broken.length ||
     wrong.length ||
