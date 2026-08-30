@@ -6,14 +6,14 @@ though only one is a media query.
 
 | Hook | Returns | Source |
 | --- | --- | --- |
-| `useIsReducedMotion()` | `boolean` | `(prefers-reduced-motion: reduce)` — rides `../../shared/useMediaQuery` (copy that too). |
+| `useIsReducedMotion()` | `boolean` | `(prefers-reduced-motion: reduce)` — rides `../../sharedStore/useMediaQuery` (copy that folder too). |
 | `useIsTouchDevice()` | `boolean` | `(pointer: coarse)` OR the first touch `pointerdown`; own store. |
 | `useDataSaver(enabled?)` | `boolean` | `(prefers-reduced-data: reduce)` OR the Network Information API `saveData`; own store. |
 
 ## Notes
 
 - **Store lifecycle.** The own-store hooks (`useIsTouchDevice`, `useDataSaver`)
-  follow the same contract as `shared/useMediaQuery` — a lazy live read on the
+  follow the same contract as `sharedStore/useMediaQuery` — a lazy live read on the
   first `getSnapshot` (React reads it during render, before subscribing, so a
   cached `false` would be wrong for the whole first frame) and attach/detach
   gated on the subscriber count. See [`../../shared/README.md`](../../shared/README.md).

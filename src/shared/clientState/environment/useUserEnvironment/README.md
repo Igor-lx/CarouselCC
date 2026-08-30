@@ -17,4 +17,4 @@ the memo boundary. The three single-signal hooks remain individually available
 
 **Layout.** `internal/` holds the facade's OWN copies of the three signal hooks,
 so the folder lifts out whole. The only shared piece is the store
-`../../shared/useMediaQuery` (reduced-motion rides it) — keep it single.
+`../../sharedStore/` (reduced-motion rides it) — keep it single.

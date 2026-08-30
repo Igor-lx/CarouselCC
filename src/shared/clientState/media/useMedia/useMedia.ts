@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { useMediaQuerySet } from "../../shared/useMediaQuerySet";
+import { useMediaQuerySet } from "../../sharedStore/useMediaQuerySet";
 import {
   resolveAxesDescriptor,
   type MediaAxesDescriptor,

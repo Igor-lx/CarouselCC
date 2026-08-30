@@ -22,5 +22,5 @@ own README with the detail.
 
 **Conventions.** Each blank keeps its own copies of the hooks it uses (duplicating
 a pure function costs nothing); the one thing never duplicated is a store — see
-`clientState/shared` for the single `useMediaQuery`. Code carries minimal
+`clientState/sharedStore` for the media-query stores. Code carries minimal
 comments (traps and doc links only); the rationale lives in these READMEs.

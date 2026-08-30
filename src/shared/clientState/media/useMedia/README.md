@@ -20,4 +20,5 @@ takes ONE subscription, so their count never reaches React's hook counter.
 resolves a set of axes once per shape, which is what lets the caller rebuild
 its axes object freely. `useMedia.ts` is the one facade hook; `index.ts` is the
 public surface. Copying this folder leaves nothing behind — except the store
-layer: take `../../shared/` along, whole and unedited (its README says why).
+layer: take `../../sharedStore/` along, whole and unedited (its README says
+why).

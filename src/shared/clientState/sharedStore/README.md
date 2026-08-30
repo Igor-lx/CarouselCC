@@ -1,4 +1,9 @@
-# shared — the store layer
+# sharedStore
+
+The name carries the whole rule. It is a **store** — state with a listener
+registry, which is the one thing here that a second copy would break. And it is
+**shared** — it travels with whatever you lift out of `clientState`, always,
+as one folder.
 
 `useMediaQuery(query)` → live `boolean`. A single reactive `matchMedia` store:
 one browser listener per distinct query string, shared by every consumer, with a

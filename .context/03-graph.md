@@ -33,7 +33,7 @@ shared/** ─ полки, импортируются откуда угодно, 
 | `client/state/**` | `client/geometry/**`, `client/slides/**`, `client/presentation/**`, `client/modules/**` | — |
 | `client/modules/**` | `client/state/**` | `client/state/validateState.ts` |
 | `shared/**` | `components/Carousel/**` | — |
-| `shared/clientState/shared/**` | `shared/**` | `shared/clientState/shared/**` |
+| `shared/clientState/sharedStore/**` | `shared/**` | `shared/clientState/sharedStore/**` |
 | `shared/engines/kinetic/internal/**` | `shared/engines/motion/**`, `shared/engines/gesture/**` | — |
 | `data-gen/**` | `react`, `client/**` | — |
 

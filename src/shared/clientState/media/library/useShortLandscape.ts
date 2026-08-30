@@ -1,4 +1,4 @@
-import { useMediaQuery } from "../../shared/useMediaQuery";
+import { useMediaQuery } from "../../sharedStore/useMediaQuery";
 
 /** Landscape AND short in HEIGHT (a handheld held sideways) — max-height, not width. */
 export const SHORT_LANDSCAPE_QUERY =

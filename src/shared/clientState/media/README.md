@@ -8,7 +8,7 @@ tiers, orientation, arbitrary queries. Two ways to take it:
 | `library/` | You want ONE thing: a breakpoint, orientation, or a single media query. Grab that hook. |
 | `useMedia/` | You want a whole SET resolved at once (tiers + orientation + flags) behind one call and one change signal. |
 
-Both sit on `../shared/`. **Take that folder whole, always** — it is the one
+Both sit on `../sharedStore/`. **Take that folder whole, always** — it is the one
 thing here that is never duplicated, and which of its two hooks you end up
 using is not a decision you should have to make while copying.
 

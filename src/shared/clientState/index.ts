@@ -1,4 +1,4 @@
 // See ./README.md
-export * from "./shared";
+export * from "./sharedStore";
 export * from "./media";
 export * from "./environment";

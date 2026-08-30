@@ -1,6 +1,6 @@
 # media/library
 
-Standalone media hooks. Individual hooks; take the one you need. All ride `../../shared/useMediaQuery`
+Standalone media hooks. Individual hooks; take the one you need. All ride `../../sharedStore/`
 (copy that file along too).
 
 | Hook | Returns | Use |

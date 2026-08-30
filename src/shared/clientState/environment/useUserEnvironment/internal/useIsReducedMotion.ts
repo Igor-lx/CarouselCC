@@ -1,4 +1,4 @@
-import { useMediaQuery } from "../../../shared/useMediaQuery";
+import { useMediaQuery } from "../../../sharedStore/useMediaQuery";
 
 export function useIsReducedMotion(): boolean {
   return useMediaQuery("(prefers-reduced-motion: reduce)");

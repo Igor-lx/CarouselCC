@@ -317,8 +317,9 @@ node .context/graph.mjs blast domain/index # кто именно зависит 
   невыразим одним безье, (2) ретаргет теряет скорость, (3) нечего разделить с
   точками и виджетом и нет `startTime`, (4) `transitionend` теряется.
 - **`shared/README.md:23-25`** — «каждая заготовка держит свои копии хуков; **то,
-  что не дублируется никогда, — стор**». Единственный стор — `clientState/shared/useMediaQuery`.
-  Читать это надо узко: правило про **один `useMediaQuery.ts` на проект**, а не
+  что не дублируется никогда, — стор**». Стор — это папка `clientState/sharedStore/`
+  целиком (`useMediaQuery` + `useMediaQuerySet`, второй импортирует первый).
+  Читать это надо узко: правило про **одну копию этой папки на проект**, а не
   про запрет модульного состояния как такового. `useIsTouchDevice` и
   `useDataSaver` держат собственные синглтоны законно — их источники
   (`pointerdown`, `navigator.connection.saveData`) через media-запрос не
@@ -369,7 +370,7 @@ node .context/graph.mjs blast domain/index # кто именно зависит 
 | Значение каждой константы | `docs/config/*.md` (8 файлов) |
 | Три решения с долгими последствиями | `docs/adr/000{1,2,3}-*.md` |
 | Движки как самостоятельные продукты | `shared/engines/{motion,gesture,kinetic}/README.md` |
-| Правило «стор не дублируется» | `shared/clientState/shared/README.md` |
+| Правило «стор не дублируется» | `shared/clientState/sharedStore/README.md` |
 | Генератор контента, конфиг, идемпотентность | `data-gen/README.md` |
 | Тесты границы client ↔ data-gen | `boundary/README.md` |
 
@@ -389,7 +390,7 @@ node .context/graph.mjs blast domain/index # кто именно зависит 
 
 2. **ЗАКРЫТО — собственный стор у `useIsTouchDevice` и `useDataSaver` не дефект.**
    Ранее здесь стоял открытый вопрос: почему эти два хука держат модульный
-   синглтон, а `useIsReducedMotion` делегирует в `shared/useMediaQuery`.
+   синглтон, а `useIsReducedMotion` делегирует в `sharedStore/useMediaQuery`.
    Разобрано, вопрос снят.
 
    `useMediaQuery` — мультиплексор «один слушатель на строку media-запроса», и
@@ -403,7 +404,7 @@ node .context/graph.mjs blast domain/index # кто именно зависит 
    `useIsReducedMotion` делегирует не потому, что «правильнее», а потому что он
    чистый media-запрос и ничего сверх. Всё это задокументировано таблицей в
    `environment/library/README.md:9-11`, включая цену делегирования: «rides
-   `../../shared/useMediaQuery` (**copy that too**)».
+   `../../sharedStore/useMediaQuery` (**copy that folder too**)».
 
    Конвенция `shared/README.md` про **один `useMediaQuery.ts` на проект**, а не
    про запрет модульного состояния вообще. Собственный синглтон у хука с

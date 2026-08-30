@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { useMediaQuerySet } from "../../shared/useMediaQuerySet";
+import { useMediaQuerySet } from "../../sharedStore/useMediaQuerySet";
 
 // See ../README.md
 /** Tier names → `min-width` px; resolution is purely numeric (largest matching wins). */
