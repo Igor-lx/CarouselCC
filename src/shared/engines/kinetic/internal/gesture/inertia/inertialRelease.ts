@@ -18,7 +18,7 @@ interface ResolveReleaseInput {
 }
 
 // Flick judgment: raw pointer faster than base tempo → boosted cruise, else
-// base. Inputs trusted (caller guards finite/in-range). See shared/gesture/README.md.
+// base. Inputs trusted (caller guards finite/in-range). See shared/engines/gesture/README.md.
 export function resolveInertialRelease({
   gestureReleaseVelocity,
   distanceToTarget,

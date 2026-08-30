@@ -1,4 +1,4 @@
-// See ./README.md
+// See ../README.md
 import { describe, expect, it } from "vitest";
 
 import type { Slide } from "../../client/public-api/types";

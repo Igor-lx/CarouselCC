@@ -1,5 +1,5 @@
 /** Speed along `distance`; 0 when velocity opposes it (or degenerate) — a
- * carried speed survives only when it helps the new motion. See shared/gesture/README.md. */
+ * carried speed survives only when it helps the new motion. See shared/engines/gesture/README.md. */
 export const sameDirectionSpeed = (velocity: number, distance: number) => {
   const direction = Math.sign(distance);
   if (

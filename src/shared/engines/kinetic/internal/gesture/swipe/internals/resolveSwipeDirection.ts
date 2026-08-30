@@ -2,7 +2,7 @@ import type { ResolvedPointerSwipeConfig } from "../types";
 import { dominantMagnitude, safeResistance } from "./math";
 
 // Commit decision at release (flick OR distance swipe, resistance-adapted).
-// See shared/gesture/README.md § Recognition internals (Commit decision).
+// See shared/engines/gesture/README.md § Recognition internals (Commit decision).
 
 interface ResolveDirectionInput {
   rawOffset: number;

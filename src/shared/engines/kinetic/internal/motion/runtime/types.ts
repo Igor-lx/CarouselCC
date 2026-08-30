@@ -18,7 +18,7 @@ export interface MotionSampleData<Strategy extends string = string> {
   strategy: Strategy;
 }
 
-// See shared/motion/README.md — atomic continuation point (one method, one answer).
+// See shared/engines/motion/README.md — atomic continuation point (one method, one answer).
 export interface MotionHandoff<Strategy extends string = string> {
   position: number;
   velocity: number;
@@ -53,7 +53,7 @@ export interface MotionStartOptions<
   onComplete?: ((sample: MotionSample<Strategy>) => void) | undefined;
   completion?: MotionCompletionMode | undefined;
   /** Paint owned elsewhere (a compositor animation): run with NO frame loop,
-   * still the position SSOT. See shared/motion/README.md § Passive segments. */
+   * still the position SSOT. See shared/engines/motion/README.md § Passive segments. */
   isPassive?: boolean | undefined;
 }
 
@@ -92,7 +92,7 @@ export interface MotionController<Strategy extends string = string> {
   set: (value: number, options?: MotionSetOptions<Strategy>) => void;
   snap: (value: number, options?: MotionSnapOptions<Strategy>) => void;
   /** Resume the frame loop for a passive segment whose paint owner vanished
-   * (else freeze + teleport at settle). See shared/motion/README.md § wake. */
+   * (else freeze + teleport at settle). See shared/engines/motion/README.md § wake. */
   wake: () => void;
   cancel: () => void;
   destroy: () => void;

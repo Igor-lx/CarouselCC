@@ -1,4 +1,4 @@
-// Put keyframes on the compositor, pinned to the motion clock. See shared/motion/README.md
+// Put keyframes on the compositor, pinned to the motion clock. See shared/engines/motion/README.md
 // § WAAPI transport. `fill: "both"` holds the origin before the clock catches up.
 import { isWaapiSupported } from "../profile/progressCurve";
 

@@ -1,5 +1,5 @@
 // Pure numeric internals — no DOM, no React; total functions over numbers.
-// See shared/gesture/README.md § Recognition internals.
+// See shared/engines/gesture/README.md § Recognition internals.
 
 const FRAME_BUDGET_MS = 1000 / 60;
 
@@ -41,7 +41,7 @@ export const frameAdjustedAlpha = (alpha: number, dt: number) => {
 };
 
 /** Human-scale pause decay: a hold under `graceMs` costs nothing, beyond it the
- * velocity halves every `halfLifeMs`. See shared/gesture/README.md. */
+ * velocity halves every `halfLifeMs`. See shared/engines/gesture/README.md. */
 export const pauseDecayedVelocity = (
   velocity: number,
   pauseMs: number,

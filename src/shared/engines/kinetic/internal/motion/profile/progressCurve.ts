@@ -1,4 +1,4 @@
-// See shared/motion/README.md § Curve math + WAAPI transport.
+// See shared/engines/motion/README.md § Curve math + WAAPI transport.
 import { clamp } from "./clamp";
 import { sampleMotionProfile, type MotionProfile } from "./profile";
 

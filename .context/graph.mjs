@@ -21,6 +21,21 @@ const CONFIG = {
   decisions: "09-decisions.md",
   /** Заголовок таблицы правил направления импортов, в любом файле базы. */
   rulesHeading: "Правила направления",
+  /** Парные форки: папка и её копия. Копии НЕ обязаны совпадать байт в байт —
+   * одиночной библиотеке и фасадной сборке нужны местами разные решения, и это
+   * законное расхождение. Обязаны совпадать смысл, поведение и корректность:
+   * найденный БАГ чинится в обеих. Отсюда и форма проверки — не сверка
+   * содержимого, а напоминание в момент правки (режим `twins`). */
+  forks: [
+    {
+      from: "shared/engines/motion",
+      to: "shared/engines/kinetic/internal/motion",
+    },
+    {
+      from: "shared/engines/gesture",
+      to: "shared/engines/kinetic/internal/gesture",
+    },
+  ],
   /** Копия этого файла, уезжающая с полкой правил в новый проект. Обязана
    * совпадать байт в байт: разошедшийся инструмент проверяет не тот проект.
    * `null` — копии в проекте нет. */
@@ -29,12 +44,18 @@ const CONFIG = {
 
 const ROOT = path.join(HERE, CONFIG.src).split(path.sep).join("/");
 
+const norm = (f) => f.split(path.sep).join("/").replace(/[/]+$/, "");
+
 const files = [];
+// Документация лежит рядом с кодом и адресуется из него якорями `// See`,
+// поэтому собирается тем же обходом.
+const docFiles = [];
 (function walk(dir) {
   for (const e of readdirSync(dir)) {
-    const full = path.join(dir, e);
+    const full = norm(path.join(dir, e));
     if (statSync(full).isDirectory()) walk(full);
-    else if (/\.tsx?$/.test(e)) files.push(full.replace(/\\/g, "/"));
+    else if (/\.tsx?$/.test(e)) files.push(full);
+    else if (/\.md$/.test(e)) docFiles.push(full);
   }
 })(ROOT);
 
@@ -254,6 +275,73 @@ if (mode === "open") {
 // CONSTRAINT и пометки решений, правила направления импортов, живость якорей
 // с их цитатами, объявленный состав папок и радиусы поражения. Ненулевой код
 // возврата означает, что база отстала от кода.
+// Правка в одной копии из пары — единственный настоящий риск форков, и он
+// виден только в диффе, а не в дереве: файлы законно расходятся там, где
+// одиночной библиотеке и фасаду нужно по-разному. Поэтому не сверка
+// содержимого, а вопрос в нужный момент: тронул одну копию — вот её близнец.
+if (mode === "twins") {
+  const NEWLINE = String.fromCharCode(10);
+  let changed = process.argv.slice(3);
+  if (changed.length === 0) {
+    try {
+      const { execSync } = await import("node:child_process");
+      changed = execSync("git diff --name-only HEAD", {
+        cwd: path.join(HERE, ".."),
+        encoding: "utf8",
+      })
+        .split(NEWLINE)
+        .map((l) => l.trim())
+        .filter(Boolean);
+    } catch {
+      console.log(
+        "git недоступен — передай пути аргументами: graph.mjs twins <путь> …",
+      );
+      process.exitCode = 1;
+      changed = null;
+    }
+  }
+  if (changed !== null) {
+    const srcPrefix = norm(path.relative(path.join(HERE, ".."), ROOT)) + "/";
+    const touched = new Set(
+      changed
+        .map(norm)
+        .filter((f) => f.startsWith(srcPrefix))
+        .map((f) => f.slice(srcPrefix.length)),
+    );
+    const lonely = [];
+    let inPairs = 0;
+    for (const f of touched) {
+      for (const pair of CONFIG.forks) {
+        const a = pair.from + "/";
+        const b = pair.to + "/";
+        const twin = f.startsWith(a)
+          ? b + f.slice(a.length)
+          : f.startsWith(b)
+            ? a + f.slice(b.length)
+            : null;
+        if (twin === null) continue;
+        inPairs++;
+        if (!touched.has(twin)) lonely.push([f, twin]);
+      }
+    }
+    console.log("=== Правки внутри парных форков ===");
+    console.log(
+      `  тронуто файлов в парах: ${inPairs}, без пары в этой же правке: ${lonely.length}`,
+    );
+    for (const [f, twin] of lonely)
+      console.log(`    ${f}${NEWLINE}      → близнец не тронут: ${twin}`);
+    if (lonely.length === 0 && inPairs > 0)
+      console.log("  обе копии каждой пары в правке — ок");
+    if (inPairs === 0) console.log("  правка форков не касается");
+    console.log(
+      NEWLINE +
+        "  Расхождение само по себе не дефект: одиночной библиотеке и фасаду" +
+        NEWLINE +
+        "  местами нужно по-разному. Дефект — БАГ, починенный в одной копии.",
+    );
+  }
+}
+
 // Объём файлов — по запросу. В базе этих чисел нет намеренно: строка меняется
 // от любой правки, и записанный объём превращает каждый коммит в правку базы.
 // Досье на файл или папку: всё, что известно про этот адрес, собранное из
@@ -414,7 +502,6 @@ if (mode === "verify") {
   const CR_LF = String.fromCharCode(13) + NEWLINE;
   const REPO = path.join(BASE, "..");
 
-  const norm = (p) => p.split(path.sep).join("/").replace(/[/]+$/, "");
   const bare = (q) => q.replace(/[*]+$/, "").replace(/[/]+$/, "");
 
   // Пути в базе сокращены и лежат на разной глубине: разрешаются по префиксу
@@ -863,6 +950,46 @@ if (mode === "verify") {
   );
   for (const t of toolDrift) console.log("    " + t);
 
+  // 10. якорь на документацию в коде указывает на существующий файл
+  // Строка-якорь целиком, потом все пути в ней: одна строка часто называет
+  // два документа («See A and B»), и ловить только первый значит не
+  // проверять второй.
+  const DOC_LINE_RE = /\/\/ See [^\n]*/g;
+  const DOC_PATH_RE = /[\w./-]+\.md/g;
+  // docFiles собран верхним обходом
+  const deadAnchors = [];
+  let anchorCount = 0;
+  for (const f of files) {
+    const body = readFileSync(f, "utf8");
+    const specs = (body.match(DOC_LINE_RE) ?? []).flatMap(
+      (line) => line.match(DOC_PATH_RE) ?? [],
+    );
+    for (const spec of specs) {
+      anchorCount++;
+      // Якорь пишут относительно файла (`./README.md`), относительно корня
+      // компонента (`docs/architecture/x.md`) или корня исходников
+      // (`shared/engines/motion/README.md`). Поэтому пробуются все предки.
+      let dir = norm(path.dirname(f));
+      let found = false;
+      while (dir.length >= ROOT.length) {
+        if (docFiles.includes(norm(path.join(dir, spec)))) {
+          found = true;
+          break;
+        }
+        const up = norm(path.dirname(dir));
+        if (up === dir) break;
+        dir = up;
+      }
+      if (found) continue;
+      deadAnchors.push(`${rel(f)} → ${spec}`);
+    }
+  }
+  console.log("=== Якоря на документацию в коде ===");
+  console.log(
+    `  проверено: ${anchorCount}, ведут в никуда: ${deadAnchors.length}`,
+  );
+  for (const a of deadAnchors) console.log("    " + a);
+
   console.log("=== Объявленный состав папок и радиусы ===");
   console.log(
     `  папок: ${dirs}, радиусов: ${radii}, разошлось: ${wrong.length}`,
@@ -882,6 +1009,7 @@ if (mode === "verify") {
     broken.length ||
     wrong.length ||
     toolDrift.length ||
+    deadAnchors.length ||
     unresolved.length
   )
     process.exitCode = 1;

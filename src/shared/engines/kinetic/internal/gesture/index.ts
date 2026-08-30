@@ -1,5 +1,5 @@
 // Internal fork of shared/gesture (duplicated, not imported; may drift — by
-// design). Physics/traps documented in shared/gesture/README.md.
+// design). Physics/traps documented in shared/engines/gesture/README.md.
 export {
   usePointerSwipe,
   POINTER_SWIPE_DEFAULTS,

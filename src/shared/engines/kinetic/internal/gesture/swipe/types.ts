@@ -5,7 +5,7 @@ export type PointerSwipePhase = "idle" | "press" | "dragging" | "cooldown";
 export type PointerSwipeDirection = "left" | "right" | "none";
 
 /** How an owned gesture ended — carries meaning for catch-and-hold consumers.
- * See shared/gesture/README.md § End reasons (Android long-press → `external-cancel`). */
+ * See shared/engines/gesture/README.md § End reasons (Android long-press → `external-cancel`). */
 export type PointerSwipeEndReason =
   "release" | "vertical-scroll" | "external-cancel";
 
@@ -64,7 +64,7 @@ export interface PointerSwipeReleasePayload extends PointerSwipeMovePayload {
   pointerReleaseVelocity: number;
   uiReleaseVelocity: number;
   /** UI-domain continuity-launch speed, judged over the whole gesture (not the
-   * last frames). See shared/gesture/README.md § End reasons. */
+   * last frames). See shared/engines/gesture/README.md § End reasons. */
   launchVelocity: number;
 }
 
@@ -77,7 +77,7 @@ export interface PointerSwipeListeners {
 }
 
 /** Everything the host needs as one spreadable bundle (`<div {...hostProps}>`);
- * the `ref` is what makes an element the host. See shared/gesture/README.md § Principle. */
+ * the `ref` is what makes an element the host. See shared/engines/gesture/README.md § Principle. */
 export interface PointerSwipeHostProps extends PointerSwipeListeners {
   ref: (node: HTMLElement | null) => void;
   style?: CSSProperties;
@@ -87,7 +87,7 @@ export interface PointerSwipeHostProps extends PointerSwipeListeners {
 export type PointerSwipeHostRef =
   ((node: HTMLElement | null) => void) | { current: HTMLElement | null };
 
-/** Turnkey "the finger drags your value". See shared/gesture/README.md § Turnkey drag→value
+/** Turnkey "the finger drags your value". See shared/engines/gesture/README.md § Turnkey drag→value
  * (anchors at activation; 1:1 px↔unit; `read` catches a flying value). */
 export interface PointerSwipeValueBinding {
   /** The value's live position at drag activation — the drag's anchor. */
@@ -104,7 +104,7 @@ export interface PointerSwipeProps {
    * second ref on the DOM). */
   hostRef?: PointerSwipeHostRef | undefined;
   /** Optional draggable SURFACE inside the host; presses outside it are chrome,
-   * handed straight back. See shared/gesture/README.md § Principle. */
+   * handed straight back. See shared/engines/gesture/README.md § Principle. */
   surfaceRef?: { readonly current: HTMLElement | null } | undefined;
   enabled?: boolean | undefined;
   config?: PointerSwipeConfig | undefined;

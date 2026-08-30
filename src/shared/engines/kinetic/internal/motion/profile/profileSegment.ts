@@ -2,7 +2,7 @@ import { motionNow } from "../runtime/clock";
 import type { MotionSampleData, MotionSegmentBase } from "../runtime/types";
 import { sampleMotionProfile, type MotionProfile } from "./profile";
 
-// See shared/motion/README.md
+// See shared/engines/motion/README.md
 /** The canonical segment shape for profile-backed motion (built + read here). */
 export interface ProfileSegment<
   Strategy extends string = string,

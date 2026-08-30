@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-// See shared/motion/README.md
+// See shared/engines/motion/README.md
 import type { MotionController, MotionSample } from "./types";
 
 // Paint each emitted sample; `paint` ref-wrapped so it never resubscribes.

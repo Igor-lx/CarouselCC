@@ -1,4 +1,4 @@
-// See shared/motion/README.md
+// See shared/engines/motion/README.md
 import { useEffect, useState } from "react";
 import { createMotionController } from "./createMotionController";
 import type { MotionController } from "./types";

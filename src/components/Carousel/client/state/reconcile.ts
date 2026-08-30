@@ -1,4 +1,4 @@
-// See docs/architecture/state.md + adr/0001-layout-reconciliation.md
+// See docs/architecture/state.md + docs/adr/0001-layout-reconciliation.md
 import { pageStart, reconciledPageIndex, type CarouselLayout } from "../domain";
 import { buildInitialState } from "./initial";
 import { ZERO_GESTURE_RELEASE, type CarouselState } from "./types";

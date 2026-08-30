@@ -1,5 +1,5 @@
 // Interactive-descendant recognition: a press on a control stays a click unless
-// the finger clearly turns it into a horizontal drag. See shared/gesture/README.md § Principle.
+// the finger clearly turns it into a horizontal drag. See shared/engines/gesture/README.md § Principle.
 
 /** Opt-out marker: `data-drag-ignore="true"` → never a drag, click preserved. */
 export const DRAG_IGNORE_ATTRIBUTE = "data-drag-ignore";
@@ -34,7 +34,7 @@ export const getInteractiveTarget = (
 
 /** The explicit opt-out alone: `data-drag-ignore="true"` is a deliberate
  * "not the surface" for point exceptions inside it (a like button on a card).
- * For a whole chrome layer use `surfaceRef`. See shared/gesture/README.md § Principle. */
+ * For a whole chrome layer use `surfaceRef`. See shared/engines/gesture/README.md § Principle. */
 export const getDragIgnoreTarget = (
   target: EventTarget | null,
   boundary: HTMLElement,

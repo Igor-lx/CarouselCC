@@ -11,7 +11,7 @@ import { startPinnedAnimation } from "./pinnedAnimation";
 
 // Compositor path for ONE controller painted through ONE element: stops →
 // keyframes → pinned animation, controller runs the same segment passively. JS
-// fallback built in. (Fork trims flyTo/dragBinding.) See shared/motion/README.md.
+// fallback built in. (Fork trims flyTo/dragBinding.) See shared/engines/motion/README.md.
 
 export interface CompositedRideStart<Strategy extends string> {
   element: Element | null;
@@ -138,7 +138,7 @@ export const createCompositedRide = <Strategy extends string>(
 };
 
 // One rider per controller identity; holds no timers, only the animation handle.
-// See shared/motion/README.md.
+// See shared/engines/motion/README.md.
 export function useCompositedRide<Strategy extends string>(
   controller: MotionController<Strategy>,
 ): CompositedRide<Strategy> {

@@ -1,4 +1,4 @@
-// See shared/motion/README.md
+// See shared/engines/motion/README.md
 import { clamp } from "./clamp";
 
 export interface MotionProfileZone {

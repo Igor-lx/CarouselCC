@@ -31,7 +31,7 @@ import type {
   ResolvedPointerSwipeConfig,
 } from "./types";
 
-// See ./types.ts for field meanings and shared/gesture/README.md for recognition internals.
+// See ./types.ts for field meanings and shared/engines/gesture/README.md for recognition internals.
 /** Out-of-the-box tuning; a partial consumer `config` merges over it per field. */
 export const POINTER_SWIPE_DEFAULTS: ResolvedPointerSwipeConfig = {
   cooldownMs: 150,
@@ -48,7 +48,7 @@ export const POINTER_SWIPE_DEFAULTS: ResolvedPointerSwipeConfig = {
   minSwipeDistance: 20,
   swipeThresholdRatio: 0.2,
   // 250ms: lets a real scroll (rests 100-250ms) through, catches a hold (~500ms
-  // long-press). See shared/gesture/README.md § Recognition internals.
+  // long-press). See shared/engines/gesture/README.md § Recognition internals.
   catchDelayMs: 250,
 };
 
@@ -70,7 +70,7 @@ interface InternalSample {
    * judges the GESTURE, not its last (decelerating) segment. */
   flickVelocity: number;
   /** Continuity-launch speed on the flick's slow law (not the fast per-frame
-   * EMA). See shared/gesture/README.md § Recognition internals. */
+   * EMA). See shared/engines/gesture/README.md § Recognition internals. */
   launchVelocity: number;
   width: number;
   timestamp: number;
@@ -95,7 +95,7 @@ const resolveConfig = (
 });
 
 /** Event hardware-time, not handler time — else a congested thread deflates
- * every velocity. See shared/gesture/README.md § Recognition internals. */
+ * every velocity. See shared/engines/gesture/README.md § Recognition internals. */
 const eventTime = (event: { timeStamp: number }): number =>
   event.timeStamp > 0 ? event.timeStamp : performance.now();
 
@@ -144,7 +144,7 @@ export function usePointerSwipe({
     startX: 0,
     startY: 0,
     /** Visual-offset anchor; re-anchored to the finger at activation. See
-     * shared/gesture/README.md § Recognition internals (visual re-anchor). */
+     * shared/engines/gesture/README.md § Recognition internals (visual re-anchor). */
     visualStartX: 0,
     lastX: 0,
     lastTime: 0,
@@ -189,7 +189,7 @@ export function usePointerSwipe({
   );
 
   // Pending catch: a press becomes a brake only if it outlasts the window.
-  // See shared/gesture/README.md § Recognition internals (the catch window).
+  // See shared/engines/gesture/README.md § Recognition internals (the catch window).
   const catchTimerRef = useRef<number | null>(null);
 
   const clearCatchTimer = useCallback(() => {
@@ -345,7 +345,7 @@ export function usePointerSwipe({
         typeof currentX === "number" && currentX !== gesture.lastX;
       // Flick + launch memory survive a lift-off hold on the pause law (grace +
       // half-life), captured BEFORE the terminal sample so a last-instant twitch
-      // can't wipe them. See shared/gesture/README.md § Recognition internals.
+      // can't wipe them. See shared/engines/gesture/README.md § Recognition internals.
       const pausedFlickVelocity = pauseDecayedVelocity(
         sampleRef.current.flickVelocity,
         now - sampleRef.current.timestamp,
@@ -453,7 +453,7 @@ export function usePointerSwipe({
 
       // Not the engine's surface → handed straight back (click marked allowed).
       // Two ways to declare it: outside `surfaceRef`, or `data-drag-ignore="true"`.
-      // See shared/gesture/README.md § Principle.
+      // See shared/engines/gesture/README.md § Principle.
       const surface = surfaceRef?.current ?? null;
       const offSurface =
         surface &&
@@ -493,7 +493,7 @@ export function usePointerSwipe({
       setPhase("press");
 
       // Ownership goes to any press that outlasts the catch window (a resting
-      // finger IS the "catch the strip" interaction). See shared/gesture/README.md § Recognition internals.
+      // finger IS the "catch the strip" interaction). See shared/engines/gesture/README.md § Recognition internals.
       ensureCapture(target, event.pointerId);
       scheduleCatch(target, event.pointerId);
     },

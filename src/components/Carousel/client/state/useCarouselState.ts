@@ -26,7 +26,7 @@ export function useCarouselState(
   // therefore before any child can dispatch — instead of riding along on every
   // command. `dispatch` needs no refs to stay stable, and nothing can read a
   // layout the state was not reconciled against.
-  // See adr/0004-reducer-owns-its-context.md.
+  // See docs/adr/0004-reducer-owns-its-context.md.
   if (
     state.layout !== layout ||
     state.config !== config ||

@@ -1,5 +1,5 @@
 // Internal fork of shared/motion (duplicated, not imported; may drift — by
-// design). Curve math + runtime traps documented in shared/motion/README.md.
+// design). Curve math + runtime traps documented in shared/engines/motion/README.md.
 export { createMotionController } from "./runtime/createMotionController";
 export { useMotionController } from "./runtime/useMotionController";
 export { useMotionPaint } from "./runtime/useMotionPaint";
