@@ -18,7 +18,7 @@ const isTest = (f) => /\/tests\//.test(f) || /\.test\.tsx?$/.test(f);
 
 const rel = (f) => f.replace(ROOT + "/", "");
 
-// --- resolve a specifier to a file -----------------------------------------
+// --- разрешение спецификатора импорта в файл ---------------------------------
 const resolve = (fromFile, spec) => {
   if (!spec.startsWith(".")) return null;
   const base = path.resolve(path.dirname(fromFile), spec).replace(/\\/g, "/");
@@ -33,10 +33,10 @@ const resolve = (fromFile, spec) => {
   return null;
 };
 
-// --- parse imports + exports ------------------------------------------------
-const importsOf = new Map(); // file -> Set<file>
-const importedNames = new Map(); // file -> Set<name>  (names pulled FROM that file)
-const exportsOf = new Map(); // file -> Set<name>
+// --- разбор импортов и экспортов ---------------------------------------------
+const importsOf = new Map(); // файл -> набор файлов, которые он импортирует
+const importedNames = new Map(); // файл -> имена, которые из него утащили
+const exportsOf = new Map(); // файл -> имена, которые он экспортирует
 
 const NAME_RE = /^[A-Za-z_$][\w$]*$/;
 
@@ -44,7 +44,7 @@ for (const f of files) {
   const src = readFileSync(f, "utf8");
   importsOf.set(f, new Set());
 
-  // import { a, b as c } from "x" | import x from "y" | export {...} from "z"
+  // разбираемые формы: import { a, b as c } from "x" | import x from "y" | export {...} from "z"
   const re =
     /(?:^|\n)\s*(?:import|export)\s+([\s\S]*?)\s*from\s*["']([^"']+)["']/g;
   let m;
@@ -76,7 +76,7 @@ for (const f of files) {
     if (def && NAME_RE.test(def)) set.add("default");
   }
 
-  // exports declared in this file
+  // экспорты, объявленные в самом файле
   const ex = new Set();
   for (const mm of src.matchAll(
     /export\s+(?:const|function|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g,
@@ -96,7 +96,7 @@ for (const f of files) {
   exportsOf.set(f, ex);
 }
 
-// --- reverse graph ----------------------------------------------------------
+// --- обратный граф: кто кого импортирует ------------------------------------
 const importedBy = new Map();
 for (const [f, deps] of importsOf) {
   for (const d of deps) {
@@ -108,12 +108,14 @@ for (const [f, deps] of importsOf) {
 const mode = process.argv[2];
 
 if (mode === "dead") {
-  console.log("=== Exports never imported anywhere (incl. tests) ===\n");
+  console.log(
+    "=== Экспорты, которые нигде не импортируют (тесты включены) ===\n",
+  );
   const rows = [];
   for (const f of files) {
     if (isTest(f)) continue;
     const pulled = importedNames.get(f) ?? new Set();
-    if (pulled.has("*")) continue; // star-reexported: cannot tell
+    if (pulled.has("*")) continue; // утащено через export * — разобрать нельзя
     const dead = [...exportsOf.get(f)].filter((n) => !pulled.has(n));
     if (dead.length) rows.push([rel(f), dead]);
   }
@@ -121,12 +123,12 @@ if (mode === "dead") {
     console.log(`${f}\n    ${dead.join(", ")}`);
   }
   console.log(
-    `\n${rows.length} files carry at least one never-imported export.`,
+    `\nФайлов хотя бы с одним неимпортируемым экспортом: ${rows.length}.`,
   );
 }
 
 if (mode === "blast") {
-  console.log("=== Blast radius: non-test importers per source file ===\n");
+  console.log("=== Радиус поражения: не-тестовых импортёров на файл ===\n");
   const rows = [];
   for (const f of files) {
     if (isTest(f)) continue;
@@ -138,7 +140,7 @@ if (mode === "blast") {
     console.log(`${String(n).padStart(3)}  ${f}`);
     if (n <= 6) console.log(`      ${users.join("\n      ")}`);
   }
-  console.log("\n--- files nothing (non-test) imports ---");
+  console.log("\n--- файлы, которые не импортирует никто (кроме тестов) ---");
   for (const [f, n] of rows) if (n === 0) console.log(`     ${f}`);
 }
 
@@ -157,7 +159,7 @@ if (mode === "cycles") {
     color.set(f, 2);
   };
   for (const f of files) if (!color.has(f)) visit(f);
-  console.log("=== Import cycles ===\n");
+  console.log("=== Циклические импорты ===\n");
   const seen = new Set();
   for (const c of found) {
     const key = [...c].sort().join("|");
@@ -166,7 +168,7 @@ if (mode === "cycles") {
     console.log(c.map(rel).join("\n  -> "));
     console.log("");
   }
-  console.log(`${seen.size} distinct cycles.`);
+  console.log(`Различных циклов: ${seen.size}.`);
 }
 
 // --- verify: покрытие карты и живость якорей --------------------------------
