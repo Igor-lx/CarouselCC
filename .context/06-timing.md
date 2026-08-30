@@ -109,7 +109,7 @@
 Слой вызывается синхронно и всегда даёт один и тот же ответ на одни и те же
 аргументы. Момент вызова не значит ничего — с одним исключением:
 
-- `measureSlotSize` (`domain/track.ts:44`) читает `getComputedStyle` и
+- `measureSlotSize` (`domain/track.ts:40`) читает `getComputedStyle` и
   `offsetWidth`, то есть **заставляет браузер посчитать раскладку**. Вызов
   внутри цикла или на каждый кадр — это layout thrashing. Кто и когда его
   вызывает, решает `geometry/useSlotSizeSource.ts`; сам `domain` цену не

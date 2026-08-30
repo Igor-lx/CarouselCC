@@ -270,9 +270,9 @@ if (mode === "verify") {
     return new RegExp("^" + body + "$");
   };
 
-  const under = (q, prefix) => {
+  // Всё, что лежит под путём, тесты включительно.
+  const inside = (q, prefix) => {
     for (const raw of prefix === null ? [q] : [q, prefix + q]) {
-      const wantTests = raw.includes("tests");
       const shapes = [];
       for (const pattern of variants(raw)) {
         const head = pattern.split("*")[0];
@@ -282,12 +282,18 @@ if (mode === "verify") {
         shapes.push(asRegExp(norm(root) + slash + pattern.slice(head.length)));
       }
       if (!shapes.length) continue;
-      const hits = everyFile.filter(
-        (f) => isTest(f) === wantTests && shapes.some((rx) => rx.test(f)),
-      );
-      if (hits.length) return hits;
+      const hits = everyFile.filter((f) => shapes.some((rx) => rx.test(f)));
+      if (hits.length) return { hits, wantTests: raw.includes("tests") };
     }
     return null;
+  };
+
+  // Размер папки считается по коду, а пути со словом `tests` — по тестам.
+  const under = (q, prefix) => {
+    const found = inside(q, prefix);
+    if (found === null) return null;
+    const hits = found.hits.filter((f) => isTest(f) === found.wantTests);
+    return hits.length ? hits : null;
   };
 
   // Группы раскрываются и в тексте базы: иначе `{a,b}.test.ts` читался бы как
@@ -330,14 +336,18 @@ if (mode === "verify") {
   );
   for (const f of unnamed) console.log("    " + rel(f));
 
-  // 3 и 4. якоря и объявленные размеры — одним проходом по строкам: обе
-  // проверки читают контекст заголовка, он задаёт и префикс пути, и файл, к
-  // которому относятся якоря вида `:120`.
+  // 3, 4 и 5. якоря, объявленные размеры и радиус поражения слоя — одним
+  // проходом по строкам: все три читают контекст заголовка, он задаёт и префикс
+  // пути, и файл, к которому относятся якоря вида `:120`.
   const FILE_RE = /`([\w./{},*-]+\.(?:tsx|ts|scss))`\s*\((\d+)\)/g;
   const DIR_RE =
     /`([\w./*{},-]+\/(?:\*\*)?)`\s*\((\d+) файл[а-я]*(?:, (\d+))?\)/g;
   const DASH_RE =
     /`([\w./*{},-]+\/(?:\*\*)?)`[^`\n]*— (\d+) файл[а-я]* \/ (\d+) стро[а-я]*/g;
+  // Радиус поражения слоя: «22 импортёра (+12 тестовых)». Считается по графу,
+  // а не по папке, поэтому и живёт в проверке, а не в тексте.
+  const IMPORTERS_RE =
+    /`([\w./*{},-]+\/(?:\*\*)?)`[^`\n]*?(\d+) импортёр[а-я]*(?: \(\+(\d+) тест[а-я]*\))?/g;
   const HEAD_RE = /^#{2,4}[^`]*`([^`]+)`/;
   const HEAD_FILES_RE = /`([\w./{},*-]+\.(?:tsx|ts|scss))`/g;
   const ANCHOR_TAIL = /\.(tsx?|scss|md|json|html)$/;
@@ -368,6 +378,35 @@ if (mode === "verify") {
     if (total !== Number(linesClaim))
       wrong.push(
         `${name}: ${q} — записано ${linesClaim} строк, на диске ${total}`,
+      );
+  };
+
+  let radii = 0;
+  // Импортёр — файл **вне** слоя: собственные тесты слоя в радиус не входят,
+  // иначе число росло бы от каждого нового теста внутри самой папки.
+  const claimImporters = (name, q, prefix, codeClaim, testClaim) => {
+    const found = inside(q, prefix);
+    if (found === null) {
+      unresolved.push(`${name}: ${q}`);
+      return;
+    }
+    const target = found.hits;
+    const users = files.filter(
+      (f) =>
+        !target.includes(f) &&
+        [...(importsOf.get(f) ?? [])].some((d) => target.includes(d)),
+    );
+    radii++;
+    const inCode = users.filter((f) => !isTest(f)).length;
+    if (inCode !== Number(codeClaim))
+      wrong.push(
+        `${name}: ${q} — записано ${codeClaim} импортёров, на диске ${inCode}`,
+      );
+    if (testClaim === undefined) return;
+    const inTests = users.length - inCode;
+    if (inTests !== Number(testClaim))
+      wrong.push(
+        `${name}: ${q} — записано ${testClaim} тестовых импортёров, на диске ${inTests}`,
       );
   };
 
@@ -448,6 +487,9 @@ if (mode === "verify") {
       DASH_RE.lastIndex = 0;
       while ((m = DASH_RE.exec(line)) !== null)
         claimDir(name, m[1], prefix, m[2], m[3]);
+      IMPORTERS_RE.lastIndex = 0;
+      while ((m = IMPORTERS_RE.exec(line)) !== null)
+        claimImporters(name, m[1], prefix, m[2], m[3]);
     }
   }
 
@@ -456,8 +498,10 @@ if (mode === "verify") {
     `  проверено: ${anchors}, из них с цитатой: ${cited}, битых: ${broken.length}`,
   );
   for (const b of broken) console.log("    " + b);
-  console.log("=== Объявленные размеры ===");
-  console.log(`  сверено: ${sized}, разошлось: ${wrong.length}`);
+  console.log("=== Объявленные размеры и радиусы ===");
+  console.log(
+    `  размеров: ${sized}, радиусов: ${radii}, разошлось: ${wrong.length}`,
+  );
   for (const w of wrong) console.log("    " + w);
   if (unresolved.length) {
     console.log("=== Не разобрано (проверкой не покрыто) ===");
