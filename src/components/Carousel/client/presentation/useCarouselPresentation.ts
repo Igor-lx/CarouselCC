@@ -55,10 +55,7 @@ export const useCarouselPresentation = ({
   );
 
   // Per-lane styles CACHED by virtual index to keep SlideItem's `style` prop
-  // `===` across the twice-per-ride virtualSlides rebuild — see the doc. The
-  // cache is owned by a memo keyed on the origin, which IS its invalidation
-  // rule: a recenter re-bases every lane, so it gets a new map and the old one
-  // goes with it. No hand-written `origin` field, and no ref written in render.
+  // `===` across the twice-per-ride virtualSlides rebuild — see the doc.
   const laneCacheRef = useRef(new Map<string, CarouselSlideCssVars>());
 
   const slideStyleFor = useCallback(

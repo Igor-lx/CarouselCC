@@ -32,14 +32,25 @@
   `reducedMotion`, `touch`, `dataSaver` приходят пропом `userEnvironment`.
 - **Reduced motion отрезает потоки на входе в контекст**: `visualPosition` и
   `motionPlan` подаются как `null`, а не как молчащие источники.
-- `planChannelRef` создаётся лениво прямо в рендере (`:206-212`). Тот же приём в
-  `useImageResourceStoreInstance` линтер помечает, здесь — нет: правило реагирует
+- `planChannelRef` создаётся лениво прямо в рендере
+  (`:208-212` `planChannelRef.current = createMotionPlanChannel()`). Тот же
+  приём в `useImageResourceStoreInstance` линтер помечает, здесь — нет: правило реагирует
   на условное чтение рефа, а не на эту форму. Знать при возврате к правилам
   React Compiler.
 - Дев-описатели медиа слайдов (`slideMediaViews`) собираются только под `IS_DEV`.
 - Разметка несёт **контракт стилей**: `data-breakpoint`, `data-orientation`,
   `data-<flag>`, `data-moving`, `data-touch`, `data-reduced-motion`,
   `data-carousel-root/viewport/track`. По ним и цепляется CSS.
+- `?` Восьмой атрибут корня, `data-responsive-images` (`:370`), не читает
+  **никто**: ни SCSS, ни код, ни тесты. В `docs/architecture/modules.md:127` он
+  описан как опубликованный признак для хоста, то есть похож на намеренный
+  маркер наружу, а не на остаток. Отличается от остальных семи тем, что ни одна
+  проверка не упадёт, если его удалить.
+- **Право слайда на загрузку решается здесь, а не в `useSlideFetchReach`**
+  (`:414-421`): реач даёт порог, а корень складывает его с `isActive` через
+  `ИЛИ`. Слайд, с которого колода уезжает, остаётся с картинкой на всю поездку
+  именно из-за этого `ИЛИ` — привязка к одной только целевой полосе гасила бы
+  его на время движения.
 
 ### `client/areCarouselPropsEqual.ts` (87) — мемо-компаратор
 Разобран отдельно, в разделе **J**: там же записано следствие, которого нет в
@@ -57,6 +68,10 @@
   строка, число **или React-элемент**, отсюда и стражи в стенде.
 - Асимметрия экспорта: `CLASS_NAME_KEYS` отдан из `public-api/index.ts`, но не
   из `client/index.ts` — записано в `01-facts.md`, D3.
+- **Схемы намеренно не реэкспортируются из бочки** (`public-api/index.ts:13-19`):
+  бочка лежит на рантайм-пути импорта, и значение-реэкспорт затянул бы Zod в
+  бандл приложения. Сегодня Zod живёт ровно в одном значении — самом
+  `schemas.ts`, — а `types.ts` берёт его `import type`, который стирается.
 
 ### `client/slots/slotNames.ts` (14) + `index.ts` (2)
 Имена четырёх слотов и тип `CarouselSlotComponent<Component, SlotName>` —
@@ -765,9 +780,9 @@ reason for the split»).
 пагинация гасятся ещё и по `canSlide`; диагностика — **только в dev**
 (`isDiagnosticAttached`), и это записано прямо в коде.
 
-### `client/presentation/useCarouselPresentation.ts` (90) — fx
+### `client/presentation/useCarouselPresentation.ts` (87) — fx
 Классы, корневые переменные, флаги и **геттер стиля полосы**.
-- `slideStyleFor` — именно геттер, а не параллельный массив: комментарий `:28-31`
+- `slideStyleFor` — именно геттер, а не параллельный массив: комментарий `:28-30`
   объясняет, что позиционное соответствие с `virtualSlides` было бы инвариантом,
   который может подтвердить только комментарий.
 - Кэш полос — в рефе с ключом `origin:virtualIndex`, поэтому смена опоры не
@@ -810,7 +825,7 @@ reason for the split»).
   `userEnvironment`, `onSlideClick`, `onCarouselStatusChange`. Инлайновый
   `slidesData={[...]}` пробивает мемо → пересборка `records`/`layout` → см.
   эффект в `useCarouselGesture:223-255`. Сильный ARCH/RISK-кандидат.
-- `:53` глубже `MAX_CHILD_COMPARE_DEPTH` возвращается «изменилось» — fail-safe,
+- `:51` глубже `MAX_CHILD_COMPARE_DEPTH` возвращается «изменилось» — fail-safe,
   явно так задумано (`:9-15`).
 
 ---
