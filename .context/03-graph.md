@@ -197,16 +197,19 @@ state + motion + geometry ──> useModuleContextValue ──> CarouselStableCo
 | Что берут | Кто |
 | --- | --- |
 | `dispatch` (нужна **неизменная идентичность**) | `autoplay/useCarouselAutoplay`, `gesture/useCarouselGesture`, `navigation/useCarouselNavigation`, `motion/useCarouselMotionExecution` |
-| `state` / `motionStatus` (чтение) | `Carousel.tsx`, `context/*` (значения контекстов модулей), `motion/segmentFactory`, `motion/duration`, `motion/useMotionRunner`, `modules/Diagnostic/checks/stateChecks` |
+| `state` / `motionStatus` (чтение) | `Carousel.tsx`, `context/*` (значения контекстов модулей), `autoplay/useCarouselAutoplay`, `motion/segmentFactory`, `motion/duration`, `motion/useMotionRunner`, `modules/Diagnostic/checks/stateChecks` |
 
 Наружу (`state/index.ts`) выходит узко: `useCarouselState`, `motionStatus` и
-четыре типа. `carouselReducer`, `buildInitialState`, `resolveStepTransition`,
-`validateCarouselState` берут прямым путём — тесты, диагностика и мотор.
+пять типов. Мимо бочки за пределы слоя уходит одно имя —
+`validateCarouselState` в `modules/Diagnostic/checks/stateChecks`;
+`carouselReducer`, `buildInitialState` и `resolveStepTransition` берут прямым
+путём только собственные тесты слоя.
 
-**Зависимость вверх, единственная в слое:** `transitions.ts` импортирует
-`resolveGoToPlan` из `motion/timing`. Планирование телепорта живёт в motion, а
-решение о нём принимается здесь — при переносе любого из двух файлов это первое,
-что порвётся.
+**Зависимость вверх — два файла, а не один.** `transitions.ts` импортирует
+`resolveGoToPlan`, `reducer.ts` — `resolveGoToApproachDistance`, оба из
+`motion/timing`. Планирование телепорта живёт в motion, а решения о нём — и
+о старте, и о развороте на подход — принимаются здесь; при переносе любого из
+трёх файлов это первое, что порвётся.
 
 ## C. `client/domain/**`
 
