@@ -249,7 +249,7 @@ client/motion/index.ts
 
 1. **`docs/architecture/geometry.md:115,120`** — описывает функцию
    **`syncGeometry`**. Такой функции нет: в
-   `geometry/useTrackBinding.ts:208,221` это `rebaseTrack` и
+   `geometry/useTrackBinding.ts:225,238` это `rebaseTrack` и
    `rebaseForLayoutOrigin`.
 2. **`docs/architecture/public-api.md:65`** — «`isFullPagesOn` … Clones **tail**
    slides». Код клонирует **головные**: `domain/slides.ts:35`
