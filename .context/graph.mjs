@@ -37,6 +37,7 @@ const resolve = (fromFile, spec) => {
 const importsOf = new Map(); // файл -> набор файлов, которые он импортирует
 const importedNames = new Map(); // файл -> имена, которые из него утащили
 const exportsOf = new Map(); // файл -> имена, которые он экспортирует
+const specsOf = new Map(); // файл -> спецификаторы как написаны, включая пакеты
 
 const NAME_RE = /^[A-Za-z_$][\w$]*$/;
 
@@ -50,6 +51,8 @@ for (const f of files) {
   let m;
   while ((m = re.exec(src))) {
     const clause = m[1];
+    if (!specsOf.has(f)) specsOf.set(f, new Set());
+    specsOf.get(f).add(m[2]);
     const target = resolve(f, m[2]);
     if (!target) continue;
     importsOf.get(f).add(target);
@@ -172,9 +175,10 @@ if (mode === "cycles") {
 }
 
 // --- verify: сверка базы с кодом ---------------------------------------------
-// Шесть проверок, и все механические: покрытие карты, покрытие тестов, пометки
-// CONSTRAINT, живость якорей с их цитатами, объявленные размеры и радиусы.
-// Ненулевой код возврата означает, что база отстала от кода.
+// Семь проверок, и все механические: покрытие карты, покрытие тестов, пометки
+// CONSTRAINT, правила направления импортов, живость якорей с их цитатами,
+// объявленные размеры и радиусы. Ненулевой код возврата означает, что база
+// отстала от кода.
 if (mode === "verify") {
   const BASE = HERE;
   const MAP = "00-map.md";
@@ -397,12 +401,19 @@ if (mode === "verify") {
   const mapMentions = new Set();
   const testMentions = new Set();
 
+  // Строки таблицы «Правила направления»: слой, запреты, разрешённые исключения.
+  const RULES_HEAD = /^#+.*Правила направления/;
+  const ROW_RE = /^\|(.+)\|(.+)\|(.*)\|\s*$/;
+  const cellPaths = (cell) => [...cell.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+  const rules = [];
+
   for (const name of readdirSync(BASE)) {
     if (!name.endsWith(".md")) continue;
     // Заголовок раздела задаёт префикс путей и, если называет ровно один файл,
     // адресата относительных якорей.
     let prefix = null;
     let current = null;
+    let inRules = false;
     for (const line of readFileSync(path.join(BASE, name), "utf8").split(
       NEWLINE,
     )) {
@@ -419,6 +430,18 @@ if (mode === "verify") {
           named.length === 1
             ? locate(named[0].split(String.fromCharCode(96)).join(""), prefix)
             : null;
+      }
+      if (line.startsWith("#")) inRules = RULES_HEAD.test(line);
+
+      const row = inRules ? ROW_RE.exec(line) : null;
+      if (row !== null) {
+        const layer = cellPaths(row[1]);
+        if (layer.length === 1)
+          rules.push({
+            layer: layer[0],
+            banned: cellPaths(row[2]),
+            allowed: cellPaths(row[3]),
+          });
       }
 
       for (const span of line
@@ -535,6 +558,38 @@ if (mode === "verify") {
   );
   for (const f of unnamed) console.log("    " + rel(f));
 
+  // 7. правила направления импортов держатся
+  // Слой описан путём, запрет — либо путём (сверяется по графу), либо именем
+  // пакета (сверяется по спецификатору как написан). Исключения перечислены
+  // рядом с правилом: дыра, о которой известно, — это не то же, что дыра.
+  const broken7 = [];
+  for (const rule of rules) {
+    const layer = (inside(rule.layer, null)?.hits ?? []).filter(
+      (f) => !isTest(f),
+    );
+    const allowed = new Set(
+      rule.allowed.flatMap((q) => inside(q, null)?.hits ?? []),
+    );
+    for (const banned of rule.banned) {
+      const target = banned.includes("/")
+        ? new Set(inside(banned, null)?.hits ?? [])
+        : null;
+      for (const f of layer) {
+        if (target === null) {
+          if (specsOf.get(f)?.has(banned))
+            broken7.push(`${rel(f)} → ${banned}`);
+          continue;
+        }
+        for (const dep of importsOf.get(f) ?? [])
+          if (target.has(dep) && !allowed.has(dep))
+            broken7.push(`${rel(f)} → ${rel(dep)}`);
+      }
+    }
+  }
+  console.log("=== Правила направления ===");
+  console.log(`  правил: ${rules.length}, нарушено: ${broken7.length}`);
+  for (const b of broken7) console.log("    " + b);
+
   console.log("=== Пометки CONSTRAINT ===");
   console.log(
     `  в коде: ${constraints}, без записи в 07-invariants: ${uncovered.length}`,
@@ -560,6 +615,7 @@ if (mode === "verify") {
     missing.length ||
     unnamed.length ||
     uncovered.length ||
+    broken7.length ||
     broken.length ||
     wrong.length ||
     unresolved.length
