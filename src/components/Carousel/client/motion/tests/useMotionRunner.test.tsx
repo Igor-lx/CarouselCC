@@ -77,14 +77,20 @@ let cancelCompositorMotion: Mock<TrackBindingApi["cancelCompositorMotion"]>;
 let settles: number[];
 let controller: MotionController<CarouselMotionStrategy> | null;
 
-function Probe({ state }: { state: CarouselState }) {
+function Probe({
+  state,
+  isInstantMode = false,
+}: {
+  state: CarouselState;
+  isInstantMode?: boolean;
+}) {
   const ctrl = useMotionController<CarouselMotionStrategy>(0, "idle");
   controller = ctrl;
   useMotionRunner({
     state,
     config,
     controller: ctrl,
-    isInstantMode: false,
+    isInstantMode,
     startCompositorMotion,
     cancelCompositorMotion,
     publishPlan: channel.publish,
@@ -342,5 +348,34 @@ describe("useMotionRunner — teardown", () => {
 
     expect(cancelCompositorMotion.mock.calls.length).toBeGreaterThan(before);
     expect(live.isActive()).toBe(false);
+  });
+});
+
+describe("useMotionRunner — instant mode switched on mid-ride", () => {
+  it("places the deck instead of animating, even before the phase catches up", () => {
+    // The host flips `isInstantMode` while a ride is in flight. The reducer
+    // only stamps `step-instant` on the NEXT command, so for the frames in
+    // between the mode is the only thing that knows, and the runner replans on
+    // it (it is part of `replanInputs`).
+    //
+    // Judged by the phase alone, this rebuild goes to the segment factory with
+    // a requested duration of zero — and a zero-duration profile does not
+    // collapse to a snap, it stretches: measured at 6 000 000 ms, with the deck
+    // still standing at its origin a full second in. Instant mode would freeze
+    // the carousel for a hundred minutes.
+    render(stationary);
+    render(moving());
+    expect(startCompositorMotion).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      root.render(<Probe state={moving()} isInstantMode />);
+    });
+
+    // Placed, not flown: no second ride starts, and the controller sits on the
+    // outcome rather than crawling towards it.
+    expect(startCompositorMotion).toHaveBeenCalledTimes(1);
+    expect(controller!.getSnapshot().value).toBe(3);
+    expect(controller!.isActive()).toBe(false);
+    expect(lastPlan().kind).toBe("instant");
   });
 });

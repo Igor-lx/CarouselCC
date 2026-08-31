@@ -131,7 +131,12 @@ export function useMotionRunner({
       return;
     }
 
-    if (state.motionPhase === "step-instant") {
+    // The mode, not only the phase: the reducer stamps `step-instant` on the
+    // NEXT command, so a host flipping instant mode mid-ride leaves the phase
+    // behind for a few frames. Judged by the phase alone those frames build a
+    // zero-duration profile, which does not collapse to a snap — it stretches
+    // into a ride minutes long that never visibly starts.
+    if (isInstantMode || state.motionPhase === "step-instant") {
       cancelCompositorMotion(state.virtualIndex);
       controller.snap(state.virtualIndex, {
         strategy: "idle",
