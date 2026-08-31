@@ -459,6 +459,54 @@ describe("useMotionRunner — the rides it refuses to start", () => {
     expect(lastPlan().kind).toBe("idle");
   });
 
+  it("a cold step within the tolerance is still stamped as a step", () => {
+    // The placement inherits the strategy of the ride that was NOT built. It
+    // is the only place the cold start's own stamp reaches a consumer, and a
+    // deck placed under no known kind of motion is one no consumer can
+    // attribute.
+    render(stationary);
+    render(
+      moving({
+        fromVirtualIndex: 0,
+        virtualIndex: config.motion.epsilon / 2,
+        targetPageIndex: 0,
+      }),
+    );
+
+    expect(startCompositorMotion).not.toHaveBeenCalled();
+    expect(controller!.getSnapshot().strategy).toBe("step");
+    // And the track is released ON the outcome: the ride was skipped, but
+    // whatever the previous animation pinned is still on the element.
+    expect(cancelCompositorMotion).toHaveBeenCalledWith(
+      config.motion.epsilon / 2,
+    );
+  });
+
+  it("a release that lands where the finger left it is stamped as a gesture", () => {
+    // Same placement, the other origin: the coasted launch point. Lose the
+    // launch point itself and the distance is not small — it is not a number
+    // at all, and a ride gets built over it.
+    render(stationary);
+    render(
+      moving({
+        moveReason: "gesture",
+        fromVirtualIndex: 0,
+        virtualIndex: config.motion.epsilon / 2,
+        targetPageIndex: 0,
+        gesture: {
+          pointerVelocity: 0,
+          uiVelocity: 0,
+          launchVelocity: 0,
+          releasedAt: motionNow(),
+        },
+      }),
+    );
+
+    expect(startCompositorMotion).not.toHaveBeenCalled();
+    expect(controller!.getSnapshot().strategy).toBe("gesture");
+    expect(controller!.getSnapshot().value).toBe(config.motion.epsilon / 2);
+  });
+
   it("a deck under the finger freezes where the eye sees it, not at its target", () => {
     // The finger owns the track from this moment. Freezing at `virtualIndex`
     // would tear the strip to the pending target under the held finger.
@@ -561,7 +609,180 @@ describe("useMotionRunner — when the compositor refuses", () => {
   });
 });
 
+describe("useMotionRunner — placing the deck instead of riding it", () => {
+  /** A ride in flight, so the controller carries a strategy that is NOT idle
+   * and a later `idle` stamp is something the test can actually see. */
+  const riding = () => {
+    render(stationary);
+    render(moving());
+    expect(controller!.getSnapshot().strategy).not.toBe("idle");
+    cancelCompositorMotion.mockClear();
+  };
+
+  it("a deck that cannot slide is placed as idle, and the track released there", () => {
+    riding();
+    render({ ...moving(), layout: { ...moving().layout, canSlide: false } });
+
+    // Both halves matter: the compositor is released AT the index the deck is
+    // placed on (released anywhere else and the track keeps a stale
+    // transform), and the strategy says the deck is standing, not riding —
+    // consumers read it to tell a placement from a flight.
+    expect(cancelCompositorMotion).toHaveBeenCalledWith(3);
+    expect(controller!.getSnapshot().strategy).toBe("idle");
+  });
+
+  it("a deck back at rest is placed the same way", () => {
+    riding();
+    render(moving({ motionPhase: "idle" }));
+
+    expect(cancelCompositorMotion).toHaveBeenCalledWith(3);
+    expect(controller!.getSnapshot().strategy).toBe("idle");
+  });
+
+  it("an instant step is placed the same way, and settles", () => {
+    riding();
+    render(moving({ motionPhase: "step-instant" }));
+
+    expect(cancelCompositorMotion).toHaveBeenCalledWith(3);
+    expect(controller!.getSnapshot().strategy).toBe("idle");
+    expect(controller!.getSnapshot().value).toBe(3);
+  });
+
+  it("names an instant plan's direction — both ways, and neither", () => {
+    render(stationary);
+    render(moving({ motionPhase: "step-instant" }));
+    expect(lastPlan()).toMatchObject({ kind: "instant", direction: 1 });
+
+    render(
+      moving({
+        motionPhase: "step-instant",
+        fromVirtualIndex: 3,
+        virtualIndex: 0,
+        targetPageIndex: 0,
+      }),
+    );
+    expect(lastPlan()).toMatchObject({ kind: "instant", direction: -1 });
+
+    // A reconcile that lands where it already is: there is no direction to
+    // give, and a consumer told "forward" here jumps a page it never left.
+    render(
+      moving({
+        motionPhase: "step-instant",
+        fromVirtualIndex: 2,
+        virtualIndex: 2,
+        targetPageIndex: 0,
+      }),
+    );
+    expect(lastPlan()).toMatchObject({ kind: "instant", direction: 0 });
+  });
+});
+
+describe("useMotionRunner — the ride it does start", () => {
+  it("leaves the compositor alone once it has taken the ride", () => {
+    // The release exists for the refusal path only. Called anyway, it tears
+    // down the animation started one line earlier — the deck stops dead at
+    // its origin while the controller runs the segment nobody paints.
+    render(stationary);
+    cancelCompositorMotion.mockClear();
+
+    render(moving());
+
+    expect(startCompositorMotion).toHaveBeenCalledTimes(1);
+    expect(cancelCompositorMotion).not.toHaveBeenCalled();
+  });
+
+  it("stamps the ride with the reason it was started for", () => {
+    // A clicked deck and a flung one are the same segment with different
+    // owners: consumers tell them apart by the strategy alone.
+    render(stationary);
+    render(moving());
+    expect(controller!.getSnapshot().strategy).toBe("step");
+
+    render(
+      moving({
+        moveReason: "gesture",
+        virtualIndex: 4,
+        gesture: {
+          pointerVelocity: 0.01,
+          uiVelocity: 0.01,
+          launchVelocity: 0.01,
+          releasedAt: motionNow() - 40,
+        },
+      }),
+    );
+    expect(controller!.getSnapshot().strategy).toBe("gesture");
+  });
+
+  it("builds the curve from the distance travelled, not from where it starts", () => {
+    // The stops are the shape of the ride. Fed the wrong span they still
+    // begin at 0 and end at 1 — they simply describe a different curve, and
+    // the compositor then plays a ride the controller is not sampling.
+    render(stationary);
+    render(
+      moving({ fromVirtualIndex: 2, virtualIndex: 8, targetPageIndex: 2 }),
+    );
+    const shifted = lastPlan();
+    render(stationary);
+    render(
+      moving({ fromVirtualIndex: 0, virtualIndex: 6, targetPageIndex: 2 }),
+    );
+    const fromZero = lastPlan();
+
+    expect(shifted.kind).toBe("waapi");
+    expect(fromZero.kind).toBe("waapi");
+    if (shifted.kind !== "waapi" || fromZero.kind !== "waapi") return;
+    expect(shifted.stops).toEqual(fromZero.stops);
+  });
+
+  it("gives a far GO_TO a plan longer than the approach it ends with", () => {
+    // The published duration spans preflight AND approach, so a one-step
+    // consumer animates the whole journey once. Spanning anything less makes
+    // the consumer's animation end while the deck is still travelling.
+    render(stationary);
+    render(
+      moving({
+        motionPhase: "step-jump",
+        virtualIndex: 3,
+        teleportVirtualIndex: 27,
+        targetPageIndex: 9,
+      }),
+    );
+    const whole = lastPlan();
+    if (whole.kind !== "waapi")
+      throw new Error("a teleport is a composited plan");
+
+    // The duration is re-authored over a unit step from preflight + approach,
+    // and the sum is what keeps it sane: a jump crosses more ground than a
+    // step and still takes LESS time than one. Get the total wrong downwards
+    // and the unit profile has no speed to build from — it falls back to its
+    // floor and the plan lasts minutes, the same failure shape as a
+    // zero-duration ride that never visibly starts.
+    expect(whole.duration).toBeGreaterThan(config.stepDuration / 8);
+    expect(whole.duration).toBeLessThan(config.stepDuration);
+  });
+});
+
+describe("useMotionRunner — telling one state from another", () => {
+  it("does not confuse two states whose fields merely shift a digit", () => {
+    // The re-plan key is the input list joined into a string. Joined with
+    // nothing between the fields, `virtualIndex: 1, from: 23` and
+    // `virtualIndex: 12, from: 3` are the same key — the second command is
+    // read as a repeat of the first and the deck never leaves for it.
+    render(stationary);
+    render(moving({ virtualIndex: 1, fromVirtualIndex: 23 }));
+    const rides = startCompositorMotion.mock.calls.length;
+
+    render(moving({ virtualIndex: 12, fromVirtualIndex: 3 }));
+
+    expect(startCompositorMotion.mock.calls.length).toBeGreaterThan(rides);
+  });
+});
+
 // The runner also cancels the controller on unmount, and that is deliberately
 // NOT pinned here: `useMotionController` tears its own controller down, so
 // removing the runner's call changes nothing observable. Defence in depth —
 // a test for it would hold the layer, not the behaviour.
+//
+// Nor is the `[onSettle]` dependency of the settle callback: the only caller
+// derives it from `dispatch` with `useCallback`, so an identity it could go
+// stale against is one the caller never produces.
