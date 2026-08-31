@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createElement } from "react";
 
 import {
   alignedVirtualIndex,
@@ -197,5 +198,64 @@ describe("reconciledPageIndex", () => {
     const many = layoutOf(24, 3, false);
     expect(reconciledPageIndex(5, many, single)).toBe(0);
     expect(reconciledPageIndex(0, single, many)).toBe(0);
+  });
+});
+
+/**
+ * `dataKey` decides the HARD reset: a different key throws the state away and
+ * starts over. Every existing test asks whether the key CHANGES; none asks
+ * whether it DISCRIMINATES, and those are different questions. A key that
+ * collapses two different decks onto one string is the worse failure of the
+ * two — the deck changes underneath a state that believes it is still valid,
+ * and nothing throws.
+ *
+ * Mutation testing surfaced this: the separator, the content-type branch and
+ * the element marker all survived, because "the key changed" holds no matter
+ * what they are replaced with.
+ */
+describe("buildCarouselLayout — dataKey discriminates, not just changes", () => {
+  const keyOf = (slides: Slide[]) =>
+    buildCarouselLayout(buildSlideRecords(slides), 3, false).dataKey;
+
+  it("separates slides, so a boundary cannot be shifted unnoticed", () => {
+    // Without a separator both decks flatten to the same string.
+    expect(
+      keyOf([
+        { id: "1", content: "ab" },
+        { id: "2", content: "c" },
+      ]),
+    ).not.toBe(
+      keyOf([
+        { id: "1", content: "a" },
+        { id: "2", content: "bc" },
+      ]),
+    );
+  });
+
+  it("tells a string apart from the number that prints the same", () => {
+    expect(keyOf([{ id: "1", content: "7" }])).not.toBe(
+      keyOf([{ id: "1", content: 7 }]),
+    );
+  });
+
+  it("tells a React element apart from the text that describes it", () => {
+    const element = createElement("span", null, "x");
+    expect(keyOf([{ id: "1", content: element }])).not.toBe(
+      keyOf([{ id: "1", content: "react-element" }]),
+    );
+  });
+
+  it("follows identity, not order of equal content", () => {
+    expect(
+      keyOf([
+        { id: "a", content: "x" },
+        { id: "b", content: "x" },
+      ]),
+    ).not.toBe(
+      keyOf([
+        { id: "b", content: "x" },
+        { id: "a", content: "x" },
+      ]),
+    );
   });
 });

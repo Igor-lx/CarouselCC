@@ -628,3 +628,54 @@ describe("instant mode", () => {
     expect(next.motionPhase).toBe("step-instant");
   });
 });
+
+describe("START_DRAG / END_DRAG — флаги поездки", () => {
+  const layout = makeLayout(12, 3, false);
+
+  /**
+   * A grab has to CLEAR the two flags that describe a ride, not merely stop
+   * moving. Both survived mutation: nothing asserted that they go false, and
+   * both are read at the next settle. A stale `isTeleportApproach` sends that
+   * settle down the teleport-cut branch, which re-bases the origin a page
+   * before a target that no longer exists; a stale repeated-click flag holds
+   * the two-page lookahead over a deck the finger has already moved.
+   */
+  it("a grab clears the ride flags, not just the phase", () => {
+    const riding = {
+      ...initialState(layout),
+      motionPhase: "step-jump" as const,
+      isTeleportApproach: true,
+      isRepeatedClickAdvance: true,
+      teleportVirtualIndex: 9,
+    };
+    const grabbed = reduce(riding, {
+      type: "START_DRAG",
+      fromVirtualIndex: 3,
+      targetPageIndex: 1,
+    });
+    expect(grabbed.isTeleportApproach).toBe(false);
+    expect(grabbed.isRepeatedClickAdvance).toBe(false);
+    expect(grabbed.teleportVirtualIndex).toBeNull();
+  });
+
+  it("landing on the spot from a grab clears them too", () => {
+    const dragging = reduce(
+      { ...initialState(layout), isRepeatedClickAdvance: true },
+      { type: "START_DRAG", fromVirtualIndex: 3, targetPageIndex: 1 },
+    );
+    const settled = reduce(dragging, {
+      type: "END_DRAG",
+      fromVirtualIndex: 3,
+      targetPageIndex: 1,
+      targetVirtualIndex: 3,
+      isSnap: true,
+      pointerReleaseVelocity: 0,
+      uiReleaseVelocity: 0,
+      launchVelocity: 0,
+      releasedAt: 0,
+    });
+    expect(settled.motionPhase).toBe("idle");
+    expect(settled.isTeleportApproach).toBe(false);
+    expect(settled.isRepeatedClickAdvance).toBe(false);
+  });
+});

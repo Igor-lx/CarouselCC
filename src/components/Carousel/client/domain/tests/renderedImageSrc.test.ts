@@ -26,6 +26,34 @@ describe("resolveLargestSrcSetCandidate", () => {
     ).toEqual({ url: "/img/b-640.webp", width: 640 });
   });
 
+  /**
+   * Дескриптор разбирается регулярным выражением, и мутационный прогон показал,
+   * что оно не закреплено ничем: любая его порча оставляла тесты зелёными.
+   * Цена ошибки тихая — кандидат получает ширину 0 и проигрывает всем, то есть
+   * в разметку уходит не тот файл, и увидеть это можно только глазами на
+   * медленной сети.
+   */
+  it("takes a w-width descriptor, not an x-density and not a bare number", () => {
+    const pick = (set: string) => resolveLargestSrcSetCandidate(set)?.url;
+    // Density and a bare number are not width descriptors: both weigh zero, so
+    // the FIRST entry wins rather than the larger-looking one.
+    expect(pick("/a.webp 2x, /b.webp 3x")).toBe("/a.webp");
+    expect(pick("/a.webp 480, /b.webp 800")).toBe("/a.webp");
+    // A real width descriptor outranks both.
+    expect(pick("/a.webp 2x, /b.webp 800w")).toBe("/b.webp");
+  });
+
+  it("accepts a fractional width and keeps its value", () => {
+    expect(resolveLargestSrcSetCandidate("/a.webp 1.5w")).toEqual({
+      url: "/a.webp",
+      width: 1.5,
+    });
+  });
+
+  it("a descriptor with trailing junk is not a width", () => {
+    expect(resolveLargestSrcSetCandidate("/a.webp 800wide")?.width).toBe(0);
+  });
+
   it("returns null for missing or empty srcSet", () => {
     expect(resolveLargestSrcSetCandidate(undefined)).toBeNull();
     expect(resolveLargestSrcSetCandidate("")).toBeNull();

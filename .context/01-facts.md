@@ -60,12 +60,13 @@
 | Проверка | Команда | Результат |
 | --- | --- | --- |
 | Типы | `npm run typecheck` | **exit 0** |
-| Тесты | `npm test` | **113 файлов / 1006 тестов — все зелёные** |
+| Тесты | `npm test` | **113 файлов / 1015 тестов — все зелёные** |
 | Сборка | `npm run build` | **exit 0**, 227 модулей |
 | Линт | `npm run lint` | **exit 0** |
 | Формат | `npm run format:check` | **exit 0** |
 | База знаний | `node .context/graph.mjs verify` | **exit 0** — ни одна сверка из таблицы § J не провалилась |
 | Покрытие | `npm run test:coverage` | строки **88.70 %** (3810/4295), ветки **79.07 %** (2022/2557), функции **87.50 %** (819/936) |
+| Мутации (по требованию) | `npm run test:mutation` | **81.44 %** по `domain` и `state`: убито 658, выжило 139, без покрытия 11, таймаутов 0. Прогон ~8 минут |
 
 Покрытие меряется по всему, что уезжает в бандл, — и карусель, и полки, и
 `.tsx`. До этого замера конфиг исключал `src/shared/**` целиком и все `.tsx`:
@@ -116,6 +117,7 @@ solution-style, `files: []`. `tsc --noEmit` в корне проверяет **�
 
 | Файл | Что задаёт |
 | --- | --- |
+| `stryker.config.json` | мутационный прогон: область — `client/{domain,state}/**` без бочек, типов и тестов; раннер vitest, анализ покрытия `perTest`, порог не рвёт сборку (`break: null`) — это аудит, а не ворота |
 | `eslint.config.js` | flat config: `typescript-eslint` с типовой проверкой (`projectService`), `react-hooks`, `react-refresh`; форматирование целиком отдано Prettier через `eslint-config-prettier` |
 | `.prettierrc.json` | `printWidth: 80`, двойные кавычки, `trailingComma: "all"`, `endOfLine: "auto"` |
 | `.prettierignore` | `dist`, `coverage`, `node_modules`, `public`, `package-lock.json`, а также **все `*.md`**: markdown здесь — свёрстанная руками проза, Prettier только доливает в неё пустые строки |
