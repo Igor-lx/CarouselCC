@@ -40,6 +40,8 @@ const CONFIG = {
    * совпадать байт в байт: разошедшийся инструмент проверяет не тот проект.
    * `null` — копии в проекте нет. */
   toolCopy: "../src/shared/context/tools/graph.mjs",
+  // Отложенное: закрытый пункт отсюда удаляют, а не помечают.
+  todo: "02-todo.md",
 };
 
 const ROOT = path.join(HERE, CONFIG.src).split(path.sep).join("/");
@@ -1219,6 +1221,36 @@ if (mode === "verify") {
   );
   for (const a of deadAnchors) console.log("    " + a);
 
+  // 11. отложенное не превращается в историю
+  // Правило написано дважды — в шапке самого файла и в CLAUDE.md — и всё равно
+  // нарушается: пометить пункт дешевле, чем удалить. Ловится маркер статуса,
+  // а не слово: капсом в любом месте заголовка, либо в его хвосте после тире
+  // или в скобках. «Закрыть доступность» — законный открытый пункт, и он не
+  // должен ловиться.
+  const closedTodos = [];
+  if (CONFIG.todo !== null) {
+    const todoPath = path.join(BASE, CONFIG.todo);
+    if (!existsSync(todoPath)) closedTodos.push(`файла нет: ${CONFIG.todo}`);
+    else {
+      const shouting = /(ЗАКРЫТО|СДЕЛАНО|ГОТОВО|ВЫПОЛНЕНО|DONE|CLOSED)/;
+      const trailing = /[—\-(]\s*(закрыт|сделан|готов|выполнен)\S*\s*\)?\s*$/i;
+      const struck = /^~~.*~~$/;
+      for (const line of readFileSync(todoPath, "utf8").split(NEWLINE)) {
+        if (!/^#{2,}\s/.test(line)) continue;
+        const title = line.replace(/^#{2,}\s+/, "").trim();
+        if (shouting.test(title) || trailing.test(title) || struck.test(title))
+          closedTodos.push(`${CONFIG.todo}: ${title}`);
+      }
+    }
+  }
+  console.log("=== Отложенное без закрытых пунктов ===");
+  console.log(
+    CONFIG.todo === null
+      ? "  файл отложенного не заявлен"
+      : `  помечено закрытыми: ${closedTodos.length}`,
+  );
+  for (const t of closedTodos) console.log("    " + t);
+
   console.log("=== Объявленный состав папок и радиусы ===");
   console.log(
     `  папок: ${dirs}, радиусов: ${radii}, разошлось: ${wrong.length}`,
@@ -1239,6 +1271,7 @@ if (mode === "verify") {
     wrong.length ||
     toolDrift.length ||
     deadAnchors.length ||
+    closedTodos.length ||
     unresolved.length
   )
     process.exitCode = 1;
