@@ -27,7 +27,6 @@ export const hasPartialPageLayout = (
   length: number,
   visibleSlidesCount: number,
 ) => {
-  if (length === 0) return false;
   const effective = clampedVisibleSlidesCount(length, visibleSlidesCount);
   // A page of no slides has no partial page to complete. Without this the
   // remainder is NaN, "not whole" reads as true, and the padder returns a

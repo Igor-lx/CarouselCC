@@ -3,12 +3,12 @@ import { pageStart, reconciledPageIndex, type CarouselLayout } from "../domain";
 import { buildInitialState } from "./initial";
 import { ZERO_GESTURE_RELEASE, type CarouselState } from "./types";
 
-// These four fields are a complete layout-equivalence check (dataKey pins the rest).
+// A complete layout-equivalence check: `dataKey` pins the records, and the
+// page count follows from those and the visible count, so it adds nothing.
 const sameLayout = (a: CarouselLayout, b: CarouselLayout) =>
   a.dataKey === b.dataKey &&
   a.visibleSlidesCount === b.visibleSlidesCount &&
-  a.isFinite === b.isFinite &&
-  a.pageCount === b.pageCount;
+  a.isFinite === b.isFinite;
 
 export const reconcileStateToLayout = (
   state: CarouselState,

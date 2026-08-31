@@ -78,7 +78,9 @@ export const pageContaining = (
   virtualIndex: number,
   layout: CarouselLayout,
 ) => {
-  if (!(layout.pageCount > 0) || !(layout.visibleSlidesCount > 0)) return 0;
+  // The divisor is the only thing that has to be guarded: `clamp` and
+  // `normalizePageIndex` both answer 0 for a zero page count on their own.
+  if (!(layout.visibleSlidesCount > 0)) return 0;
   const raw = Math.floor(Math.floor(virtualIndex) / layout.visibleSlidesCount);
   return layout.isFinite
     ? clamp(raw, 0, layout.pageCount - 1)
@@ -89,7 +91,9 @@ export const nearestPageIndex = (
   virtualIndex: number,
   layout: CarouselLayout,
 ) => {
-  if (!(layout.pageCount > 0) || !(layout.visibleSlidesCount > 0)) return 0;
+  // The divisor is the only thing that has to be guarded: `clamp` and
+  // `normalizePageIndex` both answer 0 for a zero page count on their own.
+  if (!(layout.visibleSlidesCount > 0)) return 0;
   const raw = Math.round(virtualIndex / layout.visibleSlidesCount);
   return layout.isFinite
     ? clamp(raw, 0, layout.pageCount - 1)
@@ -115,6 +119,9 @@ export const reconciledPageIndex = (
   prevLayout: CarouselLayout,
   nextLayout: CarouselLayout,
 ) => {
+  // Intent, not behaviour: the arithmetic below already collapses to 0 for a
+  // one-page layout (`nextMax` is 1 and the final clamp caps at 0), so this
+  // states the rule rather than implementing it.
   if (prevLayout.pageCount <= 1 || nextLayout.pageCount <= 1) return 0;
   const oldMax = Math.max(1, prevLayout.pageCount - 1);
   const progress = clamp(currentPageIndex, 0, oldMax) / oldMax;

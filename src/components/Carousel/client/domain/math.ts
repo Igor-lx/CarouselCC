@@ -7,5 +7,6 @@ export const mod = (value: number, total: number) => {
 export const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(value, max));
 
+/** A page index wrapped into a cyclic deck. `0` for a deck with no pages. */
 export const normalizePageIndex = (pageIndex: number, pageCount: number) =>
-  !(pageCount > 0) ? 0 : mod(pageIndex, pageCount);
+  mod(pageIndex, pageCount);
