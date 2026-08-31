@@ -470,3 +470,150 @@ describe("GO_TO flight-envelope time ceiling", () => {
     expect(jumpFrom0(cfg, 7).state.teleportVirtualIndex).not.toBeNull();
   });
 });
+
+/**
+ * The intent ladder — `intentFromState` — and it is a LADDER, not a set: the
+ * order of the checks IS the priority, and several of its conditions are true
+ * at once in ordinary rides. A deck mid-teleport is also mid-jump; a snap-back
+ * that follows a repeated click carries both flags.
+ *
+ * Nothing tested the order itself. Every case below puts two conditions on at
+ * once and pins WHICH ONE WINS — because reordering the ladder is a one-line
+ * edit that no other test in the project notices, and its symptom is a ride
+ * built with the wrong shape rather than a crash.
+ */
+
+const at = (state: CarouselState, position = 0) => ({
+  state,
+  config,
+  isInstantMode: false,
+  start: { position, velocity: 0, strategy: "idle" as const },
+  startedAt: 0,
+});
+
+const riding = (overrides: Partial<CarouselState>): CarouselState => ({
+  ...initialState(makeLayout(12, 3)),
+  fromVirtualIndex: 0,
+  virtualIndex: 6,
+  targetPageIndex: 2,
+  motionPhase: "step-normal",
+  moveReason: "click",
+  ...overrides,
+});
+
+describe("intent ladder — which condition wins when several are true", () => {
+  // The ladder's first rung — `isInstant` — is deliberately NOT exercised here.
+  // The runner returns before the factory whenever instant mode is on
+  // (`useMotionRunner`, "the mode, not only the phase"), so no state reaches
+  // this file with it set. It stays as a guard; its test lives at the runner,
+  // where the decision is actually taken.
+
+  it("a pending teleport outranks the approach flag", () => {
+    // Both are on for exactly one frame at the mid-cut. Read the approach
+    // first and the preflight is animated with the approach's shape — the
+    // deck brakes into a jump it has not started yet.
+    const both = riding({
+      teleportVirtualIndex: 15,
+      isTeleportApproach: true,
+      motionPhase: "step-jump",
+    });
+    const approachOnly = riding({
+      isTeleportApproach: true,
+      motionPhase: "step-jump",
+    });
+
+    const preflight = sampleCarouselSegment(
+      buildCarouselSegment(at(both)).segment,
+      1,
+    );
+    const approach = sampleCarouselSegment(
+      buildCarouselSegment(at(approachOnly)).segment,
+      1,
+    );
+    // A preflight accelerates from rest; an approach starts already cruising,
+    // because its ramp-up happened before the cut.
+    expect(Math.abs(preflight.velocity)).toBeLessThan(
+      Math.abs(approach.velocity),
+    );
+  });
+
+  it("the approach outranks a snap-back", () => {
+    const state = riding({
+      isTeleportApproach: true,
+      motionPhase: "step-snap",
+    });
+    expect(buildCarouselSegment(at(state)).segment.strategy).toBe("jump");
+  });
+
+  it("a repeated click outranks the reason the deck is moving", () => {
+    // Same command, same reason, one flag apart — and the flag decides whether
+    // the ride is built from the click tempo or from the repeat's speed
+    // multiplier.
+    const plain = riding({});
+    const repeated = riding({ isRepeatedClickAdvance: true });
+
+    expect(buildCarouselSegment(at(plain)).segment.strategy).toBe("step");
+    expect(buildCarouselSegment(at(repeated)).segment.strategy).toBe(
+      "repeated",
+    );
+  });
+
+  it("a repeat is faster than the step it replaces, never slower", () => {
+    // The multiplier is applied, not divided by: the whole point of the repeat
+    // is that the deck hurries. Divided, a burst of clicks would crawl.
+    const plain = buildCarouselSegment(at(riding({})));
+    const repeated = buildCarouselSegment(
+      at(riding({ isRepeatedClickAdvance: true })),
+    );
+    expect(repeated.duration).toBeLessThan(plain.duration);
+  });
+});
+
+describe("step profile — which shape a step is given", () => {
+  const shaped = {
+    ...config,
+    motion: {
+      ...config.motion,
+      // Pinned apart on purpose: a snap-back has no ramp, an ordinary step
+      // does. Anything else here and the two cannot be told apart at all.
+      stepProfile: {
+        accelerationDistanceShare: 0.6,
+        decelerationDistanceShare: 0.2,
+      },
+      snapBackProfile: {
+        accelerationDistanceShare: 0,
+        decelerationDistanceShare: 0.2,
+      },
+      autoplayProfile: {
+        accelerationDistanceShare: 0,
+        decelerationDistanceShare: 0.6,
+      },
+    },
+  };
+
+  const launchSpeed = (state: CarouselState) =>
+    Math.abs(
+      sampleCarouselSegment(
+        buildCarouselSegment({ ...at(state), config: shaped }).segment,
+        1,
+      ).velocity,
+    );
+
+  it("a snap-back leaves at speed; an ordinary step ramps up to it", () => {
+    // A rubber-band is a correction, not a journey: it must not spend the
+    // first third of its distance accelerating.
+    const snap = launchSpeed(
+      riding({ motionPhase: "step-snap", virtualIndex: 1 }),
+    );
+    const step = launchSpeed(riding({ virtualIndex: 1 }));
+    expect(snap).toBeGreaterThan(step);
+  });
+
+  it("an autoplay step is shaped by its own profile, not the click one", () => {
+    // Same phase, same distance, different reason — and the reason alone
+    // chooses the shape.
+    const autoplay = launchSpeed(riding({ moveReason: "autoplay" }));
+    const click = launchSpeed(riding({ moveReason: "click" }));
+    expect(autoplay).toBeGreaterThan(click);
+  });
+});
