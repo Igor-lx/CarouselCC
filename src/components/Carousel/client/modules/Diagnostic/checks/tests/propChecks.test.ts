@@ -140,3 +140,76 @@ describe("slide identity", () => {
     ).toBe(false);
   });
 });
+
+/**
+ * The duration and interval props, which no test reached before: whole
+ * branches of the collector, invisible to every check in the project.
+ *
+ * They are the ones that fail quietly. A bad `visibleSlidesNr` shows up as a
+ * deck that renders wrong; a bad `durationStep` shows up as motion that is
+ * subtly off — or as a ride that never ends — and the host has nothing telling
+ * it which number caused that.
+ */
+describe("collectPropWarnings — the timing props", () => {
+  // Слой Environment сюда не входит: у него свои случаи выше, а без
+  // `userEnvironment` он говорит всегда и заглушал бы счёт этого блока.
+  const fieldsOf = (props: DiagnosticProps) =>
+    collectPropWarnings(props)
+      .filter((warning) => warning.layer !== "Environment")
+      .map((warning) => warning.field);
+
+  it("says nothing about a timing prop the host did not pass", () => {
+    // Absent is the documented default, not an error — and the difference
+    // between "absent" and "zero" is the whole point of the guard.
+    expect(fieldsOf(baseProps())).not.toContain("durationStep");
+    expect(fieldsOf(baseProps())).not.toContain("intervalAutoplay");
+  });
+
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY, "500"])(
+    "flags a step duration of %p",
+    (value) => {
+      expect(fieldsOf(baseProps({ durationStep: value }))).toContain(
+        "durationStep",
+      );
+    },
+  );
+
+  it("flags an autoplay duration by the same rule, and names it separately", () => {
+    // Two fields, one loop: a warning that names the wrong one sends the host
+    // to the wrong prop.
+    const fields = fieldsOf(
+      baseProps({ durationAutoplay: 0, durationStep: 0 }),
+    );
+    expect(fields).toContain("durationAutoplay");
+    expect(fields).toContain("durationStep");
+  });
+
+  it("accepts a positive duration without comment", () => {
+    expect(fieldsOf(baseProps({ durationStep: 800 }))).toHaveLength(0);
+  });
+
+  it("lets an autoplay interval be zero, but not negative or broken", () => {
+    // Zero is a legal interval — "as soon as the last ride settles" — so the
+    // rule here is non-negative, not positive. Copy the duration rule across
+    // and a valid configuration starts warning.
+    expect(fieldsOf(baseProps({ intervalAutoplay: 0 }))).toHaveLength(0);
+    expect(fieldsOf(baseProps({ intervalAutoplay: -1 }))).toContain(
+      "intervalAutoplay",
+    );
+    expect(fieldsOf(baseProps({ intervalAutoplay: Number.NaN }))).toContain(
+      "intervalAutoplay",
+    );
+  });
+
+  it("flags a placeholder that would render as nothing", () => {
+    expect(fieldsOf(baseProps({ errAltPlaceholder: "" }))).toContain(
+      "errAltPlaceholder",
+    );
+    expect(fieldsOf(baseProps({ errAltPlaceholder: "   " }))).toContain(
+      "errAltPlaceholder",
+    );
+    expect(fieldsOf(baseProps({ errAltPlaceholder: "Failed" }))).toHaveLength(
+      0,
+    );
+  });
+});

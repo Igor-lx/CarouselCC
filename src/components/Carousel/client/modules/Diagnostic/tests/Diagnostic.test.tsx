@@ -38,6 +38,7 @@ const slides = (count: number): Slide[] =>
 let host: HTMLDivElement;
 let root: Root;
 let warn: MockInstance<typeof console.warn>;
+let info: MockInstance<typeof console.info>;
 
 const render = (props: Partial<CarouselProps> = {}) => {
   act(() => {
@@ -65,7 +66,7 @@ const slideNodes = () =>
 beforeEach(() => {
   installCarouselBrowserEnv();
   warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-  vi.spyOn(console, "info").mockImplementation(() => {});
+  info = vi.spyOn(console, "info").mockImplementation(() => {});
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
@@ -101,5 +102,35 @@ describe("<Diagnostic /> — observes, and never repairs", () => {
     // A channel that always says something is a channel nobody reads.
     render({ visibleSlidesNr: 3 });
     expect(reported()).not.toContain("visibleSlidesNr");
+  });
+});
+
+describe("<Diagnostic /> — announces itself once, then stays out of the way", () => {
+  it("says it is live, so a silent console is not mistaken for a clean deck", () => {
+    render();
+    expect(info).toHaveBeenCalledTimes(1);
+    expect(String(info.mock.calls[0]?.[0])).toContain("Carousel Diagnostic");
+  });
+
+  it("does not repeat the banner on every render", () => {
+    // The deck re-renders on every ride. A banner keyed on anything but mount
+    // scrolls the console away from the warnings it was printed to introduce.
+    render();
+    render();
+    render();
+    expect(info).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("<Diagnostic /> — follows the props it is watching", () => {
+  it("reports the NEW bad value after a prop changes", () => {
+    // Each collection is memoised on its own input. Drop that input from the
+    // deps and the slot keeps reporting the first problem it ever saw, while
+    // the host stares at a deck that is wrong for a different reason.
+    render({ visibleSlidesNr: -1 });
+    render({ visibleSlidesNr: 0 });
+    const out = reported();
+    expect(out).toContain("has value -1");
+    expect(out).toContain("has value 0");
   });
 });
