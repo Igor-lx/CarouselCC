@@ -8,6 +8,7 @@ import type { CarouselRuntimeConfig } from "../../config";
 import type { CarouselDispatch } from "../useCarouselState";
 import { useCarouselState } from "../useCarouselState";
 import type { CarouselState } from "../types";
+import { motionStatus } from "../initial";
 import { makeLayout } from "./layoutBuilder";
 
 /**
@@ -27,6 +28,7 @@ const wideLayout = makeLayout(12, 6, false);
 let host: HTMLDivElement;
 let root: Root;
 let state: CarouselState;
+let status: ReturnType<typeof motionStatus>;
 let dispatch: CarouselDispatch;
 let dispatches: CarouselDispatch[];
 let seenStepDuration: number[];
@@ -34,16 +36,15 @@ let seenStepDuration: number[];
 function Probe({
   layout: current,
   config,
+  isInstantMode = false,
 }: {
   layout: typeof layout;
   config: CarouselRuntimeConfig;
+  isInstantMode?: boolean;
 }) {
-  const result = useCarouselState({
-    layout: current,
-    config,
-    isInstantMode: false,
-  });
+  const result = useCarouselState({ layout: current, config, isInstantMode });
   state = result.state;
+  status = result.status;
   dispatch = result.dispatch;
   dispatches.push(result.dispatch);
   seenStepDuration.push(config.stepDuration);
@@ -55,9 +56,12 @@ const baseConfig = buildCarouselConfig({});
 const render = (
   current: typeof layout = layout,
   config: CarouselRuntimeConfig = baseConfig,
+  isInstantMode = false,
 ) =>
   act(() => {
-    root.render(<Probe layout={current} config={config} />);
+    root.render(
+      <Probe layout={current} config={config} isInstantMode={isInstantMode} />,
+    );
   });
 
 beforeEach(() => {
@@ -136,5 +140,35 @@ describe("useCarouselState — the derived status", () => {
     // index that means nothing in the new document.
     expect(state.targetPageIndex).toBe(0);
     expect(state.layout).toBe(otherDeck);
+  });
+});
+
+describe("useCarouselState — every part of the context is committed", () => {
+  it("a new config reaches the state, not just the render", () => {
+    // The reducer decides out of `state.config`. Sync only on a layout change
+    // and a config edited between renders never arrives, so the deck keeps
+    // animating to the previous durations with no sign anything is stale.
+    render();
+    const slow = buildCarouselConfig({ durationStep: 9000 });
+    render(layout, slow);
+    expect(state.config).toBe(slow);
+  });
+
+  it("a switch into instant mode reaches the state", () => {
+    render();
+    expect(state.isInstantMode).toBe(false);
+    render(layout, baseConfig, true);
+    expect(state.isInstantMode).toBe(true);
+  });
+
+  it("the derived status follows the phase it is derived from", () => {
+    // Memoised on the phase. Memoise on nothing and the host is told the deck
+    // is still standing still while it rides.
+    render();
+    expect(status.isIdle).toBe(true);
+    act(() => dispatch({ type: "MOVE", step: 1, moveReason: "click" }));
+    expect(state.motionPhase).toBe("step-normal");
+    expect(status.isMoving).toBe(true);
+    expect(status.isIdle).toBe(false);
   });
 });

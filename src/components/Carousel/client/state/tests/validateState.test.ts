@@ -115,3 +115,43 @@ describe("validateCarouselState — multiple issues", () => {
     ]);
   });
 });
+
+/**
+ * A diagnostic is read by a developer at 2am. `kind` says which rule broke;
+ * `field` and `actual` say where to look and what was there. The prose can be
+ * reworded freely, but those three are the payload — asserted here so a
+ * violation cannot be reported against nothing.
+ */
+describe("validateCarouselState — the payload a diagnostic carries", () => {
+  it("names the field and the values for a stray teleport index", () => {
+    const issues = validateCarouselState({
+      ...makeState(layout),
+      teleportVirtualIndex: 6,
+      motionPhase: "idle",
+    });
+    const issue = issues.find(
+      (i) => i.kind === "teleport-virtual-index-outside-step-jump",
+    );
+    expect(issue?.field).toBe("teleportVirtualIndex");
+    expect(issue?.actual).toEqual({
+      teleportVirtualIndex: 6,
+      motionPhase: "idle",
+    });
+  });
+
+  it("names the field and the values for a stray approach flag", () => {
+    const issues = validateCarouselState({
+      ...makeState(layout),
+      isTeleportApproach: true,
+      motionPhase: "idle",
+    });
+    const issue = issues.find(
+      (i) => i.kind === "teleport-approach-outside-step-jump",
+    );
+    expect(issue?.field).toBe("isTeleportApproach");
+    expect(issue?.actual).toEqual({
+      isTeleportApproach: true,
+      motionPhase: "idle",
+    });
+  });
+});

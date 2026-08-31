@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildCarouselConfig } from "../../config";
 import type { CarouselRuntimeConfig } from "../../config";
 import type { CarouselLayout } from "../../domain";
-import { buildInitialState } from "../initial";
+import { buildInitialState, motionStatus } from "../initial";
 import { carouselReducer } from "../reducer";
 import type { CarouselCommand, CarouselState } from "../types";
 import { makeLayout } from "./layoutBuilder";
@@ -629,7 +629,7 @@ describe("instant mode", () => {
   });
 });
 
-describe("START_DRAG / END_DRAG — флаги поездки", () => {
+describe("START_DRAG / END_DRAG — the ride flags", () => {
   const layout = makeLayout(12, 3, false);
 
   /**
@@ -677,5 +677,252 @@ describe("START_DRAG / END_DRAG — флаги поездки", () => {
     expect(settled.motionPhase).toBe("idle");
     expect(settled.isTeleportApproach).toBe(false);
     expect(settled.isRepeatedClickAdvance).toBe(false);
+  });
+});
+
+describe("motionStatus", () => {
+  it("reports a far jump as jumping, and nothing else as jumping", () => {
+    // `isJumping` is what the host sees through onCarouselStatusChange, and it
+    // is the only flag that separates a far GO_TO from an ordinary step.
+    expect(motionStatus("step-jump").isJumping).toBe(true);
+    expect(motionStatus("step-normal").isJumping).toBe(false);
+    expect(motionStatus("idle").isJumping).toBe(false);
+  });
+
+  it("separates still, dragging and moving", () => {
+    expect(motionStatus("idle")).toEqual({
+      isIdle: true,
+      isMoving: false,
+      isDragging: false,
+      isJumping: false,
+    });
+    expect(motionStatus("dragging")).toEqual({
+      isIdle: false,
+      isMoving: false,
+      isDragging: true,
+      isJumping: false,
+    });
+    expect(motionStatus("step-snap").isMoving).toBe(true);
+  });
+});
+
+/**
+ * The release phase is what the runner animates with: a snap rubber-bands, a
+ * normal step travels, and an instant one must not animate at all. All three
+ * come out of one small function that no test reached.
+ */
+describe("END_DRAG — the phase the release hands to the runner", () => {
+  const layout = makeLayout(12, 3, false);
+  const release = (
+    over: Partial<{ isSnap: boolean; isInstant: boolean }> = {},
+    isInstantMode = false,
+  ) =>
+    reduce(
+      { ...initialState(layout), motionPhase: "dragging" },
+      {
+        type: "END_DRAG",
+        fromVirtualIndex: 5,
+        targetPageIndex: 1,
+        targetVirtualIndex: 3,
+        isSnap: false,
+        pointerReleaseVelocity: 0.1,
+        uiReleaseVelocity: 0.12,
+        launchVelocity: 0.12,
+        releasedAt: 1000,
+        ...over,
+      },
+      layout,
+      isInstantMode,
+    );
+
+  it("an instant command lands without animating", () => {
+    expect(release({ isInstant: true }).motionPhase).toBe("step-instant");
+  });
+
+  it("instant mode does the same to an ordinary release", () => {
+    expect(release({}, true).motionPhase).toBe("step-instant");
+  });
+
+  it("a snap-back is a snap, and a committed swipe is a step", () => {
+    expect(release({ isSnap: true }).motionPhase).toBe("step-snap");
+    expect(release({ isSnap: false }).motionPhase).toBe("step-normal");
+  });
+
+  it("an instant release carries no launch velocity into the runner", () => {
+    // The velocities describe a flick. Kept on an instant landing they would
+    // launch a ride the deck is supposed to skip.
+    const gesture = release({ isInstant: true }).gesture;
+    expect(gesture.pointerVelocity).toBe(0);
+    expect(gesture.uiVelocity).toBe(0);
+    expect(gesture.launchVelocity).toBe(0);
+  });
+
+  it("a release that is already home settles as a gesture, not a step", () => {
+    const finished = reduce(
+      { ...initialState(layout), motionPhase: "dragging", virtualIndex: 3 },
+      {
+        type: "END_DRAG",
+        fromVirtualIndex: 3,
+        targetPageIndex: 1,
+        targetVirtualIndex: 3,
+        isSnap: false,
+        pointerReleaseVelocity: 0,
+        uiReleaseVelocity: 0,
+        launchVelocity: 0,
+        releasedAt: 1000,
+      },
+    );
+    expect(finished.motionPhase).toBe("idle");
+    expect(finished.moveReason).toBe("gesture");
+  });
+
+  it("clamps the released page to the finite deck it belongs to", () => {
+    const finite = makeLayout(12, 3, true); // pageCount 4
+    const released = reduce(
+      { ...initialState(finite), motionPhase: "dragging" },
+      {
+        type: "END_DRAG",
+        fromVirtualIndex: 0,
+        targetPageIndex: 9,
+        targetVirtualIndex: 27,
+        isSnap: false,
+        pointerReleaseVelocity: 0,
+        uiReleaseVelocity: 0,
+        launchVelocity: 0,
+        releasedAt: 1000,
+      },
+      finite,
+    );
+    expect(released.targetPageIndex).toBe(3);
+  });
+});
+
+describe("MOVE — an instant step", () => {
+  const layout = makeLayout(12, 3, false);
+  const move = {
+    type: "MOVE" as const,
+    step: 1,
+    moveReason: "click" as const,
+    fromVirtualIndex: 0,
+  };
+
+  it("an instant command skips the animation", () => {
+    expect(
+      reduce(initialState(layout), { ...move, isInstant: true }).motionPhase,
+    ).toBe("step-instant");
+  });
+
+  it("instant mode does the same to an ordinary step", () => {
+    expect(reduce(initialState(layout), move, layout, true).motionPhase).toBe(
+      "step-instant",
+    );
+  });
+});
+
+describe("MOVE — a step that changes nothing", () => {
+  const finite = makeLayout(12, 3, true); // pageCount 4
+  const atEnd = (): CarouselState => ({
+    ...initialState(finite),
+    targetPageIndex: 3,
+    fromVirtualIndex: 9,
+    virtualIndex: 9,
+  });
+
+  it("a press against the edge keeps the ride flags clear", () => {
+    const pressed = reduce(
+      { ...atEnd(), isTeleportApproach: true },
+      { type: "MOVE", step: 1, moveReason: "click", fromVirtualIndex: 9 },
+      finite,
+    );
+    expect(pressed.targetPageIndex).toBe(3);
+    expect(pressed.isTeleportApproach).toBe(false);
+  });
+
+  it("an instant press against the edge still switches to instant", () => {
+    const pressed = reduce(
+      atEnd(),
+      {
+        type: "MOVE",
+        step: 1,
+        moveReason: "click",
+        fromVirtualIndex: 9,
+        isInstant: true,
+      },
+      finite,
+    );
+    expect(pressed.motionPhase).toBe("step-instant");
+  });
+
+  it("a whole loop round a cyclic deck is a move, not a standstill", () => {
+    // Same page, four pages further along the lane. Judge the noop by the page
+    // alone and the deck stops dead on a full-loop GO_TO.
+    const cyclic = makeLayout(12, 3, false); // pageCount 4
+    const looped = reduce(
+      initialState(cyclic),
+      { type: "MOVE", step: 4, moveReason: "click", fromVirtualIndex: 0 },
+      cyclic,
+    );
+    expect(looped.targetPageIndex).toBe(0);
+    expect(looped.virtualIndex).toBe(12);
+    expect(looped.motionPhase).toBe("step-normal");
+  });
+});
+
+describe("MOTION_SETTLED — who may end a ride", () => {
+  const layout = makeLayout(12, 3, false);
+
+  it("a settle under the finger is ignored", () => {
+    // The runner keeps reporting positions while the deck is held. Let one end
+    // the ride and the deck lets go mid-gesture.
+    const dragging: CarouselState = {
+      ...initialState(layout),
+      motionPhase: "dragging",
+      virtualIndex: 2,
+    };
+    expect(
+      reduce(dragging, { type: "MOTION_SETTLED", settledPosition: 2 }),
+    ).toBe(dragging);
+  });
+
+  it("a settle exactly one epsilon away still counts as arrived", () => {
+    // Strictly greater: at the tolerance itself the ride is home. Read it as a
+    // new target and the deck re-anchors instead of coming to rest.
+    // Anchored at 0 so the gap is exactly the tolerance and not a float hair
+    // above it.
+    const riding: CarouselState = {
+      ...initialState(layout),
+      motionPhase: "step-normal",
+      virtualIndex: 0,
+      isTeleportApproach: true,
+      isRepeatedClickAdvance: true,
+    };
+    const settled = reduce(riding, {
+      type: "MOTION_SETTLED",
+      settledPosition: config.motion.epsilon,
+    });
+    expect(settled.motionPhase).toBe("idle");
+    expect(settled.isTeleportApproach).toBe(false);
+    expect(settled.isRepeatedClickAdvance).toBe(false);
+  });
+
+  it("a settle onto a newer target keeps moving and clears the old ride", () => {
+    const riding: CarouselState = {
+      ...reduce(initialState(layout), {
+        type: "MOVE",
+        step: 1,
+        moveReason: "click",
+        fromVirtualIndex: 0,
+      }),
+      isTeleportApproach: true,
+      isRepeatedClickAdvance: true,
+    };
+    const settled = reduce(riding, {
+      type: "MOTION_SETTLED",
+      settledPosition: riding.virtualIndex + 5,
+    });
+    expect(settled.motionPhase).toBe(riding.motionPhase);
+    expect(settled.isTeleportApproach).toBe(false);
+    expect(settled.isRepeatedClickAdvance).toBe(false);
+    expect(settled.teleportVirtualIndex).toBeNull();
   });
 });

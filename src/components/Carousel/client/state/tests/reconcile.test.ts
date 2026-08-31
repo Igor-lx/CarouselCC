@@ -177,3 +177,34 @@ describe("reconcileStateToLayout — recovery from a stuck phase", () => {
     expect(recovered.layout).toBe(replaced);
   });
 });
+
+describe("reconcileStateToLayout — what counts as the same layout", () => {
+  it("a changed page size is a different layout, even with the same slides", () => {
+    // Same deck, resized viewport: the records are identical, so `dataKey` and
+    // `isFinite` both match and only the page size differs. Read that as "same
+    // layout" and the state keeps page indices that no longer exist.
+    const before = makeLayout(12, 3, false);
+    const after = makeLayout(12, 4, false);
+    const next = reconcileStateToLayout(movedState(before, 2), after);
+    expect(next.layout).toBe(after);
+    expect(next.motionPhase).toBe("step-instant");
+  });
+
+  it("a soft reconcile clears the flags of the ride it interrupts", () => {
+    // The deck lands somewhere new by an instant re-anchor, so anything that
+    // described the ride in flight is now a lie: a live `isTeleportApproach`
+    // makes the runner plan an approach profile for a jump nobody asked for.
+    const before = makeLayout(12, 3, false);
+    const riding: CarouselState = {
+      ...movedState(before, 2),
+      motionPhase: "step-jump",
+      teleportVirtualIndex: 9,
+      isTeleportApproach: true,
+      isRepeatedClickAdvance: true,
+    };
+    const next = reconcileStateToLayout(riding, makeLayout(12, 4, false));
+    expect(next.teleportVirtualIndex).toBeNull();
+    expect(next.isTeleportApproach).toBe(false);
+    expect(next.isRepeatedClickAdvance).toBe(false);
+  });
+});
