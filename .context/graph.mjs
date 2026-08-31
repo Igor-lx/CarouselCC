@@ -359,27 +359,42 @@ if (mode === "open") {
 // возврата означает, что база отстала от кода.
 // Правка в одной копии из пары — единственный настоящий риск форков, и он
 // виден только в диффе, а не в дереве: файлы законно расходятся там, где
+/** Пути, тронутые текущей правкой: изменённые И новые, ещё не добавленные.
+ * `git diff` вторых не видит, а новый тест — обычный способ закрыть правку. */
+const changedPaths = async (repoRoot) => {
+  try {
+    const { execSync } = await import("node:child_process");
+    // `-uall`: без него новая ПАПКА печатается одной строкой, и файлы
+    // внутри неё в правку не попадают — ровно новый тест целиком.
+    return (
+      execSync("git status --porcelain -uall", {
+        cwd: repoRoot,
+        encoding: "utf8",
+      })
+        .split(String.fromCharCode(10))
+        .map((l) => l.slice(3).trim())
+        .filter(Boolean)
+        // Переименование печатается как "было -> стало": берут второе.
+        .map((l) => (l.includes(" -> ") ? l.slice(l.indexOf(" -> ") + 4) : l))
+        .map((l) => l.replace(/^"|"$/g, ""))
+    );
+  } catch {
+    return null;
+  }
+};
+
 // одиночной библиотеке и фасаду нужно по-разному. Поэтому не сверка
 // содержимого, а вопрос в нужный момент: тронул одну копию — вот её близнец.
 if (mode === "twins") {
   const NEWLINE = String.fromCharCode(10);
   let changed = process.argv.slice(3);
   if (changed.length === 0) {
-    try {
-      const { execSync } = await import("node:child_process");
-      changed = execSync("git diff --name-only HEAD", {
-        cwd: path.join(HERE, ".."),
-        encoding: "utf8",
-      })
-        .split(NEWLINE)
-        .map((l) => l.trim())
-        .filter(Boolean);
-    } catch {
+    changed = await changedPaths(path.join(HERE, ".."));
+    if (changed === null) {
       console.log(
         "git недоступен — передай пути аргументами: graph.mjs twins <путь> …",
       );
       process.exitCode = 1;
-      changed = null;
     }
   }
   if (changed !== null) {
@@ -421,6 +436,84 @@ if (mode === "twins") {
         NEWLINE +
         "  местами нужно по-разному. Дефект — БАГ, починенный в одной копии.",
     );
+  }
+}
+
+// Код и его тесты — одна правка, а не две. Сверять содержимое бессмысленно:
+// не всякая правка кода обязана менять тест (переименованный комментарий, снятая
+// мёртвая ветка). Поэтому здесь не приговор, а вопрос в нужный момент: вот
+// файлы, которые ты тронул, вот тесты, которые их гоняют, и вот те из них, что
+// в эту правку не попали. Решение — за тобой; молча пройти мимо — нет.
+if (mode === "tested") {
+  const NEWLINE = String.fromCharCode(10);
+  let changed = process.argv.slice(3);
+  if (changed.length === 0) {
+    changed = await changedPaths(path.join(HERE, ".."));
+    if (changed === null) {
+      console.log(
+        "git недоступен — передай пути аргументами: graph.mjs tested <путь> …",
+      );
+      process.exitCode = 1;
+    }
+  }
+  if (changed !== null) {
+    const repoRoot = path.join(HERE, "..");
+    const abs = (f) => norm(path.join(repoRoot, f));
+    const touched = new Set(changed.map(abs));
+    const touchedCode = [...touched].filter(
+      (f) => files.includes(f) && !isTest(f) && !f.endsWith(".d.ts"),
+    );
+
+    const naked = [];
+    const stale = [];
+    let covered = 0;
+    for (const f of touchedCode) {
+      const tests = files.filter(
+        (t) => isTest(t) && (importsOf.get(t) ?? new Set()).has(f),
+      );
+      if (tests.length === 0) {
+        naked.push(rel(f));
+        continue;
+      }
+      if (tests.some((t) => touched.has(t))) covered++;
+      else stale.push([rel(f), tests.map(rel).sort()]);
+    }
+
+    console.log("=== Код и тесты в одной правке ===");
+    console.log(
+      `  тронуто файлов кода: ${touchedCode.length}, из них с тестами в этой же правке: ${covered}`,
+    );
+    if (touchedCode.length === 0) console.log("  правка кода не касается");
+
+    if (stale.length) {
+      console.log(NEWLINE + "  Тесты есть, но в правку не попали:");
+      for (const [f, tests] of stale)
+        console.log(
+          `    ${f}${NEWLINE}      ${tests.join(NEWLINE + "      ")}`,
+        );
+      console.log(
+        NEWLINE +
+          "  Открой каждый и ответь: он всё ещё проверяет то, что называет," +
+          NEWLINE +
+          "  и он всё ещё умеет падать на новом коде? Нашёл слабый — чинится" +
+          NEWLINE +
+          "  здесь же, а не записывается.",
+      );
+    }
+    if (naked.length) {
+      console.log(
+        NEWLINE + "  ВНИМАНИЕ: тронуто, и ни один тест на это не смотрит:",
+      );
+      for (const f of naked) console.log("    " + f);
+      console.log(
+        NEWLINE +
+          "  Новая ветка логики закрывается тестом в том же заходе. Если" +
+          NEWLINE +
+          "  закрывать нечем — причина называется вслух, а не умалчивается.",
+      );
+    }
+    if (touchedCode.length && !stale.length && !naked.length)
+      console.log("  каждый тронутый файл правился вместе со своими тестами");
   }
 }
 
@@ -1258,6 +1351,53 @@ if (mode === "verify") {
       }
     }
   }
+  // 12. новый якорь пишется с цитатой
+  // Старые не переписываем: их 185, и переписывание ради переписывания —
+  // работа без адресата. Но каждый НОВЫЙ обязан нести цитату, иначе доля
+  // проверяемых по существу не растёт никогда. Проверяется по строкам,
+  // ДОБАВЛЕННЫМ этой правкой: старые записи под правило не попадают, а мимо
+  // новой пройти нельзя. Без git сверка молчит и говорит об этом вслух.
+  const uncitedNew = [];
+  let newAnchorsChecked = true;
+  {
+    const NEW_ANCHOR = /`([\w./{}-]*):(\d+)(?:-\d+)?`/g;
+    let diff = null;
+    try {
+      const { execSync } = await import("node:child_process");
+      diff = execSync("git diff -U0 HEAD -- .context", {
+        cwd: REPO,
+        encoding: "utf8",
+      });
+    } catch {
+      newAnchorsChecked = false;
+    }
+    if (diff !== null) {
+      let file = "";
+      for (const line of diff.split(NEWLINE)) {
+        if (line.startsWith("+++ b/")) {
+          file = line.slice(6);
+          continue;
+        }
+        if (!line.startsWith("+") || line.startsWith("+++")) continue;
+        const body = line.slice(1);
+        NEW_ANCHOR.lastIndex = 0;
+        let m;
+        while ((m = NEW_ANCHOR.exec(body)) !== null) {
+          // Цитата — бэктик-фрагмент сразу за якорем, на той же строке.
+          if (!/^\s*`[^`]+`/.test(body.slice(m.index + m[0].length)))
+            uncitedNew.push(`${file}: ${m[0]} — якорь без цитаты`);
+        }
+      }
+    }
+  }
+  console.log("=== Новые якоря — с цитатой ===");
+  console.log(
+    newAnchorsChecked
+      ? `  добавлено якорей без цитаты: ${uncitedNew.length}`
+      : "  git недоступен — не проверено",
+  );
+  for (const u of uncitedNew) console.log("    " + u);
+
   console.log("=== Отложенное без закрытых пунктов ===");
   console.log(
     CONFIG.todo === null
@@ -1287,6 +1427,7 @@ if (mode === "verify") {
     toolDrift.length ||
     deadAnchors.length ||
     closedTodos.length ||
+    uncitedNew.length ||
     unresolved.length
   )
     process.exitCode = 1;
