@@ -55,6 +55,29 @@ describe("useMotionPaint", () => {
     expect(seen.filter((s) => s.endsWith(":5"))).toEqual(["b:5"]);
   });
 
+  it("follows a replaced controller and lets the old one go", () => {
+    // The controller can arrive as a prop: a host that swaps its motion
+    // source must be repainted from the new one. Subscribed once and never
+    // again, the deck keeps painting a curve nobody drives any more while the
+    // live one moves invisibly.
+    const first = createMotionController(1);
+    const second = createMotionController(2);
+    const seen: number[] = [];
+    const Probe = ({ source }: { source: typeof first }) => {
+      useMotionPaint(source, ({ value }) => seen.push(value));
+      return null;
+    };
+
+    act(() => root.render(<Probe source={first} />));
+    act(() => root.render(<Probe source={second} />));
+    seen.length = 0;
+
+    act(() => second.set(20));
+    act(() => first.set(10));
+
+    expect(seen).toEqual([20]);
+  });
+
   it("unsubscribes on unmount", () => {
     const controller = createMotionController(0);
     const paint = vi.fn<(sample: MotionSample) => void>();
