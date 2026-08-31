@@ -68,6 +68,39 @@ describe("sampleProfileSegment", () => {
     expect(done.value).toBe(6);
   });
 
+  it("hands the settle a velocity rather than an infinity", () => {
+    // The last sample of a ride is the first input of whatever picks it up:
+    // the handoff reads this velocity and the next ride is aligned to it. A
+    // ride that ends at rest hands over exactly zero — divide by the settle
+    // speed instead of signing it and the handoff carries an Infinity into
+    // the profile of every ride that follows.
+    const done = sampleProfileSegment(segment, 10_000 + segment.duration + 50);
+    expect(done.velocity).toBe(0);
+  });
+
+  it("keeps a segment that ends in motion moving, signed along the travel", () => {
+    // A ride handed on to another (a release into a fling) ends at speed. The
+    // settle reports that speed pointing the way the segment travelled.
+    const flowing = createProfileSegment({
+      strategy: "ride",
+      from: 6,
+      to: 2,
+      profile: buildProfile({
+        from: 6,
+        to: 2,
+        startSpeed: 0,
+        peakSpeed: 0.004,
+        endSpeed: 0.002,
+        accelerationDistanceShare: 0.3,
+        decelerationDistanceShare: 0.4,
+      }),
+      startedAt: 0,
+    });
+    const done = sampleProfileSegment(flowing, flowing.duration + 100);
+    expect(done.progress).toBe(1);
+    expect(done.velocity).toBe(-0.002);
+  });
+
   it("signs velocity negative for backward travel", () => {
     const back = createProfileSegment({
       strategy: "ride",
