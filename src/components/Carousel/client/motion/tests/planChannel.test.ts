@@ -32,6 +32,28 @@ describe("createMotionPlanChannel", () => {
     expect(late).toHaveBeenCalledTimes(1);
   });
 
+  it("a listener unsubscribing during a publish does not receive it either", () => {
+    // The mirror of the case above. A consumer that tears down inside the
+    // notification (a paint that unmounts on the plan it just read) must not
+    // be called after the fact — but the ones still listening must, or the
+    // guard would be satisfied by a channel that simply stopped delivering.
+    const channel = createMotionPlanChannel();
+    const leaving = vi.fn();
+    const bystander = vi.fn();
+    let dropLeaving = () => {};
+
+    channel.source.subscribe(() => {
+      dropLeaving();
+    });
+    dropLeaving = channel.source.subscribe(leaving as MotionPlanListener);
+    channel.source.subscribe(bystander as MotionPlanListener);
+
+    channel.publish(waapiPlan(1));
+
+    expect(leaving).not.toHaveBeenCalled();
+    expect(bystander).toHaveBeenCalledTimes(1);
+  });
+
   it("starts idle with planId 0", () => {
     const { source } = createMotionPlanChannel();
     expect(source.getSnapshot()).toEqual({ kind: "idle", planId: 0 });

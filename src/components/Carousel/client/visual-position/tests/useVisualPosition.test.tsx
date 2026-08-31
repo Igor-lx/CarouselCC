@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { act } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import {
@@ -58,6 +58,11 @@ describe("useVisualPosition — the frame", () => {
     const frame = api.source.getSnapshot();
     expect(frame.position).toBe(6);
     expect(frame.pageOffset).toBe(2);
+    // The target travels the same conversion: the widget reads where the deck
+    // is GOING in pages, and a target left in deck units silently drives it to
+    // a page three times too far.
+    expect(frame.target).toBe(6);
+    expect(frame.targetPageOffset).toBe(2);
   });
 
   it("re-expresses the SAME position when the page size changes", () => {
@@ -235,5 +240,88 @@ describe("useVisualPosition — reading the position", () => {
     act(() => api.applyImmediatePosition(7));
     expect(api.controller.isActive()).toBe(false);
     expect(api.source.getSnapshot().velocity).toBe(0);
+  });
+});
+
+describe("useVisualPosition — the counter the drop rule reads", () => {
+  it("climbs across a run of moving frames and resets on a resting one", () => {
+    // Stamped in ONE place so the three consumers cannot disagree about which
+    // frame is the Nth. A counter that never climbs sheds nothing (every
+    // fallback frame paints, and the relief the rule exists for is gone); one
+    // that never resets sheds the first frame of the next run, which is the
+    // one frame a drag cannot afford to miss.
+    render();
+    const seen: number[] = [];
+    act(() => {
+      api.source.subscribe((frame) => seen.push(frame.runningFrameIndex), {
+        emitCurrent: false,
+      });
+    });
+
+    act(() => {
+      api.controller.set(1, { phase: "running" });
+      api.controller.set(2, { phase: "running" });
+      api.controller.set(3, { phase: "running" });
+    });
+    expect(seen).toEqual([0, 1, 2]);
+
+    act(() => api.applyImmediatePosition(3));
+    act(() => api.controller.set(4, { phase: "running" }));
+    // The resting frame reset the streak; the next run starts from zero again.
+    expect(seen).toEqual([0, 1, 2, 0, 0]);
+  });
+
+  it("paints a consumer that subscribes while mounting exactly once", () => {
+    // A consumer subscribes in its own effect, which runs before this hook's.
+    // The hook already emitted the resting frame in a layout effect, so its
+    // own subscription must NOT ask the controller for it again — the second
+    // copy reaches every consumer as a repaint of a frame already painted.
+    const seen: VisualPositionFrame[] = [];
+    function Child({ source }: { source: UseVisualPositionResult["source"] }) {
+      useEffect(
+        () =>
+          source.subscribe((frame) => seen.push(frame), { emitCurrent: false }),
+        [source],
+      );
+      return null;
+    }
+    function Deck() {
+      api = useVisualPosition({ visibleSlidesCount: 3 });
+      return <Child source={api.source} />;
+    }
+
+    act(() => root.render(<Deck />));
+    expect(seen).toEqual([]);
+  });
+});
+
+describe("useVisualPosition — what it hands to the controller", () => {
+  it("starts at rest, idle, before anything has moved", () => {
+    // The strategy every consumer switches on: an unnamed one is a deck whose
+    // first frame belongs to no known kind of motion.
+    render();
+    expect(api.source.getSnapshot()).toMatchObject({
+      position: 0,
+      strategy: "idle",
+      runningFrameIndex: 0,
+    });
+  });
+
+  it("stamps an immediate apply as the gesture that caused it", () => {
+    // A finger placed the deck here. Consumers tell a dragged position from a
+    // ridden one by this strategy alone.
+    render();
+    act(() => api.applyImmediatePosition(4));
+    expect(api.source.getSnapshot().strategy).toBe("gesture");
+  });
+
+  it("wakes the controller rather than answering for it", () => {
+    // `wake` exists for one case: a passive ride whose painter is gone. A
+    // pass-through that does nothing leaves the deck frozen mid-flight with no
+    // error anywhere.
+    render();
+    const woken = vi.spyOn(api.controller, "wake");
+    api.source.wake();
+    expect(woken).toHaveBeenCalledTimes(1);
   });
 });
