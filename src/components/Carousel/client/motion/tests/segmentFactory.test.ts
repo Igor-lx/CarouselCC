@@ -491,6 +491,9 @@ const at = (state: CarouselState, position = 0) => ({
   startedAt: 0,
 });
 
+const segmentDurationOf = (state: CarouselState) =>
+  buildCarouselSegment(at(state, state.fromVirtualIndex)).segment.duration;
+
 const riding = (overrides: Partial<CarouselState>): CarouselState => ({
   ...initialState(makeLayout(12, 3)),
   fromVirtualIndex: 0,
@@ -615,5 +618,108 @@ describe("step profile — which shape a step is given", () => {
     const autoplay = launchSpeed(riding({ moveReason: "autoplay" }));
     const click = launchSpeed(riding({ moveReason: "click" }));
     expect(autoplay).toBeGreaterThan(click);
+  });
+});
+
+/**
+ * Direction, and the degenerate jump.
+ *
+ * A segment carries both a path and a speed, and they are computed apart: the
+ * path from `from`/`to`, the speed from a distance whose SIGN says which way
+ * the deck is going. Get that sign wrong and the curve still ends in the right
+ * place — it just starts by moving away from it, which is the one motion bug a
+ * user reads as the carousel being broken rather than slow.
+ */
+describe("direction of travel", () => {
+  const backwards = riding({ fromVirtualIndex: 6, virtualIndex: 0 });
+
+  it("a step backwards leaves with a backwards velocity", () => {
+    const { segment } = buildCarouselSegment(at(backwards, 6));
+    const launch = sampleCarouselSegment(segment, 1);
+    expect(launch.velocity).toBeLessThanOrEqual(0);
+    expect(sampleCarouselSegment(segment, segment.duration).value).toBe(0);
+  });
+
+  it("a jump does not carry over a speed that points the other way", () => {
+    // A takeover inherits the speed the deck HAD — but only if it was going
+    // the same way. Ordered backwards while still moving forwards, the ride
+    // starts from REST; carry the old speed in and the deck leaves faster than
+    // it was ever pushed, in a direction it was never moving.
+    const back = riding({
+      motionPhase: "step-jump",
+      fromVirtualIndex: 9,
+      virtualIndex: 0,
+      targetPageIndex: 0,
+    });
+    const jump = (velocity: number) =>
+      buildCarouselSegment({
+        state: back,
+        config,
+        isInstantMode: false,
+        start: { position: 9, velocity, strategy: "step" as const },
+        startedAt: 0,
+      }).segment;
+
+    const wrongWay = Math.abs(sampleCarouselSegment(jump(0.01), 1).velocity);
+    const rightWay = Math.abs(sampleCarouselSegment(jump(-0.01), 1).velocity);
+    expect(wrongWay).toBeLessThan(rightWay);
+    expect(
+      sampleCarouselSegment(jump(0.01), segmentDurationOf(back)).value,
+    ).toBe(0);
+  });
+
+  it("a repeated click backwards does too", () => {
+    // The repeat builds its peak from a multiplier, and the sign has to be put
+    // back on afterwards — a separate place to lose it.
+    const { segment } = buildCarouselSegment(
+      at(
+        riding({
+          fromVirtualIndex: 6,
+          virtualIndex: 0,
+          isRepeatedClickAdvance: true,
+        }),
+        6,
+      ),
+    );
+    expect(sampleCarouselSegment(segment, 1).velocity).toBeLessThanOrEqual(0);
+  });
+});
+
+describe("a jump with nowhere to go", () => {
+  it("builds a finite profile rather than dividing by the distance", () => {
+    // Every GO_TO share is a page-screen budget divided by the distance
+    // travelled. A jump onto the deck's own position makes that a division by
+    // zero, and the shares become NaN — which reaches the profile, the stops,
+    // and finally WAAPI, which rejects the whole animation.
+    const still = riding({
+      motionPhase: "step-jump",
+      fromVirtualIndex: 3,
+      virtualIndex: 3,
+    });
+    const { segment, duration } = buildCarouselSegment(at(still, 3));
+    expect(Number.isNaN(duration)).toBe(false);
+    expect(Number.isNaN(sampleCarouselSegment(segment, 1).value)).toBe(false);
+  });
+
+  it("the same holds for each teleport slice", () => {
+    const preflight = riding({
+      motionPhase: "step-jump",
+      fromVirtualIndex: 3,
+      virtualIndex: 3,
+      teleportVirtualIndex: 3,
+    });
+    expect(Number.isNaN(buildCarouselSegment(at(preflight, 3)).duration)).toBe(
+      false,
+    );
+
+    const approach = riding({
+      motionPhase: "step-jump",
+      fromVirtualIndex: 3,
+      virtualIndex: 3,
+      isTeleportApproach: true,
+    });
+    expect(Number.isNaN(buildCarouselSegment(at(approach, 3)).duration)).toBe(
+      false,
+    );
   });
 });
