@@ -103,10 +103,11 @@ describe("ride-duration floor", () => {
       },
       startedAt: 0,
     });
-    // float-tolerant: the solver lands exactly on the floor
-    expect(segment.duration).toBeGreaterThanOrEqual(
-      RELEASE_KNOBS.minRideDurationMs - 1e-6,
-    );
+    // ON the floor, not merely above it: the solver re-derives the cruise so
+    // the ride lasts exactly the minimum. Asserted as a bound only, a ride
+    // that lost its solved cruise altogether — and so crawls at the launch
+    // speed for far longer — reads as a pass.
+    expect(segment.duration).toBeCloseTo(RELEASE_KNOBS.minRideDurationMs, 6);
   });
 
   it("a launch speed that alone beats the floor is never slowed (continuity wins)", () => {
@@ -758,6 +759,42 @@ describe("what the segment calls itself", () => {
         startedAt: 0,
       }).segment.strategy,
     ).toBe("gesture");
+  });
+});
+
+describe("the shape of a teleport's second leg", () => {
+  it("brakes from the cruise over its own budget, and stops", () => {
+    // The approach spends one page-screen's deceleration budget, expressed as
+    // a SHARE of its own travel. Compute that share by anything other than
+    // dividing by the distance and the slice is shaped for a different ride:
+    // it stops early, or brakes over a distance it does not have.
+    const approach = riding({
+      motionPhase: "step-jump",
+      isTeleportApproach: true,
+      fromVirtualIndex: 24,
+      virtualIndex: 27,
+      targetPageIndex: 9,
+    });
+    const { segment } = buildCarouselSegment(at(approach, 24));
+    const peak = resolveJumpPeakSpeed(
+      3,
+      config.stepDuration,
+      config.motion.goToSpeedMultiplier,
+    );
+
+    // Leaves at the cruise it was handed, arrives at rest.
+    expect(Math.abs(sampleCarouselSegment(segment, 0).velocity)).toBeCloseTo(
+      peak,
+      6,
+    );
+    expect(
+      Math.abs(sampleCarouselSegment(segment, segment.duration).velocity),
+    ).toBe(0);
+    // And it takes the budget the timing layer says it takes.
+    expect(segment.duration).toBeCloseTo(
+      resolveGoToApproachDuration(3, config.motion, peak),
+      6,
+    );
   });
 });
 
