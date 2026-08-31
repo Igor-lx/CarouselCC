@@ -2,6 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import { buildCarouselConfig } from "../resolve/buildConfig";
 import { CAROUSEL_DEFAULTS } from "../defaults";
+import {
+  CAROUSEL_INERTIAL_RELEASE_CONFIG,
+  CAROUSEL_SWIPE_CONFIG,
+} from "../gesture";
+import {
+  PAUSE_HOVER_DELAY_MS,
+  PAUSE_VISIBILITY_RATIO,
+  AUTOPLAY_RESETTLE_DELAY_MS,
+} from "../interaction";
+import {
+  SNAP_BACK_ACCELERATION_DISTANCE_SHARE,
+  SNAP_BACK_DECELERATION_DISTANCE_SHARE,
+} from "../motion";
 
 /**
  * This file pins an ABSENCE, which is the only reason it exists.
@@ -68,5 +81,64 @@ describe("buildCarouselConfig — the only thing it substitutes is absence", () 
     expect(
       buildCarouselConfig({ visibleSlidesNr: null }).visibleSlidesCount,
     ).toBe(null);
+  });
+});
+
+/**
+ * The gesture settings are module constants, and the engine writes into what it
+ * is handed. Passed by reference, one carousel retuning its own swipe would
+ * retune every other carousel in the bundle — the same object, mutated once.
+ * The copy is what prevents that, and it is invisible: values compare equal
+ * either way, so only identity can tell a copy from a shared reference.
+ *
+ * Recorded as an invariant; until now nothing held it, and a mutation run said
+ * so — emptying either spread killed no test.
+ */
+describe("buildCarouselConfig — gesture settings are copied, not shared", () => {
+  it("hands out a copy of the swipe config, nested commit included", () => {
+    const config = buildCarouselConfig({});
+    expect(config.swipeConfig).toEqual(CAROUSEL_SWIPE_CONFIG);
+    expect(config.swipeConfig).not.toBe(CAROUSEL_SWIPE_CONFIG);
+    // The nested object is the one that is easy to miss: a shallow spread
+    // would carry the SAME `commit` through, and the leak comes back.
+    expect(config.swipeConfig.commit).toEqual(CAROUSEL_SWIPE_CONFIG.commit);
+    expect(config.swipeConfig.commit).not.toBe(CAROUSEL_SWIPE_CONFIG.commit);
+  });
+
+  it("hands out a copy of the release config", () => {
+    const config = buildCarouselConfig({});
+    expect(config.releaseConfig).toEqual(CAROUSEL_INERTIAL_RELEASE_CONFIG);
+    expect(config.releaseConfig).not.toBe(CAROUSEL_INERTIAL_RELEASE_CONFIG);
+  });
+
+  it("gives each caller its own copy, so one cannot retune another", () => {
+    const first = buildCarouselConfig({});
+    const second = buildCarouselConfig({});
+    expect(first.swipeConfig).not.toBe(second.swipeConfig);
+    expect(first.releaseConfig).not.toBe(second.releaseConfig);
+  });
+});
+
+/**
+ * Two blocks of the assembled config were read by no test at all, so emptying
+ * them changed nothing anyone could see. They are not decoration: the pause
+ * numbers gate autoplay, and the snap-back shares are the profile a rubber-band
+ * release is animated with. Emptied, both become `undefined` deep inside the
+ * motion maths, where they read as NaN rather than as a missing setting.
+ */
+describe("buildCarouselConfig — the blocks nothing else reads", () => {
+  it("carries the interaction pauses", () => {
+    expect(buildCarouselConfig({}).interaction).toEqual({
+      hoverPauseDelayMs: PAUSE_HOVER_DELAY_MS,
+      visibilityRatio: PAUSE_VISIBILITY_RATIO,
+      autoplayResettleDelayMs: AUTOPLAY_RESETTLE_DELAY_MS,
+    });
+  });
+
+  it("carries the snap-back profile", () => {
+    expect(buildCarouselConfig({}).motion.snapBackProfile).toEqual({
+      accelerationDistanceShare: SNAP_BACK_ACCELERATION_DISTANCE_SHARE,
+      decelerationDistanceShare: SNAP_BACK_DECELERATION_DISTANCE_SHARE,
+    });
   });
 });

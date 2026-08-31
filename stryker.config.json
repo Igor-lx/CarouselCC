@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-  "_comment": "Мутационный прогон — аудит тестовой сети, а не часть общего набора: он долгий и запускается по требованию (npm run test:mutation). Область — чистая логика домена и состояния: детерминированная, без DOM, и именно на ней стоят все геометрические решения. См. .context/02-todo.md, пункт 4.",
+  "_comment": "Мутационный прогон — аудит тестовой сети, а не часть общего набора: он долгий и запускается по требованию (npm run test:mutation). Область — чистая логика домена, состояния и сборки конфига: детерминированная, без DOM, и именно на ней стоят все геометрические решения. Таблицы констант (config/*.ts) в область НЕ входят намеренно: их мутанты убиваются только пересказом самих значений, то есть тестом-детектором изменений. См. .context/02-todo.md, пункт 4.",
   "packageManager": "npm",
   "testRunner": "vitest",
   "reporters": ["html", "clear-text", "progress"],
@@ -8,6 +8,7 @@
   "mutate": [
     "src/components/Carousel/client/domain/**/*.ts",
     "src/components/Carousel/client/state/**/*.ts",
+    "src/components/Carousel/client/config/resolve/**/*.ts",
     "!src/components/Carousel/client/**/tests/**",
     "!src/components/Carousel/client/**/*.test.ts",
     "!src/components/Carousel/client/**/index.ts",
