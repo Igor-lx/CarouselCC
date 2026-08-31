@@ -1,4 +1,4 @@
-// See ./README.md — оси это данные, а не константа.
+// See ./README.md — the axes are data, not a constant.
 import { useMemo } from "react";
 
 import { useMediaQuerySet } from "../../sharedStore/useMediaQuerySet";

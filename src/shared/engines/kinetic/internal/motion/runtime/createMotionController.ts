@@ -159,8 +159,8 @@ export function createMotionController<Strategy extends string = string>(
       Math.max(0, endTime - now()),
     );
 
-  // Отменить и заморозить на живой точке. Вынесено из литерала, чтобы
-  // `destroy` не звал `this`: методы контроллера отцепляют от объекта.
+  // Cancel and freeze at the live point. Lifted out of the literal so that
+  // `destroy` never calls `this`: the controller methods get detached.
   const cancelActive = () => {
     const latest = active ? sampleActive(now()) : sample;
     cancelTick();
