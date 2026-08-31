@@ -1466,6 +1466,11 @@ if (mode === "verify") {
     const CODE_MARK =
       /(^|[^A-Za-zА-Яа-я])(TODO|FIXME|HACK|XXX|ВРЕМЕННО|ПОТОМ|ПОЧИНИТЬ)([^A-Za-zА-Яа-я]|$)/;
     for (const f of files) {
+      // Полка правил везёт копию ЭТОГО файла, и в ней маркеры перечислены как
+      // данные. Сканер, читающий собственный список, докладывает о себе —
+      // сегодня спасает только расширение (`.mjs` в обход не попадает), и
+      // полагаться на это нельзя.
+      if (rel(f).includes("shared/context/tools/")) continue;
       const body = readFileSync(f, "utf8").split(NEWLINE);
       body.forEach((line, i) => {
         if (CODE_MARK.test(line))
