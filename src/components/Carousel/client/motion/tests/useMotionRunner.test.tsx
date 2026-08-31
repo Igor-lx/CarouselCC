@@ -379,3 +379,96 @@ describe("useMotionRunner — instant mode switched on mid-ride", () => {
     expect(lastPlan().kind).toBe("instant");
   });
 });
+
+/**
+ * The plan is not a notification that something started — it is the ride,
+ * handed to everyone who paints. The dots and the widget build their own
+ * animations from these fields and never look at the deck again, so a wrong
+ * direction or a missing flag does not fail here: it shows up as pagination
+ * drifting the other way while the deck rides correctly.
+ */
+describe("useMotionRunner — what the plan carries", () => {
+  it("names the direction of travel, both ways", () => {
+    render(stationary);
+    render(moving());
+    expect(lastPlan()).toMatchObject({ kind: "waapi", direction: 1 });
+
+    // Backwards is judged from where the deck IS — the controller's live
+    // position — not from the origin the command names.
+    render(moving({ virtualIndex: -3, targetPageIndex: 3 }));
+    expect(lastPlan()).toMatchObject({ kind: "waapi", direction: -1 });
+  });
+
+  it("marks a far jump as a jump, and an ordinary step as not one", () => {
+    // The widget draws a jump differently — one continuous sweep instead of a
+    // step. It has nothing else to tell them apart by.
+    render(stationary);
+    render(moving());
+    expect(lastPlan()).toMatchObject({ isJump: false });
+
+    render(
+      moving({ motionPhase: "step-jump", virtualIndex: 9, targetPageIndex: 3 }),
+    );
+    expect(lastPlan()).toMatchObject({ isJump: true });
+  });
+
+  it("points the followers at the FAR target while a teleport is pending", () => {
+    // `virtualIndex` is the preflight landing during a teleport; keyed on it,
+    // the followers would re-plan when the deck cuts to the canonical landing
+    // and stutter in the middle of one continuous move.
+    render(stationary);
+    render(
+      moving({
+        motionPhase: "step-jump",
+        virtualIndex: 3,
+        teleportVirtualIndex: 15,
+      }),
+    );
+    expect(lastPlan()).toMatchObject({ targetKey: 15 });
+  });
+});
+
+describe("useMotionRunner — the rides it refuses to start", () => {
+  it("a deck that cannot slide is placed, not animated", () => {
+    // Mid-ride: the deck loses the ability to slide (the host shrank the
+    // deck to one page). The ride must stop being a ride.
+    render(stationary);
+    render(moving());
+    const rides = startCompositorMotion.mock.calls.length;
+
+    render({
+      ...moving(),
+      layout: { ...moving().layout, canSlide: false },
+    });
+    expect(startCompositorMotion).toHaveBeenCalledTimes(rides);
+    expect(lastPlan().kind).toBe("idle");
+    expect(controller!.getSnapshot().value).toBe(3);
+    expect(controller!.isActive()).toBe(false);
+  });
+
+  it("a target already within the tolerance is snapped, not ridden", () => {
+    // Below the motion epsilon there is nothing to travel, and a ride built
+    // over that distance is a profile divided by almost nothing.
+    render(stationary);
+    render(moving());
+    const rides = startCompositorMotion.mock.calls.length;
+
+    render(moving({ virtualIndex: config.motion.epsilon / 2 }));
+    expect(startCompositorMotion).toHaveBeenCalledTimes(rides);
+    expect(lastPlan().kind).toBe("idle");
+  });
+
+  it("a deck under the finger freezes where the eye sees it, not at its target", () => {
+    // The finger owns the track from this moment. Freezing at `virtualIndex`
+    // would tear the strip to the pending target under the held finger.
+    render(stationary);
+    render(moving());
+    cancelCompositorMotion.mockClear();
+
+    render(moving({ motionPhase: "dragging" }));
+    expect(lastPlan().kind).toBe("follow");
+    const frozenAt = cancelCompositorMotion.mock.calls.at(-1)?.[0];
+    expect(frozenAt).toBe(controller!.getSnapshot().value);
+    expect(frozenAt).not.toBe(3);
+  });
+});

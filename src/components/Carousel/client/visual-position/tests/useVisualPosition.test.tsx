@@ -95,6 +95,48 @@ describe("useVisualPosition — the frame", () => {
     act(() => api.applyImmediatePosition(2));
     expect(frames.length).toBe(delivered);
   });
+
+  it("does not deliver to a listener dropped DURING the same notification", () => {
+    // The painters unsubscribe each other in real teardown: one frame arrives,
+    // a consumer tears down, and the set shrinks while the loop over it is
+    // still running. Without the membership re-check the doomed listener is
+    // still called — a callback into a component that has already let go.
+    render();
+    // Order matters: the set is walked in insertion order, so the one that
+    // does the unsubscribing has to be reached FIRST.
+    const late: number[] = [];
+    let stopLate = () => {};
+    const stopFirst = api.source.subscribe(() => stopLate(), {
+      emitCurrent: false,
+    });
+    stopLate = api.source.subscribe((f) => late.push(f.position), {
+      emitCurrent: false,
+    });
+
+    act(() => api.applyImmediatePosition(1));
+    expect(late).toEqual([]);
+    stopFirst();
+  });
+
+  it("does not deliver to a listener that appears DURING a notification", () => {
+    // The mirror case, and the reason the loop walks a snapshot: a listener
+    // added mid-notification has not seen the frames before it, so handing it
+    // this one out of order is worse than making it wait for the next.
+    render();
+    const joined: number[] = [];
+    const stopFirst = api.source.subscribe(
+      () => {
+        api.source.subscribe((f) => joined.push(f.position), {
+          emitCurrent: false,
+        });
+      },
+      { emitCurrent: false },
+    );
+
+    act(() => api.applyImmediatePosition(1));
+    expect(joined).toEqual([]);
+    stopFirst();
+  });
 });
 
 describe("useVisualPosition — the running streak", () => {
