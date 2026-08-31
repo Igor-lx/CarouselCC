@@ -20,6 +20,7 @@ import type { TrackBindingApi } from "../../geometry";
 import { buildCarouselConfig } from "../../config";
 import type { CarouselRuntimeConfig } from "../../config";
 import { buildCarouselLayout, buildSlideRecords } from "../../domain";
+import { motionNow } from "../../../../../shared";
 import { buildInitialState } from "../../state/initial";
 import type { CarouselState } from "../../state";
 import type { Slide } from "../../public-api/types";
@@ -472,3 +473,95 @@ describe("useMotionRunner — the rides it refuses to start", () => {
     expect(frozenAt).not.toBe(3);
   });
 });
+
+/**
+ * Where the ride comes FROM — the three answers the runner picks between, and
+ * the one thing it must do when the compositor says no.
+ *
+ * All three origins produce a ride that looks correct in isolation; what
+ * separates them is a starting point a few units apart, which on screen is the
+ * deck stepping backwards before it sets off. That is why they are pinned by
+ * origin rather than by outcome.
+ */
+describe("useMotionRunner — where a ride starts from", () => {
+  it("takes an atomic handoff when a ride is already in flight", () => {
+    // Mid-flight the truth is the controller, not the reducer. The two are set
+    // deliberately apart here: the deck sits near 0 while the command claims
+    // it starts at 5. Trust the command and the deck jumps to 5 before
+    // travelling on — the handoff is what keeps it where the eye left it.
+    render(stationary);
+    render(moving());
+    expect(controller!.isActive()).toBe(true);
+
+    render(
+      moving({ fromVirtualIndex: 5, virtualIndex: 9, targetPageIndex: 3 }),
+    );
+    expect(lastPlan().kind).toBe("waapi");
+    expect(controller!.getSnapshot().value).toBeLessThan(1);
+  });
+
+  it("a cold start takes its origin from the reducer, not the controller", () => {
+    // Deliberately a split, not a mixed handoff: the position is the one the
+    // reducer decided, and only the residual velocity comes from the
+    // controller. Mixing them samples a position from one moment and a speed
+    // from another, and the segment starts with the two disagreeing.
+    render(stationary);
+    render(
+      moving({ fromVirtualIndex: 2, virtualIndex: 8, targetPageIndex: 2 }),
+    );
+    expect(controller!.getSnapshot().value).toBe(2);
+  });
+
+  it("a gesture release starts from the coasted position, not the lift-off point", () => {
+    // Between the finger leaving and the runner taking over there is a commit
+    // gap that nothing paints. The launch point is extrapolated across it, so
+    // the ride picks the deck up where it has drifted to — not where it was
+    // let go.
+    render(stationary);
+    render(
+      moving({
+        moveReason: "gesture",
+        fromVirtualIndex: 0,
+        virtualIndex: 3,
+        gesture: {
+          pointerVelocity: 0.01,
+          uiVelocity: 0.01,
+          launchVelocity: 0.01,
+          releasedAt: motionNow() - 40,
+        },
+      }),
+    );
+    // Coasted forward from 0 by the release speed over the gap.
+    expect(controller!.getSnapshot().value).toBeGreaterThan(0);
+  });
+});
+
+describe("useMotionRunner — when the compositor refuses", () => {
+  it("takes the paint back rather than leaving a dead animation on the track", () => {
+    // `false` means the browser would not take the ride. The track still
+    // carries whatever the previous animation pinned, so it has to be released
+    // at the position the ride is starting from — otherwise the deck sits on a
+    // stale transform while the JS loop paints somewhere else.
+    startCompositorMotion.mockReturnValue(false);
+    render(stationary);
+    cancelCompositorMotion.mockClear();
+
+    render(
+      moving({ fromVirtualIndex: 2, virtualIndex: 8, targetPageIndex: 2 }),
+    );
+
+    // Released AT the ride's own starting point — not at its target, and not
+    // merely "released at some point", which the idle branches do anyway.
+    expect(cancelCompositorMotion).toHaveBeenCalledWith(2);
+    expect(controller!.isActive()).toBe(true);
+    // And the plan says WHICH kind of follow this is: a finger-held track and a
+    // JS-painted ride are both "follow", and only `isFallback` tells the
+    // painters that the frames are theirs to draw.
+    expect(lastPlan()).toMatchObject({ kind: "follow", isFallback: true });
+  });
+});
+
+// The runner also cancels the controller on unmount, and that is deliberately
+// NOT pinned here: `useMotionController` tears its own controller down, so
+// removing the runner's call changes nothing observable. Defence in depth —
+// a test for it would hold the layer, not the behaviour.
