@@ -113,9 +113,19 @@ describe("useVisualPosition — the frame", () => {
       emitCurrent: false,
     });
 
+    const survivor: number[] = [];
+    const stopSurvivor = api.source.subscribe(
+      (f) => survivor.push(f.position),
+      { emitCurrent: false },
+    );
+
     act(() => api.applyImmediatePosition(1));
     expect(late).toEqual([]);
+    // And the notification still happened: an empty loop would satisfy the
+    // line above and hold nothing at all.
+    expect(survivor).toEqual([1]);
     stopFirst();
+    stopSurvivor();
   });
 
   it("does not deliver to a listener that appears DURING a notification", () => {
@@ -133,9 +143,17 @@ describe("useVisualPosition — the frame", () => {
       { emitCurrent: false },
     );
 
+    const survivor: number[] = [];
+    const stopSurvivor = api.source.subscribe(
+      (f) => survivor.push(f.position),
+      { emitCurrent: false },
+    );
+
     act(() => api.applyImmediatePosition(1));
     expect(joined).toEqual([]);
+    expect(survivor).toEqual([1]);
     stopFirst();
+    stopSurvivor();
   });
 });
 
