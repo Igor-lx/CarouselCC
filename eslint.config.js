@@ -8,7 +8,18 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import prettier from "eslint-config-prettier/flat";
 
 export default tseslint.config(
-  { ignores: ["dist", "coverage", "node_modules", "public"] },
+  {
+    // `.stryker-tmp` holds generated sandboxes of this very source tree; `reports`
+    // holds the run output. Neither is authored code.
+    ignores: [
+      "dist",
+      "coverage",
+      "node_modules",
+      "public",
+      ".stryker-tmp",
+      "reports",
+    ],
+  },
 
   // Application, shelves and tests: type-aware linting.
   {
