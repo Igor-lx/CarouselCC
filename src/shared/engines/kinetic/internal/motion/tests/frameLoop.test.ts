@@ -189,3 +189,176 @@ describe("the frame loop", () => {
     vi.useRealTimers();
   });
 });
+
+/**
+ * What must stop when something else takes over.
+ *
+ * Every entry point that changes the position — `set`, `snap`, a new `start` —
+ * first cancels what was running: the frame loop, the passive settle timer and
+ * any completion already queued for the ride being replaced. None of those
+ * cancels was observed by a test, because observing them means asking what
+ * happens AFTER the takeover, and every existing case stopped at the takeover
+ * itself.
+ *
+ * The failures are all of one shape: something from the previous ride arrives
+ * late. A loop that kept running overwrites the value that was just set; a
+ * completion left queued reports a landing for a ride nobody is on any more.
+ */
+describe("takeover — what the previous ride must stop doing", () => {
+  const drive = (ms: number) => vi.advanceTimersByTime(ms);
+
+  it("a set stops the frames, and the value it wrote stays written", () => {
+    vi.useFakeTimers();
+    const controller = createMotionController<string>(0, "idle");
+    controller.start({
+      segment: segment({ startedAt: motionNow() }),
+      sampler: linearSampler,
+    });
+    drive(200);
+
+    controller.set(42);
+    drive(2000);
+
+    // A loop still running would sample its own curve over the top of this.
+    expect(controller.getSnapshot().value).toBe(42);
+    expect(controller.isActive()).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it("a snap stops the frames the same way", () => {
+    vi.useFakeTimers();
+    const controller = createMotionController<string>(0, "idle");
+    controller.start({
+      segment: segment({ startedAt: motionNow() }),
+      sampler: linearSampler,
+    });
+    drive(200);
+
+    controller.snap(7);
+    drive(2000);
+
+    expect(controller.getSnapshot().value).toBe(7);
+    expect(controller.getSnapshot().phase).toBe("settled");
+    vi.useRealTimers();
+  });
+
+  it("a passive ride's settle timer is dropped when something takes over", () => {
+    // A passive segment has no frame loop — one timer at the end is the whole
+    // ride. Leave it armed and the deck "lands" seconds after it was placed
+    // somewhere else entirely, reporting a landing nobody is waiting for.
+    vi.useFakeTimers();
+    const controller = createMotionController<string>(0, "idle");
+    const stale = vi.fn();
+    controller.start({
+      segment: segment({ startedAt: motionNow(), duration: 1000 }),
+      sampler: linearSampler,
+      onComplete: stale,
+      isPassive: true,
+    });
+    drive(200);
+
+    controller.set(0);
+    drive(5000);
+
+    expect(stale).not.toHaveBeenCalled();
+    expect(controller.getSnapshot().value).toBe(0);
+    vi.useRealTimers();
+  });
+
+  it("a completion queued by a snap is dropped by the next snap", () => {
+    vi.useFakeTimers();
+    const controller = createMotionController<string>(0, "idle");
+    const stale = vi.fn();
+    controller.snap(5, { onComplete: stale });
+    controller.snap(9);
+    drive(100);
+
+    expect(stale).not.toHaveBeenCalled();
+    expect(controller.getSnapshot().value).toBe(9);
+    vi.useRealTimers();
+  });
+
+  it("an immediate completion arrives inside the call, not a frame later", () => {
+    // The caller asked for it synchronously because it is already inside the
+    // commit that owns the outcome; a frame later is a different commit.
+    vi.useFakeTimers();
+    const controller = createMotionController<string>(0, "idle");
+    const immediate = vi.fn();
+    const deferred = vi.fn();
+
+    controller.snap(1, { onComplete: immediate, completion: "immediate" });
+    expect(immediate).toHaveBeenCalledTimes(1);
+
+    controller.snap(2, { onComplete: deferred });
+    expect(deferred).not.toHaveBeenCalled();
+    drive(50);
+    expect(deferred).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+});
+
+describe("set and snap — what they fill in when the caller does not", () => {
+  it("a bare set rests: no velocity, target on the value, strategy kept", () => {
+    // The defaults are the whole contract of "put it here": anything else
+    // leaves a consumer reading a speed for a deck that is standing still.
+    const controller = createMotionController<string>(0, "gesture");
+    controller.set(12);
+    expect(controller.getSnapshot()).toMatchObject({
+      value: 12,
+      velocity: 0,
+      target: 12,
+      strategy: "gesture",
+      phase: "idle",
+      progress: 1,
+    });
+  });
+
+  it("a bare snap rests too, but reads as settled rather than idle", () => {
+    const controller = createMotionController<string>(0, "step");
+    controller.snap(3);
+    expect(controller.getSnapshot()).toMatchObject({
+      value: 3,
+      velocity: 0,
+      target: 3,
+      strategy: "step",
+      phase: "settled",
+    });
+  });
+
+  it("what the caller does pass is not overwritten", () => {
+    const controller = createMotionController<string>(0, "idle");
+    controller.set(5, { velocity: 2, target: 9, strategy: "gesture" });
+    expect(controller.getSnapshot()).toMatchObject({
+      value: 5,
+      velocity: 2,
+      target: 9,
+      strategy: "gesture",
+    });
+  });
+});
+
+describe("captureHandoff — the point a takeover starts from", () => {
+  const drive = (ms: number) => vi.advanceTimersByTime(ms);
+
+  it("answers from the live curve while the ride is on", () => {
+    // Not from the last emitted frame: a takeover that starts from the frame
+    // BEFORE the one on screen begins with a visible step backwards.
+    vi.useFakeTimers();
+    const controller = createMotionController<string>(0, "idle");
+    controller.start({
+      segment: segment({ startedAt: motionNow() }),
+      sampler: linearSampler,
+    });
+    drive(300);
+
+    const ahead = controller.captureHandoff(motionNow() + 100);
+    expect(ahead.position).toBeGreaterThan(controller.getSnapshot().value);
+    vi.useRealTimers();
+  });
+
+  // The handoff also caches what it sampled (`if (active) sample = point`), and
+  // that cache is deliberately NOT pinned: every path out of an active ride —
+  // `cancel`, `set`, `snap`, `finalize` — emits, and an emit writes the same
+  // field. There is no state in which the cache is the only writer, so a test
+  // for it would be pinning an internal, not a behaviour.
+});
