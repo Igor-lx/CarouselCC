@@ -119,3 +119,82 @@ describe("resolveDragRelease — directionless release", () => {
     expect(release.isSnap).toBe(false);
   });
 });
+
+/**
+ * A finite deck is where the direction and the edge meet: the swipe asks for
+ * the next page, the clamp refuses at the last one, and `isSnap` is what tells
+ * the runner "this is a rubber-band back, not a navigation". None of that was
+ * exercised — the whole finite branch of the release had no test reaching it.
+ */
+describe("resolveDragRelease — a committed swipe on a finite deck", () => {
+  const finite = (slideCount = 12, visible = 3) =>
+    buildCarouselLayout(
+      buildSlideRecords(
+        Array.from({ length: slideCount }, (_, i) => ({
+          id: `s-${i}`,
+          content: `slide-${i}`,
+        })),
+      ),
+      visible,
+      true,
+    );
+
+  const release = (
+    direction: "left" | "right",
+    dragOriginPageIndex: number,
+    layout = finite(),
+  ) =>
+    resolveDragRelease({
+      direction,
+      releasePosition: dragOriginPageIndex * layout.visibleSlidesCount,
+      dragOriginPageIndex,
+      isInFlightGrab: false,
+      pressedPageIndex: null,
+      layout,
+    });
+
+  it("swiping forward advances exactly one page", () => {
+    const r = release("left", 1);
+    expect(r.targetPageIndex).toBe(2);
+    expect(r.targetVirtualIndex).toBe(6);
+    expect(r.isSnap).toBe(false);
+  });
+
+  it("swiping back retreats exactly one page", () => {
+    const r = release("right", 2);
+    expect(r.targetPageIndex).toBe(1);
+    expect(r.targetVirtualIndex).toBe(3);
+    expect(r.isSnap).toBe(false);
+  });
+
+  it("swiping forward off the last page snaps back to it", () => {
+    // The clamp refuses, the target equals the origin, and that equality is
+    // what makes it a snap: the runner must rubber-band rather than animate a
+    // navigation to where the deck already is.
+    const r = release("left", 3);
+    expect(r.targetPageIndex).toBe(3);
+    expect(r.isSnap).toBe(true);
+  });
+
+  it("swiping back off the first page snaps back to it", () => {
+    const r = release("right", 0);
+    expect(r.targetPageIndex).toBe(0);
+    expect(r.isSnap).toBe(true);
+  });
+});
+
+describe("resolveDragRelease — a committed swipe on a cyclic deck", () => {
+  it("wraps backwards past the first page instead of snapping", () => {
+    const layout = makeLayout(12, 3);
+    const r = resolveDragRelease({
+      direction: "right",
+      releasePosition: 0,
+      dragOriginPageIndex: 0,
+      isInFlightGrab: false,
+      pressedPageIndex: null,
+      layout,
+    });
+    expect(r.targetPageIndex).toBe(3);
+    expect(r.isSnap).toBe(false);
+  });
+});

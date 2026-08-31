@@ -143,3 +143,34 @@ describe("windowContains / expandWindow", () => {
     });
   });
 });
+
+describe("buildRenderWindow — the ends of the segment", () => {
+  const finite = buildCarouselLayout(
+    buildSlideRecords(
+      Array.from({ length: 12 }, (_, i) => ({
+        id: `s-${i}`,
+        content: `c-${i}`,
+      })),
+    ),
+    3,
+    true,
+  );
+
+  it("spans a backwards ride the same as a forwards one", () => {
+    // The segment ends arrive in travel order, so a ride back gives from > to.
+    // Take the wrong end for the start and the window opens behind the deck,
+    // unmounting the slides it is riding through.
+    const back = buildRenderWindow(9, 3, finite, 0);
+    expect(back).toEqual(buildRenderWindow(3, 9, finite, 0));
+    // Named outright: the lower end of the ride is the start, whichever way
+    // the deck travelled. Symmetry alone would still hold if both ends took
+    // the larger index and the window opened past the slides in flight.
+    expect(back.start).toBe(3);
+  });
+
+  it("keeps a window that starts mid-deck where it is", () => {
+    // The upper bound of the start clamp is the last slide, not the first: cap
+    // it at 0 and every window snaps back to the head of the deck.
+    expect(buildRenderWindow(6, 6, finite, 0).start).toBe(6);
+  });
+});

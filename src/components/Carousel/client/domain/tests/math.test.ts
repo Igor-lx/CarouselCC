@@ -40,3 +40,17 @@ describe("normalizePageIndex", () => {
     expect(normalizePageIndex(3, Number.NaN)).toBe(0);
   });
 });
+
+describe("normalizePageIndex", () => {
+  it("wraps a page index into a cyclic deck", () => {
+    expect(normalizePageIndex(5, 4)).toBe(1);
+    expect(normalizePageIndex(-1, 4)).toBe(3);
+  });
+
+  it("answers 0 for a deck with no pages", () => {
+    // Reached whenever the deck is empty: the callers divide by the page count
+    // right after, so anything but 0 here is NaN downstream.
+    expect(normalizePageIndex(3, 0)).toBe(0);
+    expect(normalizePageIndex(3, -2)).toBe(0);
+  });
+});

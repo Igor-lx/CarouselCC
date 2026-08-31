@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { slideLane, trackCssTransform, trackPixelTransform } from "../track";
+import {
+  pointerVelocityToVirtual,
+  slideLane,
+  trackCssTransform,
+  trackPixelTransform,
+} from "../track";
 
 describe("trackPixelTransform", () => {
   it("scrolls by -(position - origin) * slot", () => {
@@ -37,5 +42,30 @@ describe("trackCssTransform (pre-measure fallback)", () => {
     expect(trackCssTransform(3, 1, 3)).toBe(
       "translateX(calc(-2 * (100% + var(--slides-gap, 0px)) / 3)) translateX(0px)",
     );
+  });
+});
+
+/**
+ * The sign is the whole function: the pointer moves right, the deck's virtual
+ * index goes DOWN. Flip it and the deck flies away from the finger — the one
+ * gesture bug a user cannot misread as anything but broken.
+ */
+describe("pointerVelocityToVirtual", () => {
+  it("inverts the pointer direction", () => {
+    expect(pointerVelocityToVirtual(600, 300)).toBe(-2);
+    expect(pointerVelocityToVirtual(-600, 300)).toBe(2);
+  });
+
+  it("divides by the slot, so a wider slot means a slower deck", () => {
+    expect(pointerVelocityToVirtual(600, 600)).toBe(-1);
+    expect(pointerVelocityToVirtual(600, 150)).toBe(-4);
+  });
+
+  it("answers 0 for a slot that has no width yet", () => {
+    // Measured from the DOM, so it is 0 before layout and NaN if the style is
+    // missing. Both must give 0 rather than Infinity or NaN velocity.
+    expect(pointerVelocityToVirtual(600, 0)).toBe(0);
+    expect(pointerVelocityToVirtual(600, -10)).toBe(0);
+    expect(pointerVelocityToVirtual(600, Number.NaN)).toBe(0);
   });
 });

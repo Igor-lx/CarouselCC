@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { laneDistanceFromBand, slideVisibilityFlags } from "../visibility";
+import {
+  buildSlideAriaProps,
+  laneDistanceFromBand,
+  slideVisibilityFlags,
+} from "../visibility";
 
 describe("slideVisibilityFlags", () => {
   it("idle at an integer position: the visible band only", () => {
@@ -132,5 +136,32 @@ describe("laneDistanceFromBand", () => {
     expect(laneDistanceFromBand(4, 4, 1)).toBe(0);
     expect(laneDistanceFromBand(5, 4, 1)).toBe(1);
     expect(laneDistanceFromBand(3, 4, 1)).toBe(1);
+  });
+});
+
+describe("slideVisibilityFlags — a still deck", () => {
+  it("ignores where the deck came from", () => {
+    // The early return is what makes "still" mean still: without it a slide
+    // the deck has already left stays interactive at rest, and a tap lands on
+    // a slide that is no longer on screen.
+    expect(slideVisibilityFlags(0, 3, 0, 3, false)).toEqual({
+      isActual: false,
+      isActive: false,
+    });
+    expect(slideVisibilityFlags(0, 3, 0, 3, true).isActive).toBe(true);
+  });
+});
+
+describe("buildSlideAriaProps", () => {
+  it("declares the slide a group, so a screen reader announces it as one", () => {
+    const props = buildSlideAriaProps(0, true, 4);
+    expect(props.role).toBe("group");
+    expect(props["aria-roledescription"]).toBe("slide");
+    expect(props["aria-label"]).toBe("1 of 4");
+    expect(props["aria-current"]).toBe("step");
+  });
+
+  it("marks only the actual slide as current", () => {
+    expect(buildSlideAriaProps(1, false, 4)["aria-current"]).toBeUndefined();
   });
 });

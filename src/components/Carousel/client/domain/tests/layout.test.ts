@@ -258,4 +258,92 @@ describe("buildCarouselLayout — dataKey discriminates, not just changes", () =
       ]),
     );
   });
+
+  it("tells a number apart from a React element", () => {
+    // Numbers take the same branch as strings; break that branch and they fall
+    // through to the element marker, so a numeric slide and an element slide
+    // produce one key and the deck never resets between them.
+    expect(keyOf([{ id: "1", content: 7 }])).not.toBe(
+      keyOf([{ id: "1", content: createElement("span", null, "x") }]),
+    );
+  });
+
+  it("tells one number apart from another", () => {
+    // Numbers ride the string branch. Break that branch and every number falls
+    // through to the element marker, so ALL numeric decks share one key and a
+    // deck swap never resets the state that indexes into it.
+    expect(keyOf([{ id: "1", content: 7 }])).not.toBe(
+      keyOf([{ id: "1", content: 8 }]),
+    );
+  });
+
+  it("the separator is what keeps two decks from flattening into one key", () => {
+    // A two-slide deck against a one-slide deck whose id spells out exactly
+    // what the pair concatenates to without a separator. Only the separator
+    // tells them apart, and a deck sharing a key with another never resets.
+    const pair = keyOf([
+      { id: "a", content: "x" },
+      { id: "b", content: "y" },
+    ]);
+    const single = keyOf([{ id: "a-string:xslide:b", content: "y" }]);
+    expect(pair).not.toBe(single);
+  });
+});
+
+/**
+ * An empty deck is not a test invention: `buildCarouselLayout` reports
+ * `pageCount: 0` for empty records, and both page functions carry a guard for
+ * it. The guards were there; the proof that they work was not — the mutation
+ * run removed all twelve of them and stayed green.
+ */
+describe("page geometry on a degenerate layout", () => {
+  const emptyLayout = buildCarouselLayout(buildSlideRecords([]), 3, false);
+
+  it("an empty deck reports zero pages instead of dividing by zero", () => {
+    expect(emptyLayout.pageCount).toBe(0);
+    expect(pageContaining(5, emptyLayout)).toBe(0);
+    expect(nearestPageIndex(5, emptyLayout)).toBe(0);
+  });
+
+  it("a page is found by division, not multiplication", () => {
+    const layout = layoutOf(12, 3, false);
+    expect(pageContaining(6, layout)).toBe(2);
+    expect(nearestPageIndex(6, layout)).toBe(2);
+  });
+
+  it("a page is found by rounding a fraction, not by multiplying it", () => {
+    // `nearestPageIndex` divides; with a product the position lands past the
+    // last page and clamps there, so a release near page 2 snaps to the end.
+    expect(nearestPageIndex(6, layoutOf(12, 3, true))).toBe(2);
+  });
+
+  it("a layout with no slides per page answers 0 instead of dividing", () => {
+    // Not producible by `buildCarouselLayout`, and that is the point: these
+    // are exported domain functions over a public layout type, and the guard
+    // is what makes them total. Without it the division is Infinity and the
+    // deck reports its last page for every position.
+    const noVisibleSlides: CarouselLayout = {
+      length: 12,
+      visibleSlidesCount: 0,
+      virtualLength: 12,
+      pageCount: 4,
+      canSlide: true,
+      isFinite: true,
+      dataKey: "x",
+    };
+    expect(pageContaining(5, noVisibleSlides)).toBe(0);
+    expect(nearestPageIndex(5, noVisibleSlides)).toBe(0);
+  });
+
+  it("cyclic alignment leaves an empty deck alone", () => {
+    expect(alignedVirtualIndex(0, 0, emptyLayout)).toBe(0);
+  });
+
+  it("carrying a page across a single-page layout gives zero", () => {
+    const one = layoutOf(2, 3, false);
+    const many = layoutOf(12, 3, false);
+    expect(one.pageCount).toBe(1);
+    expect(reconciledPageIndex(0, one, many)).toBe(0);
+    expect(reconciledPageIndex(3, many, one)).toBe(0);
+  });
 });

@@ -139,3 +139,36 @@ describe("a page size that is not a positive number", () => {
     }
   });
 });
+
+describe("buildSlideRecords", () => {
+  it("keys an authored slide as itself, not as a clone", () => {
+    // The clone marker is what tells the padded copies apart from the originals
+    // — in the React key, and through `dataKey` in the reset check. Mark an
+    // original as a clone and the two collide.
+    const [record] = buildSlideRecords([{ id: "a", content: "x" }]);
+    expect(record?.slideKey).toBe("slide:a");
+    expect(record?.layoutIndex).toBe(0);
+  });
+});
+
+describe("padDeckToFullPage — the appended clones", () => {
+  it("numbers each clone past the end of the deck, so no two share a key", () => {
+    // Two clones needed here. Counting the offset the wrong way gives them the
+    // same index as real slides, and React reuses the wrong DOM node.
+    const records = buildSlideRecords([
+      { id: "a", content: "x" },
+      { id: "b", content: "y" },
+      { id: "c", content: "z" },
+      { id: "d", content: "w" },
+    ]);
+    const padded = padDeckToFullPage(records, 3);
+    expect(padded).toHaveLength(6);
+    expect(padded.map((r) => r.layoutIndex)).toEqual([0, 1, 2, 3, 4, 5]);
+    // The clone key carries the lane it was appended AT, not one counted back
+    // from the end: distinctness alone is satisfied by any two numbers.
+    expect(padded.slice(4).map((r) => r.slideKey)).toEqual([
+      "slide:a:layout-clone:4",
+      "slide:b:layout-clone:5",
+    ]);
+  });
+});

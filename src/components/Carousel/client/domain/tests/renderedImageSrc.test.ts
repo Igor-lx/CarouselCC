@@ -27,11 +27,11 @@ describe("resolveLargestSrcSetCandidate", () => {
   });
 
   /**
-   * Дескриптор разбирается регулярным выражением, и мутационный прогон показал,
-   * что оно не закреплено ничем: любая его порча оставляла тесты зелёными.
-   * Цена ошибки тихая — кандидат получает ширину 0 и проигрывает всем, то есть
-   * в разметку уходит не тот файл, и увидеть это можно только глазами на
-   * медленной сети.
+   * The descriptor is parsed by a regular expression, and the mutation run
+   * showed that nothing pinned it: every corruption of it left the tests
+   * green. The cost is a quiet one — a candidate gets width 0, loses to
+   * everything, and the wrong file ends up in the markup, visible only by eye
+   * on a slow network.
    */
   it("takes a w-width descriptor, not an x-density and not a bare number", () => {
     const pick = (set: string) => resolveLargestSrcSetCandidate(set)?.url;
@@ -162,5 +162,97 @@ describe("deckCarriesImageSets", () => {
     const plain = buildSlideRecords([{ id: "b", content: "/b.webp" }]);
     expect(deckCarriesImageSets(withSets)).toBe(true);
     expect(deckCarriesImageSets(plain)).toBe(false);
+  });
+});
+
+/**
+ * `srcSet` is authored text: a stray comma, a double space, a density
+ * descriptor. Every one of these used to leave the parser free to pick the
+ * wrong file, and the only symptom is a blurry photo on a slow connection.
+ */
+describe("resolveLargestSrcSetCandidate — the shape of the text", () => {
+  it("treats a run of whitespace as one separator", () => {
+    expect(resolveLargestSrcSetCandidate("/a.webp   640w")).toEqual({
+      url: "/a.webp",
+      width: 640,
+    });
+  });
+
+  it("skips an empty entry instead of adopting it as a candidate", () => {
+    // A trailing or doubled comma is common in generated markup. Without the
+    // skip the empty URL becomes the incumbent and every later zero-width
+    // candidate loses to it, so the slide renders no image at all.
+    expect(resolveLargestSrcSetCandidate(", /a.webp")).toEqual({
+      url: "/a.webp",
+      width: 0,
+    });
+  });
+
+  it("requires the width to be the WHOLE descriptor", () => {
+    // Anchored at both ends: "x640w" is not 640 wide, and neither is "640wx".
+    expect(
+      resolveLargestSrcSetCandidate("/a.webp x640w, /b.webp 100w"),
+    ).toEqual({ url: "/b.webp", width: 100 });
+  });
+
+  it("keeps every decimal of a fractional width", () => {
+    expect(resolveLargestSrcSetCandidate("/a.webp 1.25w")).toEqual({
+      url: "/a.webp",
+      width: 1.25,
+    });
+  });
+});
+
+describe("resolveLargestImageCandidate", () => {
+  it("survives a source that yields no candidate at all", () => {
+    // The art-directed sources are authored per breakpoint and one of them may
+    // be empty. The winner must not be compared against nothing.
+    expect(
+      resolveLargestImageCandidate({
+        defaultSrc: "/d.webp",
+        srcSet: "/a.webp 100w",
+        sources: [{ media: "(min-width: 0px)", srcSet: "" }],
+      }),
+    ).toBe("/a.webp");
+  });
+
+  it("takes the widest across the default set and the sources", () => {
+    expect(
+      resolveLargestImageCandidate({
+        defaultSrc: "/d.webp",
+        srcSet: "/a.webp 100w",
+        sources: [{ media: "(min-width: 0px)", srcSet: "/b.webp 900w" }],
+      }),
+    ).toBe("/b.webp");
+  });
+});
+
+describe("deckCarriesImageSets", () => {
+  const deck = (images: (Slide["image"] | undefined)[]) =>
+    buildSlideRecords(
+      images.map((image, i) => ({
+        id: `s-${i}`,
+        content: "c",
+        ...(image ? { image } : {}),
+      })),
+    );
+
+  it("is true when ANY slide carries a set, not only when all do", () => {
+    expect(
+      deckCarriesImageSets(deck([undefined, { srcSet: "/a.webp 100w" }])),
+    ).toBe(true);
+  });
+
+  it("counts art-directed sources, not just the default set", () => {
+    expect(
+      deckCarriesImageSets(
+        deck([{ sources: [{ media: "(min-width: 0px)", srcSet: "/a 1w" }] }]),
+      ),
+    ).toBe(true);
+  });
+
+  it("is false for a deck whose images carry neither", () => {
+    expect(deckCarriesImageSets(deck([{ defaultSrc: "/a.webp" }]))).toBe(false);
+    expect(deckCarriesImageSets(deck([undefined]))).toBe(false);
   });
 });
