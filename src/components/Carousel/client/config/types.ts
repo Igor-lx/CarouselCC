@@ -54,7 +54,7 @@ export interface PropDerivedSettings {
   /** Resolved idle interval between autoplay steps (ms). */
   autoplayInterval: number;
   /** Resolved image-error placeholder text. */
-  errorAltPlaceholder: string;
+  errAltPlaceholder: string;
 }
 
 export interface MotionProfileSharesSettings {

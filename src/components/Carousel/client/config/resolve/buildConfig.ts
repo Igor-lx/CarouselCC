@@ -58,7 +58,7 @@ export const buildCarouselConfig = ({
     intervalAutoplay,
     CAROUSEL_DEFAULTS.intervalAutoplay,
   ),
-  errorAltPlaceholder: withDefault(
+  errAltPlaceholder: withDefault(
     errAltPlaceholder,
     CAROUSEL_DEFAULTS.errAltPlaceholder,
   ),
