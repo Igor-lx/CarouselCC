@@ -42,9 +42,25 @@ const CONFIG = {
   toolCopy: "../src/shared/context/tools/graph.mjs",
   // Отложенное: закрытый пункт отсюда удаляют, а не помечают.
   todo: "02-todo.md",
+  /** Полка правил: те же методы, что в `CLAUDE.md` проекта, но уезжающие в
+   * следующий проект. Инструмент держит побайтовая сверка `toolCopy`, а текст
+   * не держало ничто — и полка отстала молча в первый же заход, когда правило
+   * добавили в проект. Сверяется не формулировка (полка пишет обобщённо), а
+   * то, что **обе таблицы машинных сверок описывают одинаковое их число**:
+   * завёл сверку — опиши в обеих, иначе следующий проект увезёт инструмент с
+   * проверками, которых его база не знает. */
+  checkTables: ["01-facts.md", "../src/shared/context/knowledge-base.md"],
+  /** Корень полки правил: её трогают в той же правке, что и правила проекта. */
+  rulesShelf: "../src/shared/context",
+  /** Заголовок таблицы машинных сверок — один и тот же в обоих файлах. */
+  checkTableHeading: "| Что сверяется | Как |",
 };
 
 const ROOT = path.join(HERE, CONFIG.src).split(path.sep).join("/");
+const SHELF_RULES = path
+  .join(HERE, CONFIG.rulesShelf)
+  .split(path.sep)
+  .join("/");
 
 const norm = (f) => f.split(path.sep).join("/").replace(/[/]+$/, "");
 
@@ -438,6 +454,33 @@ if (mode === "twins") {
         NEWLINE +
         "  местами нужно по-разному. Дефект — БАГ, починенный в одной копии.",
     );
+
+    // Полка правил — такая же пара, только текстом. Сверять её содержимое
+    // нельзя: полка пишет обобщённо, без имён файлов проекта. Поэтому тот же
+    // вопрос в тот же момент — правило тронули здесь, а увозят его отсюда.
+    const all = new Set(changed.map(norm));
+    const shelf = norm(path.relative(path.join(HERE, ".."), SHELF_RULES));
+    const rulesTouched = [...all].filter(
+      (f) => /(^|\/)CLAUDE\.md$/.test(f) || f.startsWith(".context/"),
+    );
+    const shelfTouched = [...all].some((f) => f.startsWith(shelf));
+    console.log(NEWLINE + "=== Правка правил против полки правил ===");
+    if (rulesTouched.length === 0) console.log("  правила не тронуты");
+    else if (shelfTouched) console.log("  полка правил в этой же правке — ок");
+    else {
+      console.log(
+        `  тронуто в правилах проекта: ${rulesTouched.length}, полка не тронута:`,
+      );
+      for (const f of rulesTouched) console.log("    " + f);
+      console.log(
+        NEWLINE +
+          "  Не всякая правка сюда относится: «текущий проект», числа базовой" +
+          NEWLINE +
+          "  линии, записи про этот код — местные. Метод, правило и инструмент —" +
+          NEWLINE +
+          `  общие, и уезжают в следующий проект из ${shelf}.`,
+      );
+    }
   }
 }
 
@@ -1565,6 +1608,44 @@ if (mode === "verify") {
   console.log(`  отложенного без решения: ${parked.length}`);
   for (const p of parked) console.log("    " + p);
 
+  // 14. полка правил не отстаёт от проекта
+  // Инструмент на полке держит побайтовая сверка выше; текст правил не держало
+  // ничто, и полка отстала в первый же заход, когда сверку добавили в проект,
+  // а на полку — нет. Сверять формулировки нельзя: полка пишет обобщённо, без
+  // имён файлов проекта, и совпадение слов было бы ложной целью. Сверяется
+  // счёт: обе таблицы машинных сверок описывают одинаковое их число.
+  const shelfDrift = [];
+  {
+    const rows = (file) => {
+      const p = path.join(BASE, file);
+      if (!existsSync(p)) return null;
+      const lines = readFileSync(p, "utf8").split(NEWLINE);
+      const at = lines.findIndex(
+        (l) => l.trim() === CONFIG.checkTableHeading.trim(),
+      );
+      if (at < 0) return null;
+      let n = 0;
+      // Строка-разделитель под шапкой в счёт не идёт.
+      for (let i = at + 2; i < lines.length; i += 1) {
+        if (!lines[i].trimStart().startsWith("|")) break;
+        n += 1;
+      }
+      return n;
+    };
+    const counts = CONFIG.checkTables.map((f) => [f, rows(f)]);
+    for (const [f, n] of counts)
+      if (n === null) shelfDrift.push(`${f}: таблицу сверок не нашли`);
+    const numbers = counts.map(([, n]) => n).filter((n) => n !== null);
+    if (numbers.length === counts.length && new Set(numbers).size > 1)
+      shelfDrift.push(
+        counts.map(([f, n]) => `${f}: ${n}`).join("  ≠  ") +
+          " — сверку описали не везде",
+      );
+  }
+  console.log("=== Полка правил не отстаёт ===");
+  console.log(`  таблицы сверок разошлись: ${shelfDrift.length}`);
+  for (const d of shelfDrift) console.log("    " + d);
+
   console.log("=== Отложенное без закрытых пунктов ===");
   console.log(
     CONFIG.todo === null
@@ -1596,6 +1677,7 @@ if (mode === "verify") {
     closedTodos.length ||
     uncitedNew.length ||
     parked.length ||
+    shelfDrift.length ||
     unresolved.length
   )
     process.exitCode = 1;
