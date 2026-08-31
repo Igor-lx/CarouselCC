@@ -103,7 +103,11 @@ describe("start", () => {
     expect(controller.isActive()).toBe(false);
     expect(controller.getSnapshot().value).toBe(70);
     expect(controller.getSnapshot().phase).toBe("settled");
-    expect(phases[phases.length - 1]).toBe("settled");
+    // EVERY emitted phase, not just the last: the frame that opens a
+    // zero-duration ride is already at the end of its curve, and a consumer
+    // that sheds "running" frames (the fallback pacing does) would drop the
+    // one frame this ride ever paints.
+    expect(phases).toEqual(["settled", "settled"]);
     expect(completed).toBe(1);
   });
 
@@ -434,5 +438,23 @@ describe("wake — a passive segment's paint owner disappeared", () => {
 
     controller.cancel();
     frameLoop.restore();
+  });
+});
+
+describe("a controller nobody has moved yet", () => {
+  it("rests at its initial value, idle, with nothing to settle", () => {
+    // The first frame every subscriber receives. Read as anything but idle it
+    // is a ride in progress to a target the deck is already on, and a
+    // consumer that paints only moving frames never paints the first one.
+    const controller = createMotionController<string>(42, "gesture");
+    expect(controller.getSnapshot()).toMatchObject({
+      value: 42,
+      target: 42,
+      velocity: 0,
+      progress: 1,
+      strategy: "gesture",
+      phase: "idle",
+    });
+    expect(controller.isActive()).toBe(false);
   });
 });

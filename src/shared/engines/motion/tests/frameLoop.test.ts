@@ -354,3 +354,138 @@ describe("captureHandoff — the point a takeover starts from", () => {
   // field. There is no state in which the cache is the only writer, so a test
   // for it would be pinning an internal, not a behaviour.
 });
+
+/**
+ * A landing announced for a ride nobody is on.
+ *
+ * A settled ride hands its `onComplete` to the next frame — the host reads the
+ * outcome one commit later, where it can act on it. Between the settle and
+ * that frame the deck can be sent somewhere else entirely, and the queued
+ * completion is then a report about a ride that was replaced: the host advances
+ * a page it already left, or announces a landing on a slide it flew past.
+ *
+ * One test per way of replacing it, because each entry point drops the queue
+ * itself — there is no shared choke point that would make one case stand for
+ * the others.
+ */
+describe("takeover — a completion queued for a ride that is gone", () => {
+  const drive = (ms: number) => vi.advanceTimersByTime(ms);
+
+  /** A ride settled on its own, with its completion still queued for the
+   * next frame. */
+  const settledWithCompletionPending = () => {
+    const controller = createMotionController<string>(0, "idle");
+    const landed = vi.fn();
+    controller.start({
+      segment: segment({ startedAt: motionNow(), duration: 100 }),
+      sampler: linearSampler,
+      onComplete: landed,
+    });
+    // Frame by frame only until it settles: the completion goes on the NEXT
+    // frame, and driving past that would deliver it before the takeover.
+    for (let i = 0; i < 20 && controller.isActive(); i += 1) drive(16);
+    expect(controller.isActive()).toBe(false);
+    expect(landed).not.toHaveBeenCalled();
+    return { controller, landed };
+  };
+
+  it("is dropped by a new ride", () => {
+    vi.useFakeTimers();
+    const { controller, landed } = settledWithCompletionPending();
+
+    controller.start({
+      segment: segment({ startedAt: motionNow(), duration: 1000 }),
+      sampler: linearSampler,
+    });
+    drive(2000);
+
+    expect(landed).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("is dropped by a set", () => {
+    vi.useFakeTimers();
+    const { controller, landed } = settledWithCompletionPending();
+
+    controller.set(42);
+    drive(2000);
+
+    expect(landed).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("is dropped by a cancel", () => {
+    vi.useFakeTimers();
+    const { controller, landed } = settledWithCompletionPending();
+
+    controller.cancel();
+    drive(2000);
+
+    expect(landed).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+});
+
+describe("one ride, one loop", () => {
+  const drive = (ms: number) => vi.advanceTimersByTime(ms);
+
+  it("a replacing ride does not leave the old loop running beside it", () => {
+    // Every tick schedules the next one, so a loop that was not cancelled does
+    // not merely waste a frame — it doubles. Two loops become four, and within
+    // a second the deck is sampling its curve dozens of times per frame.
+    vi.useFakeTimers();
+    const controller = createMotionController<string>(0, "idle");
+    const seen = vi.fn();
+    controller.subscribe(seen, { emitCurrent: false });
+
+    controller.start({
+      segment: segment({ startedAt: motionNow(), duration: 5000 }),
+      sampler: linearSampler,
+    });
+    drive(100);
+    controller.start({
+      segment: segment({ startedAt: motionNow(), duration: 5000, to: 50 }),
+      sampler: linearSampler,
+    });
+    const afterRestart = seen.mock.calls.length;
+
+    drive(160); // ten frames
+    const perFrame = (seen.mock.calls.length - afterRestart) / 10;
+    expect(perFrame).toBeLessThanOrEqual(1);
+    vi.useRealTimers();
+  });
+
+  it("a frame that arrives after the ride was replaced paints nothing", () => {
+    // `cancelAnimationFrame` cannot retract a callback the browser has already
+    // dispatched for the frame it is running: a `set` from inside one frame
+    // callback does not stop the tick queued beside it. That tick must find
+    // the ride gone and do nothing, or it repaints the curve over the value
+    // just written.
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    vi.stubGlobal("cancelAnimationFrame", () => {
+      // a dispatched batch cannot be un-queued
+    });
+
+    const controller = createMotionController<string>(0, "idle");
+    controller.start({
+      segment: segment({ startedAt: motionNow(), duration: 1000 }),
+      sampler: linearSampler,
+    });
+    const seen = vi.fn();
+    controller.subscribe(seen, { emitCurrent: false });
+
+    controller.set(42);
+    expect(seen).toHaveBeenCalledTimes(1);
+
+    // The tick the ride queued before it was replaced, arriving anyway.
+    frames.at(-1)?.(motionNow() + 16);
+
+    expect(seen).toHaveBeenCalledTimes(1);
+    expect(controller.getSnapshot().value).toBe(42);
+    vi.unstubAllGlobals();
+  });
+});
