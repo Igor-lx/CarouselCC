@@ -65,21 +65,23 @@ interface PageTarget {
   pageDelta: number;
 }
 
-/** MOVE: step from the origin page. Cyclic mode keeps the signed step as delta. */
+/**
+ * MOVE: step from the origin page. The delta is the step itself, because it is
+ * read in cyclic mode only — as the lane advance. A finite MOVE derives its
+ * landing from the target page start and builds no GO_TO plan, so no reader of
+ * `pageDelta` exists on that path.
+ */
 const resolveMoveTarget = (
   layout: CarouselState["layout"],
   currentPageIndex: number,
   moveStep: number,
 ): PageTarget => {
   const raw = currentPageIndex + moveStep;
-  const nextTargetPageIndex = layout.isFinite
-    ? clamp(raw, 0, layout.pageCount - 1)
-    : normalizePageIndex(raw, layout.pageCount);
   return {
-    nextTargetPageIndex,
-    pageDelta: layout.isFinite
-      ? nextTargetPageIndex - currentPageIndex
-      : moveStep,
+    nextTargetPageIndex: layout.isFinite
+      ? clamp(raw, 0, layout.pageCount - 1)
+      : normalizePageIndex(raw, layout.pageCount),
+    pageDelta: moveStep,
   };
 };
 
@@ -142,17 +144,17 @@ export const resolveStepTransition = (
     command.type === "GO_TO" && !command.isInstant && !isInstantMode
       ? resolveGoToPlan(Math.abs(pageDelta), stepSize, motion)
       : null;
-  const isTeleport = goToPlan !== null && goToPlan.isTeleport;
-  const nextVirtualIndex =
-    isTeleport && goToPlan
-      ? currentVirtualIndex + Math.sign(pageDelta) * goToPlan.leadDistance
-      : canonicalVirtualIndex;
+  const nextVirtualIndex = goToPlan?.isTeleport
+    ? currentVirtualIndex + Math.sign(pageDelta) * goToPlan.leadDistance
+    : canonicalVirtualIndex;
 
   return {
     nextFromVirtualIndex,
     nextTargetPageIndex,
     nextVirtualIndex,
-    nextTeleportVirtualIndex: isTeleport ? canonicalVirtualIndex : null,
+    nextTeleportVirtualIndex: goToPlan?.isTeleport
+      ? canonicalVirtualIndex
+      : null,
     phase: stepPhase(command, isInstantMode),
   };
 };
@@ -169,7 +171,7 @@ export const isSameDirectionRepeat = (
   const currentDirection = Math.sign(
     state.virtualIndex - state.fromVirtualIndex,
   );
-  return currentDirection !== 0 && currentDirection === direction;
+  return currentDirection === direction;
 };
 
 export const hasReachedDragTarget = (
