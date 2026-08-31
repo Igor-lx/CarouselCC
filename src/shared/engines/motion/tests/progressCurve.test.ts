@@ -371,3 +371,90 @@ describe("resampleStops — refusing to invent detail", () => {
     expect(coarse.at(-1)).toBe(dense.at(-1));
   });
 });
+
+describe("progress-stop density — a zone that takes no time", () => {
+  // The builder never emits one, but the function takes a `MotionProfile`, and
+  // an instant zone is the shape a hand-assembled or hand-edited plan produces:
+  // a speed change across zero duration.
+  const instantKick = {
+    duration: 100,
+    endSpeed: 0,
+    zones: [
+      {
+        startTime: 0,
+        duration: 0,
+        startSpeed: 0,
+        endSpeed: 5,
+        startDistanceProgress: 0,
+        endDistanceProgress: 0,
+      },
+      {
+        startTime: 0,
+        duration: 100,
+        startSpeed: 5,
+        endSpeed: 0,
+        startDistanceProgress: 0,
+        endDistanceProgress: 1,
+      },
+    ],
+  };
+
+  it("contributes no acceleration rather than an infinite one", () => {
+    // Read the instant zone's acceleration and it is a division by zero: the
+    // density pins to the 256 ceiling and the compositor is handed 257
+    // keyframes for a curve that has nothing to resolve.
+    expect(resolveProgressStopIntervals(instantKick)).toBe(32);
+  });
+
+  it("still yields a legal two-ended curve", () => {
+    const stops = profileProgressStops(instantKick, 3);
+    expect(stops[0]).toBe(0);
+    expect(stops[stops.length - 1]).toBe(1);
+  });
+});
+
+describe("progress-stop density — a profile that never moves", () => {
+  // Time passes and no speed appears anywhere: the density is derived from a
+  // peak speed and a peak acceleration that are both zero, so the ratio behind
+  // it is 0/0. Let that through and the count is NaN, `profileProgressStops`
+  // reads it as "fewer than one interval" and the whole ride collapses to the
+  // trivial two-stop curve — a linear slide where a profile was asked for.
+  const stalled = {
+    duration: 100,
+    endSpeed: 0,
+    zones: [
+      {
+        startTime: 0,
+        duration: 100,
+        startSpeed: 0,
+        endSpeed: 0,
+        startDistanceProgress: 0,
+        endDistanceProgress: 1,
+      },
+    ],
+  };
+
+  it("falls to the floor instead of resolving to NaN", () => {
+    expect(resolveProgressStopIntervals(stalled)).toBe(32);
+    expect(profileProgressStops(stalled, 3)).toHaveLength(33);
+  });
+});
+
+describe("resampleStops — the edges of the grid it is asked for", () => {
+  it("collapses to the two ends when asked for a single interval", () => {
+    // One interval is a legal request: the curve is wanted as a straight line
+    // between its ends. Refuse it and the caller gets the dense array back and
+    // silently pays for stops it did not ask for.
+    const dense = profileProgressStops(stepProfile(), 3);
+    expect(dense.length).toBeGreaterThan(33);
+    expect(resampleStops(dense, 1)).toEqual([0, 1]);
+  });
+
+  it("hands back an array already exactly as coarse as the grid", () => {
+    // `length === intervals` is the boundary of "never upsamples": one stop
+    // short of the requested grid is still not an invitation to invent one.
+    const five = [0, 0.3, 0.6, 0.8, 1];
+    expect(resampleStops(five, 5)).toEqual(five);
+    expect(resampleStops(five, 4)).toEqual(five);
+  });
+});
