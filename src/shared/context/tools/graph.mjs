@@ -200,20 +200,37 @@ if (mode === "dead") {
 }
 
 if (mode === "blast") {
-  console.log("=== Радиус поражения: не-тестовых импортёров на файл ===\n");
+  // С аргументом — радиус одного адреса: кто именно от него зависит. Без
+  // аргумента — весь список по убыванию. Раньше аргумент молча игнорировался,
+  // и документированная команда `blast <путь>` печатала общий список: ответ на
+  // не тот вопрос, поданный как ответ на заданный.
+  const arg = process.argv[3];
   const rows = [];
   for (const f of files) {
     if (isTest(f)) continue;
+    if (arg && !rel(f).includes(arg)) continue;
     const users = [...(importedBy.get(f) ?? [])].filter((u) => !isTest(u));
-    rows.push([rel(f), users.length, users.map(rel)]);
+    rows.push([rel(f), users.length, users.map(rel).sort()]);
   }
   rows.sort((a, b) => b[1] - a[1]);
-  for (const [f, n, users] of rows.slice(0, 30)) {
-    console.log(`${String(n).padStart(3)}  ${f}`);
-    if (n <= 6) console.log(`      ${users.join("\n      ")}`);
+  if (arg && rows.length === 0) {
+    console.log(`Ничего не нашлось по ${arg}.`);
+    process.exitCode = 1;
+  } else if (arg) {
+    console.log(`=== Радиус поражения: ${arg} ===\n`);
+    for (const [f, n, users] of rows) {
+      console.log(`${String(n).padStart(3)}  ${f}`);
+      if (n > 0) console.log(`      ${users.join("\n      ")}`);
+    }
+  } else {
+    console.log("=== Радиус поражения: не-тестовых импортёров на файл ===\n");
+    for (const [f, n, users] of rows.slice(0, 30)) {
+      console.log(`${String(n).padStart(3)}  ${f}`);
+      if (n <= 6) console.log(`      ${users.join("\n      ")}`);
+    }
+    console.log("\n--- файлы, которые не импортирует никто (кроме тестов) ---");
+    for (const [f, n] of rows) if (n === 0) console.log(`     ${f}`);
   }
-  console.log("\n--- файлы, которые не импортирует никто (кроме тестов) ---");
-  for (const [f, n] of rows) if (n === 0) console.log(`     ${f}`);
 }
 
 if (mode === "cycles") {
@@ -254,7 +271,13 @@ if (mode === "open") {
   const scan = (title, test) => {
     console.log(`=== ${title} ===`);
     let count = 0;
-    for (const name of readdirSync(BASE).filter((n) => n.endsWith(".md"))) {
+    // README базы описывает ФОРМЫ записи, а не находки. Сканер, читающий
+    // собственную инструкцию, каждый прогон показывает фантом — и приучает не
+    // читать секцию.
+    const base = readdirSync(BASE).filter(
+      (n) => n.endsWith(".md") && n !== "README.md",
+    );
+    for (const name of base) {
       const lines = readFileSync(path.join(BASE, name), "utf8").split(NEWLINE);
       lines.forEach((line, i) => {
         if (!test(line)) return;
@@ -476,9 +499,9 @@ if (mode === "brief") {
         // проверка. Тревога «его не гоняет ни один тест» на тестовом файле —
         // не предупреждение, а шум, который учит не читать эту строку.
         if (isTest(target)) {
-          console.log("--- это тестовый файл ---");
+          console.log("--- лежит среди тестов ---");
           console.log(
-            "  накрывать нечем и незачем; что он гоняет — секция импортов выше, что закрепляет — записи базы ниже",
+            "  вопрос «что его накрывает» тут не задают: что он гоняет — секция импортов выше, что закрепляет — записи базы ниже",
           );
         } else if (r.endsWith(".scss")) {
           const base = r.slice(r.lastIndexOf("/") + 1);
@@ -531,7 +554,7 @@ if (mode === "brief") {
           console.log(
             upCode.length
               ? "  " + upCode.join(NEWLINE + "  ")
-              : "  никто — точка входа, бочка или мёртвое",
+              : "  никто — ни один файл проекта его не импортирует",
           );
 
           // Три РАЗНЫХ ответа, и путать их нельзя.
@@ -576,9 +599,16 @@ if (mode === "brief") {
                     .join(NEWLINE + "  ")
               : "  нет",
           );
+          // Тревога поднимается, только когда пусты ВСЕ три уровня. Если файл
+          // достают транзитивно, тест на него может существовать и гонять его
+          // через композицию — так закрыт BrowserChromeSync через ThemeProvider.
+          // Кричать «не гоняет никто» в этом случае значит врать.
+          const rest = all.length - direct.length - byName.length;
           if (direct.length + byName.length === 0)
             console.log(
-              "  ВНИМАНИЕ: файл не гоняет ни один тест — правку проверять руками",
+              rest === 0
+                ? "  ВНИМАНИЕ: файл не гоняет ни один тест — правку проверять руками"
+                : "  напрямую никто; проверь, гоняют ли его те, кто дотягивается ниже",
             );
           console.log(
             `--- дотягиваются транзитивно, через обычные модули: ${
