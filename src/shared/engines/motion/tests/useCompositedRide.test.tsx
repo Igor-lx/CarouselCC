@@ -79,6 +79,19 @@ function BareProbe({ controller }: { controller: MotionController<string> }) {
   return <div data-track="" />;
 }
 
+/** Defaults that carry a keyframe fn and no element ref — the shape of a
+ * caller whose element is decided later. */
+function RefLessProbe({
+  controller,
+}: {
+  controller: MotionController<string>;
+}) {
+  ride = useCompositedRide(controller, {
+    toKeyframe: (value: number) => ({ transform: `translateX(${value}px)` }),
+  });
+  return <div data-track="" />;
+}
+
 const render = (
   controller: MotionController<string>,
   px = 1,
@@ -226,6 +239,22 @@ describe("useCompositedRide — the defaults a ride reads when it starts", () =>
 
     expect(track().style.transform).toBe("");
     expect(animateMock).not.toHaveBeenCalled();
+  });
+
+  it("defaults with no element ref at all paint nothing, quietly", () => {
+    // Not the same as a ref whose element never mounted: here there is no ref
+    // to read `current` from, and every step down to it has to survive that.
+    // A consumer decides its element later and subscribes now.
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    root = createRoot(host);
+    const controller = createMotionController<string>(0, "idle");
+
+    act(() => root.render(<RefLessProbe controller={controller} />));
+    act(() => controller.set(4));
+
+    expect(track().style.transform).toBe("");
+    expect(ride?.start({ segment: segmentTo(0, 5) })).toBe(false);
   });
 
   it("an element with no keyframe fn yet stays on the JS loop", () => {

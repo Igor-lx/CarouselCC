@@ -398,6 +398,15 @@ describe("useMotionRunner — what the plan carries", () => {
     // position — not from the origin the command names.
     render(moving({ virtualIndex: -3, targetPageIndex: 3 }));
     expect(lastPlan()).toMatchObject({ kind: "waapi", direction: -1 });
+
+    // And it is the difference between the ends, not their sum: from a cold
+    // origin well past the target the two disagree in SIGN, and a consumer
+    // told "forward" sweeps the opposite way to the deck it is following.
+    render(stationary);
+    render(
+      moving({ fromVirtualIndex: 6, virtualIndex: 0, targetPageIndex: 0 }),
+    );
+    expect(lastPlan()).toMatchObject({ kind: "waapi", direction: -1 });
   });
 
   it("marks a far jump as a jump, and an ordinary step as not one", () => {
@@ -457,6 +466,24 @@ describe("useMotionRunner — the rides it refuses to start", () => {
     render(moving({ virtualIndex: config.motion.epsilon / 2 }));
     expect(startCompositorMotion).toHaveBeenCalledTimes(rides);
     expect(lastPlan().kind).toBe("idle");
+  });
+
+  it("a command to go where the deck already is builds no ride", () => {
+    // The travel is measured between the target and the point the ride would
+    // start from. Added instead of subtracted, a target that IS the current
+    // position reads as twice the distance away, and the deck sets off on a
+    // ride to where it is already standing.
+    render(stationary);
+    render(moving({ motionPhase: "step-instant" })); // places the deck on 3
+    expect(controller!.getSnapshot().value).toBe(3);
+    const rides = startCompositorMotion.mock.calls.length;
+
+    render(
+      moving({ fromVirtualIndex: 3, virtualIndex: 3, targetPageIndex: 1 }),
+    );
+
+    expect(startCompositorMotion).toHaveBeenCalledTimes(rides);
+    expect(controller!.isActive()).toBe(false);
   });
 
   it("a cold step within the tolerance is still stamped as a step", () => {
