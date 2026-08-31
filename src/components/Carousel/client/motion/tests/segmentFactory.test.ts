@@ -683,6 +683,99 @@ describe("direction of travel", () => {
     );
     expect(sampleCarouselSegment(segment, 1).velocity).toBeLessThanOrEqual(0);
   });
+
+  it("a repeated click backwards keeps the speed it was already carrying", () => {
+    // The repeat is the one builder that measures its own travel to align the
+    // inherited speed with it. Measure it the other way round and a backwards
+    // repeat looks like a forward one: the speed the deck HAS is judged to
+    // oppose the travel and dropped, and the second click starts from a
+    // standstill the eye reads as a stutter.
+    const back = riding({
+      fromVirtualIndex: 6,
+      virtualIndex: 0,
+      isRepeatedClickAdvance: true,
+    });
+    const withSpeed = buildCarouselSegment({
+      state: back,
+      config,
+      isInstantMode: false,
+      start: { position: 6, velocity: -0.01, strategy: "step" as const },
+      startedAt: 0,
+    }).segment;
+    const fromRest = buildCarouselSegment(at(back, 6)).segment;
+
+    expect(Math.abs(sampleCarouselSegment(withSpeed, 0).velocity)).toBeCloseTo(
+      0.01,
+      10,
+    );
+    expect(Math.abs(sampleCarouselSegment(fromRest, 0).velocity)).toBe(0);
+  });
+});
+
+describe("what the segment calls itself", () => {
+  // The strategy travels with every sample the controller emits, and it is the
+  // only thing that tells a consumer which kind of motion it is looking at:
+  // the runner reads it to flag a jump, the widget to tell a flung deck from a
+  // clicked one. Unnamed, they all look like the same ride.
+
+  it("an ordinary step is a step, a repeat is a repeat", () => {
+    expect(buildCarouselSegment(at(riding({}), 0)).segment.strategy).toBe(
+      "step",
+    );
+    expect(
+      buildCarouselSegment(at(riding({ isRepeatedClickAdvance: true }), 0))
+        .segment.strategy,
+    ).toBe("repeated");
+  });
+
+  it("every leg of a GO_TO is a jump", () => {
+    const jump = riding({ motionPhase: "step-jump", virtualIndex: 9 });
+    expect(buildCarouselSegment(at(jump, 0)).segment.strategy).toBe("jump");
+    expect(
+      buildCarouselSegment(
+        at(riding({ motionPhase: "step-jump", teleportVirtualIndex: 15 }), 0),
+      ).segment.strategy,
+    ).toBe("jump");
+    expect(
+      buildCarouselSegment(
+        at(riding({ motionPhase: "step-jump", isTeleportApproach: true }), 0),
+      ).segment.strategy,
+    ).toBe("jump");
+  });
+
+  it("an inertial release is a gesture", () => {
+    const released = releasedState(0.004, 0.02);
+    expect(
+      buildCarouselSegment({
+        state: released,
+        config,
+        isInstantMode: false,
+        start: {
+          position: released.fromVirtualIndex,
+          velocity: released.gesture.uiVelocity,
+          strategy: "gesture" as const,
+        },
+        startedAt: 0,
+      }).segment.strategy,
+    ).toBe("gesture");
+  });
+});
+
+describe("the shape of an ordinary jump", () => {
+  it("ramps up to its cruise instead of leaving at it", () => {
+    // A single-leg jump gets both budgets: a ramp up and a ramp down. Shaped
+    // like a teleport's second leg instead — all braking, no launch — it
+    // starts at full cruise from a standstill, which is the jolt the
+    // acceleration budget exists to prevent.
+    const jump = riding({ motionPhase: "step-jump", virtualIndex: 9 });
+    const { segment } = buildCarouselSegment(at(jump, 0));
+
+    const launch = Math.abs(sampleCarouselSegment(segment, 0).velocity);
+    const cruise = Math.abs(
+      sampleCarouselSegment(segment, segment.duration / 2).velocity,
+    );
+    expect(launch).toBeLessThan(cruise / 2);
+  });
 });
 
 describe("a jump with nowhere to go", () => {
