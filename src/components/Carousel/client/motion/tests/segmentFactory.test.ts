@@ -529,6 +529,41 @@ describe("intent ladder — which condition wins when several are true", () => {
     expect(segment.duration).toBe(0);
     // And it lands, rather than standing still at zero length.
     expect(sampleCarouselSegment(segment, 0).value).toBe(1);
+    // Still a step, so consumers attribute it like any other placement.
+    expect(segment.strategy).toBe("step");
+  });
+
+  it("the instant PHASE alone is enough, with the mode off", () => {
+    // The reducer stamps `step-instant` on a command it decided must not
+    // animate — a reconcile after a resize, say. Read only the mode and that
+    // command becomes an ordinary ride to a place the deck must already be.
+    const { segment } = buildCarouselSegment(
+      at(riding({ motionPhase: "step-instant", virtualIndex: 2 }), 0),
+    );
+    expect(segment.duration).toBe(0);
+    expect(sampleCarouselSegment(segment, 0).value).toBe(2);
+  });
+
+  it("a click is timed by its distance; a move with no reason is not", () => {
+    // The two ends of the `moveReason` switch. Collapse the click arm and a
+    // click takes the autoplay tempo — the same page arrives at a different
+    // speed depending on nothing the user can see. Collapse the default arm
+    // and a command with no reason recorded (the state before the first move)
+    // gets a duration that grows with the distance instead of a fixed one.
+    const click = buildCarouselSegment(
+      at(riding({ moveReason: "click", virtualIndex: 6 }), 0),
+    ).duration;
+    const far = buildCarouselSegment(
+      at(riding({ moveReason: "click", virtualIndex: 12 }), 0),
+    ).duration;
+    const reasonless = buildCarouselSegment(
+      at(riding({ moveReason: null, virtualIndex: 6 }), 0),
+    ).duration;
+
+    expect(click).toBeCloseTo(config.stepDuration * 2, 6);
+    expect(far).toBeCloseTo(click * 2, 6);
+    expect(reasonless).toBe(config.autoplayDuration);
+    expect(reasonless).not.toBeCloseTo(click, 0);
   });
 
   it("a pending teleport outranks the approach flag", () => {
