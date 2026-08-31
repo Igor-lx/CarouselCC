@@ -370,6 +370,8 @@ const changedPaths = async (repoRoot) => {
       execSync("git status --porcelain -uall", {
         cwd: repoRoot,
         encoding: "utf8",
+        // stderr гасим: про недоступность git режим говорит сам.
+        stdio: ["ignore", "pipe", "ignore"],
       })
         .split(String.fromCharCode(10))
         .map((l) => l.slice(3).trim())
@@ -514,6 +516,49 @@ if (mode === "tested") {
     }
     if (touchedCode.length && !stale.length && !naked.length)
       console.log("  каждый тронутый файл правился вместе со своими тестами");
+
+    // Якорь съезжает ровно от одного — вставки или удаления строк ВЫШЕ него,
+    // то есть от правки того самого файла. Значит сверять его надо не всегда,
+    // а именно сейчас. Якорь с цитатой чинит себя сам (`verify`), без цитаты —
+    // только глазами, и вот их список. Приговора нет намеренно: правка ниже
+    // якоря его не двигает, и падать на этом значило бы врать через раз.
+    const ANCHOR = /`([\w./{}-]*):(\d+)(?:-\d+)?`(\s*`[^`]+`)?/g;
+    const bySuffix = (q) => {
+      const hits = files.filter((f) => f === q || f.endsWith("/" + q));
+      return hits.length === 1 ? hits[0] : null;
+    };
+    const atRisk = [];
+    for (const name of readdirSync(HERE).filter((n) => n.endsWith(".md"))) {
+      let current = null;
+      for (const line of readFileSync(path.join(HERE, name), "utf8").split(
+        NEWLINE,
+      )) {
+        // Заголовок раздела карты задаёт файл для относительных якорей.
+        const head = /^#{2,}\s+`([^`]+)`/.exec(line);
+        if (head) current = bySuffix(head[1].replace(/^.*?([\w./-]+)$/, "$1"));
+        ANCHOR.lastIndex = 0;
+        let m;
+        while ((m = ANCHOR.exec(line)) !== null) {
+          if (m[3]) continue; // цитата есть — `verify` держит его сам
+          const file = m[1] === "" ? current : bySuffix(m[1]);
+          if (file === null || !touched.has(file)) continue;
+          atRisk.push(`${name}: ${m[0]} → ${rel(file)}`);
+        }
+      }
+    }
+    if (atRisk.length) {
+      console.log(
+        NEWLINE +
+          "  Якоря без цитаты в файлы этой правки — сверить номера глазами:",
+      );
+      for (const a of atRisk) console.log("    " + a);
+      console.log(
+        NEWLINE +
+          "  Строки выше якоря сдвинулись — номер съехал молча. Сверил —" +
+          NEWLINE +
+          "  допиши цитату, чтобы дальше он чинился сам.",
+      );
+    }
   }
 }
 
@@ -1367,6 +1412,9 @@ if (mode === "verify") {
       diff = execSync("git diff -U0 HEAD -- .context", {
         cwd: REPO,
         encoding: "utf8",
+        // stderr гасим: про недоступность git мы говорим сами, а его
+        // собственное сообщение — шум в отчёте инструмента.
+        stdio: ["ignore", "pipe", "ignore"],
       });
     } catch {
       newAnchorsChecked = false;

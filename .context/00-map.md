@@ -41,13 +41,15 @@
 - Разметка несёт **контракт стилей**: `data-breakpoint`, `data-orientation`,
   `data-<flag>`, `data-moving`, `data-touch`, `data-reduced-motion`,
   `data-carousel-root/viewport/track`. По ним и цепляется CSS.
-- Восьмой атрибут корня, `data-responsive-images` (`:370`), не читает
+- Восьмой атрибут корня, `data-responsive-images`
+  (`:371` `data-responsive-images=`), не читает
   **никто**: ни SCSS, ни код, ни тесты. В `docs/architecture/modules.md:127` он
   описан как опубликованный признак для хоста, то есть похож на намеренный
   маркер наружу, а не на остаток. Отличается от остальных семи тем, что ни одна
   проверка не упадёт, если его удалить.
 - **Право слайда на загрузку решается здесь, а не в `useSlideFetchReach`**
-  (`:414-421`): реач даёт порог, а корень складывает его с `isActive` через
+  (`:411-422` `isFetchOn={`): реач даёт порог, а корень складывает его с
+  `isActive` через
   `ИЛИ`. Слайд, с которого колода уезжает, остаётся с картинкой на всю поездку
   именно из-за этого `ИЛИ` — привязка к одной только целевой полосе гасила бы
   его на время движения.
@@ -171,7 +173,8 @@
 
 ### `client/config/resolve/buildConfig.ts` — pure
 Собирает `CarouselRuntimeConfig`: константы плюс пять пропов через `withDefault`.
-- `withDefault` (`:36-37`) подставляет дефолт **только для `undefined`** и
+- `withDefault` (`:38` `const withDefault`) подставляет дефолт **только для
+  `undefined`** и
   кастует остальное: `visibleSlidesNr: -1 | 0 | NaN | "3"` проходит насквозь.
   Ниже `clampedVisibleSlidesCount` = `Math.min(v, length)` отрицательное и `NaN`
   не отсекает. По ADR-002 это осознанно. **Куда это доезжает — проверено:**
@@ -253,7 +256,7 @@
 
 ### `client/domain/slides.ts` — pure
 Записи колоды, доклад до целых страниц и **общее правило выбора URL картинки**.
-- `resolveRenderedImageSrc` (`:91-99`) — контракт, а не удобство: комментарий
+- `resolveRenderedImageSrc` (`:96-104` `export const resolveRenderedImageSrc`) — контракт, а не удобство: комментарий
   `:94-95` `The one rule the renderer` «The one rule the renderer and the resource store share — they must
   key on the same URL». Расходятся `SlideItem` и `imageResource/*` — предзагрузка
   греет не тот файл, который потом покажут.
@@ -263,13 +266,13 @@
   — и с этого захода её **видно**: `checks/propChecks.ts` сверяет уникальность
   `id` и называет повторившееся значение. Чинить вход по-прежнему не её дело;
   дело её — не дать ошибке пройти молча.
-- `padDeckToFullPage` (`:35`) возвращает **тот же массив**, если колода уже
-  целая, — идентичность важна, на ней висят мемо потребителей (закреплено
-  тестом `deckPadding.test.ts`). Раньше это рвал вырожденный размер страницы:
-  `length % 0` — `NaN`, «колода целая» читалось как ложь, и возвращалась свежая
-  копия. Теперь `hasPartialPageLayout` отвечает «нет» на любой неположительный
-  размер, и оба случая — `0` и `NaN` — закрыты тестом.
-- `resolveLargestImageCandidate` (`:74-90`) — каста больше нет: присваивание
+- `padDeckToFullPage` (`:38` `export const padDeckToFullPage`) возвращает
+  **тот же массив**, если колода уже целая, — идентичность важна, на ней висят
+  мемо потребителей (закреплено тестом `deckPadding.test.ts`). Вырожденный
+  размер страницы её не рвёт: `hasPartialPageLayout` отвечает «нет» на любой
+  неположительный размер, поэтому `length % 0` — `NaN` — до сравнения не
+  доходит; оба случая, `0` и `NaN`, закрыты тестом.
+- `resolveLargestImageCandidate` (`:77-93` `export const resolveLargestImageCandidate`) — каста больше нет: присваивание
   внутри замыкания ломало сужение типов, замыкание убрано, порядок наборов
   прежний. Комментарий фиксирует намеренный приоритет: строгое «больше»
   сохраняет первого при равной ширине.
@@ -1631,7 +1634,7 @@ rider-defaults и собственный `useMotionPaint`. Помечено ко
    консоли. В файлах ровно 3 места (grep по всем `.ts/.tsx/.scss`):
    `modules/Pagination/widget/usePaginationWidgetBinding.ts:65` (`≤`),
    `motion/tests/segmentFactory.test.ts:228` (`≈`),
-   `state/tests/reducer.test.ts:150` (`±`).
+   `state/tests/reducer.test.ts:161` `wrap remains the business`.
 2. **Замечание об инертной подписке `useMotionPaint` в `useKineticValue`
    снимается.** `useKineticValue` импортирует `useCompositedRide` из
    `./internal/motion` — из форка, где этой подписки нет вовсе. Двойной
@@ -1639,7 +1642,7 @@ rider-defaults и собственный `useMotionPaint`. Помечено ко
 3. Форки в `shared` **не разъехались по логике** — проверено пофайловым
    диффом всех 20 пар (см. § Q). Это снимает подозрение «копии могли
    разойтись незаметно»; единственное расхождение задокументировано в коде.
-4. **Подозрение на «слепой каст» в `buildConfig.ts:36-37` снимается.**
+4. **Подозрение на «слепой каст» в `buildConfig.ts:38` `const withDefault` снимается.**
    ADR-002 (`docs/adr/0002-trusted-runtime-inputs.md`, статус Accepted)
    объявляет ВСЕ входы caller-owned: компонент подставляет дефолт только для
    `undefined` и **сознательно не валидирует, не приводит и не чинит** ничего в
