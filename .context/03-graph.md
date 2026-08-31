@@ -309,7 +309,7 @@ state + motion + geometry ──> useModuleContextValue ──> CarouselStableCo
 
 ## D. `client/state/**`
 
-`client/state/**` — 12 импортёров (+7 тестовых), и зависимость двух разных
+`client/state/**` — 11 импортёров (+7 тестовых), и зависимость двух разных
 сортов:
 
 | Что берут | Кто |

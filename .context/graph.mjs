@@ -1446,6 +1446,65 @@ if (mode === "verify") {
   );
   for (const u of uncitedNew) console.log("    " + u);
 
+  // 13. найденное чинится, а не записывается
+  // Правило в CLAUDE.md, § «Найденное чинится сразу». Ловятся две формы
+  // откладывания — обе объективные, без угадывания намерений:
+  //
+  //   а) маркер отложенной работы в самом коде (`TODO`, `FIXME`, `HACK`,
+  //      `XXX`, `ВРЕМЕННО`, `ПОТОМ`, `ПОЧИНИТЬ`). В этом проекте их ноль, и
+  //      это не случайность: находка либо исправлена, либо описана решением;
+  //   б) абзац базы знаний, где рядом стоят слово о дефекте и слово об
+  //      откладывании, но нет ссылки на файл решений. Два слова в одном
+  //      абзаце — намного тише одного: «отложенный тик» и «вынесено в
+  //      функцию» встречаются в описаниях сплошь и рядом, а вот «дыра ...
+  //      отложена» без решения — ровно то, что правило запрещает.
+  //
+  // Что проверка НЕ ловит: молчание. Находку, которую просто не записали,
+  // машина увидеть не может — это остаётся на ревью и на честности отчёта.
+  const parked = [];
+  {
+    const CODE_MARK =
+      /(^|[^A-Za-zА-Яа-я])(TODO|FIXME|HACK|XXX|ВРЕМЕННО|ПОТОМ|ПОЧИНИТЬ)([^A-Za-zА-Яа-я]|$)/;
+    for (const f of files) {
+      const body = readFileSync(f, "utf8").split(NEWLINE);
+      body.forEach((line, i) => {
+        if (CODE_MARK.test(line))
+          parked.push(`${rel(f)}:${i + 1} — маркер отложенной работы в коде`);
+      });
+    }
+
+    const DEFECT =
+      /(дыр[аеуы]|баг|ошибк|дефект|сломан|неверн|расходит|не соответств|мёртв|дубл|утечк|bug|defect|broken|wrong|leak)/i;
+    const DEFER =
+      /(не исправл|не почин|не стал[аио]? прав|оставлен[оа]? как есть|выходит за рамки|в задачу не входил|не входит в объ[её]м|вынесен[оа]? разработчику|отложен[оа]? до|записан[оа]? и не|deferred|out of scope|left as is)/i;
+    const DECIDED = /09-decisions\.md/;
+    const baseDocs = readdirSync(BASE).filter(
+      (n) => n.endsWith(".md") && n !== "README.md",
+    );
+    for (const name of baseDocs) {
+      const p = path.join(BASE, name);
+      if (!existsSync(p)) continue;
+      const text = readFileSync(p, "utf8").split(NEWLINE);
+      let start = 0;
+      const flush = (end) => {
+        const para = text.slice(start, end).join(" ");
+        if (DEFECT.test(para) && DEFER.test(para) && !DECIDED.test(para))
+          parked.push(
+            `${name}:${start + 1} — дефект отложен без записи решения`,
+          );
+      };
+      text.forEach((line, i) => {
+        if (line.trim() !== "") return;
+        flush(i);
+        start = i + 1;
+      });
+      flush(text.length);
+    }
+  }
+  console.log("=== Найденное — исправлено, а не отложено ===");
+  console.log(`  отложенного без решения: ${parked.length}`);
+  for (const p of parked) console.log("    " + p);
+
   console.log("=== Отложенное без закрытых пунктов ===");
   console.log(
     CONFIG.todo === null
@@ -1476,6 +1535,7 @@ if (mode === "verify") {
     deadAnchors.length ||
     closedTodos.length ||
     uncitedNew.length ||
+    parked.length ||
     unresolved.length
   )
     process.exitCode = 1;
