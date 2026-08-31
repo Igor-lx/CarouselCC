@@ -228,3 +228,41 @@ describe("the high-level rider surface", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("createCompositedRide — the browser takes the animation away", () => {
+  it("lets go when the animation is cancelled from outside", () => {
+    // The element is removed, the page is hidden, the engine drops the
+    // animation — the rider is told through `oncancel` and nothing else. Hold
+    // on to a handle the browser has already discarded and every later
+    // `cancel` or `isComposited` answers about an animation that is gone.
+    const anim = fakeAnimation();
+    animateMock.mockReturnValue(anim);
+    const controller = createMotionController(0);
+    const element = document.createElement("div");
+    const ride = createCompositedRide(controller);
+    ride.start({ element, segment: segmentTo(0, 100), toKeyframe });
+    expect(ride.isComposited()).toBe(true);
+
+    anim.oncancel?.();
+    expect(ride.isComposited()).toBe(false);
+  });
+
+  it("ignores a cancel from an animation it has already replaced", () => {
+    // A late callback from the PREVIOUS ride must not drop the current one:
+    // the deck would stop being painted by the compositor mid-flight, with no
+    // symptom until the next frame lands somewhere else.
+    const first = fakeAnimation();
+    animateMock.mockReturnValue(first);
+    const controller = createMotionController(0);
+    const element = document.createElement("div");
+    const ride = createCompositedRide(controller);
+    ride.start({ element, segment: segmentTo(0, 100), toKeyframe });
+
+    const second = fakeAnimation();
+    animateMock.mockReturnValue(second);
+    ride.start({ element, segment: segmentTo(0, 50, 2000), toKeyframe });
+
+    first.oncancel?.();
+    expect(ride.isComposited()).toBe(true);
+  });
+});
