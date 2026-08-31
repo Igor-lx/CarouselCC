@@ -79,14 +79,15 @@ afterEach(() => {
 });
 
 describe("<Diagnostic /> — observes, and never repairs", () => {
-  it("names the bad prop, its value and what it will cost", () => {
+  it("names the layer, the field, the value and how loud it is", () => {
     render({ visibleSlidesNr: -1 });
-    const out = reported();
-    expect(out).toContain("visibleSlidesNr");
-    expect(out).toContain("-1");
-    // The consequence is what turns a warning into something actionable: it
-    // says where the damage will surface, not merely that a value is odd.
-    expect(out).toContain("Page math");
+    // Structure, never wording. Severity, layer, field and the value are what
+    // a reader acts on and what the line must not lose; the prose around them
+    // is reworded freely and is pinned nowhere on purpose (08-tests, § E).
+    // A claim about the message CONTENT belongs to the collector's own test,
+    // against the warning object — see checks/tests/propChecks.test.ts.
+    expect(reported()).toContain("[CRITICAL] Props -> visibleSlidesNr");
+    expect(reported()).toContain("has value -1");
   });
 
   it("lets the bad value through to the deck, unrepaired", () => {
