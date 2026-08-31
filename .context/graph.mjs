@@ -617,9 +617,30 @@ if (mode === "brief") {
           );
         }
 
+        // Голое имя засчитывается, только если оно в проекте одно. `index.ts`
+        // носят сорок один файл, `types.ts` — двадцать: принять такое совпадение
+        // значит залить раздел, подписанный «точно», строками про чужие бочки.
+        const uniqueBase =
+          [...files, ...styleFiles].filter((f) => rel(f).endsWith("/" + base))
+            .length === 1;
+        const dir = r.slice(0, r.lastIndexOf("/"));
+        // Голое `index.ts` носит сорок один файл, поэтому само по себе оно не
+        // точное. Но если та же строка называет соседа по папке — `### `slots/
+        // slotNames.ts` + `index.ts`` — то речь именно об этой бочке, и строка
+        // засчитывается: контекст строки снимает неоднозначность имени.
+        const namesSibling = (line) =>
+          quoted(line).some(
+            (t) =>
+              t.includes("/") &&
+              /[.](tsx?|scss)$/.test(t) &&
+              dir.endsWith(t.slice(0, t.lastIndexOf("/"))),
+          );
         const exact = BASE_LINES.filter(([, , line]) =>
           quoted(line).some(
-            (t) => t === r || r.endsWith("/" + t) || t === base,
+            (t) =>
+              t === r ||
+              (t.includes("/") && r.endsWith("/" + t)) ||
+              (t === base && (uniqueBase || namesSibling(line))),
           ),
         );
         // Строка, которая в кавычках называет ДРУГОЙ существующий файл, — про
@@ -651,13 +672,11 @@ if (mode === "brief") {
         if (!loose.length) console.log("  нет");
 
         // Якорь в самом файле — точная ссылка, написанная его же автором.
-        const anchors = [
-          ...new Set(
-            (
-              readFileSync(target, "utf8").match(/\/\/ See [^\n]*/g) ?? []
-            ).flatMap((line) => line.match(/[\w./-]+\.md/g) ?? []),
-          ),
-        ];
+        // Тем же помощником, что и проверка: два сканера одного и того же с
+        // разными правилами — это гарантия однажды разойтись. Досье молчало про
+        // документ у useOrientationSwapVeil, потому что тот пишет ссылку в
+        // середине фразы, а не отдельной строкой.
+        const anchors = [...new Set(docRefsIn(readFileSync(target, "utf8")))];
         console.log("--- документация: на что ссылается сам файл ---");
         console.log(
           anchors.length

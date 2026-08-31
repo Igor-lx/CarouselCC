@@ -56,6 +56,11 @@ export const useCarouselPresentation = ({
 
   // Per-lane styles CACHED by virtual index to keep SlideItem's `style` prop
   // `===` across the twice-per-ride virtualSlides rebuild — see the doc.
+  //
+  // CONSTRAINT — a ref, never a memo. React may discard a memo cache at any
+  // time; the styles would then re-identify and defeat SlideItem's memo in the
+  // two frames a ride can least afford it. Same reasoning as the render window
+  // next door, and it is as untestable here as it is there.
   const laneCacheRef = useRef(new Map<string, CarouselSlideCssVars>());
 
   const slideStyleFor = useCallback(
