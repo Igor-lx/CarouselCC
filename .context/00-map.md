@@ -254,7 +254,7 @@
 ### `client/domain/slides.ts` — pure
 Записи колоды, доклад до целых страниц и **общее правило выбора URL картинки**.
 - `resolveRenderedImageSrc` (`:91-99`) — контракт, а не удобство: комментарий
-  `:89-90` «The one rule the renderer and the resource store share — they must
+  `:94-95` `The one rule the renderer` «The one rule the renderer and the resource store share — they must
   key on the same URL». Расходятся `SlideItem` и `imageResource/*` — предзагрузка
   греет не тот файл, который потом покажут.
 - `buildKey` (`:10-17`) — ключ не-клона = `slide:${id}` без индекса, поэтому
@@ -399,14 +399,16 @@
   берётся `state.virtualIndex`, а не позиция из команды.
 - `repeatedClickStep` (`:18-19`) = `sign(step) * REPEATED_CLICK_VISUAL_LOOKAHEAD_PAGES`
   — константа приходит напрямую из `config/interaction`, мимо рантайм-конфига.
-- `resolveMoveTarget` (`:69`) и `resolveGoToTarget` (`:87`) — по хелперу на
+- `resolveMoveTarget` (`:74` `const resolveMoveTarget`) и `resolveGoToTarget`
+  (`:89` `const resolveGoToTarget`) — по хелперу на
   команду, оба возвращают `PageTarget`.
-- `:86` GO_TO идёт **по направлению шкалы точек**, а не кратчайшим цикличным
+- `:88` `dot-scale direction` GO_TO идёт **по направлению шкалы точек**, а не кратчайшим цикличным
   путём: закреплено двумя тестами, включая случай, где обход короче.
 - Телепорт: при дальнем GO_TO `nextVirtualIndex` — посадка преflight'а, а
   канонический индекс уезжает в `nextTeleportVirtualIndex`. План считает
   `resolveGoToPlan` из `motion/timing` — единственная зависимость слоя вверх.
-- `isSameDirectionRepeat` (`:160`) — только вне `idle`/`dragging` и только когда
+- `isSameDirectionRepeat` (`:162` `export const isSameDirectionRepeat`) — только
+  вне `idle`/`dragging` и только когда
   знак текущего движения совпадает со знаком клика.
 
 ### `client/state/reconcile.ts` — pure
@@ -1644,7 +1646,8 @@ rider-defaults и собственный `useMotionPaint`. Помечено ко
    проде. Некорректный вход обязан ломаться видимо на границе интеграции; за
    гигиену данных отвечает хост (экспортированные Zod-схемы), за наблюдаемость —
    dev-слот `<Diagnostic />`. Это же покрывает и «перерасход долей профиля»
-   (`timing.ts:102,117`, `segmentFactory.ts:215`): не баг, а объявленный
+   (`timing.ts:102,117`, `segmentFactory.ts:217` `accelerationDistanceShare =`):
+   не баг, а объявленный
    контракт. **Все `?` этого класса из §B и §E — не находки.**
 5. **`engines/kinetic` не имеет ни одного потребителя.** Grep по всему `src`:
    `useKineticValue` импортируется только собственными тестами; из `shared`

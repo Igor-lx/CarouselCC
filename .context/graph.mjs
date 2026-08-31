@@ -683,7 +683,9 @@ if (mode === "brief") {
         console.log(
           anchors.length
             ? "  " + anchors.join(NEWLINE + "  ")
-            : "  якоря нет — «почему» этого файла нигде не объявлено",
+            : isTest(target)
+              ? "  якоря нет, и не нужен: «почему» у теста — блок в его шапке (2 файла из 117 ссылаются на доки)"
+              : "  якоря нет — «почему» этого файла нигде не объявлено",
         );
 
         const docHits = DOC_LINES.filter(([, , line]) =>
@@ -870,6 +872,13 @@ if (mode === "verify") {
   const ANCHOR_TAIL = /\.(tsx?|scss|md|json|html)$/;
   // Якорь с цитатой: (`:31` `export const buildCarouselLayout`). Номер съедет
   // от любой вставки выше, цитата — нет, поэтому проверяется именно она.
+  //
+  // Цитата есть у единиц, а номер съезжает у всех. Поэтому у якоря без цитаты
+  // проверяется то немногое, что проверить можно: строка, на которую он
+  // указывает, обязана быть содержательной. Якорь ставят на объявление, а не
+  // на закрывающую скобку и не на пустоту — если он туда попал, он съехал.
+  // Только для кода: в прозе пустая строка внутри диапазона законна.
+  const JUNK_ANCHOR = /^\s*(?:[)\]}]+[;,]?|\{|,|)\s*$/;
   const CITED_RE = /\(`([^`]*):(\d+)(?:-(\d+))?` `([^`]+)`\)/g;
 
   let anchors = 0;
@@ -997,10 +1006,16 @@ if (mode === "verify") {
           continue;
         }
         anchors++;
-        const lines = readFileSync(file, "utf8").split(NEWLINE).length;
+        const body = readFileSync(file, "utf8").split(NEWLINE);
+        const lines = body.length;
         const last = Number(numbers[numbers.length - 1]);
         if (last > lines)
           broken.push(`${name}: ${span} — в файле ${lines} строк`);
+        else if (
+          !file.endsWith(".md") &&
+          JUNK_ANCHOR.test(body[Number(numbers[0]) - 1] ?? "")
+        )
+          broken.push(`${name}: ${span} — там скобка или пусто, якорь съехал`);
         if (name === CONFIG.invariants)
           invariantAnchors.push({ file, from: Number(numbers[0]), to: last });
         if (name === CONFIG.decisions)
