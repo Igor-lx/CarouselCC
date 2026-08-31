@@ -506,11 +506,30 @@ const riding = (overrides: Partial<CarouselState>): CarouselState => ({
 });
 
 describe("intent ladder — which condition wins when several are true", () => {
-  // The ladder's first rung — `isInstant` — is deliberately NOT exercised here.
-  // The runner returns before the factory whenever instant mode is on
-  // (`useMotionRunner`, "the mode, not only the phase"), so no state reaches
-  // this file with it set. It stays as a guard; its test lives at the runner,
-  // where the decision is actually taken.
+  // The ladder is the SINGLE reading of what a motion is: the builder, the
+  // profile shape and the duration are all functions of its answer. So its
+  // order is a rule with consequences, and every rung is exercised here —
+  // including `isInstant`, which the runner also short-circuits on its own
+  // side ("the mode, not only the phase").
+
+  it("instant mode outranks a pending snap-back", () => {
+    // Both are true for the frame where the host turns instant mode on under
+    // a rubber-band. Read the snap first and the deck animates back over its
+    // fixed duration in a mode whose whole promise is that nothing animates.
+    const snapping = riding({ motionPhase: "step-snap", virtualIndex: 1 });
+    const { segment, duration } = buildCarouselSegment({
+      state: snapping,
+      config,
+      isInstantMode: true,
+      start: { position: 0, velocity: 0, strategy: "idle" as const },
+      startedAt: 0,
+    });
+
+    expect(duration).toBe(0);
+    expect(segment.duration).toBe(0);
+    // And it lands, rather than standing still at zero length.
+    expect(sampleCarouselSegment(segment, 0).value).toBe(1);
+  });
 
   it("a pending teleport outranks the approach flag", () => {
     // Both are on for exactly one frame at the mid-cut. Read the approach

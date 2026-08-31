@@ -28,6 +28,15 @@ import type {
   MotionStart,
 } from "./types";
 
+/**
+ * The ONE reading of "what this motion is". Everything downstream — which
+ * builder runs, which profile shape it gets, how long it lasts — is a function
+ * of this answer and never of the state again.
+ *
+ * CONSTRAINT: no second ladder over `motionPhase` / `moveReason` / instant mode
+ * anywhere below. Three fields can each be read as a different answer, and two
+ * ladders over them agree only until one of them is edited.
+ */
 const intentFromState = (
   state: CarouselState,
   isInstant: boolean,
@@ -52,11 +61,11 @@ const intentFromState = (
 };
 
 const stepProfileShares = (
-  state: CarouselState,
+  intent: CarouselMotionIntent,
   motion: MotionSettings,
 ): MotionProfileSharesSettings => {
-  if (state.motionPhase === "step-snap") return motion.snapBackProfile;
-  if (state.moveReason === "autoplay") return motion.autoplayProfile;
+  if (intent === "snap") return motion.snapBackProfile;
+  if (intent === "autoplay-step") return motion.autoplayProfile;
   return motion.stepProfile;
 };
 
@@ -83,6 +92,31 @@ const buildStepProfile = (
 ): CarouselSegment => {
   const distance = state.virtualIndex - start.position;
   const startSpeed = alignSpeed(start.velocity, distance);
+
+  // No time to travel in means arriving, not travelling infinitely slowly. A
+  // profile solved for a zero duration has no speed to build from and falls
+  // back to the builder's floor (1e-6 u/ms) — a step of one page then lasts
+  // about sixteen minutes and never visibly starts. Build the arrival instead:
+  // a curve with nothing to travel is already at its end, so the very first
+  // sample lands on the target.
+  if (!(duration > 0)) {
+    return createProfileSegment({
+      strategy: "step",
+      from: start.position,
+      to: state.virtualIndex,
+      profile: buildProfile({
+        from: 0,
+        to: 0,
+        startSpeed: 0,
+        peakSpeed: 0,
+        endSpeed: 0,
+        accelerationDistanceShare: shares.accelerationDistanceShare,
+        decelerationDistanceShare: shares.decelerationDistanceShare,
+      }),
+      startedAt,
+    });
+  }
+
   const peakSpeed = resolvePeakSpeedForDuration({
     distance,
     duration,
@@ -357,9 +391,7 @@ export function buildCarouselSegment({
   }
 
   const duration = resolveStepDuration({
-    motionPhase: state.motionPhase,
-    moveReason: state.moveReason,
-    isInstant: isInstantMode,
+    intent,
     segmentStartVirtualIndex: state.fromVirtualIndex,
     targetVirtualIndex: state.virtualIndex,
     stepSize,
@@ -373,7 +405,7 @@ export function buildCarouselSegment({
     start,
     startedAt,
     duration,
-    stepProfileShares(state, config.motion),
+    stepProfileShares(intent, config.motion),
   );
   return { segment, duration: segment.duration };
 }

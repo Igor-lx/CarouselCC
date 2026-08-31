@@ -14,9 +14,7 @@ import { durationByVirtualSpan, resolveStepDuration } from "../duration";
  */
 
 const base = {
-  motionPhase: "step-normal" as const,
-  moveReason: "click" as const,
-  isInstant: false,
+  intent: "click-step" as const,
   segmentStartVirtualIndex: 0,
   targetVirtualIndex: 3,
   stepSize: 3,
@@ -71,35 +69,30 @@ describe("durationByVirtualSpan", () => {
 });
 
 describe("resolveStepDuration", () => {
-  it("a snap-back has its own fixed duration, whatever else is true", () => {
-    // A rubber-band is a correction, not a journey: its length is a constant,
-    // and it outranks both the distance and the reason.
+  // The precedence between these — is a snap during instant mode instant or a
+  // snap? — is NOT decided here any more. It belongs to `intentFromState`,
+  // which is the single reading of what the motion is; this function only
+  // gives each answer its length. The order test lives beside that ladder.
+
+  it("a snap-back has its own fixed duration, whatever the distance", () => {
+    // A rubber-band is a correction, not a journey: its length is a constant.
     expect(
       resolveStepDuration({
         ...base,
-        motionPhase: "step-snap",
+        intent: "snap",
         targetVirtualIndex: 30,
-        moveReason: "autoplay",
       }),
     ).toBe(150);
   });
 
-  it("an instant step takes no time, and outranks everything below it", () => {
-    expect(
-      resolveStepDuration({ ...base, isInstant: true, targetVirtualIndex: 30 }),
-    ).toBe(0);
-  });
-
-  it("a snap-back outranks even an instant step", () => {
-    // The order is the rule: read it the other way and a snap during instant
-    // mode collapses to zero, losing the only motion instant mode keeps.
+  it("an instant step takes no time", () => {
     expect(
       resolveStepDuration({
         ...base,
-        motionPhase: "step-snap",
-        isInstant: true,
+        intent: "instant",
+        targetVirtualIndex: 30,
       }),
-    ).toBe(150);
+    ).toBe(0);
   });
 
   it("a click stretches with the distance", () => {
@@ -113,13 +106,13 @@ describe("resolveStepDuration", () => {
     expect(
       resolveStepDuration({
         ...base,
-        moveReason: "gesture",
+        intent: "gesture-release",
         targetVirtualIndex: 9,
       }),
     ).toBe(
       resolveStepDuration({
         ...base,
-        moveReason: "click",
+        intent: "click-step",
         targetVirtualIndex: 9,
       }),
     );
@@ -128,11 +121,11 @@ describe("resolveStepDuration", () => {
   it("an autoplay tick is a fixed tempo, however far it goes", () => {
     // The deck advances on a timer, and a tick that took longer for a wider
     // page would drift out of step with the interval that scheduled it.
-    expect(resolveStepDuration({ ...base, moveReason: "autoplay" })).toBe(900);
+    expect(resolveStepDuration({ ...base, intent: "autoplay-step" })).toBe(900);
     expect(
       resolveStepDuration({
         ...base,
-        moveReason: "autoplay",
+        intent: "autoplay-step",
         targetVirtualIndex: 30,
       }),
     ).toBe(900);
@@ -140,6 +133,6 @@ describe("resolveStepDuration", () => {
 
   it("a move with no stated reason takes the fixed tempo, not the scaled one", () => {
     // The safe default: a duration that cannot run away with the distance.
-    expect(resolveStepDuration({ ...base, moveReason: null })).toBe(900);
+    expect(resolveStepDuration({ ...base, intent: "unknown-step" })).toBe(900);
   });
 });

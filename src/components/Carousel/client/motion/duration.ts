@@ -1,5 +1,5 @@
 // See docs/architecture/motion.md
-import type { MotionPhase, MoveReason } from "../state";
+import type { CarouselMotionIntent } from "./types";
 
 interface DurationByVirtualSpanInput {
   from: number;
@@ -20,9 +20,10 @@ export const durationByVirtualSpan = ({
 };
 
 interface ResolveStepDurationInput {
-  motionPhase: MotionPhase;
-  moveReason: MoveReason | null;
-  isInstant: boolean;
+  /** What the motion IS, decided once by `intentFromState`. Never re-derived
+   * from the state here: the state has three fields that could each be read as
+   * a different answer, and a second ladder over them drifts from the first. */
+  intent: CarouselMotionIntent;
   segmentStartVirtualIndex: number;
   targetVirtualIndex: number;
   stepSize: number;
@@ -34,9 +35,7 @@ interface ResolveStepDurationInput {
 /** Duration for the duration-authored steps only; speed-authored motions
  * derive their own. See docs/architecture/motion.md. */
 export const resolveStepDuration = ({
-  motionPhase,
-  moveReason,
-  isInstant,
+  intent,
   segmentStartVirtualIndex,
   targetVirtualIndex,
   stepSize,
@@ -44,9 +43,6 @@ export const resolveStepDuration = ({
   autoplayDuration,
   stepDuration,
 }: ResolveStepDurationInput): number => {
-  if (motionPhase === "step-snap") return snapBackDurationMs;
-  if (isInstant) return 0;
-
   const clickSegmentDuration = durationByVirtualSpan({
     from: segmentStartVirtualIndex,
     to: targetVirtualIndex,
@@ -54,13 +50,20 @@ export const resolveStepDuration = ({
     baseDuration: stepDuration,
   });
 
-  switch (moveReason) {
-    case "click":
-      return clickSegmentDuration;
-    case "autoplay":
+  switch (intent) {
+    case "instant":
+      return 0;
+    case "snap":
+      return snapBackDurationMs;
+    case "autoplay-step":
       return autoplayDuration;
-    case "gesture":
+    // A committed but unhurried release is not speed-authored: it rides at the
+    // click tempo, and only a flick builds its own profile.
+    case "gesture-release":
+    case "click-step":
       return clickSegmentDuration;
+    // Speed-authored intents never reach here (the factory returns before
+    // this), and a step with no reason recorded takes the calmest tempo.
     default:
       return autoplayDuration;
   }
