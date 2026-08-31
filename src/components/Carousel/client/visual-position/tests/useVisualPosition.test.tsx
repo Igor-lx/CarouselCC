@@ -169,9 +169,29 @@ describe("useVisualPosition — the running streak", () => {
   it("keeps the drop rule off resting frames, whatever the counter says", () => {
     // The shared rule only ever sheds RUNNING frames: a drag or a settle must
     // always paint, or the deck visibly stalls.
+    //
+    // The counter has to be one that WOULD be shed — a resting frame stamped
+    // with index 0 is kept by the arithmetic anyway, and asserting on it says
+    // nothing about the phase check at all.
     render();
     act(() => api.applyImmediatePosition(3));
-    expect(isDroppedFallbackFrame(api.source.getSnapshot())).toBe(false);
+    const resting = api.source.getSnapshot();
+    expect(resting.phase).not.toBe("running");
+    expect(isDroppedFallbackFrame(resting)).toBe(false);
+
+    const shedIndex = FALLBACK_DROP_EVERY_NTH_FRAME - 1;
+    expect(
+      isDroppedFallbackFrame({ ...resting, runningFrameIndex: shedIndex }),
+    ).toBe(false);
+    // Same index, moving: this one IS shed — so the phase is the only
+    // difference between the two answers.
+    expect(
+      isDroppedFallbackFrame({
+        ...resting,
+        phase: "running",
+        runningFrameIndex: shedIndex,
+      }),
+    ).toBe(true);
   });
 
   it("sheds exactly every Nth running frame and never the first", () => {
