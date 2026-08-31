@@ -113,3 +113,101 @@ describe("sampleMotionProfile", () => {
     }
   });
 });
+
+describe("createMotionProfile — degenerate inputs", () => {
+  const shares = {
+    accelerationDistanceShare: 0.3,
+    decelerationDistanceShare: 0.3,
+  };
+
+  it("a curve with no distance has a duration of zero, not a NaN", () => {
+    const profile = createMotionProfile({
+      distance: 0,
+      peakSpeed: 1,
+      startSpeed: 0,
+      endSpeed: 0,
+      ...shares,
+    });
+    expect(profile.duration).toBe(0);
+    expect(Number.isNaN(profile.duration)).toBe(false);
+  });
+
+  it("a curve with no zones has a duration of zero", () => {
+    // Every share zero: nothing to accelerate over, nothing to cruise.
+    const profile = createMotionProfile({
+      distance: 0,
+      peakSpeed: 0,
+      startSpeed: 0,
+      endSpeed: 0,
+      accelerationDistanceShare: 0,
+      decelerationDistanceShare: 0,
+    });
+    expect(profile.duration).toBe(0);
+  });
+});
+
+describe("sampleMotionProfile — degenerate inputs", () => {
+  const flat = { duration: 0, endSpeed: 2, zones: [] };
+
+  it("a profile with no zones reads as finished, at its end speed", () => {
+    // Finished, not frozen: the caller pins the target and moves on. Answering
+    // "0 progress" here would leave the deck parked at its origin forever.
+    expect(sampleMotionProfile(flat, 0, 100)).toEqual({
+      distanceProgress: 1,
+      speed: 2,
+    });
+  });
+
+  it("a profile with zero duration reads as finished, whatever the elapsed", () => {
+    const zoned = {
+      duration: 0,
+      endSpeed: 0,
+      zones: [
+        {
+          startTime: 0,
+          duration: 0,
+          startSpeed: 0,
+          endSpeed: 0,
+          startDistanceProgress: 0,
+          endDistanceProgress: 1,
+        },
+      ],
+    };
+    expect(sampleMotionProfile(zoned, 5, 100).distanceProgress).toBe(1);
+  });
+
+  it("a sample over a zero distance lands on the zone's end, not on NaN", () => {
+    // `localDistance / distance` is the division in question. Without the
+    // guard this returns NaN and the track transform becomes "translate(NaNpx)".
+    const profile = createMotionProfile({
+      distance: 10,
+      peakSpeed: 5,
+      startSpeed: 0,
+      endSpeed: 0,
+      accelerationDistanceShare: 0.3,
+      decelerationDistanceShare: 0.3,
+    });
+    const sample = sampleMotionProfile(profile, profile.duration / 2, 0);
+    expect(Number.isNaN(sample.distanceProgress)).toBe(false);
+    expect(sample.distanceProgress).toBeGreaterThanOrEqual(0);
+    expect(sample.distanceProgress).toBeLessThanOrEqual(1);
+  });
+
+  it("an elapsed exactly at the duration is already finished", () => {
+    // The boundary: at `elapsed === duration` the ride is over, not in its
+    // final zone. Read the other way, the last frame samples a zone-local
+    // progress of exactly 1 and re-derives what the guard already knows.
+    const profile = createMotionProfile({
+      distance: 10,
+      peakSpeed: 5,
+      startSpeed: 0,
+      endSpeed: 0,
+      accelerationDistanceShare: 0.3,
+      decelerationDistanceShare: 0.3,
+    });
+    expect(sampleMotionProfile(profile, profile.duration, 10)).toEqual({
+      distanceProgress: 1,
+      speed: profile.endSpeed,
+    });
+  });
+});

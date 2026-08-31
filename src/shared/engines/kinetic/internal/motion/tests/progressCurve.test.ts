@@ -277,3 +277,106 @@ describe("resampleStops — a coarser grid on the same curve", () => {
     }
   });
 });
+
+/**
+ * The degenerate inputs of the curve transport.
+ *
+ * Every guard here stands in front of a division — by duration, by distance, by
+ * an interval count, by a peak acceleration. Its answer is not "an error" but a
+ * legal minimal curve, because the caller is mid-commit and has nowhere to put
+ * a failure: a `NaN` stop list reaches WAAPI as a keyframe offset and the
+ * browser rejects the whole animation, so the deck stops being painted at all.
+ *
+ * None of these was reached before.
+ */
+const emptyProfile = { duration: 0, endSpeed: 0, zones: [] };
+
+const cruiseOnly = {
+  duration: 100,
+  endSpeed: 5,
+  zones: [
+    {
+      startTime: 0,
+      duration: 100,
+      startSpeed: 5,
+      endSpeed: 5,
+      startDistanceProgress: 0,
+      endDistanceProgress: 1,
+    },
+  ],
+};
+
+describe("resolveProgressStopIntervals — nothing to resolve", () => {
+  it("falls to the floor for a profile with no duration or no zones", () => {
+    const floor = resolveProgressStopIntervals(emptyProfile);
+    expect(floor).toBeGreaterThanOrEqual(1);
+    expect(Number.isFinite(floor)).toBe(true);
+  });
+
+  it("falls to the same floor for a pure cruise", () => {
+    // No velocity step anywhere, so there is nothing for extra stops to
+    // describe — and the acceleration the density is derived from is zero,
+    // which is the division the guard is standing in front of.
+    expect(resolveProgressStopIntervals(cruiseOnly)).toBe(
+      resolveProgressStopIntervals(emptyProfile),
+    );
+  });
+});
+
+describe("profileProgressStops — nothing to travel", () => {
+  it("returns the trivial two-stop curve when the profile has no duration", () => {
+    expect(profileProgressStops(emptyProfile, 100)).toEqual([0, 1]);
+  });
+
+  it("returns the trivial curve when there is no distance", () => {
+    expect(profileProgressStops(cruiseOnly, 0)).toEqual([0, 1]);
+  });
+
+  it("returns the trivial curve when asked for fewer than one interval", () => {
+    // `intervals` is a caller-supplied count; zero would size an array of one
+    // and leave the loop writing nothing between the ends.
+    expect(profileProgressStops(cruiseOnly, 100, 0)).toEqual([0, 1]);
+  });
+
+  it("still spans exactly 0 to 1 for a real profile", () => {
+    const stops = profileProgressStops(cruiseOnly, 100);
+    expect(stops[0]).toBe(0);
+    expect(stops.at(-1)).toBe(1);
+    expect(stops.length).toBeGreaterThan(2);
+  });
+});
+
+describe("sampleProgressStops — degenerate stop lists", () => {
+  it("reads a finished curve out of an empty list", () => {
+    // Empty means "nothing was ever planned", and the honest answer for a
+    // position on a curve that does not exist is its end.
+    expect(sampleProgressStops([], 0.5)).toBe(1);
+  });
+
+  it("reads a single stop as a constant", () => {
+    expect(sampleProgressStops([0.42], 0.5)).toBe(0.42);
+    expect(sampleProgressStops([0.42], 0)).toBe(0.42);
+  });
+});
+
+describe("resampleStops — refusing to invent detail", () => {
+  it("hands back a copy when asked for fewer than one interval", () => {
+    const stops = [0, 0.5, 1];
+    expect(resampleStops(stops, 0)).toEqual(stops);
+  });
+
+  it("hands back a copy rather than upsampling a shorter list", () => {
+    // Asking for MORE stops than exist would interpolate detail the curve
+    // never had — a smoother line that is no longer the ride.
+    const stops = [0, 0.5, 1];
+    expect(resampleStops(stops, 10)).toEqual(stops);
+  });
+
+  it("keeps the exact ends when it does resample", () => {
+    const dense = profileProgressStops(cruiseOnly, 100, 20);
+    const coarse = resampleStops(dense, 4);
+    expect(coarse).toHaveLength(5);
+    expect(coarse[0]).toBe(dense[0]);
+    expect(coarse.at(-1)).toBe(dense.at(-1));
+  });
+});
