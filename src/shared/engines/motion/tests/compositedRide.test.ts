@@ -2,8 +2,12 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { buildProfile } from "../profile/profile";
-import { createProfileSegment } from "../profile/profileSegment";
+import {
+  createProfileSegment,
+  sampleProfileSegment,
+} from "../profile/profileSegment";
 import { createMotionController } from "../runtime/createMotionController";
+import { motionNow } from "../runtime/clock";
 import {
   applyKeyframe,
   createCompositedRide,
@@ -25,6 +29,7 @@ beforeAll(() => {
 
 afterEach(() => {
   animateMock.mockReset();
+  vi.useRealTimers();
 });
 
 interface FakeAnimation {
@@ -358,5 +363,107 @@ describe("createCompositedRide — a rider with no defaults", () => {
     expect(ride.isComposited()).toBe(false);
     expect(animateMock).not.toHaveBeenCalled();
     expect(controller.isActive()).toBe(true);
+  });
+});
+describe("the keyframes ARE the JS curve", () => {
+  const pxOf = (frame: Keyframe) =>
+    Number(/translateX\((-?[\d.]+)px\)/.exec(String(frame.transform))?.[1]);
+
+  it("every keyframe carries the value the controller samples at that time", () => {
+    // The compositor plays the keyframes, the controller samples the profile,
+    // and a drag or a takeover reads the controller. Let the two drift apart
+    // and the deck jumps the moment anything interrupts the ride — which is
+    // what a wrong travel distance behind the stops quietly produces.
+    animateMock.mockReturnValue(fakeAnimation());
+    const controller = createMotionController(0);
+    const element = document.createElement("div");
+    const ride = createCompositedRide(controller);
+    const segment = segmentTo(40, 140);
+
+    ride.start({ element, segment, toKeyframe });
+
+    const frames = animateMock.mock.calls[0]?.[0] as Keyframe[];
+    expect(frames.length).toBeGreaterThan(2);
+    // WAAPI spreads offset-less keyframes evenly in TIME, so frame i is the
+    // curve at i/(n-1) of the duration.
+    frames.forEach((frame, i) => {
+      const fraction = i / (frames.length - 1);
+      const at = segment.startedAt + fraction * segment.duration;
+      expect(pxOf(frame)).toBeCloseTo(
+        sampleProfileSegment(segment, at).value,
+        6,
+      );
+    });
+  });
+});
+
+describe("flyTo — the ride built from the live handoff", () => {
+  /** A controller genuinely in flight on the JS loop, so the handoff it hands
+   * out carries a real velocity rather than a resting zero. */
+  const inFlight = () => {
+    vi.useFakeTimers();
+    animateMock.mockImplementation(() => {
+      throw new Error("compositor unavailable");
+    });
+    const controller = createMotionController(500);
+    const element = document.createElement("div");
+    const ride = createCompositedRide(controller, {
+      element: { current: element },
+      toKeyframe,
+    });
+    ride.start({ segment: segmentTo(500, 1500, motionNow()) });
+    vi.advanceTimersByTime(300);
+
+    const moving = controller.captureHandoff();
+    expect(moving.velocity).toBeGreaterThan(0);
+
+    const anim = fakeAnimation();
+    animateMock.mockReset();
+    animateMock.mockReturnValue(anim);
+    return { ride, controller, moving, anim };
+  };
+
+  it("picks the flight up at the speed it already had", () => {
+    const { ride, controller, moving } = inFlight();
+
+    ride.flyTo({ to: moving.position + 200, cruiseSpeed: 0.5 });
+
+    // Velocity-continuous: retargeting mid-flight must not restart from rest,
+    // or the deck visibly stalls at the moment the new target is chosen.
+    expect(controller.captureHandoff().velocity).toBeCloseTo(
+      moving.velocity,
+      6,
+    );
+  });
+
+  it("drops the inherited speed when the new target is the other way", () => {
+    const { ride, controller, moving } = inFlight();
+
+    ride.flyTo({ to: moving.position - 200, cruiseSpeed: 0.5 });
+
+    // Carrying a forward speed into a backward ride is a lurch the wrong way
+    // before the curve turns around.
+    expect(controller.captureHandoff().velocity).toBeCloseTo(0, 10);
+  });
+
+  it("pins the animation to the handoff's own clock", () => {
+    const { ride, anim } = inFlight();
+
+    ride.flyTo({ to: 900, cruiseSpeed: 0.5 });
+
+    // One clock domain: the WAAPI pin, the segment and the samples all read
+    // `motionNow`. A pin off by even a frame plays the ride from the wrong
+    // point of the curve.
+    expect(anim.startTime).toBe(motionNow());
+  });
+
+  it("honours an explicit start time — a ride already under way", () => {
+    const { ride, anim } = inFlight();
+    const startedAt = motionNow() - 120;
+
+    ride.flyTo({ to: 900, cruiseSpeed: 0.5, startedAt });
+
+    // A release hands over the timestamp of the gesture, not of the call.
+    expect(anim.startTime).toBe(startedAt);
   });
 });

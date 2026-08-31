@@ -12,7 +12,10 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { buildProfile } from "../profile/profile";
-import { createProfileSegment } from "../profile/profileSegment";
+import {
+  createProfileSegment,
+  sampleProfileSegment,
+} from "../profile/profileSegment";
 import { createMotionController } from "../runtime/createMotionController";
 import {
   applyKeyframe,
@@ -282,5 +285,36 @@ describe("createCompositedRide — a finish from a ride already replaced", () =>
     expect(element.style.transform).toBe(pinned);
     expect(ride.isComposited()).toBe(true);
     expect(second.cancel).not.toHaveBeenCalled();
+  });
+});
+describe("the keyframes ARE the JS curve", () => {
+  const pxOf = (frame: Keyframe) =>
+    Number(/translateX\((-?[\d.]+)px\)/.exec(String(frame.transform))?.[1]);
+
+  it("every keyframe carries the value the controller samples at that time", () => {
+    // The compositor plays the keyframes, the controller samples the profile,
+    // and a drag or a takeover reads the controller. Let the two drift apart
+    // and the deck jumps the moment anything interrupts the ride — which is
+    // what a wrong travel distance behind the stops quietly produces.
+    animateMock.mockReturnValue(fakeAnimation());
+    const controller = createMotionController(0);
+    const element = document.createElement("div");
+    const ride = createCompositedRide(controller);
+    const segment = segmentTo(40, 140);
+
+    ride.start({ element, segment, toKeyframe });
+
+    const frames = animateMock.mock.calls[0]?.[0] as Keyframe[];
+    expect(frames.length).toBeGreaterThan(2);
+    // WAAPI spreads offset-less keyframes evenly in TIME, so frame i is the
+    // curve at i/(n-1) of the duration.
+    frames.forEach((frame, i) => {
+      const fraction = i / (frames.length - 1);
+      const at = segment.startedAt + fraction * segment.duration;
+      expect(pxOf(frame)).toBeCloseTo(
+        sampleProfileSegment(segment, at).value,
+        6,
+      );
+    });
   });
 });
