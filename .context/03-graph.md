@@ -282,7 +282,7 @@ state + motion + geometry ──> useModuleContextValue ──> CarouselStableCo
 
 ## E–F. `client/motion/**` и `client/visual-position/**`
 
-`client/motion/**` — 14 импортёров (+4 тестовых), `client/visual-position/**` —
+`client/motion/**` — 14 импортёров (+5 тестовых), `client/visual-position/**` —
 6 (+4). Но связь здесь не «импорт функции», а **две шины**, и это главное
 отличие слоя от остальных:
 
@@ -309,7 +309,7 @@ state + motion + geometry ──> useModuleContextValue ──> CarouselStableCo
 
 ## D. `client/state/**`
 
-`client/state/**` — 12 импортёров (+6 тестовых), и зависимость двух разных
+`client/state/**` — 12 импортёров (+7 тестовых), и зависимость двух разных
 сортов:
 
 | Что берут | Кто |
@@ -331,7 +331,7 @@ state + motion + geometry ──> useModuleContextValue ──> CarouselStableCo
 
 ## C. `client/domain/**`
 
-`client/domain/**` — 22 импортёра (+12 тестовых), самый широко потребляемый
+`client/domain/**` — 22 импортёра (+13 тестовых), самый широко потребляемый
 слой. Смена сигнатуры здесь задевает больше всего кода, поэтому радиус
 проверяется до правки: `node .context/graph.mjs blast`.
 
