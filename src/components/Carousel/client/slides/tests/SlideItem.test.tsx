@@ -263,3 +263,121 @@ describe("SlideItem — band attributes", () => {
     expect(host.firstElementChild).toBeNull();
   });
 });
+
+/**
+ * The flags the slide wears, and the one effect it runs.
+ *
+ * Every class name in the harness above is an empty string, so the three
+ * conditional classes were pinned by nothing: each of their mutants walked
+ * straight through. They are what the stylesheet hangs the error, text and
+ * interactive treatments on — a slide that always wears `slideError` looks
+ * broken while it is merely loading.
+ */
+describe("SlideItem — the conditional classes", () => {
+  const named = {
+    slide: "slide",
+    slideInteractive: "is-interactive",
+    slideError: "is-error",
+    slideText: "is-text",
+  };
+
+  it("wears the error class only once the image has actually failed", () => {
+    render({ className: named });
+    expect(rootEl().className).not.toContain("is-error");
+
+    act(() => {
+      img()!.dispatchEvent(new Event("error"));
+    });
+    expect(rootEl().className).toContain("is-error");
+  });
+
+  it("wears the text class only when the slide is not a content image", () => {
+    render({ className: named });
+    expect(rootEl().className).not.toContain("is-text");
+
+    render({ className: named, slideData: TEXT, isContentImg: false });
+    expect(rootEl().className).toContain("is-text");
+  });
+
+  it("wears the interactive class only when the click can actually happen", () => {
+    // Both halves: a handler with interactivity off, and interactivity on with
+    // no handler. Either alone would leave a cursor promising something that
+    // does not happen.
+    render({
+      className: named,
+      onSlideClick: () => {},
+      isInteractiveOn: false,
+    });
+    expect(rootEl().className).not.toContain("is-interactive");
+
+    render({ className: named, isInteractiveOn: true });
+    expect(rootEl().className).not.toContain("is-interactive");
+
+    render({ className: named, onSlideClick: () => {}, isInteractiveOn: true });
+    expect(rootEl().className).toContain("is-interactive");
+  });
+});
+
+describe("SlideItem — retrying a failed image", () => {
+  it("retries a failure inside the band, and leaves an off-band one alone", () => {
+    // The store owns backoff and the attempt cap; what SlideItem decides is
+    // WHICH failures are worth retrying. Retrying off-band ones turns a
+    // flaky network into a background request storm across the whole buffer.
+    const retried: string[] = [];
+    const originalRetry = store.requestRetry.bind(store);
+    store.requestRetry = (url: string) => {
+      retried.push(url);
+      originalRetry(url);
+    };
+
+    render({ isActual: false });
+    act(() => {
+      img()!.dispatchEvent(new Event("error"));
+    });
+    expect(retried).toEqual([]);
+
+    render({ isActual: true });
+    // The URL is the slide's `content` — the image module carries candidates,
+    // not the source of truth for the address.
+    expect(retried).toEqual([IMAGE.content]);
+  });
+});
+
+describe("SlideItem — what the slow-load reveal is gated on", () => {
+  it("marks a loading image, and stops marking it once it is there", () => {
+    // The stylesheet fades a complete bitmap in instead of letting the
+    // progressive stripe paint show. A mark that never clears leaves every
+    // slide faded out for good.
+    render();
+    expect(img()!.getAttribute("data-awaiting-image")).toBe("true");
+
+    act(() => {
+      img()!.dispatchEvent(new Event("load"));
+    });
+    expect(img()!.getAttribute("data-awaiting-image")).toBeNull();
+  });
+
+  it("does not mark anything without the responsive module", () => {
+    // No module, no responsive selection, no progressive-stripe problem to
+    // hide — and the stylesheet that would fade it in is not there either.
+    render({ isResponsiveImagesOn: false });
+    expect(img()!.getAttribute("data-awaiting-image")).toBeNull();
+  });
+});
+
+describe("SlideItem — when a sizes hint is worth sending", () => {
+  it("sends it for a slide with candidates, and not for one without", () => {
+    // `sizes` without `srcSet` or `<source>` is noise the browser ignores; the
+    // gate is the presence of candidates, from EITHER source.
+    render({ slideData: { ...IMAGE, image: undefined } });
+    expect(img()!.getAttribute("sizes")).toBeNull();
+
+    render({
+      slideData: { ...IMAGE, image: { srcSet: "a.webp 480w" } },
+    });
+    expect(img()!.getAttribute("sizes")).toBe("400px");
+
+    render(); // art direction via <source>, no srcSet of its own
+    expect(img()!.getAttribute("sizes")).toBe("400px");
+  });
+});
