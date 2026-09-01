@@ -180,3 +180,125 @@ describe("useSlideFetchReach — the latch", () => {
     store = real;
   });
 });
+
+/**
+ * The fourth property, and the one no test held: the band's URL list has to
+ * keep its IDENTITY while its contents are the same.
+ *
+ * `virtualSlides` is a fresh array on every dispatch — twice per ride at the
+ * very least — so a list rebuilt each time would tear down and rebuild one
+ * store subscription per band slide on every one of them, and re-run the
+ * settle evaluation with it. The latch that holds the identity is a state
+ * write during render, and its guard had no coverage at all.
+ */
+describe("useSlideFetchReach — the subscription economy", () => {
+  /** Count how many times the store is asked to watch a URL. */
+  const countingStore = (): {
+    store: ImageResourceStore;
+    count: () => number;
+  } => {
+    const inner = createImageResourceStore();
+    let subscriptions = 0;
+    return {
+      count: () => subscriptions,
+      store: {
+        ...inner,
+        getSnapshot: (url: string) => inner.getSnapshot(url),
+        subscribe: (url: string, listener: () => void) => {
+          subscriptions += 1;
+          return inner.subscribe(url, listener);
+        },
+        reportLoaded: (url: string) => inner.reportLoaded(url),
+        reportError: (url: string) => inner.reportError(url),
+        requestRetry: (url: string) => inner.requestRetry(url),
+        prune: (allowed: readonly string[]) => inner.prune(allowed),
+        dispose: () => inner.dispose(),
+      },
+    };
+  };
+
+  it("does not re-subscribe when the band's slides are rebuilt unchanged", () => {
+    const { store: counting, count } = countingStore();
+    store = counting;
+
+    render([slide("a.webp", true), slide("b.webp", true)]);
+    const afterFirst = count();
+    expect(afterFirst).toBe(2);
+
+    // Two more dispatches with the very same URLs, fresh arrays and fresh
+    // slide objects each time — exactly what a ride produces.
+    render([slide("a.webp", true), slide("b.webp", true)]);
+    render([slide("a.webp", true), slide("b.webp", true)]);
+
+    expect(count()).toBe(afterFirst);
+  });
+
+  it("does re-subscribe when the band's content actually changes", () => {
+    const { store: counting, count } = countingStore();
+    store = counting;
+
+    render([slide("a.webp", true), slide("b.webp", true)]);
+    const afterFirst = count();
+
+    render([slide("a.webp", true), slide("c.webp", true)]);
+    expect(count()).toBeGreaterThan(afterFirst);
+  });
+
+  it("notices a band that lost a slide, gained one, or only reordered", () => {
+    // All three halves of the comparison. The GROWTH case is the one that
+    // needs the explicit length check: comparing index by index over the OLD
+    // list walks off the end of it and calls a longer band the same band, so
+    // the slide that just entered is never waited for and the gate opens
+    // without it.
+    const { store: counting, count } = countingStore();
+    store = counting;
+
+    render([slide("a.webp", true)]);
+    const one = count();
+
+    render([slide("a.webp", true), slide("b.webp", true)]);
+    const grown = count();
+    expect(grown).toBeGreaterThan(one);
+    // And it really is waiting for the new one, not just re-subscribing.
+    act(() => store.reportLoaded("a.webp"));
+    expect(isBufferOpen()).toBe(false);
+
+    render([slide("a.webp", true)]);
+    const shorter = count();
+    expect(shorter).toBeGreaterThan(grown);
+
+    render([slide("b.webp", true), slide("a.webp", true)]);
+    expect(count()).toBeGreaterThan(shorter);
+  });
+
+  it("counts a URL once however many lanes show it", () => {
+    // A looping deck renders the same slide twice in one band. Subscribing
+    // per lane rather than per URL would make the settle check wait for the
+    // same answer twice.
+    const { store: counting, count } = countingStore();
+    store = counting;
+
+    render([
+      slide("a.webp", true),
+      slide("a.webp", true),
+      slide("b.webp", true),
+    ]);
+
+    expect(count()).toBe(2);
+  });
+
+  it("waits only for the slides that are actually in the band", () => {
+    // Buffered lanes are exactly what the reach is deciding about: counting
+    // them among the things it waits for would make the gate wait on itself.
+    const { store: counting, count } = countingStore();
+    store = counting;
+
+    render([slide("a.webp", true), slide("far.webp", false)]);
+
+    expect(count()).toBe(1);
+    expect(isBufferOpen()).toBe(false);
+
+    act(() => store.reportLoaded("a.webp"));
+    expect(isBufferOpen()).toBe(true);
+  });
+});
