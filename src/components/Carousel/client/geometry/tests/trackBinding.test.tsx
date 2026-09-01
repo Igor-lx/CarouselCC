@@ -300,9 +300,23 @@ describe("useTrackBinding — compositor ownership", () => {
   });
 
   it("refuses a degenerate ride instead of building a broken animation", () => {
+    // One bad input at a time: a refusal that only ever fires for the same
+    // reason says nothing about the other disjuncts, and each of them is a
+    // separate way to hand the compositor a broken keyframe list.
     expect(startRide({ duration: 0 })).toBe(false);
+    expect(startRide({ duration: -1 })).toBe(false);
     expect(startRide({ stops: [0] })).toBe(false);
+    expect(startRide({ stops: [] })).toBe(false);
     expect(startRide({ from: Number.NaN })).toBe(false);
+    expect(startRide({ to: Number.NaN })).toBe(false);
+    expect(startRide({ to: Number.POSITIVE_INFINITY })).toBe(false);
+  });
+
+  it("accepts the shortest curve there is — two stops", () => {
+    // Two points are a straight line, which is a perfectly good ride. Reading
+    // the floor as "more than two" would push every linear segment back onto
+    // the JS loop for nothing.
+    expect(startRide({ stops: [0, 1] })).toBe(true);
   });
 
   it("locks out per-frame writes while the compositor owns the track", () => {
