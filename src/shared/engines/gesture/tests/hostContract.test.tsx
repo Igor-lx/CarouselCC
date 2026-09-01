@@ -69,6 +69,7 @@ const click = (target: Element, { t }: { t?: number } = {}): Event => {
 };
 
 interface RigProps {
+  commitDistance?: number;
   enabled?: boolean;
   width?: number;
   hostRef?: RefObject<HTMLElement | null>;
@@ -81,6 +82,7 @@ let boundValue: number;
 function Rig({
   enabled = true,
   width = 400,
+  commitDistance,
   hostRef,
   callbackRef,
   withValue = false,
@@ -101,6 +103,9 @@ function Rig({
       catchDelayMs: 0,
       intentThreshold: THRESHOLD,
       cooldownMs: COOLDOWN,
+      ...(commitDistance === undefined
+        ? {}
+        : { minSwipeDistance: commitDistance, swipeThresholdRatio: 0 }),
     },
     onPressStart: () => {
       starts += 1;
@@ -441,5 +446,97 @@ describe("the width the commit distance is measured against", () => {
     fire(host, pointer("pointerup", { x: 122, t: 600 }));
 
     expect(lastRelease().direction).toBe("none");
+  });
+});
+
+describe("what the engine does to the events it takes", () => {
+  it("claims the browser's default on the move that CLAIMS the gesture", () => {
+    // The activating move is the one that matters most: it is where the page
+    // would otherwise start scrolling. It is also the only place with its own
+    // `cancelable` check, and the drag branch's check says nothing about it.
+    mount();
+    fire(host, pointer("pointerdown", { x: 100, t: 0 }));
+
+    const claiming = pointer("pointermove", { x: 150, t: 16 });
+    let tried = 0;
+    const real = claiming.preventDefault.bind(claiming);
+    claiming.preventDefault = () => {
+      tried += 1;
+      real();
+    };
+    fire(host, claiming);
+
+    expect(dragStarts).toBe(1);
+    expect(tried).toBeGreaterThan(0);
+  });
+
+  it("does not try it on an activating move the browser has committed", () => {
+    // Non-cancelable: `defaultPrevented` stays false either way, so only the
+    // CALL can be observed — and every browser logs it as an error, once per
+    // frame of a scroll.
+    mount();
+    fire(host, pointer("pointerdown", { x: 100, t: 0 }));
+
+    const uncancelable = new MouseEvent("pointermove", {
+      bubbles: true,
+      cancelable: false,
+      clientX: 150,
+      clientY: 40,
+      button: 0,
+    });
+    Object.defineProperty(uncancelable, "pointerId", { value: 1 });
+    Object.defineProperty(uncancelable, "pointerType", { value: "touch" });
+    Object.defineProperty(uncancelable, "isPrimary", { value: true });
+    Object.defineProperty(uncancelable, "timeStamp", { value: 16 });
+    let tried = 0;
+    uncancelable.preventDefault = () => {
+      tried += 1;
+    };
+    fire(host, uncancelable);
+
+    // The gesture is still claimed — refusing to call `preventDefault` is not
+    // refusing to drag.
+    expect(dragStarts).toBe(1);
+    expect(tried).toBe(0);
+  });
+
+  it("stops a swallowed click from reaching anything above it", () => {
+    // Preventing the default is only half of it: a click that still bubbles
+    // reaches the page's own delegated handlers, and the slide under the
+    // finger opens anyway while the deck slides.
+    mount();
+    fire(host, pointer("pointerdown", { x: 100, t: 0 }));
+    fire(host, pointer("pointermove", { x: 150, t: 16 }));
+    fire(host, pointer("pointerup", { x: 170, t: 30 }));
+
+    let reachedAbove = 0;
+    const onAbove = () => {
+      reachedAbove += 1;
+    };
+    container.addEventListener("click", onAbove);
+    click(container.querySelector("[data-plain]") as Element, { t: 100 });
+    container.removeEventListener("click", onAbove);
+
+    expect(reachedAbove).toBe(0);
+  });
+});
+
+describe("settings that change while the hook is alive", () => {
+  it("reads the settings it was last given, not the ones it started with", () => {
+    // The carousel's real sequence: the deck is measured after the first
+    // paint, so the commit distance the engine is handed CHANGES between the
+    // mount and the first gesture. A hook that kept its first settings would
+    // judge every swipe by a tuning nobody is using any more.
+    mount({ commitDistance: 200 });
+    // Re-render with a far smaller commit distance, then swipe 40px slowly:
+    // too little for the old tuning, plenty for the new one.
+    mount({ commitDistance: 20 });
+
+    fire(host, pointer("pointerdown", { x: 100, t: 1000 }));
+    fire(host, pointer("pointermove", { x: 120, t: 1300 }));
+    fire(host, pointer("pointermove", { x: 140, t: 1600 }));
+    fire(host, pointer("pointerup", { x: 140, t: 1900 }));
+
+    expect(lastRelease().direction).toBe("right");
   });
 });
