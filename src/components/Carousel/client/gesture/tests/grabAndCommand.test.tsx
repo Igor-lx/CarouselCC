@@ -105,7 +105,7 @@ const render = (props: ProbeProps = {}) =>
     root.render(<Probe {...props} />);
   });
 
-const pointer = (type: string, x: number, y = 100): Event => {
+const pointer = (type: string, x: number, y = 100, t?: number): Event => {
   const event = new MouseEvent(type, {
     bubbles: true,
     cancelable: true,
@@ -116,6 +116,9 @@ const pointer = (type: string, x: number, y = 100): Event => {
   Object.defineProperty(event, "pointerId", { value: 1 });
   Object.defineProperty(event, "pointerType", { value: "touch" });
   Object.defineProperty(event, "isPrimary", { value: true });
+  // Without an explicit time the events land in the same millisecond and every
+  // pull reads as a flick, which would commit on speed rather than distance.
+  if (t !== undefined) Object.defineProperty(event, "timeStamp", { value: t });
   return event;
 };
 
@@ -303,6 +306,33 @@ describe("the origin the offsets are measured from", () => {
   });
 });
 
+describe("a render that changes nothing", () => {
+  it("does not drop a live drag", () => {
+    // The teardown effect runs on every render; its guard is the only thing
+    // that stops an ordinary parent re-render from clearing the drag origin
+    // mid-gesture, which would leave the finger dragging a deck whose origin
+    // is zero.
+    render();
+    fire(surface(), pointer("pointerdown", 300));
+    fire(surface(), pointer("pointermove", 400));
+    fire(surface(), pointer("pointermove", 600));
+    const beforeRerender = seen.painted.at(-1)!;
+
+    render(); // same props, new render
+
+    fire(surface(), pointer("pointermove", 700));
+    const afterRerender = seen.painted.at(-1)!;
+
+    // The deck still MOVES (the drag is alive) and still moves from the same
+    // origin (the drag was not silently restarted): the first half fails if the
+    // re-render cleared the origin, the second if it re-anchored one.
+    expect(afterRerender).not.toBe(beforeRerender);
+    expect(afterRerender).toBeLessThan(beforeRerender);
+    expect(afterRerender).toBeLessThan(ORIGIN);
+    expect(afterRerender).toBeGreaterThan(ORIGIN - 1);
+  });
+});
+
 describe("the surface going away under a live drag", () => {
   it("ends an orphaned drag as a directionless release", () => {
     // Switching the gesture off mid-drag gives no `onRelease`: the adapter
@@ -334,11 +364,15 @@ describe("the surface going away under a live drag", () => {
     expect(types.indexOf("START_DRAG")).toBeLessThan(types.indexOf("END_DRAG"));
   });
 
-  it("drops a start that never became a drag when the deck stops sliding", () => {
-    // Pressed, not yet dragged, and the deck stops being slidable: the queued
-    // START_DRAG describes a drag that will never exist, so it must not fire.
+  it("drops a queued start when the deck stops being slidable", () => {
+    // Grabbed (so the start IS queued) and then the deck collapses to fewer
+    // slides than a page. The queued START_DRAG describes a drag that will
+    // never exist, so it must not fire — and a collapse is recovered by
+    // reconciliation, so no END_DRAG is invented for it either.
     render();
     fire(surface(), pointer("pointerdown", 300));
+    fire(surface(), pointer("pointermove", 400)); // grabs; start still pending
+
     render({ layout: STUCK });
     act(() => {
       vi.advanceTimersByTime(100);
@@ -351,17 +385,30 @@ describe("the surface going away under a live drag", () => {
 
 describe("the adapter's own wiring", () => {
   it("hands the engine the slot-adapted tuning, not the engine defaults", () => {
-    // The commit distance is delivered resolved (`swipeThresholdRatio: 0`).
-    // Lose the memo and the engine falls back to its own host-relative
-    // threshold, which on a 600px viewport is 120px — far more than the
-    // carousel's slot-derived commit distance.
-    render({ slotPx: SLOT });
-    fire(surface(), pointer("pointerdown", 300));
-    fire(surface(), pointer("pointermove", 400));
-    fire(surface(), pointer("pointermove", 460));
-    fire(surface(), pointer("pointerup", 460));
+    // The commit distance is delivered resolved (`swipeThresholdRatio: 0`,
+    // `minSwipeDistance` = 30 % of the 200px slot = 60px). Lose the memo and
+    // the engine falls back to its own host-relative rule, which on this 600px
+    // viewport adapts to 36px — so a 45px pull would turn the page that the
+    // carousel's own tuning leaves alone.
+    //
+    // Both sides are asserted: a test that only ever refuses would pass on an
+    // engine that refuses everything.
+    // The distance that decides is measured from the PRESS, not from the move
+    // that claimed the gesture, so `travel` is the total.
+    // Each pull gets its own time window: a second gesture inside the first
+    // one's cooldown is refused outright and would report the first release
+    // twice.
+    const slowPull = (travel: number, t0: number) => {
+      render({ slotPx: SLOT });
+      fire(surface(), pointer("pointerdown", 300, 100, t0));
+      fire(surface(), pointer("pointermove", 320, 100, t0 + 300));
+      fire(surface(), pointer("pointermove", 300 + travel, 100, t0 + 600));
+      fire(surface(), pointer("pointerup", 300 + travel, 100, t0 + 900));
+      return lastEnd().isSnap;
+    };
 
-    expect(lastEnd().isSnap).toBe(false);
+    expect(slowPull(45, 1000)).toBe(true); // under 60px: snaps back
+    expect(slowPull(80, 9000)).toBe(false); // over it: turns the page
   });
 
   it("survives a first render that has no viewport node yet", () => {
@@ -383,8 +430,13 @@ describe("the adapter's own wiring", () => {
   });
 
   it("does not dispatch a deferred start after unmounting", () => {
+    // The grab has to happen first, or there is no queued dispatch to cancel
+    // and the assertion holds for the wrong reason.
     render();
     fire(surface(), pointer("pointerdown", 300));
+    fire(surface(), pointer("pointermove", 400));
+    expect(commandsOfType("START_DRAG")).toEqual([]); // queued, not sent
+
     act(() => root.unmount());
     act(() => {
       vi.advanceTimersByTime(100);

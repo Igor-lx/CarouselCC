@@ -229,10 +229,16 @@ describe("a release with no direction, on a deck that was already moving", () =>
     // No slot means no lane and therefore no pressed slide. The destination of
     // the interrupted ride is the only thing left to honour — guessing a page
     // from an unmeasured deck would land the finger on an arbitrary slide.
+    //
+    // The ride is aimed at page 1, NOT the last one: an unmeasured deck divides
+    // by zero, and a lane of Infinity floors to the far end of the strip. Aim
+    // the ride at the end and the two answers coincide by accident.
     slotSize = 0;
-    catchInFlight(700);
+    render({ inFlightTargetPageIndex: 1 });
+    fire(surface(), pointer("pointerdown", 700));
+    settleCatch();
     fire(surface(), pointer("pointerup", 700));
 
-    expect(lastEnd().targetPageIndex).toBe(3);
+    expect(lastEnd().targetPageIndex).toBe(1);
   });
 });

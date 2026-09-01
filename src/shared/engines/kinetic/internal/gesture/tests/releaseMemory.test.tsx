@@ -197,6 +197,60 @@ describe("the pause law — a finger that stops has said something", () => {
   });
 });
 
+describe("the pause is an INTERVAL, not a sum of two clocks", () => {
+  const swipeAt = (epoch: number, holdMs: number) => {
+    mount();
+    fire(pointer("pointerdown", { x: 100, t: epoch }));
+    fire(pointer("pointermove", { x: 160, t: epoch + 16 }));
+    fire(pointer("pointermove", { x: 220, t: epoch + 32 }));
+    fire(pointer("pointerup", { x: 220, t: epoch + 32 + holdMs }));
+    return lastRelease();
+  };
+
+  it("decays by how long the finger held, not by what time it is", () => {
+    // Every test above starts the gesture at t = 0, where "now minus the last
+    // sample" and "now plus it" are nearly the same number. On a page that has
+    // been open a while they are not: at t = 30000 a sum reads as a half-hour
+    // hold, and every flick dies the moment the user has been on the page for
+    // a minute. Same gesture, same hold, two epochs — the answers must match.
+    // Neither epoch may be 0: React substitutes `Date.now()` for a zero
+    // `timeStamp`, which would put the press on a different clock from its
+    // own moves and make the two gestures incomparable for the wrong reason.
+    const early = swipeAt(1000, GRACE - 1);
+    const late = swipeAt(30000, GRACE - 1);
+
+    expect(late.launchVelocity).toBeCloseTo(early.launchVelocity, 10);
+    expect(late.pointerReleaseVelocity).toBeCloseTo(
+      early.pointerReleaseVelocity,
+      10,
+    );
+    expect(late.uiReleaseVelocity).toBeCloseTo(early.uiReleaseVelocity, 10);
+    // And they are still live numbers, so the comparison is between two flicks
+    // rather than between two zeroes — a sum decays everything to nothing at
+    // either epoch, and two nothings agree perfectly.
+    expect(Math.abs(late.launchVelocity)).toBeGreaterThan(0.5);
+    expect(Math.abs(late.pointerReleaseVelocity)).toBeGreaterThan(0.5);
+    expect(late.direction).toBe("right");
+  });
+
+  it("costs an instant lift nothing, however late in the session", () => {
+    // The per-frame velocities decay by the EMA law rather than the pause law,
+    // so any hold at all leaves them near zero and two near-zeroes agree
+    // whatever the arithmetic. The case that separates them is the lift with
+    // NO hold: the honest interval is zero and nothing decays, while a sum
+    // reads two epochs of standstill and wipes the reading the deck settles by.
+    const early = swipeAt(1000, 0);
+    const late = swipeAt(30000, 0);
+
+    expect(late.uiReleaseVelocity).toBeCloseTo(early.uiReleaseVelocity, 10);
+    expect(Math.abs(late.uiReleaseVelocity)).toBeGreaterThan(0.1);
+    expect(late.pointerReleaseVelocity).toBeCloseTo(
+      early.pointerReleaseVelocity,
+      10,
+    );
+  });
+});
+
 describe("the twitch at lift-off — the mirror risk", () => {
   it("cannot wipe a real flick", () => {
     // The terminal sample is judged over the last frames alone, so a
