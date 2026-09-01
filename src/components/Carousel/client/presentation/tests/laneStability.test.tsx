@@ -35,23 +35,33 @@ const slide = (virtualIndex: number, isActual: boolean): VirtualSlide =>
 const Probe = ({
   virtualSlides,
   layoutOrigin,
+  flags = {},
 }: {
   virtualSlides: VirtualSlide[];
   layoutOrigin: number;
+  flags?: Readonly<Record<string, boolean>>;
 }) => {
   seen = useCarouselPresentation({
     visibleSlidesCount: 3,
     virtualSlides,
     layoutOrigin,
-    flags: {},
+    flags,
   });
   return null;
 };
 
-const render = (virtualSlides: VirtualSlide[], layoutOrigin = 0) => {
+const render = (
+  virtualSlides: VirtualSlide[],
+  layoutOrigin = 0,
+  flags?: Readonly<Record<string, boolean>>,
+) => {
   act(() =>
     root.render(
-      <Probe virtualSlides={virtualSlides} layoutOrigin={layoutOrigin} />,
+      <Probe
+        virtualSlides={virtualSlides}
+        layoutOrigin={layoutOrigin}
+        {...(flags ? { flags } : {})}
+      />,
     ),
   );
   return seen!;
@@ -117,5 +127,27 @@ describe("slide lane styles are identity-stable", () => {
     expect(
       [0, 1, 2].map((index) => back.slideStyleFor(index)["--slide-lane"]),
     ).toEqual([0, 1, 2]);
+  });
+});
+
+describe("the flags the host asked for reach the DOM payload", () => {
+  it("turns the active ones into attributes, and the inactive into absence", () => {
+    // A flag the host switched off is an ABSENT attribute, never
+    // `data-x="false"`: CSS attribute selectors match on presence, so a
+    // "false" would style the deck as if the flag were on. The hook only
+    // carries the payload — but nothing was checking that it carries it.
+    const view = render([], 0, { loop: true, autoplay: false });
+
+    expect(view.flagAttributes).toEqual({ "data-loop": "true" });
+  });
+
+  it("keeps the payload identical while the flags do not move", () => {
+    // Spread onto the root element every render; a fresh object each time
+    // rewrites the attributes on every parent render.
+    const flags = { loop: true };
+    const first = render([], 0, flags);
+    const second = render([], 0, flags);
+
+    expect(second.flagAttributes).toBe(first.flagAttributes);
   });
 });
