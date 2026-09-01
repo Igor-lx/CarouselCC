@@ -376,14 +376,19 @@ export function usePointerSwipe({
               gesture.width || target?.offsetWidth || sampleRef.current.width,
             timestamp: now,
           };
-      sample.flickVelocity = dominantMagnitude(
-        sample.flickVelocity ?? 0,
-        pausedFlickVelocity,
-      );
-      sample.launchVelocity = dominantMagnitude(
-        sample.launchVelocity ?? 0,
-        pausedLaunchVelocity,
-      );
+      // The merge guards the FRESH terminal sample only: a one-pixel twitch at
+      // lift-off is judged over the last frames alone and reads as a
+      // standstill, so it must not wipe a real flick. A still lift has no new
+      // reading to guard against — the spread above carries the memory
+      // UNDECAYED, and merging it here lets it out-magnitude the paused value
+      // every time, defeating the pause law in exactly the case it exists for
+      // (swipe, change your mind, hold, lift).
+      sample.flickVelocity = hasMovementOnRelease
+        ? dominantMagnitude(sample.flickVelocity ?? 0, pausedFlickVelocity)
+        : pausedFlickVelocity;
+      sample.launchVelocity = hasMovementOnRelease
+        ? dominantMagnitude(sample.launchVelocity ?? 0, pausedLaunchVelocity)
+        : pausedLaunchVelocity;
       sampleRef.current = sample;
 
       const wasDragging = phase === "dragging";
