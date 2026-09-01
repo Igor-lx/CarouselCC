@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-  "_comment": "Мутационный прогон — аудит тестовой сети, а не часть общего набора: он долгий и запускается по требованию (npm run test:mutation). Область растёт по критичности слоя, а не по удобству: сюда входит то, чья поломка не роняет ни одну проверку и видна только глазом на устройстве — геометрия страниц, состояние, сборка конфига и ядро движения (позиция и кривая) и распознавание жеста (пороги намерения, скорости, отпускание). DOM границей не является: компонент и хук мутируются под jsdom так же, как чистая функция; дороже — да, невозможно — нет. Что НЕ входит и почему: таблицы констант (config/*.ts) — их мутанты убиваются только пересказом самих значений, то есть тестом-детектором изменений; dev-слой modules/Diagnostic — не уезжает в прод-бандл (разбор в .context/08-tests.md, F); фасад engines/kinetic — объединённая копия двух форков, его гарантия приходит из движков по смыслу (решение в .context/09-decisions.md, G).",
+  "_comment": "Мутационный прогон — аудит тестовой сети, а не часть общего набора: он долгий и запускается по требованию (npm run test:mutation). Область растёт по критичности слоя, а не по удобству: сюда входит то, чья поломка не роняет ни одну проверку и видна только глазом на устройстве — геометрия страниц, состояние, сборка конфига и ядро движения (позиция и кривая) распознавание жеста (пороги намерения, скорости, отпускание) и то, что существует в DOM и где оно нарисовано (измерение слота, владелец transform, окно рендера, ворота загрузки картинок, презентация). DOM границей не является: компонент и хук мутируются под jsdom так же, как чистая функция; дороже — да, невозможно — нет. Что НЕ входит и почему: таблицы констант (config/*.ts) — их мутанты убиваются только пересказом самих значений, то есть тестом-детектором изменений; dev-слой modules/Diagnostic — не уезжает в прод-бандл (разбор в .context/08-tests.md, F); фасад engines/kinetic — объединённая копия двух форков, его гарантия приходит из движков по смыслу (решение в .context/09-decisions.md, G).",
   "packageManager": "npm",
   "testRunner": "vitest",
   "reporters": ["html", "clear-text", "progress"],
@@ -12,6 +12,11 @@
     "src/components/Carousel/client/motion/**/*.ts",
     "src/components/Carousel/client/visual-position/**/*.ts",
     "src/components/Carousel/client/gesture/**/*.ts",
+    "src/components/Carousel/client/geometry/**/*.ts",
+    "src/components/Carousel/client/geometry/**/*.tsx",
+    "src/components/Carousel/client/slides/**/*.ts",
+    "src/components/Carousel/client/slides/**/*.tsx",
+    "src/components/Carousel/client/presentation/**/*.ts",
     "src/shared/engines/motion/**/*.ts",
     "src/shared/engines/gesture/**/*.ts",
     "!src/shared/engines/**/tests/**",
@@ -22,7 +27,11 @@
     "!src/components/Carousel/client/**/index.ts",
     "!src/components/Carousel/client/**/types.ts"
   ],
-  "thresholds": { "high": 90, "low": 80, "break": null },
+  "thresholds": {
+    "high": 90,
+    "low": 80,
+    "break": null
+  },
   "timeoutMS": 20000,
   "concurrency": 4
 }
