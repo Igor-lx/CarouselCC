@@ -24,6 +24,7 @@ import { useSlideRenderModel } from "../useSlideRenderModel";
  */
 
 const BUFFER = 4;
+const BAND = 512; // LAYOUT_ORIGIN_BAND_SLOTS
 
 const recordsOf = (slideCount: number): CarouselSlideRecord[] =>
   buildSlideRecords(
@@ -196,6 +197,68 @@ describe("useSlideRenderModel — the layout origin", () => {
 
     render({ current: 5000, previous: 5000, isMoving: false });
     expect(seen.layoutOrigin).not.toBe(origin);
+  });
+
+  it("re-centres in BOTH directions, not only forwards", () => {
+    // The band is two-sided: a deck ridden backwards drifts below the origin
+    // just as far. Watch only the far edge and the lane numbers grow without
+    // bound going left, until the transform loses its precision.
+    render({ current: 0, previous: 0, isMoving: false });
+    const origin = seen.layoutOrigin;
+
+    render({ current: -5000, previous: -5000, isMoving: false });
+    expect(seen.layoutOrigin).not.toBe(origin);
+    expect(seen.layoutOrigin).toBeLessThan(origin);
+  });
+
+  it("holds AT the band edge and lets go one lane past it", () => {
+    // The edge is where "inside the band" and "past it" stop agreeing, and it
+    // is the only place the comparison is specified. A window that reaches the
+    // edge exactly must still cost nothing.
+    render({ current: 0, previous: 0, isMoving: false });
+    const origin = seen.layoutOrigin;
+    const far = () => Math.max(...lanes());
+
+    // Walk the window outwards one lane at a time. The window's shape is not
+    // predicted — it is read back each step — so the assertion is exactly the
+    // rule: the origin holds for as long as the far lane is inside the band,
+    // and moves on the first lane that is not.
+    let current = origin;
+    let steppedOut = false;
+    while (!steppedOut && current < origin + BAND + 32) {
+      current += 1;
+      render({ current, previous: current, isMoving: false });
+      steppedOut = far() > origin + BAND;
+      if (!steppedOut) expect(seen.layoutOrigin).toBe(origin);
+    }
+
+    expect(steppedOut).toBe(true);
+    expect(far()).toBe(origin + BAND + 1);
+    expect(seen.layoutOrigin).not.toBe(origin);
+  });
+});
+
+describe("useSlideRenderModel — which lanes are loop clones", () => {
+  it("clones only the lanes that fall outside the deck", () => {
+    // A clone key exists to stop a looped lane colliding with the original.
+    // Handing one to an in-range lane duplicates keys the other way round.
+    render({ current: 0, previous: 0, isMoving: false });
+
+    expect(byIndex(-1)!.slideKey).toContain("clone:");
+    expect(byIndex(0)!.slideKey).not.toContain("clone:");
+    expect(byIndex(11)!.slideKey).not.toContain("clone:");
+    expect(byIndex(12)!.slideKey).toContain("clone:");
+  });
+
+  it("clones nothing at all on a finite deck", () => {
+    // Without looping there is no second copy to collide with, and a lane
+    // outside the deck is simply not rendered.
+    const finite = buildCarouselLayout(records, 3, true);
+    render({ current: 0, previous: 0, isMoving: false, layout: finite });
+
+    for (const slide of seen.virtualSlides) {
+      expect(slide.slideKey).not.toContain("clone:");
+    }
   });
 });
 

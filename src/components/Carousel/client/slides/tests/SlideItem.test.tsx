@@ -381,3 +381,54 @@ describe("SlideItem — when a sizes hint is worth sending", () => {
     expect(img()!.getAttribute("sizes")).toBe("400px");
   });
 });
+
+describe("SlideItem — the orientation veil is gated on a shown bitmap", () => {
+  const rotate = (overrides: Partial<SlideItemProps> = {}) => {
+    render({ viewportSignature: "0110", ...overrides });
+    act(() => {
+      img()?.dispatchEvent(new Event("load"));
+    });
+    render({ viewportSignature: "1010", ...overrides });
+    return img()?.getAttribute("data-reorienting") ?? null;
+  };
+
+  it("veils a loaded image when the viewport flips", () => {
+    // The artefact it hides is a stale `<source media>` crop, so it can only
+    // happen to a bitmap that is on screen.
+    expect(rotate()).toBe("true");
+  });
+
+  it("veils nothing without the responsive module", () => {
+    // No module, no `<source>` selection, no stale crop to hide — and veiling
+    // anyway would blank a perfectly good image on every rotation.
+    expect(rotate({ isResponsiveImagesOn: false })).toBeNull();
+  });
+
+  it("veils nothing on a slide that carries no image", () => {
+    expect(rotate({ slideData: TEXT, isContentImg: false })).toBeNull();
+  });
+
+  it("veils nothing while the image has not arrived", () => {
+    // Still loading: there is no old crop on screen to be replaced.
+    render({ viewportSignature: "0110" });
+    render({ viewportSignature: "1010" });
+
+    expect(img()!.getAttribute("data-reorienting")).toBeNull();
+  });
+});
+
+describe("SlideItem — the alt text", () => {
+  it("carries the slide's own alt", () => {
+    render();
+    expect(img()!.getAttribute("alt")).toBe("a photo");
+  });
+
+  it("falls back to an EMPTY alt, never to no alt at all", () => {
+    // A missing `alt` attribute makes screen readers announce the file name;
+    // an empty one marks the image decorative, which is the honest answer for
+    // a slide whose author gave no text.
+    render({ slideData: { ...IMAGE, alt: undefined } });
+
+    expect(img()!.getAttribute("alt")).toBe("");
+  });
+});
