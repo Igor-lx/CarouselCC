@@ -157,3 +157,135 @@ describe("soft lifecycle / reuse after dispose", () => {
     expect(() => store.dispose()).not.toThrow();
   });
 });
+
+describe("notifying subscribers is re-entrant", () => {
+  it("does not call a listener that unsubscribed during the notification", () => {
+    // Every listener here is a React `useSyncExternalStore` callback, and one
+    // of them unmounting its slide mid-notification is ordinary: a settle
+    // commits, the window shrinks, and the subscriber is gone before the loop
+    // reaches it. Calling it anyway schedules an update on a dead tree.
+    // Listeners run in subscription order, so the one doing the unsubscribing
+    // has to be registered FIRST — otherwise the victim has already run and
+    // the guard is never the thing answering.
+    const calls: string[] = [];
+    let unsubscribeSecond = (): void => undefined;
+    store.subscribe("u", () => {
+      calls.push("first");
+      unsubscribeSecond();
+    });
+    unsubscribeSecond = store.subscribe("u", () => calls.push("second"));
+
+    store.reportLoaded("u");
+
+    expect(calls).toEqual(["first"]);
+  });
+
+  it("does not call a listener that subscribed during the notification", () => {
+    // The mirror: a listener added mid-loop has not seen the state before the
+    // change, so the notification it would receive is about nothing.
+    const calls: string[] = [];
+    store.subscribe("u", () => {
+      calls.push("first");
+      store.subscribe("u", () => calls.push("late"));
+    });
+
+    store.reportLoaded("u");
+
+    expect(calls).toEqual(["first"]);
+  });
+});
+
+describe("the subscription bookkeeping", () => {
+  it("keeps the URL watched while any listener is left", () => {
+    const seen: string[] = [];
+    const off = store.subscribe("u", () => seen.push("a"));
+    store.subscribe("u", () => seen.push("b"));
+
+    off();
+    store.reportLoaded("u");
+
+    expect(seen).toEqual(["b"]);
+  });
+
+  it("takes a fresh subscription after the last listener left", () => {
+    // The empty set is dropped from the map; the next subscribe has to build
+    // a new one rather than add to a set nobody is holding.
+    const off = store.subscribe("u", () => undefined);
+    off();
+
+    const seen: string[] = [];
+    store.subscribe("u", () => seen.push("again"));
+    store.reportLoaded("u");
+
+    expect(seen).toEqual(["again"]);
+  });
+
+  it("unsubscribing twice is harmless", () => {
+    const off = store.subscribe("u", () => undefined);
+    off();
+    expect(() => off()).not.toThrow();
+  });
+});
+
+describe("what counts as a change worth committing", () => {
+  it("notifies again when a retry moves the generation but not the status", () => {
+    // After a retry the status is `loading` — which it was before the error
+    // too. Only the generation separates them, and it is what makes the slide
+    // remount its `<img>` and fetch again. Comparing the status alone would
+    // swallow the notification and the retry would never reach the DOM.
+    vi.useFakeTimers();
+    let notifications = 0;
+    store.subscribe("u", () => {
+      notifications += 1;
+    });
+
+    store.reportError("u");
+    const afterError = notifications;
+
+    store.requestRetry("u");
+    vi.advanceTimersByTime(IMAGE_RETRY.baseDelayMs);
+
+    expect(store.getSnapshot("u").status).toBe("loading");
+    expect(notifications).toBeGreaterThan(afterError);
+  });
+
+  it("does not resurrect a URL that loaded while a retry was pending", () => {
+    // A slide that loaded from cache in the meantime must not be pushed back
+    // to `loading` and made to fetch all over again.
+    //
+    // Two defences hold this, and neither can be tested alone: the load
+    // cancels the timer, and the timer re-checks the status before acting.
+    // Remove either and the other still answers; remove BOTH and this case
+    // goes red, which is what makes it a test of the guarantee rather than of
+    // one implementation of it.
+    vi.useFakeTimers();
+    store.reportError("u");
+    store.requestRetry("u");
+    store.reportLoaded("u");
+
+    vi.advanceTimersByTime(IMAGE_RETRY.maxDelayMs);
+
+    expect(store.getSnapshot("u").status).toBe("loaded");
+  });
+});
+
+describe("the backoff is exponential, not flat", () => {
+  it("doubles the wait with every further failure", () => {
+    // A flat delay turns a dead CDN into a steady request stream from every
+    // slide at once; the point of the curve is that it gets out of the way.
+    vi.useFakeTimers();
+
+    store.reportError("u"); // failure 1 → base
+    store.requestRetry("u");
+    vi.advanceTimersByTime(IMAGE_RETRY.baseDelayMs);
+    expect(store.getSnapshot("u").status).toBe("loading");
+
+    store.reportError("u"); // failure 2 → twice base
+    store.requestRetry("u");
+    vi.advanceTimersByTime(IMAGE_RETRY.baseDelayMs);
+    expect(store.getSnapshot("u").status).toBe("error");
+
+    vi.advanceTimersByTime(IMAGE_RETRY.baseDelayMs);
+    expect(store.getSnapshot("u").status).toBe("loading");
+  });
+});
