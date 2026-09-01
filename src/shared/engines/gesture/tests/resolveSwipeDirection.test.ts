@@ -165,3 +165,52 @@ describe("resolveSwipeDirection — a late reversal", () => {
     expect(slow.direction).toBe("right");
   });
 });
+
+/**
+ * Both commit ways are thresholds, and a threshold is only specified at its
+ * edge. Everywhere else the two readings of it — "past" and "at least" — give
+ * the same answer, which is why the tests above pass either way.
+ */
+describe("resolveSwipeDirection — the edges of the two thresholds", () => {
+  it("the token distance is reached AT the token distance", () => {
+    // `quickFlickMinOffset` (10) sits well below the distance threshold (24 for
+    // this width), so an offset of exactly 10 can only commit as a flick: the
+    // edge decides between a turned page and nothing at all.
+    const atEdge = resolveSwipeDirection({
+      ...base,
+      rawOffset: config.quickFlickMinOffset,
+      rawVelocity: config.quickFlickVelocity * 2,
+    });
+    const justUnder = resolveSwipeDirection({
+      ...base,
+      rawOffset: config.quickFlickMinOffset - 1,
+      rawVelocity: config.quickFlickVelocity * 2,
+    });
+
+    expect(atEdge.direction).toBe("right");
+    expect(justUnder.direction).toBe("none");
+  });
+
+  it("the adapted distance is reached AT the adapted distance", () => {
+    // width 400 → 80px raw, ×(1 − 0.7 resistance) → 24px, floored at
+    // minSwipeDistance 20. Slow enough that only distance can commit it. The
+    // edge is computed rather than written out because `1 - 0.7` is not 0.3 in
+    // binary: a literal 24 sits a float below the real threshold.
+    const adapted =
+      base.width * config.swipeThresholdRatio * (1 - config.resistance);
+    expect(adapted).toBeCloseTo(24, 10);
+    const slow = config.quickFlickVelocity / 10;
+
+    expect(
+      resolveSwipeDirection({ ...base, rawOffset: adapted, rawVelocity: slow })
+        .direction,
+    ).toBe("right");
+    expect(
+      resolveSwipeDirection({
+        ...base,
+        rawOffset: adapted - 1,
+        rawVelocity: slow,
+      }).direction,
+    ).toBe("none");
+  });
+});

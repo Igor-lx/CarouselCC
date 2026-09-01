@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyResistance,
+  clampMagnitude,
+  dominantMagnitude,
   calculateEma,
   decayedVelocity,
   frameAdjustedAlpha,
@@ -9,12 +11,14 @@ import {
 } from "../swipe/internals/math";
 import { sameDirectionSpeed } from "../inertia/speed";
 
-// `safeResistance`, `clampMagnitude` and `dominantMagnitude` had a describe
-// each. All three are one-line arithmetic that cannot fail subtly, and the two
-// that carry meaning are already asserted where that meaning lives:
-// safeResistance through applyResistance's "1:1 at zero, finite at one" case,
-// dominantMagnitude through resolveSwipeDirection's "flicks on the
-// WEIGHTED-AVERAGE speed" case.
+// `safeResistance` has no block of its own: its clamp is asserted where it
+// matters, in applyResistance's "1:1 at zero, finite at one" case.
+//
+// `clampMagnitude` and `dominantMagnitude` DO have one, below. They lost it
+// once to the argument that one-line arithmetic cannot fail subtly; a mutation
+// run disagreed and named the price — the whole body of clampMagnitude could
+// be emptied out, and dominantMagnitude's tie could flip, with every suite
+// still green.
 
 describe("applyResistance", () => {
   it("tracks the finger ~1:1 near zero", () => {
@@ -104,5 +108,67 @@ describe("pauseDecayedVelocity", () => {
 
   it("degenerate half-life disables decay instead of exploding", () => {
     expect(pauseDecayedVelocity(2, 1000, 120, 0)).toBe(2);
+  });
+});
+
+describe("clampMagnitude", () => {
+  // This one lost its block to the claim that it "cannot fail subtly". The
+  // measurement disagreed: emptied out entirely, turned into a division, or
+  // made to keep the LARGER of the two, it broke nothing that was watching.
+  // It is the ceiling on every velocity the engine reports, so a wrong answer
+  // here launches a ride at a speed no finger produced.
+  it("passes a magnitude under the limit through, sign and all", () => {
+    expect(clampMagnitude(3, 5)).toBe(3);
+    expect(clampMagnitude(-3, 5)).toBe(-3);
+  });
+
+  it("cuts a magnitude over the limit down to it, keeping the direction", () => {
+    expect(clampMagnitude(9, 5)).toBe(5);
+    expect(clampMagnitude(-9, 5)).toBe(-5);
+  });
+
+  it("is the limit exactly at the limit", () => {
+    expect(clampMagnitude(5, 5)).toBe(5);
+    expect(clampMagnitude(-5, 5)).toBe(-5);
+  });
+});
+
+describe("dominantMagnitude", () => {
+  it("returns the argument that is larger in magnitude, signed", () => {
+    expect(dominantMagnitude(2, -7)).toBe(-7);
+    expect(dominantMagnitude(-7, 2)).toBe(-7);
+  });
+
+  it("keeps the FIRST argument on a tie", () => {
+    // Both callers pass the live reading first and the remembered one second,
+    // so a tie has to resolve to the live one: equal magnitudes with opposite
+    // signs is a finger that just reversed, and the memory would send the deck
+    // the way the finger no longer goes.
+    expect(dominantMagnitude(5, -5)).toBe(5);
+    expect(dominantMagnitude(-5, 5)).toBe(-5);
+  });
+});
+
+describe("applyResistance — the shape of the lag", () => {
+  it("lags harder as resistance rises, at the same pull", () => {
+    const pull = 300;
+    const light = applyResistance(pull, 0.3, 0.01);
+    const medium = applyResistance(pull, 0.6, 0.01);
+    const heavy = applyResistance(pull, 0.9, 0.01);
+
+    expect(light).toBeGreaterThan(medium);
+    expect(medium).toBeGreaterThan(heavy);
+  });
+
+  it("divides the pull by the stiffness ratio, exactly", () => {
+    // The stiffness is a RATIO — `safe / (1 - safe)` — so half resistance is
+    // exactly 1, and the pull is divided by `1 + abs * curvature`. Reading
+    // `1 + safe` instead flattens the curve, and multiplying by the divisor
+    // instead of dividing runs the deck AHEAD of the finger.
+    expect(applyResistance(100, 0.5, 0.01)).toBeCloseTo(
+      100 / (1 + 100 * 0.01),
+      10,
+    );
+    expect(applyResistance(100, 0.5, 0.01)).toBeLessThan(100);
   });
 });

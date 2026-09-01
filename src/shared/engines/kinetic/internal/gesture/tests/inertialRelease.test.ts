@@ -70,4 +70,19 @@ describe("resolveInertialRelease", () => {
     });
     expect(r.effectiveReleaseSpeed).toBeCloseTo(1, 10);
   });
+  it("a release exactly at the base speed is not a flick", () => {
+    // The boundary is what separates "the finger merely kept up with the ride
+    // it was already owed" from "the finger asked for more". Read as `>=`, a
+    // release that matched the base tempo would be boosted to twice it — a
+    // deck that lurches on a gesture the user made no faster than the animation
+    // would have gone on its own.
+    const r = resolveInertialRelease({
+      gestureReleaseVelocity: 0.1, // base = 100 / 1000 = 0.1 exactly
+      distanceToTarget: 100,
+      baseDuration: 1000,
+      config,
+    });
+    expect(r.isInertialRelease).toBe(false);
+    expect(r.effectiveReleaseSpeed).toBeCloseTo(0.1, 10);
+  });
 });

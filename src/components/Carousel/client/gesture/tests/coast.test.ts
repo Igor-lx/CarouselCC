@@ -56,4 +56,18 @@ describe("resolveCoastedLaunchPosition", () => {
       }),
     ).toBeCloseTo(-0.128, 10);
   });
+  it("reads the coast direction from the GAP, not from the target alone", () => {
+    // Coasting leftward: the deck sits past its target and the finger left
+    // going left. Add the live position instead of subtracting it and the gap
+    // flips sign; `sameDirectionSpeed` then reads a helping release as an
+    // opposing one, and a fast flick launches its ride from a standstill.
+    expect(
+      resolveCoastedLaunchPosition({
+        ...base,
+        livePosition: 3,
+        targetVirtualIndex: 1,
+        releaseVelocity: -0.002,
+      }),
+    ).toBeCloseTo(3 - 0.128, 10);
+  });
 });

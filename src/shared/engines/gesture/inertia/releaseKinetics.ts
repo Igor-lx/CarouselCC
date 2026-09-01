@@ -51,10 +51,9 @@ export const resolveReleaseKinetics = ({
   const { inertiaBoost } = { ...RELEASE_KINETICS_DEFAULTS, ...config };
 
   // The intent primitive is duration-authored; express base SPEED as a duration.
-  const baseDuration =
-    baseSpeed > 0 && Math.abs(distance) > 0
-      ? Math.abs(distance) / baseSpeed
-      : 0;
+  // Only the speed needs guarding: a zero distance already divides to a zero
+  // duration, so asking about it here was a second reading of the same fact.
+  const baseDuration = baseSpeed > 0 ? Math.abs(distance) / baseSpeed : 0;
 
   const intent = resolveInertialRelease({
     gestureReleaseVelocity: pointerReleaseVelocity ?? launchVelocity,

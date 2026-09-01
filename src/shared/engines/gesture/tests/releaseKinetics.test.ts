@@ -85,4 +85,12 @@ describe("projectMomentum", () => {
     expect(projectMomentum(1.0, { momentumMs: 100 })).toBeCloseTo(100, 10);
     expect(projectMomentum(0.2, { minSpeed: 0.3 })).toBeNull();
   });
+  it("keeps a release that sits exactly ON the rest threshold", () => {
+    // The threshold separates a glide from a rest, and only its edge says
+    // which way it leans. Read as `<=`, the slowest release the engine still
+    // calls a glide would come back as "rest where dropped" — a deck that
+    // stops dead on a gesture the user did make.
+    expect(projectMomentum(0.05)).toBeCloseTo(0.05 * 260, 10);
+    expect(projectMomentum(-0.05)).toBeCloseTo(-0.05 * 260, 10);
+  });
 });
