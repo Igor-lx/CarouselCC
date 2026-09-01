@@ -40,17 +40,25 @@ interface Input {
   current: number;
   previous: number;
   isMoving: boolean;
+  /** Swapped in by the identity tests: the deck's data can change under a
+   *  window that did not move at all. */
+  records?: CarouselSlideRecord[];
+  layout?: CarouselLayout;
 }
 
 let host: HTMLDivElement;
 let root: Root;
 let seen: { virtualSlides: VirtualSlide[]; layoutOrigin: number };
 
-function Probe(input: Input) {
+function Probe({
+  records: recordsOverride,
+  layout: layoutOverride,
+  ...input
+}: Input) {
   seen = useSlideRenderModel({
     ...input,
-    layout,
-    records,
+    layout: layoutOverride ?? layout,
+    records: recordsOverride ?? records,
     renderWindowBufferMultiplier: BUFFER,
   });
   return null;
@@ -188,5 +196,77 @@ describe("useSlideRenderModel — the layout origin", () => {
 
     render({ current: 5000, previous: 5000, isMoving: false });
     expect(seen.layoutOrigin).not.toBe(origin);
+  });
+});
+
+/**
+ * The identity cache carries two `eslint-disable`s and a CONSTRAINT saying why
+ * the rule is worth breaking here. The run asked the fair question back: is
+ * that benefit held by a test, or only by the comment? Three of the four
+ * fields the cache compares had no test at all — meaning the cache could have
+ * started handing back a STALE object and every suite would have stayed green,
+ * which is worse than not caching at all.
+ */
+describe("useSlideRenderModel — what forces a slide object to be rebuilt", () => {
+  it("rebuilds when the band membership changes but actuality does not", () => {
+    // Slide 0 is outside the destination band in both renders — `isActual` is
+    // false either way — yet it is on screen in the first (it was where the
+    // ride started) and gone in the second. Reuse the object and the slide
+    // keeps `inert` off after it has left, catching focus and taps.
+    render({ current: 3, previous: 0, isMoving: true });
+    const onScreen = byIndex(0)!;
+    expect(onScreen.isActual).toBe(false);
+    expect(onScreen.isActive).toBe(true);
+
+    render({ current: 3, previous: 6, isMoving: true });
+    const offScreen = byIndex(0)!;
+
+    expect(offScreen.isActual).toBe(false);
+    expect(offScreen.isActive).toBe(false);
+    expect(offScreen).not.toBe(onScreen);
+  });
+
+  it("rebuilds when the slide's own data is replaced under it", () => {
+    // The host can swap a slide's content without the window moving: same id,
+    // same lane, new picture. A cache that only watches the flags would hand
+    // React the previous object and the deck would keep showing the old one.
+    render({ current: 0, previous: 0, isMoving: false });
+    const before = byIndex(1)!;
+    expect(before.slideData.content).toBe("slide 1");
+
+    const swapped = buildSlideRecords(
+      Array.from({ length: 12 }, (_, i): Slide => ({
+        id: `s${i}`,
+        content: i === 1 ? "replaced" : `slide ${i}`,
+      })),
+    );
+    render({ current: 0, previous: 0, isMoving: false, records: swapped });
+
+    expect(byIndex(1)).not.toBe(before);
+    expect(byIndex(1)!.slideData.content).toBe("replaced");
+    // …and the slides that did NOT change are still the same objects, or the
+    // cache would be doing nothing at all.
+    expect(byIndex(2)!.slideData.content).toBe("slide 2");
+  });
+
+  // The fourth field the cache compares, `slideKey`, has no test of its own on
+  // purpose: it can only differ for an out-of-band lane (`clone:` prefix), and
+  // those lanes exist only while the deck loops. Flip that and the lane itself
+  // stops being rendered, so there is no cached object left to hand back — the
+  // comparison cannot be falsified through anything a consumer can observe.
+
+  it("keeps reusing objects across repeated rebuilds, not just the first", () => {
+    // Bounded memory evicts what left the window — but only what left it.
+    // Evicting live entries would make the cache miss every time, which the
+    // single-rebuild test above cannot tell apart from a hit.
+    render({ current: 0, previous: 0, isMoving: false });
+    render({ current: 0, previous: 0, isMoving: true });
+    const second = byIndex(1);
+
+    render({ current: 0, previous: 0, isMoving: false });
+    expect(byIndex(1)).toBe(second);
+
+    render({ current: 0, previous: 0, isMoving: true });
+    expect(byIndex(1)).toBe(second);
   });
 });
