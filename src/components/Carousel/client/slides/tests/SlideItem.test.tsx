@@ -179,16 +179,47 @@ describe("SlideItem — interactivity", () => {
     expect(rootEl().tagName).toBe("DIV");
   });
 
-  it("becomes a real button once interactive, handled and loaded", () => {
+  it("is a button from the first paint, before any pixel has arrived", () => {
+    // The tab order is decided by the markup, and the markup must not wait for
+    // the network: a slide that joins the tab order when its image lands moves
+    // the stops under a user who is already tabbing. The element type is also
+    // the identity of the DOM node — swapping it re-creates the whole subtree,
+    // `<img>` and all.
     const onSlideClick = vi.fn();
     render({ isInteractiveOn: true, onSlideClick });
-    // Still a div: the image has not loaded, so there is nothing to open yet.
-    expect(rootEl().tagName).toBe("DIV");
+
+    expect(rootEl().tagName).toBe("BUTTON");
+    expect(rootEl().getAttribute("type")).toBe("button");
+
+    rootEl().click();
+    expect(onSlideClick).toHaveBeenCalledWith(IMAGE);
+  });
+
+  it("stays the same button through the load, without re-creating the node", () => {
+    const onSlideClick = vi.fn();
+    render({ isInteractiveOn: true, onSlideClick });
+    const before = rootEl();
 
     markLoaded();
     render({ isInteractiveOn: true, onSlideClick });
+
     expect(rootEl().tagName).toBe("BUTTON");
-    expect(rootEl().getAttribute("type")).toBe("button");
+    // The very same element: React keeps the node when the tag does not change.
+    expect(rootEl()).toBe(before);
+  });
+
+  it("a slide whose image failed is still focusable and still reports its click", () => {
+    // What the deck shows is a placeholder, not an absence: the item exists,
+    // and whether it is worth opening without its picture is the host's call —
+    // it holds the slide, we hold only the pixels that did not arrive.
+    const onSlideClick = vi.fn();
+    render({ isInteractiveOn: true, onSlideClick });
+    act(() => {
+      img()!.dispatchEvent(new Event("error"));
+    });
+
+    expect(rootEl().tagName).toBe("BUTTON");
+    expect(rootEl().textContent).toBe("a photo");
 
     rootEl().click();
     expect(onSlideClick).toHaveBeenCalledWith(IMAGE);

@@ -55,9 +55,13 @@ export const SlideItem = memo(function SlideItem(props: SlideItemProps) {
 
   if (!slideData) return null;
 
-  const isContentReady = !isImageSlide || status === "loaded";
-  const isClickable =
-    Boolean(onSlideClick) && isInteractiveOn && isContentReady;
+  // Two conditions, and neither is the network. The element type decides the
+  // tab order and the identity of the DOM node: gate it on the image and the
+  // stops appear under a user who is already tabbing, while every load swaps
+  // `div` for `button` and re-creates the subtree, `<img>` included. Whether a
+  // slide whose picture never came is worth opening is the host's call — it
+  // holds the slide; we hold only the pixels that did not arrive.
+  const isClickable = Boolean(onSlideClick) && isInteractiveOn;
   const Tag = isClickable ? "button" : "div";
 
   // Render-only responsive sources, gated by the module's presence (see slides.md).
