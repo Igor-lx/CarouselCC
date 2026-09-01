@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
+import { IMAGE_RETRY } from "../../config";
 import { buildSlideRecords } from "../../domain";
 import type { CarouselSlideRecord } from "../../domain";
 import type { Slide } from "../../public-api/types";
@@ -156,5 +157,53 @@ describe("useImageResourceStore — the instance", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("useImageResourceStore — retention when there is nothing to retain", () => {
+  it("keeps nothing at all once the deck stops being image content", () => {
+    // `isContentImg` off means the renderer mounts no images, so every tracked
+    // URL is dead weight: entries AND their pending retry timers.
+    //
+    // Two defences hold this and neither can be falsified alone — retention
+    // collects no URLs, and the instance soft-disposes the store. Removing
+    // both turns this case red, which is what makes it a test of the
+    // guarantee rather than of one implementation of it.
+    render({ records: deckA });
+    const kept = store!;
+    kept.reportLoaded("https://x.test/a.webp");
+    expect(kept.getSnapshot("https://x.test/a.webp").status).toBe("loaded");
+
+    // The instance is withheld from consumers, but the same store object is
+    // still the one being pruned behind it.
+    render({ records: deckA, isContentImg: false });
+
+    expect(store).toBeNull();
+    expect(kept.getSnapshot("https://x.test/a.webp").status).toBe("loading");
+  });
+});
+
+describe("useImageResourceStore — letting the store go", () => {
+  it("disposes the store when the carousel unmounts", () => {
+    // The store owns entries and `setTimeout` handles for the carousel's
+    // lifetime. After the deck is gone they are simply a leak — and a pending
+    // retry would go on firing into a tree that is no longer on the page.
+    //
+    // Asserted through an ERROR rather than a pending retry: both a disposed
+    // store and a leaked timer end up reading `loading`, so a retry cannot
+    // tell them apart. An emptied store reads an errored URL as untracked.
+    vi.useFakeTimers();
+    render({ records: deckA });
+    const owned = store!;
+    owned.reportError("https://x.test/a.webp");
+    owned.requestRetry("https://x.test/a.webp");
+    expect(owned.getSnapshot("https://x.test/a.webp").status).toBe("error");
+
+    act(() => root.unmount());
+    root = createRoot(host);
+
+    expect(owned.getSnapshot("https://x.test/a.webp").status).toBe("loading");
+    vi.advanceTimersByTime(IMAGE_RETRY.maxDelayMs);
+    vi.useRealTimers();
   });
 });
