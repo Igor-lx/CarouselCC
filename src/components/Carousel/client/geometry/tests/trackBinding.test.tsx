@@ -396,3 +396,111 @@ describe("useTrackBinding — the ride's baseline moving under it", () => {
     expect(transform()).toBe(`translate3d(${-2 * 200}px, 0, 0)`);
   });
 });
+
+/**
+ * The stub has carried `onfinish` and `oncancel` since it was written and
+ * nothing ever called them: twelve mutants in this file had no coverage at
+ * all. They are the ride's own ending — the moment the compositor layer is
+ * handed back — and the guard inside each is the only thing keeping a ride
+ * that was already replaced from repainting the track to its old destination.
+ */
+describe("useTrackBinding — how a compositor ride ends", () => {
+  it("pins the track at the destination and lets per-frame paint back in", () => {
+    // Without the final pin the track keeps whatever the last compositor frame
+    // left, which is close to the target but not on it — the deck settles a
+    // fraction of a pixel off, every ride.
+    startRide({ from: 0, to: 3 });
+    const animation = lastAnimation!;
+
+    act(() => animation.onfinish?.());
+
+    expect(transform()).toBe(`translate3d(${-3 * SLOT}px, 0, 0)`);
+    // The layer is released, not left held for the rest of the session.
+    expect(animation.cancel).toHaveBeenCalled();
+
+    // And the JS loop owns the track again.
+    act(() => emit(frameAt(1, 0)));
+    expect(transform()).toBe(`translate3d(${-1 * SLOT}px, 0, 0)`);
+  });
+
+  it("ignores the finish of a ride that was already replaced", () => {
+    // Two rides in a row: the first one's `onfinish` can still arrive after
+    // the second has taken the track. Acting on it would yank the deck back to
+    // the first ride's destination mid-flight.
+    startRide({ from: 0, to: 3 });
+    const first = lastAnimation!;
+    startRide({ from: 0, to: 8 });
+    const second = lastAnimation!;
+    expect(second).not.toBe(first);
+
+    const pinned = transform();
+    act(() => first.onfinish?.());
+
+    expect(transform()).toBe(pinned);
+    // The live ride still owns the track: a per-frame write is refused.
+    act(() => emit(frameAt(1, 0)));
+    expect(transform()).toBe(pinned);
+  });
+
+  it("releases the track when the ride is cancelled", () => {
+    startRide({ from: 0, to: 3 });
+    const animation = lastAnimation!;
+
+    act(() => animation.oncancel?.());
+
+    act(() => emit(frameAt(1, 0)));
+    expect(transform()).toBe(`translate3d(${-1 * SLOT}px, 0, 0)`);
+  });
+
+  it("ignores the cancel of a ride that was already replaced", () => {
+    // The mirror of the finish guard: the superseded ride's cancel must not
+    // clear the ref the LIVE ride is holding, or per-frame writes would start
+    // fighting a compositor animation that is still running.
+    startRide({ from: 0, to: 3 });
+    const first = lastAnimation!;
+    startRide({ from: 0, to: 8 });
+
+    const pinned = transform();
+    act(() => first.oncancel?.());
+
+    act(() => emit(frameAt(1, 0)));
+    expect(transform()).toBe(pinned);
+  });
+});
+
+describe("useTrackBinding — freezing the track before the cancel", () => {
+  it("freezes at the live compositor transform when no position is given", () => {
+    // Cancelling a running animation snaps the element back to its untouched
+    // style unless the current transform is written down FIRST. With no
+    // explicit position to resolve, that means reading the live curve.
+    startRide({ from: 0, to: 3 });
+    const live = "matrix(1, 0, 0, 1, -123, 0)";
+    const spy = vi
+      .spyOn(window, "getComputedStyle")
+      .mockReturnValue({ transform: live } as unknown as CSSStyleDeclaration);
+
+    act(() => {
+      api.cancelCompositorMotion();
+    });
+    spy.mockRestore();
+
+    expect(transform()).toBe(live);
+  });
+
+  it("leaves the track alone when the live transform says nothing", () => {
+    // `none` and the empty string are not positions: writing them would move
+    // the deck to lane zero at the exact moment a ride is being taken over.
+    startRide({ from: 0, to: 3 });
+    const pinned = transform();
+    const spy = vi
+      .spyOn(window, "getComputedStyle")
+      .mockReturnValue({ transform: "none" } as unknown as CSSStyleDeclaration);
+
+    act(() => {
+      api.cancelCompositorMotion();
+    });
+    spy.mockRestore();
+
+    expect(transform()).toBe(pinned);
+  });
+});
