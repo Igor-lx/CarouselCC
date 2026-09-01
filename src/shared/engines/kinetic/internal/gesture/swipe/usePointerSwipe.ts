@@ -600,7 +600,11 @@ export function usePointerSwipe({
       const dx = touch.clientX - gestureRef.current.startX;
       const dy = touch.clientY - gestureRef.current.startY;
       const threshold = settingsRef.current.intentThreshold;
-      if (Math.abs(dx) > threshold && Math.abs(dx) > Math.abs(dy)) {
+      // The tie belongs to the drag, exactly as the pointer path decides it
+      // (`absY > absX` → the page). Enforcement mirrors the decision: read
+      // strictly here and an exact 45° pull starts a drag while this listener
+      // still lets the page scroll for one frame — one rule, two answers.
+      if (Math.abs(dx) > threshold && Math.abs(dx) >= Math.abs(dy)) {
         event.preventDefault();
       }
     };

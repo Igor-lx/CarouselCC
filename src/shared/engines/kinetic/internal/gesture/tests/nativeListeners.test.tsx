@@ -149,11 +149,16 @@ describe("touchmove — the border with the page's own scroll", () => {
   });
 
   it("leaves a diagonal pull to the page while the vertical part leads", () => {
-    // Equal parts are not ours either: the rule is strictly "more horizontal".
+    // The page keeps what is MORE vertical. An exact tie is ours, because the
+    // pointer path claims it — the two rules answer the tie the same way, and
+    // the test below holds them to it.
     mount();
     fire(host, pointer("pointerdown", { x: 100, y: 100, t: 0 }));
-    const diagonal = fire(host, touchMove([{ x: 140, y: 140 }]));
-    expect(diagonal.defaultPrevented).toBe(false);
+    const leaning = fire(host, touchMove([{ x: 140, y: 150 }]));
+    expect(leaning.defaultPrevented).toBe(false);
+
+    const tie = fire(host, touchMove([{ x: 140, y: 140 }]));
+    expect(tie.defaultPrevented).toBe(true);
   });
 
   it("does not even try on an event the browser has already committed", () => {
