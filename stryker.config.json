@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-  "_comment": "Мутационный прогон — аудит тестовой сети, а не часть общего набора: он долгий и запускается по требованию (npm run test:mutation). Область растёт по критичности слоя, а не по удобству: сюда входит то, чья поломка не роняет ни одну проверку и видна только глазом на устройстве — геометрия страниц, состояние, сборка конфига и ядро движения (позиция и кривая) распознавание жеста (пороги намерения, скорости, отпускание) и то, что существует в DOM и где оно нарисовано (измерение слота, владелец transform, окно рендера, ворота загрузки картинок, презентация). DOM границей не является: компонент и хук мутируются под jsdom так же, как чистая функция; дороже — да, невозможно — нет. Что НЕ входит и почему: таблицы констант (config/*.ts) — их мутанты убиваются только пересказом самих значений, то есть тестом-детектором изменений; dev-слой modules/Diagnostic — не уезжает в прод-бандл (разбор в .context/08-tests.md, F); фасад engines/kinetic — объединённая копия двух форков, его гарантия приходит из движков по смыслу (решение в .context/09-decisions.md, G).",
+  "_comment": "Мутационный прогон — аудит тестовой сети, а не часть общего набора: он долгий и запускается по требованию (npm run test:mutation). Область растёт по критичности слоя, а не по удобству: сюда входит то, чья поломка не роняет ни одну проверку и видна только глазом на устройстве — геометрия страниц, состояние, сборка конфига и ядро движения (позиция и кривая) распознавание жеста (пороги намерения, скорости, отпускание) то, что существует в DOM и где оно нарисовано (измерение слота, владелец transform, окно рендера, ворота загрузки картинок, презентация), и обвязка с презентацией (контексты, модули, входы, полки состояния и темы). DOM границей не является: компонент и хук мутируются под jsdom так же, как чистая функция; дороже — да, невозможно — нет. Что НЕ входит и почему: таблицы констант (config/*.ts) — их мутанты убиваются только пересказом самих значений, то есть тестом-детектором изменений; dev-слой modules/Diagnostic — не уезжает в прод-бандл (разбор в .context/08-tests.md, F); фасад engines/kinetic — объединённая копия двух форков, его гарантия приходит из движков по смыслу (решение в .context/09-decisions.md, G). Строковые мутанты исключены мутатором: 426 неубитых из 611 в диагностическом прогоне оказались строками — классом, который закрепляется только пересказом самих значений. Stryker их не удаляет, а помечает Ignored: в знаменатель счёта они не входят.",
   "packageManager": "npm",
   "testRunner": "vitest",
   "reporters": ["html", "clear-text", "progress"],
@@ -17,6 +17,21 @@
     "src/components/Carousel/client/slides/**/*.ts",
     "src/components/Carousel/client/slides/**/*.tsx",
     "src/components/Carousel/client/presentation/**/*.ts",
+    "src/components/Carousel/client/context/**/*.ts",
+    "src/components/Carousel/client/context/**/*.tsx",
+    "src/components/Carousel/client/modules/**/*.ts",
+    "src/components/Carousel/client/modules/**/*.tsx",
+    "!src/components/Carousel/client/modules/Diagnostic/**",
+    "src/components/Carousel/client/autoplay/**/*.ts",
+    "src/components/Carousel/client/navigation/**/*.ts",
+    "src/components/Carousel/client/focus/**/*.ts",
+    "src/components/Carousel/client/host-report/**/*.ts",
+    "src/components/Carousel/client/public-api/**/*.ts",
+    "src/shared/clientState/**/*.ts",
+    "src/shared/clientState/**/*.tsx",
+    "src/shared/theme/**/*.ts",
+    "src/shared/theme/**/*.tsx",
+    "src/shared/viewportObservation/**/*.ts",
     "src/shared/engines/motion/**/*.ts",
     "src/shared/engines/gesture/**/*.ts",
     "!src/shared/engines/**/tests/**",
@@ -33,5 +48,8 @@
     "break": null
   },
   "timeoutMS": 20000,
-  "concurrency": 4
+  "concurrency": 4,
+  "mutator": {
+    "excludedMutations": ["StringLiteral"]
+  }
 }
