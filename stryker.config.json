@@ -21,7 +21,6 @@
     "src/components/Carousel/client/context/**/*.tsx",
     "src/components/Carousel/client/modules/**/*.ts",
     "src/components/Carousel/client/modules/**/*.tsx",
-    "!src/components/Carousel/client/modules/Diagnostic/**",
     "src/components/Carousel/client/autoplay/**/*.ts",
     "src/components/Carousel/client/navigation/**/*.ts",
     "src/components/Carousel/client/focus/**/*.ts",
@@ -45,13 +44,12 @@
     "src/shared/styles/**/*.ts",
     "src/shared/engines/motion/**/*.ts",
     "src/shared/engines/gesture/**/*.ts",
-    "!src/shared/engines/**/tests/**",
-    "!src/shared/engines/**/index.ts",
-    "!src/shared/engines/**/types.ts",
-    "!src/components/Carousel/client/**/tests/**",
-    "!src/components/Carousel/client/**/*.test.ts",
-    "!src/components/Carousel/client/**/index.ts",
-    "!src/components/Carousel/client/**/types.ts"
+    "!src/**/tests/**",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx",
+    "!src/**/index.ts",
+    "!src/**/types.ts",
+    "!src/components/Carousel/client/modules/Diagnostic/**"
   ],
   "thresholds": {
     "high": 90,
