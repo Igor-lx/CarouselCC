@@ -23,11 +23,16 @@ let observers: StubObserver[];
 
 class StubObserver {
   callback: IntersectionObserverCallback;
+  options: IntersectionObserverInit | undefined;
   disconnected = false;
   observed: Element[] = [];
 
-  constructor(callback: IntersectionObserverCallback) {
+  constructor(
+    callback: IntersectionObserverCallback,
+    options?: IntersectionObserverInit,
+  ) {
     this.callback = callback;
+    this.options = options;
     observers.push(this);
   }
 
@@ -51,6 +56,13 @@ class StubObserver {
       );
     });
   }
+
+  /** The spec allows an empty batch. */
+  fireEmpty(): void {
+    act(() => {
+      this.callback([], this as unknown as IntersectionObserver);
+    });
+  }
 }
 
 const installObserver = () =>
@@ -66,15 +78,21 @@ const setTabVisibility = (state: DocumentVisibilityState) => {
   });
 };
 
-function Probe() {
+function Probe({
+  threshold = 0.2,
+  withElement = true,
+}: {
+  threshold?: number;
+  withElement?: boolean;
+}) {
   const elementRef = useRef<HTMLDivElement | null>(null);
-  visible = useViewportVisibility({ elementRef, threshold: 0.2 });
-  return <div ref={elementRef} />;
+  visible = useViewportVisibility({ elementRef, threshold });
+  return withElement ? <div ref={elementRef} /> : null;
 }
 
-const render = () =>
+const render = (props: { threshold?: number; withElement?: boolean } = {}) =>
   act(() => {
-    root.render(<Probe />);
+    root.render(<Probe {...props} />);
   });
 
 beforeEach(() => {
@@ -176,5 +194,61 @@ describe("useViewportVisibility — without an observer", () => {
 
     setTabVisibility("visible");
     expect(visible).toBe(true);
+  });
+});
+
+describe("useViewportVisibility — the details of the watching", () => {
+  beforeEach(installObserver);
+
+  it("hands the observer the threshold it was asked for", () => {
+    // The threshold decides how much of a slide counts as on screen. Dropping
+    // it falls back to the browser's default of 0 — a single pixel of the
+    // element makes it "visible", and off-screen work starts a page early.
+    render({ threshold: 0.75 });
+
+    expect(observers[0]!.options?.threshold).toBe(0.75);
+  });
+
+  it("survives a notification that carries no entry", () => {
+    // Reading `[0].isIntersecting` blindly throws inside an observer callback,
+    // where nothing catches it — the element then stops being observed for the
+    // rest of the session.
+    render();
+    observers[0]!.fire(true);
+    expect(visible).toBe(true);
+
+    const blown: string[] = [];
+    const onError = (event: ErrorEvent) => blown.push(event.message);
+    window.addEventListener("error", onError);
+    observers[0]!.fireEmpty();
+    window.removeEventListener("error", onError);
+
+    expect(blown).toEqual([]);
+    // No entry means nothing is known to be on screen.
+    expect(visible).toBe(false);
+  });
+
+  it("stops listening for the tab signal on unmount", () => {
+    // The observer is disconnected in the same teardown; this listener lives
+    // on `document` and would otherwise outlive the component, calling
+    // `setState` on a tree that is gone.
+    render();
+    observers[0]!.fire(true);
+    expect(visible).toBe(true);
+
+    act(() => root.unmount());
+    root = createRoot(host);
+
+    expect(() => setTabVisibility("hidden")).not.toThrow();
+    expect(visible).toBe(true); // nothing wrote to it after the unmount
+  });
+
+  it("watches nothing at all until there is an element to watch", () => {
+    // The ref is empty on the very first layout effect of a subtree that
+    // renders nothing yet. Observing `null` throws.
+    render({ withElement: false });
+
+    expect(observers).toEqual([]);
+    expect(visible).toBe(false);
   });
 });
