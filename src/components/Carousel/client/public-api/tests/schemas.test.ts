@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 
-import { CarouselSlidesDataSchema, SlideSchema } from "../schemas";
+import {
+  CarouselSlidesDataSchema,
+  SlideImageSourceSchema,
+  SlideImageVariantsSchema,
+  SlideSchema,
+} from "../schemas";
 
 /**
  * The host's only supported way to validate external slide data, and the
@@ -121,5 +126,86 @@ describe("CarouselSlidesDataSchema — the document", () => {
   it("rejects a document that is not an array at all", () => {
     expect(CarouselSlidesDataSchema.safeParse(IMAGE_SLIDE).success).toBe(false);
     expect(CarouselSlidesDataSchema.safeParse(null).success).toBe(false);
+  });
+});
+
+describe("the image fields reject blanks as firmly as content does", () => {
+  // Every one of these ends up in an attribute the browser parses. An empty
+  // `srcSet` or `media` is not a smaller picture — it is a `<source>` that
+  // matches nothing, so the whole `<picture>` silently falls through to the
+  // fallback, or nothing renders at all. Whitespace is the case a length check
+  // alone lets past.
+  const blanks = ["", "   ", "\t\n"];
+
+  it("refuses a blank media or srcSet on a source", () => {
+    for (const blank of blanks) {
+      expect(
+        SlideImageSourceSchema.safeParse({
+          media: blank,
+          srcSet: "a.webp 1x",
+        }).success,
+      ).toBe(false);
+      expect(
+        SlideImageSourceSchema.safeParse({
+          media: "(min-width: 1px)",
+          srcSet: blank,
+        }).success,
+      ).toBe(false);
+    }
+  });
+
+  it("refuses a blank sizes or type when the host does supply one", () => {
+    // Optional means "may be absent", not "may be empty".
+    for (const blank of blanks) {
+      for (const field of ["sizes", "type"] as const) {
+        expect(
+          SlideImageSourceSchema.safeParse({
+            media: "(min-width: 1px)",
+            srcSet: "a.webp 1x",
+            [field]: blank,
+          }).success,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it("refuses a blank srcSet, sizes or defaultSrc on the variants", () => {
+    for (const blank of blanks) {
+      for (const field of ["srcSet", "sizes", "defaultSrc"] as const) {
+        expect(
+          SlideImageVariantsSchema.safeParse({ [field]: blank }).success,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it("keeps a value the host padded, rather than rejecting it", () => {
+    // Trimming decides ACCEPTANCE; it must not silently rewrite what the host
+    // sent, or a `sizes` string would come back subtly different.
+    const parsed = SlideImageSourceSchema.safeParse({
+      media: " (min-width: 1px) ",
+      srcSet: " a.webp 1x ",
+    });
+    expect(parsed.success).toBe(true);
+  });
+});
+
+describe("a React element is recognised under either of its sigils", () => {
+  it("accepts the legacy element symbol as well as the transitional one", () => {
+    // React 19 emits `react.transitional.element`; anything compiled against
+    // an older runtime — a host's own component library — still emits
+    // `react.element`. Recognising only one rejects half the ecosystem.
+    for (const sigil of ["react.element", "react.transitional.element"]) {
+      const element = { $$typeof: Symbol.for(sigil), type: "div", props: {} };
+      expect(SlideSchema.safeParse({ id: "s", content: element }).success).toBe(
+        true,
+      );
+    }
+  });
+
+  it("still refuses a plain object pretending to be one", () => {
+    expect(
+      SlideSchema.safeParse({ id: "s", content: { type: "div" } }).success,
+    ).toBe(false);
   });
 });
