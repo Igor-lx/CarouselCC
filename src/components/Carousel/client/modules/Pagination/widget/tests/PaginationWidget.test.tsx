@@ -14,6 +14,9 @@ import type {
 import { createMotionPlanChannel } from "../../../../motion";
 import type { VisualPositionSource } from "../../../../visual-position";
 import { PaginationWidget } from "../PaginationWidget";
+import { PAGINATION_WIDGET_DEFAULTS } from "../defaults";
+import { buildPaginationWidgetGeometry } from "../math/spatialField";
+import { projectDot } from "../math/projection";
 
 /**
  * The widget has TWO rendering modes and picks between them itself.
@@ -104,6 +107,29 @@ const render = (isReducedMotion: boolean, bound = true) =>
     );
   });
 
+/** CSS module names are empty strings under vitest; the `className` prop is
+ *  how a host names the parts, and it is also how a test can SEE them. */
+const NAMES = {
+  container_PW: "strip",
+  dot_PW: "dot",
+  dotActive_PW: "is-active",
+  activeDot_PW: "overlay",
+};
+
+const renderNamed = (
+  stable: CarouselStableContextValue,
+  props: Record<string, unknown> = {},
+) =>
+  act(() => {
+    root.render(
+      <CarouselStableContext.Provider value={stable}>
+        <CarouselMotionContext.Provider value={motion}>
+          <PaginationWidget className={NAMES} {...props} />
+        </CarouselMotionContext.Provider>
+      </CarouselStableContext.Provider>,
+    );
+  });
+
 const container = () => host.firstElementChild as HTMLElement;
 const dots = () => container().querySelectorAll("div");
 
@@ -177,5 +203,113 @@ describe("<PaginationWidget> — what it renders", () => {
     expect(container().getAttribute("style")).toContain(
       "--visible-dots-count: 7",
     );
+  });
+});
+
+describe("<PaginationWidget> — each stream on its own", () => {
+  it("goes static when only the position stream is missing", () => {
+    // The two sources are nulled together by the carousel, but the component
+    // is a public slot: a host wiring one and not the other must get the
+    // static strip, not a binding reading a null.
+    const stable = {
+      ...stableWith(false, true),
+      visualPosition: null,
+    } as CarouselStableContextValue;
+    renderNamed(stable);
+
+    expect(container().hasAttribute("data-motion-bound")).toBe(false);
+  });
+
+  it("goes static when only the plan stream is missing", () => {
+    const stable = {
+      ...stableWith(false, true),
+      motionPlan: null,
+    } as CarouselStableContextValue;
+    renderNamed(stable);
+
+    expect(container().hasAttribute("data-motion-bound")).toBe(false);
+  });
+});
+
+describe("<PaginationWidget> — the static strip", () => {
+  const staticStable = () => stableWith(true, true);
+  const dotsOf = () =>
+    Array.from(container().querySelectorAll<HTMLElement>(".dot"));
+
+  it("marks exactly one dot active, and it is the middle of the strip", () => {
+    // The strip is re-centred on the current page every render, so the active
+    // dot is always the middle one. Get the centring arithmetic wrong and the
+    // marker slides off the centre — or off the strip entirely, leaving a
+    // pagination with nothing marked at all.
+    renderNamed(staticStable());
+    const strip = dotsOf();
+    const active = strip.filter((dot) => dot.classList.contains("is-active"));
+
+    expect(active).toHaveLength(1);
+    expect(strip.indexOf(active[0]!)).toBe((strip.length - 1) / 2);
+  });
+
+  it("stays centred when the deck is on a different page", () => {
+    const onPageFive = {
+      ...motion,
+      intent: { targetPageIndex: 5 },
+    };
+    act(() => {
+      root.render(
+        <CarouselStableContext.Provider value={staticStable()}>
+          <CarouselMotionContext.Provider value={onPageFive}>
+            <PaginationWidget className={NAMES} />
+          </CarouselMotionContext.Provider>
+        </CarouselStableContext.Provider>,
+      );
+    });
+
+    const strip = dotsOf();
+    const active = strip.filter((dot) => dot.classList.contains("is-active"));
+    expect(active).toHaveLength(1);
+    expect(strip.indexOf(active[0]!)).toBe((strip.length - 1) / 2);
+  });
+
+  it("places each dot exactly where the projection says", () => {
+    // The static strip has no binding to paint it later, so the transform it
+    // is born with is the only one it will ever have.
+    renderNamed(staticStable());
+    const geometry = buildPaginationWidgetGeometry(
+      PAGINATION_WIDGET_DEFAULTS.visibleDots,
+      {
+        size: PAGINATION_WIDGET_DEFAULTS.dotSize,
+        gap: PAGINATION_WIDGET_DEFAULTS.dotGap,
+        scaleFactor: PAGINATION_WIDGET_DEFAULTS.scaleFactor,
+      },
+    );
+
+    const strip = dotsOf();
+    const centre = (strip.length - 1) / 2;
+    strip.forEach((dot, index) => {
+      const projected = projectDot(1 + index - centre, 1, geometry);
+      expect(dot.style.transform).toBe(
+        `translate3d(${projected.x}px, 0, 0) scale(${projected.scale})`,
+      );
+      expect(dot.style.opacity).toBe(String(projected.opacity));
+    });
+  });
+
+  it("mounts no highlight overlays — there is nothing to highlight with", () => {
+    // The overlays exist for the binding to animate. In static mode they would
+    // be empty elements sitting on top of the strip forever.
+    renderNamed(staticStable());
+    expect(container().querySelectorAll(".overlay")).toHaveLength(0);
+  });
+});
+
+describe("<PaginationWidget> — the geometry it publishes to CSS", () => {
+  it("carries px units, not bare numbers", () => {
+    // The custom properties are consumed by `calc()` in the stylesheet; a bare
+    // number there makes the whole rule invalid and the strip collapses.
+    renderNamed(stableWith(false, true), { dotSize: 12, dotGap: 8 });
+    const style = container().getAttribute("style") ?? "";
+
+    expect(style).toContain("--dot-size: 12px");
+    expect(style).toContain("--dots-gap: 8px");
   });
 });
