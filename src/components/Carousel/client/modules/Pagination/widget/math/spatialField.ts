@@ -9,10 +9,11 @@ const buildScales = (
   centerIndex: number,
   scaleFactor: number,
 ): number[] =>
-  Array.from({ length: visibleCount }, (_, index) => {
-    const distance = Math.abs(index - centerIndex);
-    return distance > centerIndex + 0.5 ? 0 : Math.pow(scaleFactor, distance);
-  });
+  Array.from({ length: visibleCount }, (_, index) =>
+    // No cut-off: `centerIndex` is `floor(visibleCount / 2)`, so the farthest
+    // index of any strip sits exactly `centerIndex` away and never further.
+    Math.pow(scaleFactor, Math.abs(index - centerIndex)),
+  );
 
 const buildStrip = (
   scales: number[],
