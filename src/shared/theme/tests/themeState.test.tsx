@@ -119,6 +119,51 @@ describe("ThemeStateProvider", () => {
     expect(dataTheme()).toBe("dark");
   });
 
+  it("stops tracking the OS once the user has chosen a mode", () => {
+    // The listener is attached ONLY in auto. Left attached, an OS switch would
+    // override a deliberate choice — the setting would look like it silently
+    // stopped working.
+    localStorage.setItem(THEME_STORAGE_KEY, "light");
+    render();
+    expect(captured!.onScreenTheme).toBe("light");
+    expect(mqlListeners.size).toBe(0);
+
+    setOsDark(true);
+    expect(captured!.onScreenTheme).toBe("light");
+    expect(dataTheme()).toBe("light");
+  });
+
+  it("lets go of the OS listener when it stops being needed", () => {
+    // Auto → explicit while mounted: the subscription has to come off with the
+    // effect that made it, or it accumulates one per mode change.
+    render();
+    expect(mqlListeners.size).toBe(1);
+
+    act(() => captured!.setTheme("dark"));
+
+    expect(mqlListeners.size).toBe(0);
+  });
+
+  it("ignores a storage event about somebody else's key", () => {
+    // `storage` fires for EVERY key the origin holds. Reading them all makes
+    // any other app on the same origin able to repaint this one.
+    render();
+    const before = captured!.theme;
+
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent("storage", { key: "unrelated", newValue: "dark" }),
+      );
+    });
+
+    expect(captured!.theme).toBe(before);
+  });
+
+  // The `storage` listener's removal on unmount is deliberately NOT asserted:
+  // React swallows a `setState` on an unmounted component, so a leaked
+  // listener changes nothing any test can observe. The OS listener above IS
+  // observable, because it is counted at the MediaQueryList.
+
   it("syncs across tabs via the storage event", () => {
     render();
     act(() => {
