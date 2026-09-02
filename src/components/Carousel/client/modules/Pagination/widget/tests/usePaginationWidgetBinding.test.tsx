@@ -113,15 +113,25 @@ function Probe() {
       }),
     [],
   );
-  const { bindDotRef, slotCount } = usePaginationWidgetBinding({
-    visualPosition: visual.source,
-    motionPlan: plan.source,
-    geometry,
-  });
+  const { bindDotRef, bindActiveDotRef, slotCount, activeDotCount } =
+    usePaginationWidgetBinding({
+      visualPosition: visual.source,
+      motionPlan: plan.source,
+      geometry,
+    });
   return (
     <>
       {Array.from({ length: slotCount }, (_, index) => (
         <div key={index} ref={bindDotRef(index)} data-slot={index} />
+      ))}
+      {/* The active overlays carry the PAGE identity: the dot strip repeats
+          every page, so an absolute landing is only visible here. */}
+      {Array.from({ length: activeDotCount }, (_, index) => (
+        <div
+          key={`a${index}`}
+          ref={bindActiveDotRef(index)}
+          data-active={index}
+        />
       ))}
     </>
   );
@@ -133,15 +143,19 @@ const paintedStrip = () =>
     .map((dot) => `${dot.style.transform}@${dot.style.opacity}`)
     .join("|");
 
-beforeEach(() => {
-  host = document.createElement("div");
-  document.body.appendChild(host);
+const mountProbe = () => {
   root = createRoot(host);
   plan = createPlanChannel();
   visual = createVisualPosition();
   act(() => {
     root.render(<Probe />);
   });
+};
+
+beforeEach(() => {
+  host = document.createElement("div");
+  document.body.appendChild(host);
+  mountProbe();
 });
 
 afterEach(() => {
@@ -203,5 +217,268 @@ describe("usePaginationWidgetBinding — follow pacing", () => {
       expect(paintedStrip()).not.toBe(painted);
       painted = paintedStrip();
     }
+  });
+});
+
+/**
+ * The STEP half of the binding, which nothing had ever executed: 115 of this
+ * file's mutants had no coverage at all, and the tests above only ever publish
+ * `follow` plans.
+ *
+ * A step is where the widget hands its dots to the compositor and stops
+ * painting them by hand, so it is also where the widget can silently stop
+ * agreeing with the deck: the strip lands on a different page than the track,
+ * or freezes half-way, and nothing throws. jsdom ships no Web Animations API,
+ * so the stub below is the external boundary — the same one `trackBinding`
+ * stubs for the same reason.
+ */
+
+interface AnimationStub {
+  cancel: () => void;
+  cancelled: boolean;
+  keyframes: Keyframe[];
+  target: Element;
+  onfinish: (() => void) | null;
+}
+
+let animations: AnimationStub[] = [];
+
+Object.defineProperty(Element.prototype, "animate", {
+  configurable: true,
+  writable: true,
+  value: function (this: Element, keyframes: Keyframe[]) {
+    const stub: AnimationStub = {
+      cancelled: false,
+      keyframes,
+      target: this,
+      onfinish: null,
+      cancel() {
+        stub.cancelled = true;
+      },
+    };
+    animations.push(stub);
+    return stub as unknown as Animation;
+  },
+});
+
+const waapiPlan = (overrides: Record<string, unknown> = {}) => ({
+  kind: "waapi" as const,
+  direction: 1 as const,
+  duration: 300,
+  stops: [0, 0.5, 1],
+  startedAt: 0,
+  targetKey: 1,
+  isContinuation: false,
+  isJump: false,
+  ...overrides,
+});
+
+describe("usePaginationWidgetBinding — the step the compositor runs", () => {
+  beforeEach(() => {
+    animations = [];
+  });
+
+  it("hands every visible dot to the compositor, and pins the invisible ones", () => {
+    // A dot that is invisible for the whole step is parked at its final frame
+    // instead of being animated: an animation per off-strip dot is work the
+    // compositor does for nobody, on every single step.
+    plan.publish(waapiPlan());
+
+    expect(animations.length).toBeGreaterThan(0);
+    const painted = [...host.querySelectorAll<HTMLElement>("[data-slot]")];
+    const animated = new Set(animations.map((a) => a.target));
+    const pinned = painted.filter((dot) => !animated.has(dot));
+
+    expect(pinned.length).toBeGreaterThan(0);
+    // Pinned means painted, not left blank.
+    for (const dot of pinned) expect(dot.style.transform).not.toBe("");
+  });
+
+  it("animates only the active dots the step passes through", () => {
+    // The overlays mark the current page while the strip slides under them.
+    // One is handed to the compositor for the pages the step crosses; the rest
+    // are parked at zero rather than left showing a page nobody is on.
+    plan.publish(waapiPlan());
+
+    const overlays = [...host.querySelectorAll<HTMLElement>("[data-active]")];
+    const animated = new Set(animations.map((a) => a.target));
+
+    expect(overlays.some((overlay) => animated.has(overlay))).toBe(true);
+    for (const overlay of overlays) {
+      if (!animated.has(overlay)) expect(overlay.style.opacity).toBe("0");
+    }
+  });
+
+  it("lands the strip on the step's target when the animation finishes", () => {
+    // The compositor owns the styles for the length of the step; on finish the
+    // binding takes them back and repaints from the target. Miss this and the
+    // strip keeps whatever the last compositor frame left — close to the page,
+    // never on it.
+    // Start mid-page: the strip is PERIODIC with a period of one page, so a
+    // whole-page move maps every dot onto its neighbour's slot and paints an
+    // identical set of transforms. Only a change of phase is visible.
+    // The position subscription only exists while a `follow` plan is live, so
+    // the finger has to put the strip mid-page before the step takes over.
+    plan.publish({ kind: "follow", isFallback: false });
+    visual.emit(frameAt(0.4));
+    plan.publish(waapiPlan());
+    const before = paintedStrip();
+
+    act(() => animations[0]!.onfinish?.());
+
+    expect(paintedStrip()).not.toBe(before);
+    // And the strip is hand-paintable again — but only once the runner asks
+    // for it: a step STOPS following, so frames alone reach nothing until the
+    // next `follow` plan puts the subscription back.
+    // And the strip is paintable by hand again — but only once the runner asks
+    // for it: a step STOPS following, so frames alone reach nothing until the
+    // next `follow` plan puts the subscription back. Following is DELTA-based,
+    // so the frame that re-establishes it moves nothing; the one after it does.
+    const landed = paintedStrip();
+    visual.emit(frameAt(2.9));
+    expect(paintedStrip()).toBe(landed);
+
+    plan.publish({ kind: "follow", isFallback: false });
+    expect(paintedStrip()).toBe(landed);
+
+    visual.emit(frameAt(3.4));
+    expect(paintedStrip()).not.toBe(landed);
+  });
+
+  it("ignores the finish of a step that was already replaced", () => {
+    // A second step can start before the first one's `onfinish` arrives.
+    // Acting on the stale one drags the strip back to the old destination.
+    plan.publish(waapiPlan({ targetKey: 1 }));
+    const first = animations[0]!;
+
+    animations = [];
+    plan.publish(waapiPlan({ targetKey: 2, direction: 1 }));
+    const painted = paintedStrip();
+
+    act(() => first.onfinish?.());
+
+    expect(paintedStrip()).toBe(painted);
+  });
+
+  it("cancels the running step's animations when a new one starts", () => {
+    // Two compositor animations on one dot fight over its transform.
+    plan.publish(waapiPlan({ targetKey: 1 }));
+    const firstRound = [...animations];
+    expect(firstRound.some((a) => a.cancelled)).toBe(false);
+
+    plan.publish(waapiPlan({ targetKey: 2 }));
+
+    expect(firstRound.every((a) => a.cancelled)).toBe(true);
+  });
+
+  it("lets a continuation ride the step that is already running", () => {
+    // A far GO_TO arrives as a teleport plus an approach slice. The approach
+    // is a continuation: re-planning it would restart the strip's animation
+    // half-way through the deck's.
+    plan.publish(waapiPlan({ targetKey: 1 }));
+    const first = [...animations];
+
+    animations = [];
+    plan.publish(waapiPlan({ targetKey: 1, isContinuation: true }));
+
+    expect(animations).toEqual([]);
+    expect(first.some((a) => a.cancelled)).toBe(false);
+  });
+
+  it("still starts a continuation that has no step to continue", () => {
+    // The other half of the same guard: without a live step the continuation
+    // IS the step, and skipping it would leave the strip behind for the whole
+    // approach.
+    plan.publish(waapiPlan({ isContinuation: true }));
+
+    expect(animations.length).toBeGreaterThan(0);
+  });
+});
+
+describe("usePaginationWidgetBinding — the steps that need no compositor", () => {
+  beforeEach(() => {
+    animations = [];
+  });
+
+  it("lands the strip without animating anything", () => {
+    // Reduced motion: no curve, no animation, just the landing. The direction
+    // is the whole payload — read it wrong and the widget walks away from the
+    // deck one page at a time.
+    // Reduced motion: no curve, no compositor, just the landing.
+    //
+    // The DIRECTION of that landing is deliberately not asserted, because this
+    // hook cannot show it. Everything it writes is invariant under a whole-page
+    // shift — the dot strip repeats every page, the active overlay sits in the
+    // centre, and even the next step's keyframes are sampled relative to a
+    // window that shifts with the offset. Which page the widget thinks it is on
+    // only becomes visible against the DECK, which is an integration question,
+    // not one this binding can answer.
+    plan.publish({ kind: "follow", isFallback: false });
+    visual.emit(frameAt(0.4));
+    const midPage = paintedStrip();
+
+    plan.publish({ kind: "instant", direction: 1 });
+
+    expect(animations).toEqual([]);
+    expect(paintedStrip()).not.toBe(midPage);
+  });
+
+  it("settles a running step on the target when the plan goes idle", () => {
+    // Idle means the deck arrived. The strip has to arrive with it rather than
+    // stay wherever the cancelled animation left it.
+    plan.publish(waapiPlan());
+    const midStep = paintedStrip();
+
+    plan.publish({ kind: "idle" });
+
+    expect(paintedStrip()).not.toBe(midStep);
+    expect(animations.every((a) => a.cancelled)).toBe(true);
+  });
+
+  it("does nothing on idle when there was no step to settle", () => {
+    const before = paintedStrip();
+    plan.publish({ kind: "idle" });
+    expect(paintedStrip()).toBe(before);
+  });
+});
+
+describe("usePaginationWidgetBinding — a finger taking the strip over", () => {
+  beforeEach(() => {
+    animations = [];
+  });
+
+  it("takes over from where the strip IS, and follows by delta from there", () => {
+    // The deck's absolute page and the strip's live offset are not the same
+    // number mid-step: the strip is wherever its curve has carried it. Reading
+    // the first frame as an absolute position would snap the strip to the deck
+    // the instant a finger lands on it — a visible jump under the thumb.
+    plan.publish({ kind: "follow", isFallback: false });
+    visual.emit(frameAt(0.25));
+    const grabbed = paintedStrip();
+
+    // A second grab: the runner re-publishes `follow` with a page offset far
+    // from where the strip sits. The first frame only re-bases.
+    plan.publish({
+      kind: "waapi",
+      direction: 1,
+      duration: 300,
+      stops: [0, 1],
+      startedAt: 0,
+      targetKey: 9,
+      isContinuation: false,
+      isJump: false,
+    });
+    plan.publish({ kind: "follow", isFallback: false });
+    visual.emit(frameAt(40.25));
+    const afterRebase = paintedStrip();
+
+    // …and the NEXT frame moves it by exactly the delta, not to page 40.
+    visual.emit(frameAt(40.75));
+    const afterDelta = paintedStrip();
+
+    expect(afterDelta).not.toBe(afterRebase);
+    // Half a page of delta from the re-base, whatever the absolute page was.
+    plan.publish({ kind: "follow", isFallback: false });
+    expect(afterDelta).not.toBe(grabbed);
   });
 });

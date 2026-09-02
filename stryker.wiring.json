@@ -1,0 +1,43 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_comment": "ВРЕМЕННЫЙ конфиг пункта 7 (обвязка и презентация). Строки исключены МУТАТОРОМ, а не разбором: условие входа объявлено в 02-todo.md заранее. Диагностика вне области — dev-слой. Удаляется вместе с пунктом.",
+  "packageManager": "npm",
+  "testRunner": "vitest",
+  "reporters": ["html", "clear-text", "progress"],
+  "coverageAnalysis": "perTest",
+  "mutate": [
+    "src/components/Carousel/client/context/**/*.ts",
+    "src/components/Carousel/client/context/**/*.tsx",
+    "src/components/Carousel/client/modules/**/*.ts",
+    "src/components/Carousel/client/modules/**/*.tsx",
+    "!src/components/Carousel/client/modules/Diagnostic/**",
+    "src/components/Carousel/client/autoplay/**/*.ts",
+    "src/components/Carousel/client/navigation/**/*.ts",
+    "src/components/Carousel/client/focus/**/*.ts",
+    "src/components/Carousel/client/host-report/**/*.ts",
+    "src/components/Carousel/client/public-api/**/*.ts",
+    "src/components/Carousel/client/public-api/**/*.tsx",
+    "src/shared/clientState/**/*.ts",
+    "src/shared/clientState/**/*.tsx",
+    "src/shared/theme/**/*.ts",
+    "src/shared/theme/**/*.tsx",
+    "src/shared/viewportObservation/**/*.ts",
+    "src/shared/viewportObservation/**/*.tsx",
+    "!src/**/tests/**",
+    "!src/**/index.ts",
+    "!src/**/types.ts"
+  ],
+  "thresholds": {
+    "high": 90,
+    "low": 80,
+    "break": null
+  },
+  "timeoutMS": 20000,
+  "concurrency": 4,
+  "mutator": {
+    "excludedMutations": ["StringLiteral"]
+  },
+  "htmlReporter": {
+    "fileName": "reports/mutation-wiring/mutation.html"
+  }
+}
