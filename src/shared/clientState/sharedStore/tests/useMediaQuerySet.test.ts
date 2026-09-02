@@ -187,3 +187,79 @@ describe("getMediaQuerySetStore — lifecycle", () => {
     off2();
   });
 });
+
+describe("getMediaQuerySetStore — where the signature comes from", () => {
+  it("trusts the event stream while subscribed, rather than polling the DOM", () => {
+    // React compares the signature to decide whether to re-render. A signature
+    // that re-read `matchMedia` on every snapshot could change with nobody
+    // notified — the value moving under React unannounced.
+    const mm = installMatchMedia();
+    const [a, b] = uniqueQueries(2);
+    const store = getMediaQuerySetStore([a!, b!]);
+    const off = store.subscribe(() => undefined);
+    expect(store.getSnapshot()).toBe("00");
+
+    mm.set(a!, true); // moved, no event fired
+    expect(store.getSnapshot()).toBe("00");
+
+    mm.fire(a!, true);
+    expect(store.getSnapshot()).toBe("10");
+    off();
+  });
+
+  it("keeps every consumer on the same answer, whenever it joined", () => {
+    // The set re-reads when it WAKES — for the first subscriber. Re-reading
+    // for a later one refreshes the signature with nobody notified, and the
+    // newcomer renders a different answer from the consumers already there.
+    const mm = installMatchMedia();
+    const [a, b] = uniqueQueries(2);
+    const store = getMediaQuerySetStore([a!, b!]);
+    const offFirst = store.subscribe(() => undefined);
+    expect(store.getSnapshot()).toBe("00");
+
+    mm.set(b!, true); // silent
+    const offSecond = store.subscribe(() => undefined);
+
+    expect(store.getSnapshot()).toBe("00");
+    offFirst();
+    offSecond();
+  });
+
+  it("does not call a listener that unsubscribed during the notification", () => {
+    // Every listener is a React subscription; one unmounting while the walk is
+    // in progress is ordinary, and calling it schedules work on a dead tree.
+    const mm = installMatchMedia();
+    const [a] = uniqueQueries(1);
+    const store = getMediaQuerySetStore([a!]);
+
+    const heard: string[] = [];
+    let offSecond = (): void => undefined;
+    const offFirst = store.subscribe(() => {
+      heard.push("first");
+      offSecond();
+    });
+    offSecond = store.subscribe(() => heard.push("second"));
+
+    mm.fire(a!, true);
+
+    expect(heard).toEqual(["first"]);
+    offFirst();
+  });
+
+  it("does not call a listener that subscribed during the notification", () => {
+    const mm = installMatchMedia();
+    const [a] = uniqueQueries(1);
+    const store = getMediaQuerySetStore([a!]);
+
+    const heard: string[] = [];
+    const off = store.subscribe(() => {
+      heard.push("first");
+      store.subscribe(() => heard.push("late"));
+    });
+
+    mm.fire(a!, true);
+
+    expect(heard).toEqual(["first"]);
+    off();
+  });
+});
