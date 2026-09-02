@@ -22,9 +22,15 @@ let host: HTMLDivElement;
 let getBusy: () => boolean;
 let renders = 0;
 
-const Probe = ({ enabled }: { enabled: boolean }) => {
+const Probe = ({
+  enabled,
+  quietDelayMs = 600,
+}: {
+  enabled: boolean;
+  quietDelayMs?: number;
+}) => {
   renders += 1;
-  getBusy = useViewportBusy({ enabled, quietDelayMs: 600 });
+  getBusy = useViewportBusy({ enabled, quietDelayMs });
   return null;
 };
 
@@ -137,5 +143,102 @@ describe("useViewportBusy", () => {
     mount(false);
     fire("touchstart", 1);
     expect(getBusy()).toBe(false);
+  });
+});
+
+describe("useViewportBusy — the edge of the quiet window", () => {
+  it("is busy up to the delay and quiet AT it", () => {
+    // The window is what autoplay waits out. One tick too long and every
+    // scroll costs an extra interval; one too short and the tick lands in the
+    // middle of a fling.
+    mount(true);
+    fire("touchstart", 1);
+    fire("touchend", 0);
+
+    advance(599);
+    expect(getBusy()).toBe(true);
+
+    advance(1);
+    expect(getBusy()).toBe(false);
+  });
+
+  it("follows a delay the consumer changes without remounting", () => {
+    // The settings are mirrored into refs after the commit precisely so the
+    // getter — polled from a timer, never from a render — sees the current
+    // ones rather than the ones it closed over.
+    mount(true);
+    fire("touchstart", 1);
+    fire("touchend", 0);
+    advance(599);
+    expect(getBusy()).toBe(true);
+
+    act(() => {
+      root.render(<Probe enabled={true} quietDelayMs={100} />);
+    });
+
+    // 599ms have passed and the window is now 100ms: already quiet.
+    expect(getBusy()).toBe(false);
+  });
+});
+
+describe("useViewportBusy — the mobile chrome", () => {
+  it("counts a visual-viewport resize as activity", () => {
+    // The URL bar collapsing resizes the VISUAL viewport without resizing the
+    // window. Missing it lets autoplay tick in the middle of that reflow.
+    // jsdom ships no `visualViewport`, so it is stubbed here — which is also
+    // why the hook reaches for it optionally.
+    const visual = new EventTarget();
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      value: visual,
+    });
+
+    mount(true);
+    advance(1000);
+    expect(getBusy()).toBe(false);
+
+    act(() => {
+      visual.dispatchEvent(new Event("resize"));
+    });
+    expect(getBusy()).toBe(true);
+
+    act(() => root.unmount());
+    advance(1000);
+    // And it lets go of that listener too.
+    act(() => {
+      visual.dispatchEvent(new Event("resize"));
+    });
+    expect(getBusy()).toBe(false);
+
+    Reflect.deleteProperty(window, "visualViewport");
+  });
+
+  it("does not reach for a visual viewport that is not there", () => {
+    // Safari on desktop and every non-browser runtime have none; reading it
+    // blindly throws inside an effect, which unmounts the whole host tree.
+    expect(window.visualViewport).toBeUndefined();
+    expect(() => mount(true)).not.toThrow();
+  });
+});
+
+describe("useViewportBusy — letting go", () => {
+  it("removes every listener and forgets the last signal on unmount", () => {
+    // The listeners are on `document` and `window`, not on a node React owns,
+    // so nothing removes them for us. A leaked one keeps a dead carousel's
+    // refs alive and answering.
+    mount(true);
+    fire("touchstart", 1);
+    expect(getBusy()).toBe(true);
+
+    const orphaned = getBusy;
+    act(() => root.unmount());
+
+    // Teardown forgot the finger and the timestamp…
+    expect(orphaned()).toBe(false);
+
+    // …and nothing reaches it any more.
+    fire("touchstart", 2);
+    fireWindow("scroll");
+    expect(orphaned()).toBe(false);
   });
 });
