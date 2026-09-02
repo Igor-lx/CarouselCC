@@ -144,6 +144,24 @@ describe("ThemeStateProvider", () => {
     expect(mqlListeners.size).toBe(0);
   });
 
+  it("returns to auto when another tab clears the storage", () => {
+    // `clear()` fires ONE event with a null key, not one per key. Ignoring it
+    // leaves this tab showing a mode that no longer exists anywhere — it would
+    // hold until a reload, while the tab that cleared shows the system theme.
+    localStorage.setItem(THEME_STORAGE_KEY, "dark");
+    render();
+    expect(captured!.theme).toBe("dark");
+
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent("storage", { key: null, newValue: null }),
+      );
+    });
+
+    expect(captured!.theme).toBe("auto");
+    expect(captured!.onScreenTheme).toBe("light"); // the OS is light here
+  });
+
   it("ignores a storage event about somebody else's key", () => {
     // `storage` fires for EVERY key the origin holds. Reading them all makes
     // any other app on the same origin able to repaint this one.

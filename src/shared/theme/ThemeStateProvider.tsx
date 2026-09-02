@@ -50,7 +50,11 @@ export function ThemeStateProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
-      if (event.key === THEME_STORAGE_KEY)
+      // `key === null` is `localStorage.clear()` — our setting went with it, so
+      // the tab follows the system again instead of holding a mode nobody
+      // stores any more. Any OTHER key belongs to some other app on this
+      // origin and must not repaint us.
+      if (event.key === null || event.key === THEME_STORAGE_KEY)
         setTheme(asThemeMode(event.newValue));
     };
     window.addEventListener("storage", onStorage);
