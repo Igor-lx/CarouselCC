@@ -215,3 +215,139 @@ describe("<ResponsiveImages> — teardown", () => {
     expect(decoded).toEqual([]);
   });
 });
+
+describe("<ResponsiveImages> — the idle scheduler", () => {
+  it("uses requestIdleCallback when the browser has one", async () => {
+    // The whole point of the module is to decode WITHOUT competing with the
+    // deck. A timer runs whether the main thread is busy or not; the idle
+    // callback is what makes it yield — and jsdom has none, so nothing had
+    // ever executed this branch.
+    const scheduled: Array<{ work: () => void; options?: unknown }> = [];
+    let nextHandle = 1;
+    const cancelled: number[] = [];
+    vi.stubGlobal(
+      "requestIdleCallback",
+      (work: () => void, options: unknown) => {
+        scheduled.push({ work, options });
+        return nextHandle++;
+      },
+    );
+    vi.stubGlobal("cancelIdleCallback", (handle: number) => {
+      cancelled.push(handle);
+    });
+
+    addSlide(false, "https://x.test/a.webp");
+    render(motionOf(true));
+
+    expect(scheduled).toHaveLength(1);
+    // With a timeout, so a permanently busy thread still decodes eventually.
+    expect(scheduled[0]!.options).toEqual({ timeout: 1000 });
+    expect(decoded).toEqual([]); // nothing until the browser says "idle"
+
+    await act(async () => {
+      scheduled[0]!.work();
+      await Promise.resolve();
+    });
+    expect(decoded).toEqual(["https://x.test/a.webp"]);
+
+    // And the pending callback is cancelled through the same API on teardown.
+    addSlide(false, "https://x.test/b.webp");
+    render(motionOf(true, 1));
+    act(() => root.unmount());
+    expect(cancelled.length).toBeGreaterThan(0);
+
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("<ResponsiveImages> — draining the queue", () => {
+  it("works through every buffered url, not just the first", async () => {
+    // One decode is scheduled per idle slot and the next is armed from the
+    // previous one's completion. Losing that re-arm decodes the first slide of
+    // the buffer and silently abandons the rest.
+    addSlide(false, "https://x.test/a.webp");
+    addSlide(false, "https://x.test/b.webp");
+    addSlide(false, "https://x.test/c.webp");
+    render(motionOf(true));
+
+    await drain();
+
+    expect(decoded.sort()).toEqual([
+      "https://x.test/a.webp",
+      "https://x.test/b.webp",
+      "https://x.test/c.webp",
+    ]);
+  });
+
+  it("skips an image whose source is still empty", async () => {
+    // `currentSrc` is empty until the element starts loading. Enqueuing it
+    // would decode the empty string and burn the queue slot.
+    addSlide(false, "");
+    addSlide(false, "https://x.test/real.webp");
+    render(motionOf(true));
+
+    await drain();
+
+    expect(decoded).toEqual(["https://x.test/real.webp"]);
+  });
+
+  it("skips it again when the load event arrives with nothing chosen", async () => {
+    // A `load` can fire on an element the browser resolved to no candidate at
+    // all (every `<source>` excluded, no fallback). Enqueuing that decodes the
+    // empty string — a request for the page itself.
+    const image = addSlide(false, "", false);
+    render(motionOf(true));
+
+    await act(async () => {
+      image.dispatchEvent(new Event("load"));
+    });
+    await drain();
+
+    expect(decoded).toEqual([]);
+  });
+
+  it("waits for the load event when the element is complete but sourceless", async () => {
+    // `complete` is true for an <img> that was never given a source at all;
+    // reading it alone would enqueue nothing and never listen either.
+    const image = addSlide(false, "", true);
+    render(motionOf(true));
+    await drain();
+    expect(decoded).toEqual([]);
+
+    Object.defineProperty(image, "currentSrc", {
+      value: "https://x.test/late.webp",
+      configurable: true,
+    });
+    await act(async () => {
+      image.dispatchEvent(new Event("load"));
+    });
+    await drain();
+
+    expect(decoded).toEqual(["https://x.test/late.webp"]);
+  });
+
+  it("forgets a url that has left the buffer, so it decodes again if it returns", async () => {
+    // The memory is pruned to the LIVE buffer each pass. Keeping every url
+    // ever seen means a slide that scrolled away and came back — its bitmap
+    // long evicted — is never decoded again.
+    const image = addSlide(false, "https://x.test/a.webp");
+    render(motionOf(true));
+    await drain();
+    expect(decoded).toEqual(["https://x.test/a.webp"]);
+
+    // It leaves the buffer…
+    image.closest("div")!.remove();
+    addSlide(false, "https://x.test/other.webp");
+    render(motionOf(true, 1));
+    await drain();
+
+    // …and comes back.
+    addSlide(false, "https://x.test/a.webp");
+    render(motionOf(true, 2));
+    await drain();
+
+    expect(
+      decoded.filter((url) => url === "https://x.test/a.webp"),
+    ).toHaveLength(2);
+  });
+});
