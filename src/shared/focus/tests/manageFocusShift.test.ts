@@ -136,3 +136,54 @@ describe("manageFocusShift", () => {
     expect(document.activeElement).toBe(slideAt(1));
   });
 });
+
+describe("manageFocusShift — when there is no active band at all", () => {
+  it("parks focus on the container rather than leaving it on a dead slide", () => {
+    // Every slide is out of band — a deck mid-jump, or one whose bands have
+    // not settled yet. There is nowhere to send focus, and leaving it where it
+    // is means leaving it inside an `inert` subtree, where the browser stops
+    // delivering keys: the user's keyboard goes dead with no visible reason.
+    build([{ active: false }, { active: false }]);
+    slideAt(0).removeAttribute("inert"); // focusable long enough to focus it
+    slideAt(0).tabIndex = 0;
+    slideAt(0).focus();
+    slideAt(0).setAttribute("inert", "");
+
+    const options: unknown[] = [];
+    const original = container.focus.bind(container);
+    container.focus = (init?: FocusOptions) => {
+      options.push(init);
+      original(init);
+    };
+
+    manageFocusShift(container);
+
+    expect(document.activeElement).toBe(container);
+    // The same no-scroll rule as the ordinary path: the deck may already be
+    // animating, and an instant scroll on top of it is the jump to avoid.
+    expect(options).toEqual([{ preventScroll: true }]);
+  });
+
+  it("asks the browser NOT to scroll while it moves focus", () => {
+    // Focus normally scrolls its target into view. Here the deck is already
+    // animating to that slide, and a second, instant scroll on top of it is
+    // the jump the option exists to prevent.
+    build([
+      { active: false, focusable: true },
+      { active: true, focusable: true },
+    ]);
+    slideAt(0).focus();
+
+    const options: unknown[] = [];
+    const target = slideAt(1);
+    const original = target.focus.bind(target);
+    target.focus = (init?: FocusOptions) => {
+      options.push(init);
+      original(init);
+    };
+
+    manageFocusShift(container);
+
+    expect(options).toEqual([{ preventScroll: true }]);
+  });
+});

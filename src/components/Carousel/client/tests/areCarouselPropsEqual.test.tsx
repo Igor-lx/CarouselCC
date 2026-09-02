@@ -152,3 +152,48 @@ describe("areCarouselPropsEqual", () => {
     expect(areCarouselPropsEqual(props(nest(9)), props(nest(9)))).toBe(false);
   });
 });
+
+describe("areCarouselPropsEqual — the identity React itself goes by", () => {
+  it("re-renders when a child keeps its type but changes its KEY", () => {
+    // Same component, different key: React unmounts one and mounts the other.
+    // Calling that "equal" keeps the old subtree on screen — the module never
+    // remounts, and whatever the new key was meant to reset stays as it was.
+    const prev = props(<Pagination key="a" />);
+    const next = props(<Pagination key="b" />);
+
+    expect(areCarouselPropsEqual(prev, next)).toBe(false);
+  });
+
+  it("holds when the key is the same on both sides", () => {
+    // The mirror, so the comparison is not simply "keys always differ".
+    expect(
+      areCarouselPropsEqual(
+        props(<Pagination key="a" />),
+        props(<Pagination key="a" />),
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps comparing right up to the depth fuse, and gives up past it", () => {
+    // The fuse is a cost ceiling, not a correctness rule: everything shallower
+    // than it must still be compared properly, or a host nesting its modules
+    // one level deeper silently loses the memo.
+    const nest = (levels: number): ReactNode => {
+      let node: ReactNode = <Pagination />;
+      for (let i = 0; i < levels; i += 1) node = <Wrapper>{node}</Wrapper>;
+      return node;
+    };
+
+    // Two levels of wrapping is well inside the fuse: still judged equal.
+    expect(areCarouselPropsEqual(props(nest(2)), props(nest(2)))).toBe(true);
+    // …and a real difference at that depth is still seen.
+    const differing = (
+      <Wrapper>
+        <Wrapper>
+          <Controls />
+        </Wrapper>
+      </Wrapper>
+    );
+    expect(areCarouselPropsEqual(props(nest(2)), props(differing))).toBe(false);
+  });
+});
