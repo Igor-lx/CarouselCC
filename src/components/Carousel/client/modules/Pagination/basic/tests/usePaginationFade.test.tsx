@@ -446,3 +446,154 @@ describe("usePaginationFade — handing the strip back", () => {
     expect(visual.listenerCount()).toBe(0);
   });
 });
+
+/**
+ * The JUMP half of the plan, which nothing had ever published: 81 of this
+ * file's mutants had no coverage, almost all of them here.
+ *
+ * A far GO_TO teleports the deck's middle, so there is no sweep for the dots
+ * to ride — the strip would have to fly across pages it never shows. Instead
+ * the dots CROSS-FADE straight from where they are to where they belong, still
+ * on the plan's own clock, so the landing dot finishes with the picture rather
+ * than before or after it.
+ */
+const jump = (
+  overrides: Partial<Extract<PublishablePlan, { kind: "waapi" }>> = {},
+): Extract<PublishablePlan, { kind: "waapi" }> => ({
+  ...sweepStartedAt(motionNow()),
+  isJump: true,
+  ...overrides,
+});
+
+describe("usePaginationFade — a jump cross-fades instead of sweeping", () => {
+  it("animates the dots whose look actually changes, and only those", () => {
+    // Every other dot already wears the inactive look; animating it would be a
+    // compositor layer per page, on every jump, for no visible change.
+    render(0);
+    render(3);
+    plan.publish(jump());
+
+    expect(animationOf(3)).toBeDefined();
+    expect(animationOf(0)).toBeDefined();
+    // A dot that is inactive before and after is left to its class.
+    expect(animationOf(2)).toBeUndefined();
+  });
+
+  it("takes each dot from its own look to the one it should end on", () => {
+    render(0);
+    render(3);
+    plan.publish(jump());
+
+    const landing = animationOf(3)!;
+    const leaving = animationOf(0)!;
+    const first = <T,>(a: T[]) => a[0]!;
+    const last = <T,>(a: T[]) => a[a.length - 1]!;
+
+    // The landing dot ends brighter than it starts; the one being left, dimmer.
+    expect(last(landing.keyframes).opacity).toBeGreaterThan(
+      first(landing.keyframes).opacity,
+    );
+    expect(last(leaving.keyframes).opacity).toBeLessThan(
+      first(leaving.keyframes).opacity,
+    );
+  });
+
+  it("hands the dots back once the cross-fade finishes", () => {
+    render(0);
+    render(3);
+    plan.publish(jump());
+
+    // While the compositor owns a dot the hook pins its transition off, so the
+    // CSS rule cannot animate the same property underneath. That flag — not
+    // the opacity, which WAAPI writes and no stub can emulate — is what says
+    // who is holding the dot.
+    expect(dot(3).style.transition).toBe("none");
+    expect(dot(0).style.transition).toBe("none");
+
+    act(() => animationOf(3)!.finish());
+
+    // Settled: the classes own the dots again, inline layer and all.
+    expect(dot(3).style.transition).toBe("");
+    expect(dot(0).style.transition).toBe("");
+    expect(dot(3).style.opacity).toBe("");
+  });
+
+  it("settles without animating when there is nothing to cross-fade", () => {
+    // Jumping to the page the strip is already on: every dot already wears the
+    // look it should end on.
+    render(2);
+    plan.publish(jump());
+
+    expect(recorded).toEqual([]);
+    expect(dot(2).style.opacity).toBe("");
+  });
+
+  it("continues a jump from the previous cross-fade's own curve", () => {
+    // Two GO_TOs in a row. The second must start from where the first fade had
+    // got to ON ITS CURVE — reading the DOM instead would restart it from the
+    // last painted frame, which the compositor may be ahead of.
+    render(0);
+    render(3);
+    plan.publish(jump({ startedAt: motionNow() - 50_000 })); // mid cross-fade
+    const firstLanding = animationOf(3)!;
+
+    recorded = [];
+    render(1);
+    plan.publish(jump({ targetKey: 2 }));
+
+    const secondLeaving = animationOf(3)!;
+    // Dot 3 was on its way to being active and is now on its way back: its
+    // fade starts from the MIDDLE of the first blend, not from either end.
+    const start = secondLeaving.keyframes[0]!.opacity;
+    const firstFrom = firstLanding.keyframes[0]!.opacity;
+    const firstTo =
+      firstLanding.keyframes[firstLanding.keyframes.length - 1]!.opacity;
+
+    expect(start).toBeGreaterThan(Math.min(firstFrom, firstTo));
+    expect(start).toBeLessThan(Math.max(firstFrom, firstTo));
+  });
+
+  it("clears the inline layer a finger left behind", () => {
+    // A drag paints every dot inline, frame by frame. The cross-fade re-takes
+    // only the dots it animates; the rest have to fall back to their classes,
+    // or they stay frozen at whatever the last dragged frame wrote — a strip
+    // that is half live and half stale.
+    grabMidRideAndDragTo(0.5);
+    expect(dot(2).style.opacity).not.toBe("");
+
+    render(3);
+    plan.publish(jump());
+
+    expect(animationOf(2)).toBeUndefined();
+    expect(dot(2).style.opacity).toBe("");
+  });
+
+  it("ignores a stale finish from a fade that was already replaced", () => {
+    // A second jump cancels the first one's animations; the first one's
+    // `onfinish` can still arrive and would settle the strip on the OLD page,
+    // mid-way through the new fade.
+    render(0);
+    render(3);
+    plan.publish(jump({ startedAt: motionNow() - 50_000 }));
+    const stale = animationOf(3)!;
+
+    render(1);
+    plan.publish(jump({ targetKey: 2 }));
+    expect(dot(1).style.transition).toBe("none"); // the new fade owns them
+
+    act(() => stale.finish());
+
+    expect(dot(1).style.transition).toBe("none"); // still owned, not settled
+  });
+
+  it("ignores a continuation slice — the jump already spans the command", () => {
+    render(0);
+    render(3);
+    plan.publish(jump());
+    const before = recorded.length;
+
+    plan.publish(jump({ isContinuation: true, targetKey: 2 }));
+
+    expect(recorded.length).toBe(before);
+  });
+});
