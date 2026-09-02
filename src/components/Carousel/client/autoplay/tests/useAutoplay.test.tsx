@@ -219,6 +219,11 @@ describe("useAutoplay — hover", () => {
     advance(HOVER_DELAY - 50);
     act(() => api.handleHoverChange(false));
 
+    // The clock is advanced PAST the abandoned delay first, on its own. React
+    // flushes state only when `act` exits, so a stale timer left armed would
+    // land its pause after this step rather than before it — and a single
+    // combined advance would tick first and never notice.
+    advance(100);
     advance(INTERVAL);
     expect(onStep).toHaveBeenCalledTimes(1);
   });
@@ -239,6 +244,40 @@ describe("useAutoplay — hover", () => {
     render({ ignoreHover: true });
     act(() => api.handleHoverChange(true));
     advance(HOVER_DELAY);
+    advance(INTERVAL);
+    expect(onStep).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops a hover that stops being watched before its delay lands", () => {
+    // The pause is armed but has not fired yet, and hover stops mattering —
+    // the deck goes to a touch device, or autoplay is switched off. The armed
+    // timer has to die with the watching: firing later would pause a deck
+    // whose pointer nobody is listening to any more, with no hover-leave ever
+    // coming to release it.
+    //
+    // TWO defences hold this and neither can be falsified alone: the effect
+    // clears the armed timer, and the render-time guard releases a pause that
+    // is no longer watched. Remove either and the other still answers; remove
+    // both and this case goes red.
+    render();
+    act(() => api.handleHoverChange(true));
+    advance(HOVER_DELAY - 50);
+
+    render({ ignoreHover: true });
+    advance(HOVER_DELAY);
+
+    advance(INTERVAL);
+    expect(onStep).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a hover reported while autoplay is off", () => {
+    // The handler is public: a host may keep sending pointer events to a
+    // carousel whose autoplay it has switched off.
+    render({ enabled: false });
+    act(() => api.handleHoverChange(true));
+    advance(HOVER_DELAY);
+
+    render({ enabled: true });
     advance(INTERVAL);
     expect(onStep).toHaveBeenCalledTimes(1);
   });
