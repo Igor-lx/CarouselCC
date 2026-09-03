@@ -1,4 +1,11 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import {
+  existsSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -54,6 +61,18 @@ const CONFIG = {
   rulesShelf: "../src/shared/context",
   /** Заголовок таблицы машинных сверок — один и тот же в обоих файлах. */
   checkTableHeading: "| Что сверяется | Как |",
+  /** Отчёт последнего мутационного прогона. HTML-репортер держит внутри тот
+   * же объект, что отдал бы JSON, поэтому второй репортер не нужен. */
+  mutationReport: "../reports/mutation/mutation.html",
+  /** Конфиг мутационного прогона: из него берётся ОБЛАСТЬ. Считать долг по
+   * всему `src` значило бы врать — часть файлов исключена намеренно. */
+  mutationConfig: "../stryker.config.json",
+  /** Накопительный реестр замеров: файл → счёт и хеш содержимого, на котором
+   * он получен. Нужен потому, что Stryker ПЕРЕЗАПИСЫВАЕТ отчёт каждым
+   * прогоном: без реестра однофайловый прогон стирал бы память о полном, и
+   * долг считался бы неверно. Хеш, а не время: клон ставит всем файлам одну
+   * свежую метку, и по времени всё выглядело бы устаревшим. */
+  mutationLedger: "mutation-ledger.json",
 };
 
 const ROOT = path.join(HERE, CONFIG.src).split(path.sep).join("/");
@@ -611,6 +630,212 @@ if (mode === "tested") {
 // графа и из базы разом. Существует потому, что база организована ПО ТЕМАМ, а
 // задача всегда приходит ПО АДРЕСУ: без этой сборки знание об одном файле
 // приходится обходить по девяти файлам базы вручную.
+if (mode === "mutated") {
+  const NEWLINE = String.fromCharCode(10);
+  const repoRoot = path.join(HERE, "..");
+  const ledgerPath = path.join(HERE, CONFIG.mutationLedger);
+
+  // Содержимое, а не время: реестр переживает клон, где mtime у всех файлов
+  // одинаковый и новее любой записи. Концы строк нормализуются — иначе одна
+  // и та же строка в CRLF и LF даёт разные хеши.
+  const stamp = (f) =>
+    createHash("sha1")
+      .update(readFileSync(f, "utf8").split("\r\n").join("\n"))
+      .digest("hex")
+      .slice(0, 12);
+
+  const ledger = existsSync(ledgerPath)
+    ? JSON.parse(readFileSync(ledgerPath, "utf8"))
+    : {};
+
+  // Отчёт последнего прогона. HTML-репортер Stryker держит внутри ТОТ ЖЕ
+  // объект, что отдал бы JSON-репортер: `app.report = {…}` перед закрытием
+  // тега. Разбираем его, а не заводим второй источник истины рядом.
+  const reportPath = path.join(HERE, CONFIG.mutationReport);
+  let merged = 0;
+  if (existsSync(reportPath)) {
+    const html = readFileSync(reportPath, "utf8");
+    const head = "app.report = ";
+    const from = html.indexOf(head);
+    const to = from < 0 ? -1 : html.indexOf("</script>", from);
+    if (to > from) {
+      const body = html
+        .slice(from + head.length, to)
+        .trim()
+        .replace(/;$/, "");
+      const reportedAt = statSync(reportPath).mtimeMs;
+      for (const [key, d] of Object.entries(
+        new Function("return " + body)().files ?? {},
+      )) {
+        const file = norm(path.join(repoRoot, key));
+        if (!files.includes(file)) continue;
+        // Числа описывают тот код, что был на момент прогона. Если файл
+        // тронут ПОСЛЕ него, приписать их нынешнему содержимому нельзя —
+        // такую запись пропускаем, и файл остаётся непромеренным.
+        if (statSync(file).mtimeMs > reportedAt) continue;
+        let killed = 0;
+        let alive = 0;
+        for (const m of d.mutants ?? []) {
+          // Исключённые мутаторы остаются в отчёте пометкой `Ignored` — они
+          // не убиты и не выжили, в знаменатель счёта не входят.
+          if (m.status === "Ignored") continue;
+          if (m.status === "Killed" || m.status === "Timeout") killed += 1;
+          else alive += 1;
+        }
+        const row = { killed, alive, hash: stamp(file) };
+        if (JSON.stringify(ledger[key]) !== JSON.stringify(row)) merged += 1;
+        ledger[key] = row;
+      }
+    }
+  }
+  if (merged) {
+    const ordered = {};
+    for (const k of Object.keys(ledger).sort()) ordered[k] = ledger[k];
+    writeFileSync(
+      ledgerPath,
+      JSON.stringify(ordered, null, 2) + String.fromCharCode(10),
+      "utf8",
+    );
+  }
+
+  // Область прогона берётся из конфига самого инструмента. Считать долг по
+  // всему `src` значило бы врать: часть файлов исключена намеренно и с
+  // записанной причиной, и они бы числились долгом навсегда.
+  const inScope = (() => {
+    const cfg = path.join(HERE, CONFIG.mutationConfig);
+    if (!existsSync(cfg)) return null;
+    const globs = JSON.parse(readFileSync(cfg, "utf8")).mutate ?? [];
+    const toRe = (glob) => {
+      let out = "";
+      for (let i = 0; i < glob.length; i += 1) {
+        const ch = glob[i];
+        if (ch === "*") {
+          if (glob[i + 1] === "*") {
+            if (glob[i + 2] === "/") {
+              out += "(?:[^/]*/)*";
+              i += 2;
+            } else {
+              out += ".*";
+              i += 1;
+            }
+          } else out += "[^/]*";
+        } else if (".+^${}()|[]\\?".includes(ch)) out += "\\" + ch;
+        else out += ch;
+      }
+      return new RegExp("^" + out + "$");
+    };
+    const yes = globs.filter((g) => !g.startsWith("!")).map(toRe);
+    const no = globs
+      .filter((g) => g.startsWith("!"))
+      .map((g) => toRe(g.slice(1)));
+    return (f) => yes.some((r) => r.test(f)) && !no.some((r) => r.test(f));
+  })();
+
+  const key = (f) => norm(path.relative(repoRoot, f));
+  const scoreOf = (row) =>
+    ((100 * row.killed) / (row.killed + row.alive || 1)).toFixed(2);
+
+  console.log("=== Мутационный прогон против правки ===");
+  console.log(
+    `  в реестре файлов: ${Object.keys(ledger).length}` +
+      (merged ? `, добавлено этим прогоном: ${merged}` : ""),
+  );
+
+  let changed = process.argv.slice(3);
+  if (changed.length === 0) {
+    changed = await changedPaths(repoRoot);
+    if (changed === null) {
+      console.log(
+        "  git недоступен — передай пути аргументами: graph.mjs mutated <путь> …",
+      );
+      process.exitCode = 1;
+    }
+  }
+
+  const needRun = [];
+  if (changed !== null) {
+    const touched = new Set(changed.map((f) => norm(path.join(repoRoot, f))));
+    const touchedCode = [...touched].filter(
+      (f) =>
+        files.includes(f) &&
+        !isTest(f) &&
+        !f.endsWith(".d.ts") &&
+        (inScope === null || inScope(key(f))),
+    );
+
+    const never = [];
+    const stale = [];
+    const fresh = [];
+    for (const f of touchedCode) {
+      const row = ledger[key(f)];
+      if (row === undefined) {
+        never.push(rel(f));
+        needRun.push(key(f));
+      } else if (row.hash !== stamp(f)) {
+        stale.push(`${rel(f)} — было ${scoreOf(row)} %, живых ${row.alive}`);
+        needRun.push(key(f));
+      } else {
+        fresh.push(`${rel(f)} — ${scoreOf(row)} %, живых ${row.alive}`);
+      }
+    }
+
+    console.log(`  тронуто файлов в области прогона: ${touchedCode.length}`);
+    if (touchedCode.length === 0)
+      console.log("  правка файлов в области прогона не касается");
+    for (const [title, rows] of [
+      ["Под мутациями не были ни разу:", never],
+      [
+        "Содержимое изменилось после прогона — число уже не про этот код:",
+        stale,
+      ],
+      ["Измерено на нынешнем содержимом:", fresh],
+    ]) {
+      if (!rows.length) continue;
+      console.log(NEWLINE + "  " + title);
+      for (const r of rows) console.log("    " + r);
+    }
+  }
+
+  if (needRun.length) {
+    console.log(
+      NEWLINE +
+        "  Прогнать по ним:" +
+        NEWLINE +
+        `    npx stryker run --mutate "${needRun.join(",")}"` +
+        NEWLINE +
+        NEWLINE +
+        "  У каждого выжившего ровно три законных исхода, и каждый называется" +
+        NEWLINE +
+        "  вслух: добавлен тест; исправлен код; признан неубиваемым — с" +
+        NEWLINE +
+        "  причиной. Счёт здесь не ворота, а список для разбора.",
+    );
+  }
+
+  // Долг по всей области, а не только по правке: файл, который уезжает
+  // пользователю и ни разу не был под прогоном, — непромеренная поверхность.
+  if (inScope !== null) {
+    const surface = files.filter(
+      (f) => !isTest(f) && !f.endsWith(".d.ts") && inScope(key(f)),
+    );
+    const unseen = surface.filter((f) => ledger[key(f)] === undefined);
+    const drifted = surface.filter(
+      (f) => ledger[key(f)] !== undefined && ledger[key(f)].hash !== stamp(f),
+    );
+    console.log(
+      NEWLINE +
+        "=== Непромеренная поверхность ===" +
+        NEWLINE +
+        `  в области прогона: ${surface.length}; ни разу не мерены: ${unseen.length}; ` +
+        `изменились после замера: ${drifted.length}`,
+    );
+    for (const f of [...unseen, ...drifted].slice(0, 15))
+      console.log("    " + rel(f));
+    const rest = unseen.length + drifted.length - 15;
+    if (rest > 0) console.log(`    …и ещё ${rest}`);
+  }
+}
+
 if (mode === "brief") {
   const NEWLINE = String.fromCharCode(10);
   const TICK = String.fromCharCode(96);

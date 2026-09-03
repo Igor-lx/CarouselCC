@@ -490,6 +490,7 @@ node .context/graph.mjs verify   # сверка базы с кодом, весь
 node .context/graph.mjs twins    # правка форка: не забыт ли близнец; и правка
                                  # правил: не забыта ли полка правил
 node .context/graph.mjs tested   # правка кода: тронуты ли её тесты
+node .context/graph.mjs mutated  # правка кода: под мутациями ли она была
 node .context/graph.mjs open     # гипотезы, дыры в тестах, узлы без якоря
 node .context/graph.mjs sizes    # непустых строк на файл (в базе их нет)
 ```
