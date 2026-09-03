@@ -579,6 +579,64 @@ if (mode === "tested") {
     if (touchedCode.length && !stale.length && !naked.length)
       console.log("  каждый тронутый файл правился вместе со своими тестами");
 
+    // Документация отвечает на другой вопрос, чем база, и закрывается ОТДЕЛЬНО
+    // от неё. Названные в правилах одной строкой, они сливаются в одно дело:
+    // базу ведут по ходу правки, пара кажется закрытой, а `docs/**` остаются
+    // описывать код, которого больше нет. Ровно так и вышло однажды. Поэтому
+    // список печатается здесь — это второй вопрос того же момента, и задавать
+    // его надо машиной, а не памятью.
+    if (touchedCode.length) {
+      const TICK = String.fromCharCode(96);
+      const DOC_LINES = [];
+      for (const d of docFiles) {
+        const body = readFileSync(d, "utf8").split(NEWLINE);
+        body.forEach((line, i) => DOC_LINES.push([rel(d), i + 1, line]));
+      }
+      const quoted = (line) =>
+        line
+          .split(TICK)
+          .filter((_, i) => i % 2 === 1)
+          .flatMap((t) => t.split(",").map((x) => x.trim()));
+
+      const described = [];
+      for (const f of touchedCode) {
+        const r = rel(f);
+        const base = r.slice(r.lastIndexOf("/") + 1);
+        const bare = base.replace(/\.(tsx?|scss)$/, "");
+        const named = [
+          ...new Set(
+            DOC_LINES.filter(([, , line]) =>
+              quoted(line).some(
+                (t) =>
+                  t === r || r.endsWith("/" + t) || t === base || t === bare,
+              ),
+            ).map(([n, i]) => n + ":" + i),
+          ),
+        ];
+        const own = [...new Set(docRefsIn(readFileSync(f, "utf8")))];
+        if (named.length || own.length) described.push([r, own, named]);
+      }
+
+      console.log(NEWLINE + "=== Документация тронутых файлов ===");
+      if (!described.length)
+        console.log("  ни один тронутый файл не описан документацией");
+      for (const [r, own, named] of described) {
+        console.log("  " + r);
+        if (own.length) console.log("    ссылается сам: " + own.join(", "));
+        if (named.length)
+          console.log("    назван в: " + named.slice(0, 8).join(", "));
+      }
+      if (described.length)
+        console.log(
+          NEWLINE +
+            "  Открыть и ответить: описывает ли это ещё тот код, что сейчас в" +
+            NEWLINE +
+            "  файле? Приговора здесь нет — не всякая правка меняет «почему»." +
+            NEWLINE +
+            "  Но пройти мимо молча нельзя.",
+        );
+    }
+
     // Якорь съезжает ровно от одного — вставки или удаления строк ВЫШЕ него,
     // то есть от правки того самого файла. Значит сверять его надо не всегда,
     // а именно сейчас. Якорь с цитатой чинит себя сам (`verify`), без цитаты —
