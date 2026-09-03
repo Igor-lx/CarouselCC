@@ -103,7 +103,7 @@ export function useSlideRenderModel({
   // The numbers, and the control proving the instrument can see a re-render,
   // are in `slides/tests/slideRenderCost.test.tsx`. Whether that saving is
   // worth two suppressed lint rules is an open decision, deferred until it can
-  // be felt on real devices; it is item 8 of the project's deferred-work list.
+  // be felt on real devices; it is item 4 of the project's deferred-work list.
   // Owned by a memo with no inputs, so it lives as long as the hook does and
   // no render writes a ref to keep it.
   const slideCache = useMemo(() => new Map<number, VirtualSlide>(), []);

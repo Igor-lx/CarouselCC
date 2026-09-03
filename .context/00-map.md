@@ -895,7 +895,7 @@ reason for the split»).
   вся колода; **замерено — не перерисовывается ни один слайд**: `ariaProps`
   спредится на месте вызова, и до `memo` доходят примитивы. Экономит он
   аллокации — N объектов, N `ariaProps` и N строк на диспатч. Судьба кэша
-  открыта: `02-todo.md`, пункт 8; числа — `slides/tests/slideRenderCost.test.tsx`.
+  открыта: `02-todo.md`, пункт 4; числа — `slides/tests/slideRenderCost.test.tsx`.
 
 ### `client/slides/useSlideFetchReach.ts` — fx, ворота пропускной способности
 Две волны загрузки: сперва видимая полоса, буфер — потом. Ворота открываются по

@@ -1748,6 +1748,49 @@ if (mode === "verify") {
       }
     }
   }
+  // 11-бис. ссылка на пункт отложенного ведёт в существующий пункт.
+  // Закрытый пункт удаляется целиком, следующие сдвигаются — и «пункт 8»
+  // остаётся висеть в пяти файлах сразу. Проверяется не нумерация: дыра в ней
+  // безвредна, вредна ссылка в никуда. Считается только там, где рядом назван
+  // сам файл отложенного или список отложенного по-английски, иначе проверка
+  // ловила бы «пункт 3» любого другого перечня и врала бы.
+  const danglingTodo = [];
+  if (CONFIG.todo !== null) {
+    const todoPath = path.join(BASE, CONFIG.todo);
+    if (existsSync(todoPath)) {
+      const numbers = new Set();
+      for (const line of readFileSync(todoPath, "utf8").split(NEWLINE)) {
+        const head = /^#{2,}\s+(\d+)\./.exec(line);
+        if (head !== null) numbers.add(head[1]);
+      }
+      const REF = /(?:пункт[ае]?|item)\s+(\d+)/gi;
+      const NAMES = new RegExp(
+        CONFIG.todo.replace(".", "\\.") + "|deferred-work list",
+      );
+      const scan = [
+        ...readdirSync(BASE)
+          .filter((n) => n.endsWith(".md") && n !== CONFIG.todo)
+          .map((n) => [n, path.join(BASE, n)]),
+        ...files.map((f) => [rel(f), f]),
+        ...docFiles.map((f) => [rel(f), f]),
+      ];
+      for (const [name, full] of scan) {
+        readFileSync(full, "utf8")
+          .split(NEWLINE)
+          .forEach((line, i) => {
+            if (!NAMES.test(line)) return;
+            REF.lastIndex = 0;
+            let m;
+            while ((m = REF.exec(line)) !== null)
+              if (!numbers.has(m[1]))
+                danglingTodo.push(
+                  name + ":" + (i + 1) + " — пункта " + m[1] + " там нет",
+                );
+          });
+      }
+    }
+  }
+
   // 12. новый якорь пишется с цитатой
   // Старые не переписываем: их 185, и переписывание ради переписывания —
   // работа без адресата. Но каждый НОВЫЙ обязан нести цитату, иначе доля
@@ -1962,6 +2005,8 @@ if (mode === "verify") {
       : `  помечено закрытыми: ${closedTodos.length}`,
   );
   for (const t of closedTodos) console.log("    " + t);
+  console.log(`  ссылок на несуществующий пункт: ${danglingTodo.length}`);
+  for (const t of danglingTodo) console.log("    " + t);
 
   console.log("=== Объявленный состав папок и радиусы ===");
   console.log(
@@ -1984,6 +2029,7 @@ if (mode === "verify") {
     toolDrift.length ||
     deadAnchors.length ||
     closedTodos.length ||
+    danglingTodo.length ||
     uncitedNew.length ||
     parked.length ||
     shelfDrift.length ||

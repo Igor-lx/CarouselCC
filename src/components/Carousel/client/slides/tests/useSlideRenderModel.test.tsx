@@ -22,7 +22,7 @@ import { useSlideRenderModel } from "../useSlideRenderModel";
  * The identity assertions below say the cache WORKS, which is not the same as
  * the deck being spared: measured, it prevents no re-render at all, because
  * `ariaProps` is spread at the call site. What that costs and what follows is
- * `slideRenderCost.test.tsx`, and item 8 of the deferred-work list.
+ * `slideRenderCost.test.tsx`, and item 4 of the deferred-work list.
  */
 
 const BUFFER = 4;
