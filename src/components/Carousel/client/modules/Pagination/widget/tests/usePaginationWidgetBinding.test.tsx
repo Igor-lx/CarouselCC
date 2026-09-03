@@ -17,6 +17,7 @@ import {
 import { buildPaginationWidgetGeometry } from "../math/spatialField";
 import { PAGINATION_WIDGET_DEFAULTS } from "../defaults";
 import { usePaginationWidgetBinding } from "../usePaginationWidgetBinding";
+import { watchStyleWrites } from "../../tests/styleWrites";
 
 /**
  * Follow mode's pacing contract. The runner publishes `follow` twice on a
@@ -480,5 +481,114 @@ describe("usePaginationWidgetBinding — a finger taking the strip over", () => 
     // Half a page of delta from the re-base, whatever the absolute page was.
     plan.publish({ kind: "follow", isFallback: false });
     expect(afterDelta).not.toBe(grabbed);
+  });
+});
+
+/**
+ * The per-frame write gate — the one contract in this file that NO assertion
+ * about the DOM can reach.
+ *
+ * The binding caches what it last wrote per slot and skips the write when the
+ * new value lands within an epsilon of it. Skipping produces a document byte
+ * for byte identical to writing, so every test above stays green with the gate
+ * removed entirely; the only observable is the number of times the setter ran.
+ *
+ * What is at stake is not correctness but the cost of a drag: `slotCount` dots
+ * plus the overlays, twice per frame, at 60 frames a second, for values the
+ * compositor would resolve to the same pixels.
+ */
+describe("usePaginationWidgetBinding — what it refuses to write", () => {
+  const everyPaintedNode = () => [
+    ...host.querySelectorAll<HTMLElement>("[data-slot], [data-active]"),
+  ];
+
+  let writes: ReturnType<typeof watchStyleWrites>;
+
+  beforeEach(() => {
+    animations = [];
+    // The mount's own static paint happens before this, which is what we want:
+    // the first paint has nothing to compare against and must always write.
+    writes = watchStyleWrites(everyPaintedNode());
+    plan.publish({ kind: "follow", isFallback: false });
+    writes.reset();
+  });
+
+  it("writes nothing at all for a frame that repeats the last one", () => {
+    // A finger held still, a ride paused against a bound, a stream that
+    // re-emits: the strip has not moved, so nothing about it may be touched.
+    visual.emit(frameAt(0));
+
+    expect(writes.count()).toBe(0);
+  });
+
+  it("writes nothing for a move too small to see", () => {
+    // Sub-pixel drift below the position epsilon. The gate exists exactly for
+    // this: a frame that moves the strip by a thousandth of a pixel costs the
+    // same as no frame at all.
+    //
+    // Nudged from MID-page on purpose: crossing a whole page is a different
+    // event, and it has its own case below.
+    visual.emit(frameAt(0.5));
+    writes.reset();
+
+    visual.emit(frameAt(0.5 + 1e-6));
+
+    expect(writes.count()).toBe(0);
+  });
+
+  it("places the second overlay the moment the strip leaves a whole page", () => {
+    // Exactly on a page the two overlays name the same dot, so the second is
+    // parked. A hair past it they name different pages and the parked one has
+    // to be MOVED to its own before it can be faded up — even though the move
+    // itself is far below the epsilon that would otherwise silence it.
+    //
+    // Found by this suite: the sub-epsilon case above first ran from 0 and saw
+    // exactly this one write.
+    visual.emit(frameAt(1e-6));
+
+    expect(writes.count("transform")).toBe(1);
+    expect(writes.written()).toEqual([
+      host.querySelector<HTMLElement>('[data-active="1"]'),
+    ]);
+  });
+
+  it("writes when the strip actually moves", () => {
+    // The other half of the same gate — proof the silence above is the gate
+    // working and not the harness failing to reach the DOM.
+    visual.emit(frameAt(0.5));
+
+    expect(writes.count()).toBeGreaterThan(0);
+  });
+
+  it("gates the two properties apart", () => {
+    // Transform and opacity have their own epsilons and their own cache
+    // fields. A dot near the middle of the strip slides a visible distance
+    // while its opacity barely stirs: collapsing the two gates into one would
+    // repaint an opacity nobody can tell apart, on every frame of every drag.
+    visual.emit(frameAt(0.02));
+
+    expect(writes.count("transform")).toBeGreaterThan(0);
+    expect(writes.count("opacity")).toBeLessThan(writes.count("transform"));
+  });
+
+  it("never touches a slot that is hidden and staying hidden", () => {
+    // The strip carries coverage margin on both sides — slots that exist so a
+    // step has somewhere to land, and paint nothing until it does. Their
+    // POSITION still changes on every frame, so the epsilon gate alone would
+    // happily rewrite the transform of a dot nobody can see; the early exit is
+    // what makes an invisible slot cost nothing at all.
+    const hidden = () =>
+      new Set(everyPaintedNode().filter((node) => node.style.opacity === "0"));
+
+    const before = hidden();
+    visual.emit(frameAt(0.5));
+    const after = hidden();
+    const stayedHidden = [...before].filter((node) => after.has(node));
+
+    expect(stayedHidden.length).toBeGreaterThan(0);
+    expect(writes.count()).toBeGreaterThan(0); // the visible ones did move
+    for (const node of stayedHidden) {
+      expect(writes.written()).not.toContain(node);
+    }
   });
 });
