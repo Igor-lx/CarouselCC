@@ -1,7 +1,657 @@
 {
+  "src/components/Carousel/client/Carousel.tsx": {
+    "killed": 31,
+    "alive": 44,
+    "hash": "1c76e7fedfef"
+  },
+  "src/components/Carousel/client/areCarouselPropsEqual.ts": {
+    "killed": 67,
+    "alive": 8,
+    "hash": "889f9369070b"
+  },
+  "src/components/Carousel/client/autoplay/useAutoplay.ts": {
+    "killed": 53,
+    "alive": 14,
+    "hash": "5f1f3fd20ec0"
+  },
+  "src/components/Carousel/client/autoplay/useCarouselAutoplay.ts": {
+    "killed": 14,
+    "alive": 6,
+    "hash": "3c85e0005042"
+  },
+  "src/components/Carousel/client/config/resolve/buildConfig.ts": {
+    "killed": 16,
+    "alive": 0,
+    "hash": "13211ca2870f"
+  },
+  "src/components/Carousel/client/config/resolve/useCarouselConfig.ts": {
+    "killed": 4,
+    "alive": 0,
+    "hash": "9bdfdcdb1a7b"
+  },
+  "src/components/Carousel/client/context/CarouselDiagnosticContext.ts": {
+    "killed": 3,
+    "alive": 3,
+    "hash": "627a489e26df"
+  },
+  "src/components/Carousel/client/context/CarouselModuleContext.ts": {
+    "killed": 6,
+    "alive": 4,
+    "hash": "22540e0367c2"
+  },
+  "src/components/Carousel/client/context/useDiagnosticContextValue.ts": {
+    "killed": 10,
+    "alive": 3,
+    "hash": "a3b00b557967"
+  },
+  "src/components/Carousel/client/context/useModuleContextValue.ts": {
+    "killed": 20,
+    "alive": 2,
+    "hash": "dc1d23fb7390"
+  },
+  "src/components/Carousel/client/domain/dragRelease.ts": {
+    "killed": 23,
+    "alive": 1,
+    "hash": "bb2877f1a0ea"
+  },
+  "src/components/Carousel/client/domain/layout.ts": {
+    "killed": 95,
+    "alive": 10,
+    "hash": "b87ff53f7a21"
+  },
+  "src/components/Carousel/client/domain/math.ts": {
+    "killed": 15,
+    "alive": 0,
+    "hash": "a3e78188dbbe"
+  },
+  "src/components/Carousel/client/domain/renderWindow.ts": {
+    "killed": 45,
+    "alive": 1,
+    "hash": "64f644d1d942"
+  },
+  "src/components/Carousel/client/domain/slides.ts": {
+    "killed": 111,
+    "alive": 1,
+    "hash": "76561da9f284"
+  },
+  "src/components/Carousel/client/domain/track.ts": {
+    "killed": 39,
+    "alive": 0,
+    "hash": "d0e79281510e"
+  },
+  "src/components/Carousel/client/domain/visibility.ts": {
+    "killed": 44,
+    "alive": 2,
+    "hash": "264da1de7f41"
+  },
+  "src/components/Carousel/client/focus/useFocusRecovery.ts": {
+    "killed": 11,
+    "alive": 4,
+    "hash": "70568e00581a"
+  },
+  "src/components/Carousel/client/geometry/resolveImageSizes.ts": {
+    "killed": 6,
+    "alive": 0,
+    "hash": "3b755b92039b"
+  },
+  "src/components/Carousel/client/geometry/useSlotSizeSource.ts": {
+    "killed": 78,
+    "alive": 18,
+    "hash": "79c4de5c5476"
+  },
+  "src/components/Carousel/client/geometry/useTrackBinding.ts": {
+    "killed": 106,
+    "alive": 38,
+    "hash": "2df33cbf61e5"
+  },
+  "src/components/Carousel/client/gesture/coast.ts": {
+    "killed": 14,
+    "alive": 1,
+    "hash": "e373ac20bb0e"
+  },
+  "src/components/Carousel/client/gesture/slotAdaptiveSwipe.ts": {
+    "killed": 22,
+    "alive": 1,
+    "hash": "d0fa55745baa"
+  },
+  "src/components/Carousel/client/gesture/useCarouselGesture.ts": {
+    "killed": 91,
+    "alive": 46,
+    "hash": "e14418cc5d01"
+  },
+  "src/components/Carousel/client/host-report/statusSnapshot.ts": {
+    "killed": 20,
+    "alive": 0,
+    "hash": "f8bfaa5d2956"
+  },
+  "src/components/Carousel/client/host-report/useCarouselStatusReporter.ts": {
+    "killed": 11,
+    "alive": 1,
+    "hash": "b7641943d98a"
+  },
+  "src/components/Carousel/client/modules/Controls/Controls.tsx": {
+    "killed": 11,
+    "alive": 1,
+    "hash": "ba20a7ae4891"
+  },
+  "src/components/Carousel/client/modules/Controls/NavigationZone.tsx": {
+    "killed": 7,
+    "alive": 0,
+    "hash": "d1ae238ebfaf"
+  },
+  "src/components/Carousel/client/modules/Pagination/basic/Pagination.tsx": {
+    "killed": 5,
+    "alive": 8,
+    "hash": "eb557e6e648f"
+  },
+  "src/components/Carousel/client/modules/Pagination/basic/PaginationDot.tsx": {
+    "killed": 9,
+    "alive": 7,
+    "hash": "2cf9084c059c"
+  },
+  "src/components/Carousel/client/modules/Pagination/basic/fadeKeyframes.ts": {
+    "killed": 78,
+    "alive": 8,
+    "hash": "74fff5da2438"
+  },
+  "src/components/Carousel/client/modules/Pagination/basic/usePaginationFade.ts": {
+    "killed": 196,
+    "alive": 77,
+    "hash": "6dbafc048279"
+  },
   "src/components/Carousel/client/modules/Pagination/useOffsetFollow.ts": {
     "killed": 22,
     "alive": 3,
     "hash": "a5541e8e62e6"
+  },
+  "src/components/Carousel/client/modules/Pagination/widget/PaginationWidget.tsx": {
+    "killed": 36,
+    "alive": 15,
+    "hash": "effa54df49db"
+  },
+  "src/components/Carousel/client/modules/Pagination/widget/PaginationWidgetDot.tsx": {
+    "killed": 1,
+    "alive": 1,
+    "hash": "965dc5ac73ae"
+  },
+  "src/components/Carousel/client/modules/Pagination/widget/defaults.ts": {
+    "killed": 0,
+    "alive": 0,
+    "hash": "4ea37e1ee11e"
+  },
+  "src/components/Carousel/client/modules/Pagination/widget/math/projection.ts": {
+    "killed": 61,
+    "alive": 8,
+    "hash": "4417b896863b"
+  },
+  "src/components/Carousel/client/modules/Pagination/widget/math/spatialField.ts": {
+    "killed": 41,
+    "alive": 0,
+    "hash": "ad0e70c5f1ab"
+  },
+  "src/components/Carousel/client/modules/Pagination/widget/math/trajectory.ts": {
+    "killed": 17,
+    "alive": 2,
+    "hash": "7c2227df3b8a"
+  },
+  "src/components/Carousel/client/modules/Pagination/widget/stepTarget.ts": {
+    "killed": 32,
+    "alive": 4,
+    "hash": "e1afd1382a0c"
+  },
+  "src/components/Carousel/client/modules/Pagination/widget/usePaginationWidgetBinding.ts": {
+    "killed": 219,
+    "alive": 101,
+    "hash": "70454a32d672"
+  },
+  "src/components/Carousel/client/modules/ResponsiveImages/ResponsiveImages.tsx": {
+    "killed": 61,
+    "alive": 21,
+    "hash": "f3053d7db421"
+  },
+  "src/components/Carousel/client/motion/duration.ts": {
+    "killed": 18,
+    "alive": 0,
+    "hash": "8d7212ed5517"
+  },
+  "src/components/Carousel/client/motion/planChannel.ts": {
+    "killed": 33,
+    "alive": 3,
+    "hash": "c51d09b77957"
+  },
+  "src/components/Carousel/client/motion/sampler.ts": {
+    "killed": 0,
+    "alive": 0,
+    "hash": "f0027fddb3e6"
+  },
+  "src/components/Carousel/client/motion/segmentFactory.ts": {
+    "killed": 137,
+    "alive": 25,
+    "hash": "c479c0af8447"
+  },
+  "src/components/Carousel/client/motion/speed.ts": {
+    "killed": 0,
+    "alive": 0,
+    "hash": "1786e211de56"
+  },
+  "src/components/Carousel/client/motion/timing.ts": {
+    "killed": 80,
+    "alive": 0,
+    "hash": "ded82a1743d7"
+  },
+  "src/components/Carousel/client/motion/tolerances.ts": {
+    "killed": 0,
+    "alive": 0,
+    "hash": "280719d5ac14"
+  },
+  "src/components/Carousel/client/motion/useCarouselMotionExecution.ts": {
+    "killed": 5,
+    "alive": 0,
+    "hash": "d88cb27e7210"
+  },
+  "src/components/Carousel/client/motion/useMotionRunner.ts": {
+    "killed": 108,
+    "alive": 4,
+    "hash": "4ce176f7d8c4"
+  },
+  "src/components/Carousel/client/navigation/useCarouselNavigation.ts": {
+    "killed": 21,
+    "alive": 6,
+    "hash": "74f8d4d3ce49"
+  },
+  "src/components/Carousel/client/presentation/cssVars.ts": {
+    "killed": 5,
+    "alive": 0,
+    "hash": "cde679fd4f18"
+  },
+  "src/components/Carousel/client/presentation/domPayload.ts": {
+    "killed": 7,
+    "alive": 0,
+    "hash": "13bc49dce61b"
+  },
+  "src/components/Carousel/client/presentation/useCarouselPresentation.ts": {
+    "killed": 13,
+    "alive": 10,
+    "hash": "c4e60076c36b"
+  },
+  "src/components/Carousel/client/public-api/schemas.ts": {
+    "killed": 37,
+    "alive": 0,
+    "hash": "ac1842294800"
+  },
+  "src/components/Carousel/client/render-policy/useModuleRenderPolicy.ts": {
+    "killed": 18,
+    "alive": 0,
+    "hash": "6ac9f550108d"
+  },
+  "src/components/Carousel/client/slides/SlideItem.tsx": {
+    "killed": 94,
+    "alive": 9,
+    "hash": "170ed01a3dc1"
+  },
+  "src/components/Carousel/client/slides/SlideItem.types.ts": {
+    "killed": 0,
+    "alive": 0,
+    "hash": "e9b694e71ee0"
+  },
+  "src/components/Carousel/client/slides/imageResource/createImageResourceStore.ts": {
+    "killed": 85,
+    "alive": 18,
+    "hash": "8aa7c1273e75"
+  },
+  "src/components/Carousel/client/slides/imageResource/useImageResource.ts": {
+    "killed": 31,
+    "alive": 7,
+    "hash": "ab317001bd09"
+  },
+  "src/components/Carousel/client/slides/imageResource/useImageResourceRetention.ts": {
+    "killed": 14,
+    "alive": 3,
+    "hash": "4464c02e5eaf"
+  },
+  "src/components/Carousel/client/slides/imageResource/useImageResourceStore.ts": {
+    "killed": 2,
+    "alive": 0,
+    "hash": "d887009ec6dd"
+  },
+  "src/components/Carousel/client/slides/imageResource/useImageResourceStoreInstance.ts": {
+    "killed": 15,
+    "alive": 2,
+    "hash": "81d0d7daff17"
+  },
+  "src/components/Carousel/client/slides/useCarouselSlideDeck.ts": {
+    "killed": 14,
+    "alive": 1,
+    "hash": "00d4c5185607"
+  },
+  "src/components/Carousel/client/slides/useOrientationSwapVeil.ts": {
+    "killed": 38,
+    "alive": 11,
+    "hash": "bd191e2e0bf2"
+  },
+  "src/components/Carousel/client/slides/useSlideFetchReach.ts": {
+    "killed": 71,
+    "alive": 14,
+    "hash": "3c104b2f6e49"
+  },
+  "src/components/Carousel/client/slides/useSlideRenderModel.ts": {
+    "killed": 90,
+    "alive": 8,
+    "hash": "fb3a943add87"
+  },
+  "src/components/Carousel/client/slots/slotNames.ts": {
+    "killed": 0,
+    "alive": 0,
+    "hash": "66d7a2205630"
+  },
+  "src/components/Carousel/client/state/initial.ts": {
+    "killed": 23,
+    "alive": 0,
+    "hash": "afc4bca581b4"
+  },
+  "src/components/Carousel/client/state/reconcile.ts": {
+    "killed": 32,
+    "alive": 0,
+    "hash": "4de375da5fea"
+  },
+  "src/components/Carousel/client/state/reducer.ts": {
+    "killed": 111,
+    "alive": 5,
+    "hash": "dd715d7f7c9e"
+  },
+  "src/components/Carousel/client/state/transitions.ts": {
+    "killed": 81,
+    "alive": 3,
+    "hash": "1036e36eecda"
+  },
+  "src/components/Carousel/client/state/useCarouselState.ts": {
+    "killed": 18,
+    "alive": 0,
+    "hash": "50191b5fe333"
+  },
+  "src/components/Carousel/client/state/validateState.ts": {
+    "killed": 36,
+    "alive": 0,
+    "hash": "9e32c13cc489"
+  },
+  "src/components/Carousel/client/viewport/useSlideViewport.ts": {
+    "killed": 1,
+    "alive": 0,
+    "hash": "82d1c4b9efe6"
+  },
+  "src/components/Carousel/client/visual-position/fallbackPacing.ts": {
+    "killed": 13,
+    "alive": 2,
+    "hash": "0daee4d8ca72"
+  },
+  "src/components/Carousel/client/visual-position/useVisualPosition.ts": {
+    "killed": 45,
+    "alive": 9,
+    "hash": "3c5ecd2c204f"
+  },
+  "src/shared/clientState/environment/library/useDataSaver.ts": {
+    "killed": 54,
+    "alive": 16,
+    "hash": "d2b7811edf06"
+  },
+  "src/shared/clientState/environment/library/useIsReducedMotion.ts": {
+    "killed": 0,
+    "alive": 1,
+    "hash": "1ecf8a60de48"
+  },
+  "src/shared/clientState/environment/library/useIsTouchDevice.ts": {
+    "killed": 49,
+    "alive": 16,
+    "hash": "8318c413c03d"
+  },
+  "src/shared/clientState/environment/useUserEnvironment/internal/useDataSaver.ts": {
+    "killed": 54,
+    "alive": 16,
+    "hash": "d2b7811edf06"
+  },
+  "src/shared/clientState/environment/useUserEnvironment/internal/useIsReducedMotion.ts": {
+    "killed": 0,
+    "alive": 1,
+    "hash": "f454449fa1c6"
+  },
+  "src/shared/clientState/environment/useUserEnvironment/internal/useIsTouchDevice.ts": {
+    "killed": 49,
+    "alive": 16,
+    "hash": "8318c413c03d"
+  },
+  "src/shared/clientState/environment/useUserEnvironment/useUserEnvironment.ts": {
+    "killed": 0,
+    "alive": 4,
+    "hash": "dfaa365b2c0b"
+  },
+  "src/shared/clientState/media/library/useBreakpoint.ts": {
+    "killed": 36,
+    "alive": 2,
+    "hash": "beb67f53305d"
+  },
+  "src/shared/clientState/media/library/useOrientation.ts": {
+    "killed": 0,
+    "alive": 1,
+    "hash": "7df29df239ff"
+  },
+  "src/shared/clientState/media/library/useShortLandscape.ts": {
+    "killed": 0,
+    "alive": 1,
+    "hash": "9682799a0504"
+  },
+  "src/shared/clientState/media/useMedia/internal/axesDescriptor.ts": {
+    "killed": 10,
+    "alive": 2,
+    "hash": "4cd650efeef9"
+  },
+  "src/shared/clientState/media/useMedia/internal/canonicalMedia.ts": {
+    "killed": 10,
+    "alive": 0,
+    "hash": "9b47235720c3"
+  },
+  "src/shared/clientState/media/useMedia/internal/resolveActiveBreakpoint.ts": {
+    "killed": 11,
+    "alive": 1,
+    "hash": "6d2968a8a4a4"
+  },
+  "src/shared/clientState/media/useMedia/internal/useOrientation.ts": {
+    "killed": 0,
+    "alive": 1,
+    "hash": "47e6dc662ce4"
+  },
+  "src/shared/clientState/media/useMedia/useMedia.ts": {
+    "killed": 14,
+    "alive": 3,
+    "hash": "032b1ba5a19b"
+  },
+  "src/shared/clientState/sharedStore/useMediaQuery.ts": {
+    "killed": 44,
+    "alive": 10,
+    "hash": "f5bb35fa1157"
+  },
+  "src/shared/clientState/sharedStore/useMediaQuerySet.ts": {
+    "killed": 42,
+    "alive": 6,
+    "hash": "931ec02e3034"
+  },
+  "src/shared/engines/gesture/inertia/inertialRelease.ts": {
+    "killed": 16,
+    "alive": 2,
+    "hash": "f9fc438d3cdf"
+  },
+  "src/shared/engines/gesture/inertia/releaseKinetics.ts": {
+    "killed": 22,
+    "alive": 2,
+    "hash": "bacfb6cf0314"
+  },
+  "src/shared/engines/gesture/inertia/releaseLaunch.ts": {
+    "killed": 4,
+    "alive": 0,
+    "hash": "fa855a703189"
+  },
+  "src/shared/engines/gesture/inertia/speed.ts": {
+    "killed": 11,
+    "alive": 1,
+    "hash": "77e073b9a82c"
+  },
+  "src/shared/engines/gesture/swipe/internals/interactiveTarget.ts": {
+    "killed": 19,
+    "alive": 0,
+    "hash": "82fc751a8037"
+  },
+  "src/shared/engines/gesture/swipe/internals/math.ts": {
+    "killed": 58,
+    "alive": 3,
+    "hash": "1b2034c911d5"
+  },
+  "src/shared/engines/gesture/swipe/internals/resolveSwipeDirection.ts": {
+    "killed": 38,
+    "alive": 2,
+    "hash": "a94478b3e75f"
+  },
+  "src/shared/engines/gesture/swipe/usePointerSwipe.ts": {
+    "killed": 271,
+    "alive": 78,
+    "hash": "482ca8a8605a"
+  },
+  "src/shared/engines/motion/compositor/compositedRide.ts": {
+    "killed": 99,
+    "alive": 2,
+    "hash": "e4f47a710ad7"
+  },
+  "src/shared/engines/motion/compositor/pinnedAnimation.ts": {
+    "killed": 7,
+    "alive": 1,
+    "hash": "add6e8790fad"
+  },
+  "src/shared/engines/motion/profile/clamp.ts": {
+    "killed": 3,
+    "alive": 0,
+    "hash": "9a5a6964c996"
+  },
+  "src/shared/engines/motion/profile/profile.ts": {
+    "killed": 113,
+    "alive": 9,
+    "hash": "3e89cb057753"
+  },
+  "src/shared/engines/motion/profile/profileSegment.ts": {
+    "killed": 29,
+    "alive": 6,
+    "hash": "665248c87203"
+  },
+  "src/shared/engines/motion/profile/progressCurve.ts": {
+    "killed": 160,
+    "alive": 26,
+    "hash": "6c5de13dacb0"
+  },
+  "src/shared/engines/motion/runtime/clock.ts": {
+    "killed": 4,
+    "alive": 0,
+    "hash": "08e2dc2380b3"
+  },
+  "src/shared/engines/motion/runtime/createMotionController.ts": {
+    "killed": 143,
+    "alive": 16,
+    "hash": "0aa9ae1303a3"
+  },
+  "src/shared/engines/motion/runtime/useMotionController.ts": {
+    "killed": 4,
+    "alive": 1,
+    "hash": "d513cd3ccfbc"
+  },
+  "src/shared/engines/motion/runtime/useMotionPaint.ts": {
+    "killed": 5,
+    "alive": 0,
+    "hash": "ddcfd94a1355"
+  },
+  "src/shared/focus/manageFocusShift.ts": {
+    "killed": 23,
+    "alive": 5,
+    "hash": "5b9451295b52"
+  },
+  "src/shared/hooks/useIsomorphicLayoutEffect.ts": {
+    "killed": 2,
+    "alive": 1,
+    "hash": "e90a1f2918c2"
+  },
+  "src/shared/icons/ChevronIcon.tsx": {
+    "killed": 0,
+    "alive": 3,
+    "hash": "ca097144adce"
+  },
+  "src/shared/math/numeric.ts": {
+    "killed": 89,
+    "alive": 4,
+    "hash": "acf344fb19f3"
+  },
+  "src/shared/slots/resolveSlots.ts": {
+    "killed": 10,
+    "alive": 12,
+    "hash": "597d6b8e2b89"
+  },
+  "src/shared/styles/mergeStyleMaps.ts": {
+    "killed": 8,
+    "alive": 1,
+    "hash": "d50f604ee84e"
+  },
+  "src/shared/theme/ThemeProvider.tsx": {
+    "killed": 1,
+    "alive": 0,
+    "hash": "42a219288f7a"
+  },
+  "src/shared/theme/ThemeStateProvider.tsx": {
+    "killed": 34,
+    "alive": 5,
+    "hash": "7c6b27e9e141"
+  },
+  "src/shared/theme/colors.ts": {
+    "killed": 0,
+    "alive": 0,
+    "hash": "faa20416f2ce"
+  },
+  "src/shared/theme/internal/BrowserChromeSync.tsx": {
+    "killed": 21,
+    "alive": 2,
+    "hash": "dd7e463a2671"
+  },
+  "src/shared/theme/internal/ThemeContext.ts": {
+    "killed": 0,
+    "alive": 0,
+    "hash": "c0fe64919c79"
+  },
+  "src/shared/theme/internal/constants.ts": {
+    "killed": 0,
+    "alive": 0,
+    "hash": "fc18d2da556a"
+  },
+  "src/shared/theme/internal/resolve.ts": {
+    "killed": 24,
+    "alive": 2,
+    "hash": "0c5b619d2ec4"
+  },
+  "src/shared/theme/internal/storage.ts": {
+    "killed": 6,
+    "alive": 2,
+    "hash": "5589e431da66"
+  },
+  "src/shared/theme/useTheme.ts": {
+    "killed": 5,
+    "alive": 0,
+    "hash": "6a6c8be829a6"
+  },
+  "src/shared/viewportObservation/useIsomorphicLayoutEffect.ts": {
+    "killed": 0,
+    "alive": 3,
+    "hash": "6c0f2a284503"
+  },
+  "src/shared/viewportObservation/useViewportBusy.ts": {
+    "killed": 32,
+    "alive": 12,
+    "hash": "093a2bcb8458"
+  },
+  "src/shared/viewportObservation/useViewportVisibility.ts": {
+    "killed": 31,
+    "alive": 4,
+    "hash": "2deb28e5a4ef"
   }
 }

@@ -648,63 +648,15 @@ if (mode === "mutated") {
     ? JSON.parse(readFileSync(ledgerPath, "utf8"))
     : {};
 
-  // Отчёт последнего прогона. HTML-репортер Stryker держит внутри ТОТ ЖЕ
-  // объект, что отдал бы JSON-репортер: `app.report = {…}` перед закрытием
-  // тега. Разбираем его, а не заводим второй источник истины рядом.
-  const reportPath = path.join(HERE, CONFIG.mutationReport);
-  let merged = 0;
-  if (existsSync(reportPath)) {
-    const html = readFileSync(reportPath, "utf8");
-    const head = "app.report = ";
-    const from = html.indexOf(head);
-    const to = from < 0 ? -1 : html.indexOf("</script>", from);
-    if (to > from) {
-      const body = html
-        .slice(from + head.length, to)
-        .trim()
-        .replace(/;$/, "");
-      const reportedAt = statSync(reportPath).mtimeMs;
-      for (const [key, d] of Object.entries(
-        new Function("return " + body)().files ?? {},
-      )) {
-        const file = norm(path.join(repoRoot, key));
-        if (!files.includes(file)) continue;
-        // Числа описывают тот код, что был на момент прогона. Если файл
-        // тронут ПОСЛЕ него, приписать их нынешнему содержимому нельзя —
-        // такую запись пропускаем, и файл остаётся непромеренным.
-        if (statSync(file).mtimeMs > reportedAt) continue;
-        let killed = 0;
-        let alive = 0;
-        for (const m of d.mutants ?? []) {
-          // Исключённые мутаторы остаются в отчёте пометкой `Ignored` — они
-          // не убиты и не выжили, в знаменатель счёта не входят.
-          if (m.status === "Ignored") continue;
-          if (m.status === "Killed" || m.status === "Timeout") killed += 1;
-          else alive += 1;
-        }
-        const row = { killed, alive, hash: stamp(file) };
-        if (JSON.stringify(ledger[key]) !== JSON.stringify(row)) merged += 1;
-        ledger[key] = row;
-      }
-    }
-  }
-  if (merged) {
-    const ordered = {};
-    for (const k of Object.keys(ledger).sort()) ordered[k] = ledger[k];
-    writeFileSync(
-      ledgerPath,
-      JSON.stringify(ordered, null, 2) + String.fromCharCode(10),
-      "utf8",
-    );
-  }
-
   // Область прогона берётся из конфига самого инструмента. Считать долг по
   // всему `src` значило бы врать: часть файлов исключена намеренно и с
   // записанной причиной, и они бы числились долгом навсегда.
-  const inScope = (() => {
+  const mutateGlobs = (() => {
     const cfg = path.join(HERE, CONFIG.mutationConfig);
     if (!existsSync(cfg)) return null;
-    const globs = JSON.parse(readFileSync(cfg, "utf8")).mutate ?? [];
+    return JSON.parse(readFileSync(cfg, "utf8")).mutate ?? [];
+  })();
+  const globsToTest = (globs) => {
     const toRe = (glob) => {
       let out = "";
       for (let i = 0; i < glob.length; i += 1) {
@@ -729,11 +681,85 @@ if (mode === "mutated") {
       .filter((g) => g.startsWith("!"))
       .map((g) => toRe(g.slice(1)));
     return (f) => yes.some((r) => r.test(f)) && !no.some((r) => r.test(f));
-  })();
-
+  };
+  const inScope = mutateGlobs === null ? null : globsToTest(mutateGlobs);
   const key = (f) => norm(path.relative(repoRoot, f));
+
+  // Отчёт последнего прогона. HTML-репортер Stryker держит внутри ТОТ ЖЕ
+  // объект, что отдал бы JSON-репортер: `app.report = {…}` перед закрытием
+  // тега. Разбираем его, а не заводим второй источник истины рядом.
+  const reportPath = path.join(HERE, CONFIG.mutationReport);
+  let merged = 0;
+  if (existsSync(reportPath)) {
+    const html = readFileSync(reportPath, "utf8");
+    const head = "app.report = ";
+    const from = html.indexOf(head);
+    const to = from < 0 ? -1 : html.indexOf("</script>", from);
+    if (to > from) {
+      const body = html
+        .slice(from + head.length, to)
+        .trim()
+        .replace(/;$/, "");
+      const reportedAt = statSync(reportPath).mtimeMs;
+      const parsed = new Function("return " + body)();
+      // Отчёт несёт СВОЮ область (`config.mutate`). Совпала с конфигом —
+      // прогон был полным, и тогда файл в области, которого в отчёте нет,
+      // доказанно не дал ни одного мутанта: мутировать в нём нечего. Без этой
+      // сверки такие файлы числились бы долгом вечно — а проверка, которую
+      // нельзя удовлетворить, учит не читать её вывод.
+      const fullScope =
+        mutateGlobs !== null &&
+        JSON.stringify(parsed.config?.mutate ?? null) ===
+          JSON.stringify(mutateGlobs);
+      for (const [key, d] of Object.entries(parsed.files ?? {})) {
+        const file = norm(path.join(repoRoot, key));
+        if (!files.includes(file)) continue;
+        // Числа описывают тот код, что был на момент прогона. Если файл
+        // тронут ПОСЛЕ него, приписать их нынешнему содержимому нельзя —
+        // такую запись пропускаем, и файл остаётся непромеренным.
+        if (statSync(file).mtimeMs > reportedAt) continue;
+        let killed = 0;
+        let alive = 0;
+        for (const m of d.mutants ?? []) {
+          // Исключённые мутаторы остаются в отчёте пометкой `Ignored` — они
+          // не убиты и не выжили, в знаменатель счёта не входят.
+          if (m.status === "Ignored") continue;
+          if (m.status === "Killed" || m.status === "Timeout") killed += 1;
+          else alive += 1;
+        }
+        const row = { killed, alive, hash: stamp(file) };
+        if (JSON.stringify(ledger[key]) !== JSON.stringify(row)) merged += 1;
+        ledger[key] = row;
+      }
+      if (fullScope) {
+        for (const file of files) {
+          if (isTest(file) || file.endsWith(".d.ts")) continue;
+          const k = key(file);
+          if (!inScope(k) || parsed.files[k] !== undefined) continue;
+          if (statSync(file).mtimeMs > reportedAt) continue;
+          const row = { killed: 0, alive: 0, hash: stamp(file) };
+          if (JSON.stringify(ledger[k]) !== JSON.stringify(row)) merged += 1;
+          ledger[k] = row;
+        }
+      }
+    }
+  }
+  if (merged) {
+    const ordered = {};
+    for (const k of Object.keys(ledger).sort()) ordered[k] = ledger[k];
+    writeFileSync(
+      ledgerPath,
+      JSON.stringify(ordered, null, 2) + String.fromCharCode(10),
+      "utf8",
+    );
+  }
+
   const scoreOf = (row) =>
-    ((100 * row.killed) / (row.killed + row.alive || 1)).toFixed(2);
+    row.killed + row.alive === 0
+      ? "мутировать нечего"
+      : ((100 * row.killed) / (row.killed + row.alive)).toFixed(2) +
+        " %, живых " +
+        row.alive;
 
   console.log("=== Мутационный прогон против правки ===");
   console.log(
@@ -772,10 +798,10 @@ if (mode === "mutated") {
         never.push(rel(f));
         needRun.push(key(f));
       } else if (row.hash !== stamp(f)) {
-        stale.push(`${rel(f)} — было ${scoreOf(row)} %, живых ${row.alive}`);
+        stale.push(`${rel(f)} — было ${scoreOf(row)}`);
         needRun.push(key(f));
       } else {
-        fresh.push(`${rel(f)} — ${scoreOf(row)} %, живых ${row.alive}`);
+        fresh.push(`${rel(f)} — ${scoreOf(row)}`);
       }
     }
 
