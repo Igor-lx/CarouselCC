@@ -24,6 +24,7 @@ import {
   type VisualPositionSource,
 } from "../../../../visual-position";
 import { usePaginationFade } from "../usePaginationFade";
+import { watchStyleWrites } from "../../tests/styleWrites";
 
 /**
  * The binding's whole job is that ONE offset owns the strip across every mode.
@@ -595,5 +596,70 @@ describe("usePaginationFade — a jump cross-fades instead of sweeping", () => {
     plan.publish(jump({ isContinuation: true, targetKey: 2 }));
 
     expect(recorded.length).toBe(before);
+  });
+});
+
+/**
+ * The follow-mode write gate — the same contract the widget carries, and just
+ * as unreachable from any assertion about the DOM.
+ *
+ * Here the memory is per dot and keyed on ACTIVE STRENGTH rather than on the
+ * painted values: one number decides both the opacity and the scale, so one
+ * comparison is enough to know that neither moved. A strip of four dots is
+ * cheap; a strip of twenty, repainted twice per dot on every frame of every
+ * drag, is not.
+ */
+describe("usePaginationFade — what it refuses to write", () => {
+  const everyDot = () => [...host.querySelectorAll<HTMLElement>("[data-page]")];
+
+  let writes: ReturnType<typeof watchStyleWrites>;
+
+  const followFrom = (offset: number) => {
+    render(0);
+    plan.publish({ kind: "follow", isFallback: false });
+    visual.emit(frameAt(offset));
+    // Instrumented only now: the take-over deliberately claims EVERY dot, and
+    // that first sweeping write is not what the gate is about.
+    writes = watchStyleWrites(everyDot());
+  };
+
+  it("writes nothing at all for a frame that repeats the last one", () => {
+    followFrom(0.5);
+
+    visual.emit(frameAt(0.5));
+
+    expect(writes.count()).toBe(0);
+  });
+
+  it("writes nothing for a move too small to see", () => {
+    // Below `FOLLOW_STRENGTH_EPSILON`: the dot's look is a function of its
+    // strength, so a strength that has not moved is a look that has not moved.
+    followFrom(0.5);
+
+    visual.emit(frameAt(0.5 + 1e-6));
+
+    expect(writes.count()).toBe(0);
+  });
+
+  it("writes when the strip actually moves", () => {
+    // The positive control: the silence above is the gate, not the harness
+    // failing to reach the dots.
+    followFrom(0.5);
+
+    visual.emit(frameAt(0.9));
+
+    expect(writes.count()).toBeGreaterThan(0);
+  });
+
+  it("leaves alone the dots the offset never comes near", () => {
+    // Strength is zero for anything more than a page away and stays zero as
+    // the strip slides between two neighbours. Those dots are not merely
+    // written with the same value — they are not written.
+    followFrom(0);
+
+    visual.emit(frameAt(0.5));
+
+    expect(writes.count()).toBeGreaterThan(0);
+    expect(writes.written()).not.toContain(dot(2));
   });
 });
