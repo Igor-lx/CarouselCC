@@ -285,12 +285,15 @@ describe("what a dispatch allocates no matter what", () => {
     // to cost twice: `committedOrigin` started at `null`, and the render-phase
     // write that forced ran the whole deck a second time before the first
     // paint. Seeding it from the mount's own window removed that pass.
+    // Counted against the mounted set rather than a literal: the deck's size
+    // is a tuning question (slides, visible count, buffer), and a test that
+    // hard-codes it goes red on a knob turn while saying nothing about renders.
     render({ current: 0, previous: 0, isMoving: false });
-    expect(elementsBuilt).toBe(27);
+    expect(elementsBuilt).toBe(seenSlides.length);
 
     elementsBuilt = 0;
     render({ current: 0, previous: 0, isMoving: true });
 
-    expect(elementsBuilt).toBe(27);
+    expect(elementsBuilt).toBe(seenSlides.length);
   });
 });
