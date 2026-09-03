@@ -213,6 +213,44 @@ describe("useSlideRenderModel — the layout origin", () => {
     expect(seen.layoutOrigin).toBeLessThan(origin);
   });
 
+  it("remembers where it re-centred, so the next shift is free again", () => {
+    // Computing the new origin is half the job; committing it is the other
+    // half. Drop the commit and the origin is recomputed from the window on
+    // every render after a drift — which moves every slide's lane on every
+    // settle, the exact re-raster the band exists to prevent. The first shift
+    // after a re-centre is where that shows.
+    render({ current: 0, previous: 0, isMoving: false });
+    render({ current: 5000, previous: 5000, isMoving: false });
+    const recentred = seen.layoutOrigin;
+
+    render({ current: 5003, previous: 5003, isMoving: false });
+
+    expect(seen.layoutOrigin).toBe(recentred);
+  });
+
+  it("holds at the band's LOWER edge too, not only its upper one", () => {
+    // The band is two-sided and its two edges are two separate comparisons.
+    // The upper one is walked below; this one is its mirror, and without it a
+    // deck ridden backwards re-bases a lane early — invisible in every test
+    // that only ever moves forwards.
+    render({ current: 0, previous: 0, isMoving: false });
+    const origin = seen.layoutOrigin;
+    const near = () => Math.min(...lanes());
+
+    let current = origin;
+    let steppedOut = false;
+    while (!steppedOut && current > origin - BAND - 32) {
+      current -= 1;
+      render({ current, previous: current, isMoving: false });
+      steppedOut = near() < origin - BAND;
+      if (!steppedOut) expect(seen.layoutOrigin).toBe(origin);
+    }
+
+    expect(steppedOut).toBe(true);
+    expect(near()).toBe(origin - BAND - 1);
+    expect(seen.layoutOrigin).not.toBe(origin);
+  });
+
   it("holds AT the band edge and lets go one lane past it", () => {
     // The edge is where "inside the band" and "past it" stop agreeing, and it
     // is the only place the comparison is specified. A window that reaches the

@@ -38,8 +38,9 @@ const records = buildSlideRecords(
 );
 const layout: CarouselLayout = buildCarouselLayout(records, 3, false);
 
-/** Элементы, созданные `map` на последнем рендере: их аллоцирует каждый
- * рендер родителя, кэш на это не влияет — нужно как знаменатель. */
+/** Elements built by `map` on the latest render. Every parent render
+ * allocates them, cache or not — the denominator the saving is measured
+ * against. */
 let elementsBuilt: number;
 
 /** The slide objects of the latest render — read back to count rebuilds. */
@@ -274,14 +275,18 @@ describe("the deck's allocation cost across a ride", () => {
 });
 
 describe("what a dispatch allocates no matter what", () => {
-  it("rebuilds one element and one props object per mounted slide, cache or not", () => {
+  it("builds one element per mounted slide, once — mount included", () => {
     // The denominator. `virtualSlides.map(...)` runs on every parent render, so
-    // the elements and their props objects are allocated whether or not the
-    // slide objects inside them were reused. Any saving the identity cache
-    // makes is measured against this, not against zero.
+    // an element and its props object are allocated whether or not the slide
+    // object inside was reused. Any saving the identity cache makes is measured
+    // against this, not against zero.
+    //
+    // Mount costing the SAME as a dispatch is the part worth pinning. It used
+    // to cost twice: `committedOrigin` started at `null`, and the render-phase
+    // write that forced ran the whole deck a second time before the first
+    // paint. Seeding it from the mount's own window removed that pass.
     render({ current: 0, previous: 0, isMoving: false });
-    const onMount = elementsBuilt;
-    expect(onMount).toBe(54); // два прохода: правка состояния во время рендера
+    expect(elementsBuilt).toBe(27);
 
     elementsBuilt = 0;
     render({ current: 0, previous: 0, isMoving: true });

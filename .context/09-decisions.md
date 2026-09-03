@@ -58,7 +58,7 @@
 
 **Кэш идентичности `VirtualSlide` остаётся с двумя `eslint-disable` — замер
 сделан, решение отложено**
-(`slides/useSlideRenderModel.ts:93` `MEASURED — it saves allocations, not renders`).
+(`slides/useSlideRenderModel.ts:97` `MEASURED — it saves allocations, not renders`).
 Решено разработчиком: **отложить до проверки руками на реальных устройствах**;
 работа — `02-todo.md`, пункт 8.
 

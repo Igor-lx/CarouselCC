@@ -75,9 +75,13 @@ export function useSlideRenderModel({
 
   // Stable coordinate base; recenters only on a whole-band drift, so a settle
   // window shift changes no slide's lane (the no-re-raster win; see motion.md).
-  const [committedOrigin, setCommittedOrigin] = useState<number | null>(null);
+  // Seeded from the mount's own window, not from `null`: "not decided yet" would
+  // be a state that exists for exactly one render, and paying for it costs a
+  // whole extra pass over the deck before the first paint.
+  const [committedOrigin, setCommittedOrigin] = useState(
+    () => freshWindow.start,
+  );
   const layoutOrigin =
-    committedOrigin === null ||
     renderWindow.start < committedOrigin - LAYOUT_ORIGIN_BAND_SLOTS ||
     renderWindow.end > committedOrigin + LAYOUT_ORIGIN_BAND_SLOTS
       ? renderWindow.start

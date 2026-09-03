@@ -335,9 +335,9 @@
     "hash": "3c104b2f6e49"
   },
   "src/components/Carousel/client/slides/useSlideRenderModel.ts": {
-    "killed": 90,
-    "alive": 8,
-    "hash": "8c16629e780c"
+    "killed": 88,
+    "alive": 7,
+    "hash": "281772e716ed"
   },
   "src/components/Carousel/client/slots/slotNames.ts": {
     "killed": 0,
