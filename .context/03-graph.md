@@ -331,7 +331,7 @@ state + motion + geometry ──> useModuleContextValue ──> CarouselStableCo
 
 ## C. `client/domain/**`
 
-`client/domain/**` — 22 импортёра (+15 тестовых), самый широко потребляемый
+`client/domain/**` — 22 импортёра (+16 тестовых), самый широко потребляемый
 слой. Смена сигнатуры здесь задевает больше всего кода, поэтому радиус
 проверяется до правки: `node .context/graph.mjs blast`.
 

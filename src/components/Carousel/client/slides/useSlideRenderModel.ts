@@ -90,11 +90,16 @@ export function useSlideRenderModel({
   // because the visibility flags depend on `isMoving` — yet the only fields
   // that ever move are the two flags, and only for the two or three slides at
   // the band's edges.
-  // CONSTRAINT — without this cache every dispatch mints N slide objects, N
-  // `ariaProps` objects and N `aria-label` strings, and hands every memoised
-  // SlideItem a fresh `ariaProps` to shallow-compare: the whole deck then
-  // re-renders in the two frames a ride starts and settles in. The lane styles
-  // (`laneCacheRef` in presentation) are cached for the same reason.
+  // MEASURED — it saves allocations, not renders. The deck re-renders
+  // identically without it: `ariaProps` is SPREAD at the call site, so what
+  // reaches SlideItem's memo is four primitives compared by value, and no
+  // other prop carries this object's identity — the lane style comes from
+  // presentation's own cache. What the cache does save is N slide objects, N
+  // `ariaProps` and N `aria-label` strings per dispatch, twice per ride.
+  // The numbers, and the control proving the instrument can see a re-render,
+  // are in `slides/tests/slideRenderCost.test.tsx`. Whether that saving is
+  // worth two suppressed lint rules is an open decision, deferred until it can
+  // be felt on real devices; it is item 8 of the project's deferred-work list.
   // Owned by a memo with no inputs, so it lives as long as the hook does and
   // no render writes a ref to keep it.
   const slideCache = useMemo(() => new Map<number, VirtualSlide>(), []);
@@ -156,7 +161,7 @@ export function useSlideRenderModel({
           totalSlides,
         ),
       };
-      // eslint-disable-next-line react-hooks/immutability -- a per-instance identity cache: the rule wants no mutation of a value from an outer scope, but losing this cache re-renders the whole deck on every dispatch (see the CONSTRAINT above)
+      // eslint-disable-next-line react-hooks/immutability -- a per-instance identity cache: the rule wants no mutation of a value from an outer scope; measured to save allocations rather than renders, kept pending the decision above
       cache.set(virtualIndex, next);
       return next;
     });

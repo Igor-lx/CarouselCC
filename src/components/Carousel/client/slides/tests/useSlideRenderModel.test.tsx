@@ -16,11 +16,13 @@ import { useSlideRenderModel } from "../useSlideRenderModel";
  * Which slides exist, where their lanes are measured from, and whether their
  * objects survive a re-render.
  *
- * Two of these are invisible when broken. A window that shrinks mid-ride
- * unmounts a slide the eye can still see — a pop, only on a real device. And a
- * `VirtualSlide` rebuilt when nothing about it moved hands every memoised
- * `SlideItem` a fresh `ariaProps`, so the whole deck re-renders twice per ride,
- * in exactly the two frames it can least afford.
+ * A window that shrinks mid-ride unmounts a slide the eye can still see — a
+ * pop, only on a real device.
+ *
+ * The identity assertions below say the cache WORKS, which is not the same as
+ * the deck being spared: measured, it prevents no re-render at all, because
+ * `ariaProps` is spread at the call site. What that costs and what follows is
+ * `slideRenderCost.test.tsx`, and item 8 of the deferred-work list.
  */
 
 const BUFFER = 4;

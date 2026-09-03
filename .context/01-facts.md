@@ -152,7 +152,7 @@ solution-style, `files: []`. `tsc --noEmit` в корне проверяет **�
 
 | Файл | Правило | Почему |
 | --- | --- | --- |
-| `slides/useSlideRenderModel.ts` ×2 | `react-hooks/immutability` | кэш идентичности `VirtualSlide`: без него вся колода перерисовывается дважды за поездку (CONSTRAINT в коде) |
+| `slides/useSlideRenderModel.ts` ×2 | `react-hooks/immutability` | кэш идентичности `VirtualSlide`. **Замерено:** перерисовок не предотвращает ни одной — экономит аллокации. Судьба открыта, `02-todo.md`, пункт 8 |
 | `slides/imageResource/useImageResourceStoreInstance.ts` ×2 | `react-hooks/refs` | документированная React ленивая инициализация рефа; условное создание не выражается через `useState`, а создание из эффекта отдало бы `null` на рендер |
 | `modules/Pagination/basic/tests/usePaginationFade.test.tsx` | `@typescript-eslint/unbound-method` | сохранение метода прототипа для восстановления; jsdom не имеет `Element.animate`, поэтому `vi.spyOn` не подходит |
 
