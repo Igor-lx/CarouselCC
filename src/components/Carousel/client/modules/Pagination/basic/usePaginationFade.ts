@@ -13,10 +13,8 @@ import {
   type InFlightSpan,
   type MotionPlanSource,
 } from "../../../motion";
-import {
-  isDroppedFallbackFrame,
-  type VisualPositionSource,
-} from "../../../visual-position";
+import type { VisualPositionSource } from "../../../visual-position";
+import { useOffsetFollow } from "../useOffsetFollow";
 import {
   blendDotStates,
   buildDotKeyframes,
@@ -135,14 +133,6 @@ export function usePaginationFade({
   /** Where the carousel LOOKS to be, in pages — fractional while a step runs. */
   const offsetRef = useRef(targetPageIndex);
   const stepRef = useRef<ActiveFade | null>(null);
-  const followUnsubRef = useRef<(() => void) | null>(null);
-  const followBaseRef = useRef<{ pageOffset: number; offset: number } | null>(
-    null,
-  );
-  /** Which follow the live subscription is serving. A drag that releases into the
-   * no-WAAPI path switches flavour WITHOUT a new subscription, and the frame-drop
-   * rule has to switch with it or the strip outruns the track. */
-  const isFallbackFollowRef = useRef(false);
 
   // Reading the CSS-owned look forces a recalc, so cache it; refresh only at rest.
   const dotStatesRef = useRef<{
@@ -282,61 +272,26 @@ export function usePaginationFade({
     [isFinite, pageCount, takeDotOwnership],
   );
 
-  const stopFollowing = useCallback(() => {
-    followUnsubRef.current?.();
-    followUnsubRef.current = null;
-    followBaseRef.current = null;
-  }, []);
+  /** What a finger takes the strip away from: the compositor's fades stop, and
+   * the write gate's memory goes with them — WAAPI owned the look, so the gate
+   * has nothing true to compare against. The dot states are re-read only if
+   * nothing has read them yet; at rest `settle` keeps them fresh. */
+  const takeOverFromFade = useCallback(() => {
+    cancelAllFades();
+    stepRef.current = null;
+    if (!dotStatesRef.current) refreshDotStates();
+    writtenStrengthRef.current.clear();
+  }, [cancelAllFades, refreshDotStates]);
 
-  const startFollowing = useCallback(
-    (isFallback: boolean) => {
-      isFallbackFollowRef.current = isFallback;
-      if (followUnsubRef.current || !visualPosition) return;
-
-      // Take over from the LIVE offset, so a grab mid-ride keeps the position the
-      // strip had reached instead of re-anchoring on the logical target.
-      const start = liveOffset();
-      cancelAllFades();
-      stepRef.current = null;
-      offsetRef.current = start;
-      followBaseRef.current = null;
-      if (!dotStatesRef.current) refreshDotStates();
-      writtenStrengthRef.current.clear(); // WAAPI owned the look; the gate is blind
-      // The first write claims EVERY dot: the class flip may sit anywhere on the
-      // strip, and an unclaimed dot would keep painting it.
-      writeFollowOffset(start);
-
-      followUnsubRef.current = visualPosition.subscribe(
-        (frame) => {
-          // Delta-follow in the page domain: the deck's absolute position is not
-          // the strip's (a cyclic wrap must not teleport the dots).
-          if (followBaseRef.current === null) {
-            followBaseRef.current = {
-              pageOffset: frame.pageOffset,
-              offset: offsetRef.current,
-            };
-          }
-          const base = followBaseRef.current;
-          const next = base.offset + (frame.pageOffset - base.pageOffset);
-          offsetRef.current = next;
-
-          // Fallback relief: the same shared frame-drop rule the track and the
-          // widget apply, so the three consumers cannot desync.
-          if (isFallbackFollowRef.current && isDroppedFallbackFrame(frame))
-            return;
-          writeFollowOffset(next);
-        },
-        { emitCurrent: true },
-      );
-    },
-    [
-      cancelAllFades,
-      liveOffset,
-      refreshDotStates,
-      visualPosition,
-      writeFollowOffset,
-    ],
-  );
+  // The first paint claims EVERY dot: the class flip may sit anywhere on the
+  // strip, and an unclaimed dot would keep painting it.
+  const { startFollowing, stopFollowing } = useOffsetFollow({
+    visualPosition,
+    offsetRef,
+    readLiveOffset: liveOffset,
+    onTakeOver: takeOverFromFade,
+    paint: writeFollowOffset,
+  });
 
   // ---- plan routing -----------------------------------------------------------
 

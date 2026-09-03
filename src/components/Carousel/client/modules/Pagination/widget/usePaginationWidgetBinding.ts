@@ -14,10 +14,8 @@ import {
   type MotionPlanSource,
   type WaapiMotionPlan,
 } from "../../../motion";
-import {
-  isDroppedFallbackFrame,
-  type VisualPositionSource,
-} from "../../../visual-position";
+import type { VisualPositionSource } from "../../../visual-position";
+import { useOffsetFollow } from "../useOffsetFollow";
 // Per-frame write gates: within-epsilon values skip the DOM write, so a steady
 // idle widget emits zero per-rAF writes.
 const DOT_POSITION_EPSILON_PX = 0.25;
@@ -149,14 +147,6 @@ export function usePaginationWidgetBinding({
   const stepRef = useRef<ActiveStep | null>(null);
   /** The step a finger grab tore down — so a repeat swipe advances one step BEYOND. */
   const interruptedStepRef = useRef<WidgetStepMemory | null>(null);
-  const followUnsubRef = useRef<(() => void) | null>(null);
-  const followBaseRef = useRef<{ pageOffset: number; offset: number } | null>(
-    null,
-  );
-  /** Which follow the live subscription is serving. A drag that releases into the
-   * no-WAAPI path switches flavour WITHOUT a new subscription, and the frame-drop
-   * rule has to switch with it or the strip outruns the track. */
-  const isFallbackFollowRef = useRef(false);
 
   const side = widgetProjectionSide(geometry.visibleCount);
   const dotCount =
@@ -497,60 +487,28 @@ export function usePaginationWidgetBinding({
 
   // ---- follow mode (finger drag / JS fallback) -------------------------------
 
-  const stopFollowing = useCallback(() => {
-    followUnsubRef.current?.();
-    followUnsubRef.current = null;
-    followBaseRef.current = null;
-  }, []);
+  /** What a finger takes the strip away from: the step it interrupts is
+   * remembered, so a repeat swipe advances one step BEYOND it rather than
+   * re-running the one it just tore down. */
+  const takeOverFromStep = useCallback(() => {
+    interruptedStepRef.current = stepRef.current
+      ? {
+          target: stepRef.current.to,
+          direction: stepRef.current.direction,
+          targetKey: stepRef.current.targetKey,
+        }
+      : null;
+    cancelStepAnimations();
+    invalidateWriteCaches(); // WAAPI owned the styles; the caches are stale
+  }, [cancelStepAnimations, invalidateWriteCaches]);
 
-  const startFollowing = useCallback(
-    (isFallback: boolean) => {
-      isFallbackFollowRef.current = isFallback;
-      if (followUnsubRef.current || !visualPosition) return;
-      // Take over from the live offset; remember the step this grab tears down.
-      const start = currentOffset();
-      interruptedStepRef.current = stepRef.current
-        ? {
-            target: stepRef.current.to,
-            direction: stepRef.current.direction,
-            targetKey: stepRef.current.targetKey,
-          }
-        : null;
-      cancelStepAnimations();
-      invalidateWriteCaches();
-      offsetRef.current = start;
-      writeOffset(start);
-      followBaseRef.current = null;
-
-      followUnsubRef.current = visualPosition.subscribe(
-        (frame) => {
-          // Delta-follow in the widget's own step domain (epsilon-gated writes).
-          if (followBaseRef.current === null) {
-            followBaseRef.current = {
-              pageOffset: frame.pageOffset,
-              offset: offsetRef.current,
-            };
-          }
-          const base = followBaseRef.current;
-          const next = base.offset + (frame.pageOffset - base.pageOffset);
-          offsetRef.current = next;
-
-          // Fallback relief: same shared frame-drop rule as the track.
-          if (isFallbackFollowRef.current && isDroppedFallbackFrame(frame))
-            return;
-          writeOffset(next);
-        },
-        { emitCurrent: true },
-      );
-    },
-    [
-      cancelStepAnimations,
-      currentOffset,
-      invalidateWriteCaches,
-      visualPosition,
-      writeOffset,
-    ],
-  );
+  const { startFollowing, stopFollowing } = useOffsetFollow({
+    visualPosition,
+    offsetRef,
+    readLiveOffset: currentOffset,
+    onTakeOver: takeOverFromStep,
+    paint: writeOffset,
+  });
 
   // ---- plan routing -----------------------------------------------------------
 
