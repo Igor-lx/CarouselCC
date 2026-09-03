@@ -1067,7 +1067,11 @@ React флипает активную точку **сразу**, а плавно
 #### `widget/usePaginationWidgetBinding.ts` — fx
 - **Покрытие выведено, а не выбрано**: `DOT_COVERAGE_MARGIN_SLOTS` и
   `ACTIVE_DOT_COUNT` считаются из `WIDGET_STEP_LOOKAHEAD` — они не могут
-  разъехаться.
+  разъехаться. Граница **тугая с обеих сторон**: правило цели зажимает посадку
+  в `[ceil(from) − LOOKAHEAD, floor(from) + LOOKAHEAD]`, и самый широкий шаг
+  называет ровно `LOOKAHEAD + 1` идентификаторов — не больше ни при каком
+  дробном `from`. Оверлеев столько же: лишний был бы элементом с нулевой
+  прозрачностью на всю жизнь виджета.
 - Три режима, как у точек: статическое письмо, покадровое следование, WAAPI-шаг.
   Все пишут одну и ту же проекцию.
 - **Две памяти шага** сводятся одним правилом (`resolveWidgetStepTarget`):
@@ -1657,7 +1661,7 @@ rider-defaults и собственный `useMotionPaint`. Помечено ко
 
 1. **Мохибейка НЕ повсеместна.** В выводе PowerShell она была артефактом
    консоли. В файлах ровно 3 места (grep по всем `.ts/.tsx/.scss`):
-   (`modules/Pagination/widget/usePaginationWidgetBinding.ts:63` `≤`),
+   (`modules/Pagination/widget/usePaginationWidgetBinding.ts:68` `≤`),
    `motion/tests/segmentFactory.test.ts:228` (`≈`),
    `state/tests/reducer.test.ts:161` `wrap remains the business`.
 2. **Замечание об инертной подписке `useMotionPaint` в `useKineticValue`

@@ -51,11 +51,16 @@ import type {
 export const DOT_COVERAGE_MARGIN_SLOTS = WIDGET_STEP_LOOKAHEAD * 2;
 
 /**
- * Overlay elements. A step spans at most `WIDGET_STEP_LOOKAHEAD` from the live
- * offset, and `activeTrajectoryIds` brackets that span with a floor and a ceil,
- * so it can name one more id than the span itself.
+ * Overlay elements — the tight bound, not a rounded-up one.
+ *
+ * `resolveWidgetStepTarget` clamps a landing into
+ * `[ceil(from) - LOOKAHEAD, floor(from) + LOOKAHEAD]`, and
+ * `activeTrajectoryIds` brackets `from..target` with a floor and a ceil. Take
+ * `from = n + f`: for `f = 0` the span is at most `n±LOOKAHEAD` and brackets to
+ * `LOOKAHEAD + 1` ids; for `0 < f < 1` the clamp costs a whole unit on the side
+ * the fraction is on, so the bracket lands on the same count. Never more.
  */
-export const ACTIVE_DOT_COUNT = WIDGET_STEP_LOOKAHEAD + 2;
+export const ACTIVE_DOT_COUNT = WIDGET_STEP_LOOKAHEAD + 1;
 
 /** At or below this a dot paints nothing: pin it, don't pay for an invisible animation. */
 const INVISIBLE_OPACITY_MAX = 0.001;

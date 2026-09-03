@@ -102,18 +102,27 @@ describe("widget element pool covers every reachable step", () => {
     }
   });
 
-  it("no reachable step names more highlight ids than there are overlays", () => {
+  it("has exactly as many overlays as the furthest step names, no more", () => {
+    // Both directions matter and only one of them used to be checked. Too few
+    // overlays and the arriving page's highlight pops in at settle instead of
+    // animating; too many and the widget renders an element that is `opacity:
+    // 0` for its whole life. A `<=` here let a spare slot sit unnoticed — the
+    // pool is DERIVED from the reach, so the two must be equal, not merely
+    // compatible.
+    let widest = 0;
     for (const base of [-5, 0, 3]) {
       for (const fraction of FRACTIONS) {
         const from = base + fraction;
         for (const target of reachableTargets(from)) {
-          expect(
-            activeTrajectoryIds(from, target).length,
-            `${from} -> ${target}`,
-          ).toBeLessThanOrEqual(ACTIVE_DOT_COUNT);
+          const named = activeTrajectoryIds(from, target).length;
+          expect(named, `${from} -> ${target}`).toBeLessThanOrEqual(
+            ACTIVE_DOT_COUNT,
+          );
+          widest = Math.max(widest, named);
         }
       }
     }
+    expect(widest).toBe(ACTIVE_DOT_COUNT);
   });
 
   it("the active slot really is the pool index holding the resting offset", () => {
