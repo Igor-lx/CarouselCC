@@ -104,7 +104,7 @@ let root: Root;
 let plan: ReturnType<typeof createPlanChannel>;
 let visual: ReturnType<typeof createVisualPosition>;
 
-function Probe() {
+function Probe({ activeClassName }: { activeClassName?: string }) {
   const geometry = useMemo(
     () =>
       buildPaginationWidgetGeometry(PAGINATION_WIDGET_DEFAULTS.visibleDots, {
@@ -119,6 +119,7 @@ function Probe() {
       visualPosition: visual.source,
       motionPlan: plan.source,
       geometry,
+      activeClassName,
     });
   return (
     <>
@@ -144,13 +145,17 @@ const paintedStrip = () =>
     .map((dot) => `${dot.style.transform}@${dot.style.opacity}`)
     .join("|");
 
+const renderProbe = (props: { activeClassName?: string } = {}) => {
+  act(() => {
+    root.render(<Probe {...props} />);
+  });
+};
+
 const mountProbe = () => {
   root = createRoot(host);
   plan = createPlanChannel();
   visual = createVisualPosition();
-  act(() => {
-    root.render(<Probe />);
-  });
+  renderProbe();
 };
 
 beforeEach(() => {
@@ -590,5 +595,109 @@ describe("usePaginationWidgetBinding — what it refuses to write", () => {
     for (const node of stayedHidden) {
       expect(writes.written()).not.toContain(node);
     }
+  });
+});
+
+/**
+ * The active class on the resting slot — 23 of this file's mutants survived
+ * here, and four of them had no coverage at all, because every test above
+ * mounts the binding without an `activeClassName` and never renames one.
+ *
+ * The class is how the widget's CSS knows which dot is "the current page". It
+ * is placed on the slot the strip rests under, not on a page index: the strip
+ * slides beneath a fixed marker rather than the marker chasing the strip.
+ */
+describe("usePaginationWidgetBinding — the class marking the resting slot", () => {
+  const slots = () => [...host.querySelectorAll<HTMLElement>("[data-slot]")];
+  const carrying = (className: string) =>
+    slots().filter((slot) => slot.classList.contains(className));
+
+  it("marks the middle slot, and only that one", () => {
+    // The strip is symmetric around its centre; the centre is where the deck's
+    // current page sits at rest. Two marked dots — or a marked neighbour — is
+    // the widget disagreeing with the deck about which page is current.
+    renderProbe({ activeClassName: "is-active" });
+
+    const marked = carrying("is-active");
+    expect(marked).toHaveLength(1);
+    expect(marked[0]).toBe(slots()[Math.floor(slots().length / 2)]);
+  });
+
+  it("carries no class at all when the host passes none", () => {
+    // The static widget and the CSS-module-less host both land here, and a
+    // stray class name is a style nobody wrote.
+    renderProbe();
+
+    for (const slot of slots()) expect(slot.className).toBe("");
+  });
+
+  it("takes the old name off every slot when the host renames it", () => {
+    // CSS modules hand out a fresh hashed name whenever the stylesheet is
+    // rebuilt, and the whole strip is written once and reused. Leaving the old
+    // name behind marks a slot for good, and the marker never moves again.
+    renderProbe({ activeClassName: "old-name" });
+    expect(carrying("old-name")).toHaveLength(1);
+
+    renderProbe({ activeClassName: "new-name" });
+
+    expect(carrying("old-name")).toHaveLength(0);
+    expect(carrying("new-name")).toHaveLength(1);
+  });
+
+  it("strips the class when the host stops passing one", () => {
+    // Switching the module off must leave the strip as bare as it was before
+    // it was ever switched on — the removal cannot be skipped just because
+    // there is no new name to put in its place.
+    renderProbe({ activeClassName: "is-active" });
+
+    renderProbe();
+
+    expect(carrying("is-active")).toHaveLength(0);
+  });
+});
+
+describe("usePaginationWidgetBinding — when the compositor takes nothing", () => {
+  beforeEach(() => {
+    animations = [];
+  });
+
+  it("lands the strip on the target instead of leaving it mid-step", () => {
+    // `startPinnedAnimation` answers `null` — not throws — when the engine
+    // refuses the keyframes, and every dot may refuse at once. With no
+    // animation to finish, nothing would ever call `finalizeStep`: the strip
+    // would sit at the offset it had when the step began, one page behind the
+    // deck, until the next plan happened to move it.
+    //
+    // Watched by WRITES rather than by the painted strip: a dot that is
+    // invisible for the whole step is parked at its last frame BEFORE the
+    // empty-animation check, so the strip's look changes either way. Only the
+    // visible dots tell the two apart — they are painted by the landing and by
+    // nothing else.
+    plan.publish({ kind: "follow", isFallback: false });
+    visual.emit(frameAt(0.4));
+    const slots = [...host.querySelectorAll<HTMLElement>("[data-slot]")];
+    const middle = slots[Math.floor(slots.length / 2)]!;
+    expect(middle.style.opacity).not.toBe("0"); // it is one of the visible ones
+    const writes = watchStyleWrites(slots);
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- saved to be put back verbatim, never called; the same exception the stub install above carries
+    const real = Element.prototype.animate;
+    Element.prototype.animate = () => {
+      throw new Error("keyframes not supported");
+    };
+    try {
+      plan.publish(waapiPlan());
+    } finally {
+      Element.prototype.animate = real;
+    }
+
+    expect(animations).toEqual([]);
+    expect(writes.written()).toContain(middle);
+
+    // And it LANDED rather than merely repainted: an idle plan finds no step
+    // left to settle, so it changes nothing.
+    const landed = paintedStrip();
+    plan.publish({ kind: "idle" });
+    expect(paintedStrip()).toBe(landed);
   });
 });

@@ -174,14 +174,27 @@ const unmount = () => {
   act(() => root.unmount());
 };
 
-function Probe({ targetPageIndex }: { targetPageIndex: number }) {
+interface ProbeProps {
+  targetPageIndex: number;
+  /** The host may render the dots later than it wires the binding up. */
+  withDots?: boolean;
+  /** The carousel nulls both streams together; a host may not. */
+  withVisualPosition?: boolean;
+}
+
+function Probe({
+  targetPageIndex,
+  withDots = true,
+  withVisualPosition = true,
+}: ProbeProps) {
   const { bindDotRef } = usePaginationFade({
     motionPlan: plan.source,
-    visualPosition: visual.source,
+    visualPosition: withVisualPosition ? visual.source : null,
     targetPageIndex,
     pageCount: PAGE_COUNT,
     isFinite: true,
   });
+  if (!withDots) return null;
   return (
     <>
       {Array.from({ length: PAGE_COUNT }, (_, pageIndex) => (
@@ -195,9 +208,12 @@ function Probe({ targetPageIndex }: { targetPageIndex: number }) {
   );
 }
 
-const render = (targetPageIndex: number) =>
+const render = (
+  targetPageIndex: number,
+  props: Omit<ProbeProps, "targetPageIndex"> = {},
+) =>
   act(() => {
-    root.render(<Probe targetPageIndex={targetPageIndex} />);
+    root.render(<Probe targetPageIndex={targetPageIndex} {...props} />);
   });
 
 const dot = (pageIndex: number) =>
@@ -661,5 +677,90 @@ describe("usePaginationFade — what it refuses to write", () => {
 
     expect(writes.count()).toBeGreaterThan(0);
     expect(writes.written()).not.toContain(dot(2));
+  });
+});
+
+/**
+ * The three defensive branches nothing had ever executed: a plan that lands
+ * before the host has rendered a dot, an engine that refuses keyframes, and a
+ * follow plan with no position stream behind it.
+ *
+ * None of them is exotic — they are what the module does on the way in, on the
+ * way out, and on a browser that says no. All three are silent when wrong: the
+ * dots simply stop agreeing with the deck, and nothing throws.
+ */
+describe("usePaginationFade — the branches that run when something is missing", () => {
+  it("still takes a running motion down when the dots have gone", () => {
+    // Between two renders the host may hand back an empty strip. There is
+    // nothing left to paint, but the motion already on the compositor is not
+    // nothing: left alone it keeps running against dots that will come back.
+    render(0);
+    render(1);
+    plan.publish(midFlightSweep());
+    const running = recorded.filter((entry) => !entry.isCancelled);
+    expect(running.length).toBeGreaterThan(0);
+
+    render(1, { withDots: false });
+    plan.publish(releaseSweep());
+
+    expect(running.every((entry) => entry.isCancelled)).toBe(true);
+  });
+
+  // Both motions build their own keyframes and both must survive the refusal;
+  // covering one proves nothing about the other.
+  const withRefusedKeyframes = (publish: () => void) => {
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- saved to be put back verbatim, never called; the same exception the stub install above carries
+    const real = Element.prototype.animate;
+    Element.prototype.animate = () => {
+      throw new Error("keyframes not supported");
+    };
+    try {
+      publish();
+    } finally {
+      Element.prototype.animate = real;
+    }
+  };
+
+  it.each([
+    ["a sweep", () => plan.publish(releaseSweep())],
+    ["a jump", () => plan.publish(jump())],
+  ])(
+    "hands a dot back to its classes when the engine refuses %s's keyframes",
+    (_name, publish) => {
+      // `startPinnedAnimation` answers `null` rather than throwing when the
+      // engine will not take the keyframes. The dot must then be RELEASED, not
+      // left owned: an owned dot keeps `transition: none` and the inline look
+      // it was mid-write on, so it freezes for the rest of the page's life.
+      render(0);
+      render(1);
+
+      withRefusedKeyframes(publish);
+
+      for (const pageIndex of [0, 1]) {
+        expect(dot(pageIndex).style.transition).toBe("");
+        expect(dot(pageIndex).style.opacity).toBe("");
+        expect(dot(pageIndex).style.transform).toBe("");
+      }
+    },
+  );
+
+  it("settles instead of following when there is no position stream", () => {
+    // The carousel nulls both streams together, so this is reachable only from
+    // a host that splits them. Following nothing would park the dots wherever
+    // the last motion left them, for good.
+    // Mounted without the stream from the start, on purpose: switching it off
+    // mid-life re-runs the subscription effect, and its teardown releases every
+    // dot on its own. A test that renamed the prop would be watching the
+    // teardown and calling it the guard.
+    const withoutStream = { withVisualPosition: false } as const;
+    render(0, withoutStream);
+    render(1, withoutStream);
+    plan.publish(midFlightSweep()); // dots owned, mid cross-fade
+    expect(dot(1).style.transition).toBe("none");
+
+    plan.publish({ kind: "follow", isFallback: false });
+
+    expect(dot(1).style.transition).toBe("");
+    expect(dot(1).style.opacity).toBe("");
   });
 });
