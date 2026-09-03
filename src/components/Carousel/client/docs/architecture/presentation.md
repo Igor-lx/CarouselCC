@@ -62,6 +62,17 @@ frames where the animation starts and settles, the two frames the carousel can
 least afford it. Reusing the cached object keeps the prop `===`, so only slides
 whose OWN flags changed re-render.
 
+**The slide-identity cache next door is NOT the same trap, and assuming it is
+was an actual mistake.** `useSlideRenderModel` caches `VirtualSlide` objects by
+the same virtual index, and it looks like this one — but measured, it prevents
+no re-render at all. The difference is one character of syntax at the call site:
+the lane style is passed as an OBJECT (`style={slideStyleFor(...)}`), so its
+identity reaches the memo boundary, while the slide's ARIA payload is SPREAD
+(`{...slide.ariaProps}`) and arrives as four primitives compared by value. Same
+shape, opposite consequence. The numbers, and the control that proves an
+object-valued prop really does re-render the whole deck, are in
+`slides/tests/slideRenderCost.test.tsx`.
+
 Correctness and bounded memory are separate mechanisms, deliberately. Every
 entry is keyed `layoutOrigin:virtualIndex`, so a recenter — which re-bases every
 lane — cannot serve a stale style: the old keys become unreachable rather than
