@@ -107,6 +107,28 @@ stays exactly as far ahead of what the eye sees as the deck itself does.
   epsilon write gates. The fallback flavour drops the same Nth frames the track
   does (shared pacing rule).
 
+**Two rendering modes, and why the highlight is a separate layer.** A dot
+carries TWO independent numbers: its own fade (`opacity`, by distance from the
+centre) and its highlight (`activeStrength`, which reaches 1 only at the centre
+and zero one full step away). One element cannot animate two opacities, so the
+two modes solve it differently, and the stylesheet switches between them on
+`data-motion-bound`:
+
+- **static** — the highlight is the dot's own `::after`, whose opacity is the
+  per-dot custom property `--dot-active-strength`. React writes it inline.
+- **bound** — that `::after` is turned off
+  (`.container_PW[data-motion-bound="true"] .dot_PW::after { display: none }`)
+  and the highlight moves to the pooled `activeDot` overlays, which the binding
+  paints and hands to the compositor. A real element is what makes a keyframed
+  opacity track possible at all.
+
+The overlays are NOT a redundant second copy of the dots. At rest exactly one is
+live, centred and full — the strip always settles on an integer offset, so a dot
+IS at the centre. Mid-step there is no dot at the centre at all: at offset n+0.5
+the neighbours sit at ±24.5px (defaults), so the highlight cross-fades between
+them at half strength each. Pinning a single glow to the centre would light the
+gap between two dots.
+
 Reduced motion → a static React-rendered strip reflecting the logical target.
 Its own tuning props are audited by `useWidgetDiagnostic` (see
 [diagnostics.md](./diagnostics.md)).

@@ -121,7 +121,7 @@ DOM**: один файл пишет атрибут или переменную, 
 | `--slide-reorient-fade-in` / `-out` | `presentation/cssVars.ts` из `config/slides` | `Carousel.module.scss` — длительности вуали |
 | `--slide-lane` | `presentation/cssVars.ts` на каждый слайд | `Carousel.module.scss` — сдвиг полосы |
 | `--visible-dots-count`, `--dot-size`, `--dots-gap` | `PaginationWidget.tsx` | `PaginationWidget.module.scss` — вся геометрия ленты |
-| `--dot-active-strength` | `PaginationWidget.tsx` на точку | `PaginationWidget.module.scss` |
+| `--dot-active-strength` | `PaginationWidget.tsx` на точку | `PaginationWidget.module.scss` — **только статический режим**: в связанном `::after`, который её читает, выключен через `data-motion-bound`, и подсветку дают оверлеи |
 
 ### Переменные CSS: CSS → JS (обратное направление)
 
