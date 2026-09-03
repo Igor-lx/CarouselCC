@@ -18,6 +18,7 @@ import { buildPaginationWidgetGeometry } from "../math/spatialField";
 import { PAGINATION_WIDGET_DEFAULTS } from "../defaults";
 import { usePaginationWidgetBinding } from "../usePaginationWidgetBinding";
 import { watchStyleWrites } from "../../tests/styleWrites";
+import { INVISIBLE_OPACITY_MAX } from "../usePaginationWidgetBinding";
 
 /**
  * Follow mode's pacing contract. The runner publishes `follow` twice on a
@@ -285,19 +286,37 @@ describe("usePaginationWidgetBinding — the step the compositor runs", () => {
   });
 
   it("hands every visible dot to the compositor, and pins the invisible ones", () => {
-    // A dot that is invisible for the whole step is parked at its final frame
-    // instead of being animated: an animation per off-strip dot is work the
-    // compositor does for nobody, on every single step.
+    // A dot invisible for the WHOLE step is parked at its final frame instead
+    // of being animated: an animation per off-strip dot is work the compositor
+    // does for nobody, on every single step.
+    //
+    // The split is asserted in both directions, because each side has its own
+    // failure. Pin a dot that becomes visible and it freezes mid-strip for the
+    // length of the step; animate one that never shows and the compositor
+    // carries a layer for nobody.
     plan.publish(waapiPlan());
 
     expect(animations.length).toBeGreaterThan(0);
     const painted = [...host.querySelectorAll<HTMLElement>("[data-slot]")];
-    const animated = new Set(animations.map((a) => a.target));
+    const animated = new Map(animations.map((a) => [a.target, a]));
     const pinned = painted.filter((dot) => !animated.has(dot));
 
     expect(pinned.length).toBeGreaterThan(0);
-    // Pinned means painted, not left blank.
-    for (const dot of pinned) expect(dot.style.transform).not.toBe("");
+    for (const dot of pinned) {
+      // Parked, not left blank — and parked INVISIBLE, which is the very
+      // reason it was not worth animating.
+      expect(dot.style.transform).not.toBe("");
+      expect(Number(dot.style.opacity)).toBeLessThanOrEqual(
+        INVISIBLE_OPACITY_MAX,
+      );
+    }
+    for (const [, animation] of animated) {
+      expect(
+        animation.keyframes.some(
+          (frame) => Number(frame.opacity) > INVISIBLE_OPACITY_MAX,
+        ),
+      ).toBe(true);
+    }
   });
 
   it("animates only the active dots the step passes through", () => {

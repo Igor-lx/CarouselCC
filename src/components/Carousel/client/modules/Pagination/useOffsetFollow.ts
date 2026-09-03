@@ -79,6 +79,10 @@ export function useOffsetFollow({
       onTakeOver();
       offsetRef.current = start;
       baseRef.current = null;
+      // Not redundant with the `emitCurrent` frame below, which usually repaints
+      // this very offset: on a fallback ride that anchoring frame may be one the
+      // drop rule sheds, and then this is the ONLY paint of the take-over. Without
+      // it the strip holds whatever the compositor left until the next kept frame.
       paint(start);
 
       unsubscribeRef.current = visualPosition.subscribe(

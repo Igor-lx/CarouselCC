@@ -151,6 +151,24 @@ describe("useOffsetFollow — taking the strip over", () => {
     expect(offsetRef.current).toBe(1.25);
   });
 
+  it("paints the take-over even when the anchoring frame is shed", () => {
+    // Subscribing emits the stream's CURRENT frame at once, and on a fallback
+    // ride that frame may be one the drop rule sheds — leaving the hand-paint
+    // before the subscription as the only paint the take-over gets.
+    visual.emit(
+      frameAt(5, {
+        phase: "running",
+        runningFrameIndex: FALLBACK_DROP_EVERY_NTH_FRAME - 1,
+      }),
+    );
+    liveOffset = 2.5;
+    painted.length = 0;
+
+    act(() => follow.startFollowing(true));
+
+    expect(painted).toEqual([2.5]);
+  });
+
   it("does nothing at all without a stream to follow", () => {
     // A host that wires a plan source but no position source. Silence here is
     // the contract — the caller settles instead.

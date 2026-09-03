@@ -457,7 +457,15 @@ export function usePaginationFade({
                       isFinite,
                     ),
                   ) <= INVISIBLE_STRENGTH_MAX,
-              ) && index !== targetRef.current;
+              ) &&
+              // The destination is never skipped, even though today it cannot
+              // be: the sweep ENDS on it, so its strength reaches 1 at the last
+              // stop and the scan above already answers false. The clause is
+              // insurance, not logic — the settle hangs off this very
+              // animation's finish, and a destination that got skipped would
+              // leave the dots owned, transition suppressed, for good. One
+              // comparison against that.
+              index !== targetRef.current;
             if (staysInvisible) continue;
 
             takeDotOwnership(index);

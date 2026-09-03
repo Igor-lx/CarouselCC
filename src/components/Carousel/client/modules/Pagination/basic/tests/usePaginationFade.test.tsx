@@ -7,6 +7,7 @@ import {
   describe,
   expect,
   it,
+  vi,
 } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -762,5 +763,87 @@ describe("usePaginationFade — the branches that run when something is missing"
 
     expect(dot(1).style.transition).toBe("");
     expect(dot(1).style.opacity).toBe("");
+  });
+});
+
+/**
+ * Three rules that decide how much work a motion costs, none of which changes
+ * what the strip finally looks like — so none of them is reachable by an
+ * assertion about the painted dots alone.
+ */
+describe("usePaginationFade — the work it declines to do", () => {
+  it("animates only the dots the sweep actually lights up", () => {
+    // A dot the offset never comes near keeps its class look for the whole
+    // ride: animating it is a compositor layer per page, every step, for a
+    // change nobody can see. The destination dot is the exception — it is
+    // animated even when its look barely moves, because the settle hangs off
+    // its finish.
+    render(0);
+    render(1);
+
+    plan.publish(releaseSweep());
+
+    expect(animationOf(1)).toBeDefined(); // the destination
+    expect(animationOf(0)).toBeDefined(); // it fades out as the strip leaves
+    expect(animationOf(3)).toBeUndefined(); // two pages away the whole way
+    for (const entry of recorded) {
+      const looks = entry.keyframes.map((frame) => String(frame.opacity));
+      expect(new Set(looks).size).toBeGreaterThan(1);
+    }
+  });
+
+  it.each([0, 1, 2, 3])(
+    "always animates the destination, whichever page %i it is",
+    (destination) => {
+      // The settle hangs off the destination's own finish, so an unanimated
+      // destination is a strip that never gets handed back to its classes.
+      // Pinned across every page because the skip rule above is what could
+      // take it away, and the rule is a scan over a sampled curve.
+      render((destination + 2) % PAGE_COUNT);
+      render(destination);
+
+      plan.publish(releaseSweep());
+
+      expect(animationOf(destination)).toBeDefined();
+    },
+  );
+
+  it("hangs the settle on the DESTINATION's animation, not the first one built", () => {
+    // The blends are built in page order, so the destination is rarely last —
+    // and whichever animation happens to be built first would settle the strip
+    // early, handing the dots back to their classes mid-cross-fade.
+    render(3);
+    render(0); // destination 0, but dot 3 is blended too and finishes alongside
+
+    plan.publish(jump());
+
+    const destination = animationOf(0);
+    const other = animationOf(3);
+    expect(destination).toBeDefined();
+    expect(other).toBeDefined();
+
+    act(() => other!.finish());
+    expect(dot(0).style.transition).toBe("none"); // still owned: not settled
+
+    act(() => destination!.finish());
+    expect(dot(0).style.transition).toBe(""); // handed back
+  });
+
+  it("reads the CSS look once, not on every take-over", () => {
+    // `readDotStates` runs `getComputedStyle`, which forces a style recalc.
+    // The look only changes at rest (theme, breakpoint), and `settle` re-reads
+    // it there — so a grab must ride the cached answer.
+    render(0);
+    render(1);
+    const computed = vi.spyOn(window, "getComputedStyle");
+
+    plan.publish({ kind: "follow", isFallback: false });
+    const afterFirst = computed.mock.calls.length;
+
+    plan.publish(midFlightSweep()); // stops following, no settle
+    plan.publish({ kind: "follow", isFallback: false });
+
+    expect(computed.mock.calls.length).toBe(afterFirst);
+    computed.mockRestore();
   });
 });

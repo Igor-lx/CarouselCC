@@ -63,7 +63,7 @@ export const DOT_COVERAGE_MARGIN_SLOTS = WIDGET_STEP_LOOKAHEAD * 2;
 export const ACTIVE_DOT_COUNT = WIDGET_STEP_LOOKAHEAD + 1;
 
 /** At or below this a dot paints nothing: pin it, don't pay for an invisible animation. */
-const INVISIBLE_OPACITY_MAX = 0.001;
+export const INVISIBLE_OPACITY_MAX = 0.001;
 
 /** Strip plan-curve density — coarser than the track's (a dot travels ≤ a strip width). */
 const STRIP_CURVE_INTERVALS = 32;
