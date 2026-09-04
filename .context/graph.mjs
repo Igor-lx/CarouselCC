@@ -1760,6 +1760,7 @@ if (mode === "verify") {
   const broken = [];
   const wrong = [];
   const unresolved = [];
+  const goneTests = [];
 
   const claimDir = (name, q, prefix, filesClaim) => {
     const hits = under(q, prefix);
@@ -1922,7 +1923,22 @@ if (mode === "verify") {
       while ((m = PATH_RE.exec(line)) !== null) {
         for (const one of variants(m[1])) {
           const hit = locate(one, prefix);
-          if (hit === null) continue;
+          // Реестр тестов сверялся в одну сторону: каждый тест с диска обязан
+          // быть назван. Обратное молчало — удалённый тест оставлял строку,
+          // описывающую проверку, которой нет, и это хуже отсутствующей: она
+          // читается как действующая гарантия. Ловится только имя, похожее на
+          // тест, — иначе в список посыпалась бы проза.
+          if (hit === null) {
+            // `locate` молчит и когда файла нет, и когда имя неоднозначно —
+            // у парных форков одноимённых тестов по два. Неоднозначность
+            // отсутствием не является, иначе список наполнится живыми файлами.
+            const existsSomewhere = files.some(
+              (f) => rel(f) === one || rel(f).endsWith("/" + one),
+            );
+            if (name === TESTS && /\.test\.tsx?$/.test(one) && !existsSomewhere)
+              goneTests.push(`${name}: ${one}`);
+            continue;
+          }
           if (name === MAP) mapMentions.add(hit);
           if (name === TESTS) testMentions.add(hit);
         }
@@ -2007,9 +2023,13 @@ if (mode === "verify") {
   const unnamed = testFiles.filter((f) => !testMentions.has(f));
   console.log("=== Покрытие тестов ===");
   console.log(
-    `  тестовых файлов: ${testFiles.length}, не названо: ${unnamed.length}`,
+    `  тестовых файлов: ${testFiles.length}, не названо: ${unnamed.length}` +
+      (goneTests.length
+        ? `, названо и не существует: ${goneTests.length}`
+        : ""),
   );
   for (const f of unnamed) console.log("    " + rel(f));
+  for (const t of goneTests) console.log("    " + t);
 
   // 7. правила направления импортов держатся
   // Слой описан путём, запрет — либо путём (сверяется по графу), либо именем
@@ -2655,6 +2675,7 @@ if (mode === "verify") {
   if (
     missing.length ||
     unnamed.length ||
+    goneTests.length ||
     uncovered.length ||
     undecided.length ||
     broken7.length ||
