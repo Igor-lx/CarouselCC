@@ -497,14 +497,22 @@ if (mode === "plan") {
   // четырьмя вызовами, но каждый стоит контекста, а склеивать их приходится
   // руками и по памяти — то есть ровно там, где память и подводит.
   const arg = process.argv[3];
-  const hits = arg
-    ? [...files, ...styleFiles].filter(
-        (f) => rel(f).includes(arg) && !isTest(f),
-      )
+  const matched = arg
+    ? [...files, ...styleFiles].filter((f) => rel(f).includes(arg))
     : [];
+  const hits = matched.filter((f) => !isTest(f));
   if (!arg) {
     console.log(
       "Укажи путь: node .context/graph.mjs plan <путь или его хвост>",
+    );
+    process.exitCode = 1;
+  } else if (hits.length === 0 && matched.length > 0) {
+    // «Ничего не нашлось» про существующий файл отправляет читателя искать
+    // опечатку в пути, которой нет. У теста вопрос «что придётся тронуть»
+    // стоит наоборот: тронут будет он сам, а его радиус — то, что он гоняет.
+    console.log(
+      `${BACKTICK}${arg}${BACKTICK} — это тест, у него «что придётся тронуть» не спрашивают:` +
+        ` что он гоняет и что закрепляет — ${BACKTICK}graph.mjs brief${BACKTICK}.`,
     );
     process.exitCode = 1;
   } else if (hits.length === 0) {
@@ -866,11 +874,20 @@ if (mode === "tested") {
       else stale.push([rel(f), tests.map(rel).sort()]);
     }
 
+    // Удалённый файл в граф не попадает: его больше нет на диске. А записи о
+    // нём остались — и это худший случай, потому что запись про то, чего нет,
+    // выглядит достоверной. Рецепт удаления узла отсылает сюда, значит здесь
+    // и должно быть сказано, что именно осталось висеть.
+    const deletedCode = changed
+      .map(abs)
+      .filter((f) => /\.(tsx?|scss)$/.test(f) && !isTest(f) && !existsSync(f));
+
     console.log("=== Код и тесты в одной правке ===");
     console.log(
       `  тронуто файлов кода: ${touchedCode.length}, из них с тестами в этой же правке: ${covered}`,
     );
-    if (touchedCode.length === 0) console.log("  правка кода не касается");
+    if (touchedCode.length === 0 && deletedCode.length === 0)
+      console.log("  правка кода не касается");
 
     if (stale.length) {
       console.log(NEWLINE + "  Тесты есть, но в правку не попали:");
@@ -917,6 +934,29 @@ if (mode === "tested") {
       for (const f of smokeHits) console.log("    " + f);
       console.log(
         `  прогнать ${CONFIG.smokeCommand} и назвать результат в отчёте`,
+      );
+    }
+
+    if (deletedCode.length > 0) {
+      console.log(
+        NEWLINE + "=== Удалённые файлы: что о них осталось в базе ===",
+      );
+      for (const f of deletedCode) {
+        const { exact } = baseHitsFor(f);
+        console.log("  " + rel(f));
+        console.log(
+          exact.length
+            ? "    " + exact.map(([name, line]) => `${name}:${line}`).join(", ")
+            : "    записей нет",
+        );
+      }
+      console.log(
+        NEWLINE +
+          "  Эти строки описывают файл, которого больше нет, и читаются как" +
+          NEWLINE +
+          "  достоверные. Снимаются здесь же — вместе с якорями на него и с" +
+          NEWLINE +
+          "  описаниями связи у тех, кто его импортировал.",
       );
     }
 
