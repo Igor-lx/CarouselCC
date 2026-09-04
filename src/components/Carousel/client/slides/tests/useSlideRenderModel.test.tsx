@@ -94,6 +94,22 @@ describe("useSlideRenderModel — the mounted set", () => {
     expect(lanes().length).toBeGreaterThan(3);
   });
 
+  it("mounts nothing at all for an empty deck", () => {
+    // The early return is the only path that never touches the window, so
+    // nothing downstream would notice it handing back a filled array — the
+    // deck would render slides built from records that do not exist.
+    const empty = recordsOf(0);
+    render({
+      current: 0,
+      previous: 0,
+      isMoving: false,
+      records: empty,
+      layout: buildCarouselLayout(empty, 3, false),
+    });
+
+    expect(seen.virtualSlides).toEqual([]);
+  });
+
   it("keeps a slide mounted for the whole ride it appears in", () => {
     render({ current: 0, previous: 0, isMoving: false });
     const atStart = lanes();
