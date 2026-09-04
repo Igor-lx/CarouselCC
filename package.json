@@ -3,7 +3,11 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.15 <25"
+  },
   "scripts": {
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm test && node .context/graph.mjs verify",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
@@ -28,6 +32,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
     "@stryker-mutator/core": "^10.0.0",

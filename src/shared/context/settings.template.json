@@ -2,6 +2,7 @@
   "permissions": {
     "allow": [
       "Bash(cd *)",
+      "Bash(npm run check)",
       "Bash(npm run typecheck)",
       "Bash(npm run lint)",
       "Bash(npm run format:check)",
