@@ -12,6 +12,8 @@
       "Bash(npx eslint *)",
       "Bash(npx tsc *)",
       "Bash(npx prettier --check *)",
+      "Bash(npx prettier --write *)",
+      "Bash(npm run test:coverage)",
       "Bash(npx stryker run *)",
       "Bash(node .context/graph.mjs *)",
       "Bash(grep *)",

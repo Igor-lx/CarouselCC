@@ -277,7 +277,10 @@ shared/** ─ полки: импортируются откуда угодно, 
 ### `client/domain/layout.ts` — pure, SSOT геометрии страниц
 `buildCarouselLayout` (`:32` `export const buildCarouselLayout`) выводит всю
 геометрию: `visibleSlidesCount` **клампится к длине колоды**,
-`canSlide = length > effectiveVisible`, `pageCount = ceil(length/effectiveVisible)`,
+`canSlide = length > effectiveVisible`, `pageCount = ceil(length/effectiveVisible)`
+**при `effectiveVisible > 0` и ноль иначе** — страж стоит ради пустой колоды, где
+деление дало бы `NaN` (`:43-44` `effectiveVisible > 0 ? Math.ceil`; тот же страж с разбором причины — в
+`domain/slides.ts:31-34` `A page of no slides has no partial page`),
 `virtualLength` — полное покрытие страниц только в цикличном режиме с прокруткой,
 иначе `length`.
 - **Два разных вопроса к одной координате**: `pageContaining` (floor — на какой
@@ -303,7 +306,7 @@ shared/** ─ полки: импортируются откуда угодно, 
 
 ### `client/domain/slides.ts` — pure
 Записи колоды, доклад до целых страниц и **общее правило выбора URL картинки**.
-- `resolveRenderedImageSrc` (`:96-104` `export const resolveRenderedImageSrc`) — контракт, а не удобство: комментарий
+- `resolveRenderedImageSrc` (`:94-102` `export const resolveRenderedImageSrc`) — контракт, а не удобство: комментарий
   `:94-95` `The one rule the renderer` «The one rule the renderer and the resource store share — they must
   key on the same URL». Расходятся `SlideItem` и `imageResource/*` — предзагрузка
   греет не тот файл, который потом покажут.
@@ -319,7 +322,7 @@ shared/** ─ полки: импортируются откуда угодно, 
   размер страницы её не рвёт: `hasPartialPageLayout` отвечает «нет» на любой
   неположительный размер, поэтому `length % 0` — `NaN` — до сравнения не
   доходит; оба случая, `0` и `NaN`, закрыты тестом.
-- `resolveLargestImageCandidate` (`:77-93` `export const resolveLargestImageCandidate`) — каста больше нет: присваивание
+- `resolveLargestImageCandidate` (`:75-91` `export const resolveLargestImageCandidate`) — каста больше нет: присваивание
   внутри замыкания ломало сужение типов, замыкание убрано, порядок наборов
   прежний. Комментарий фиксирует намеренный приоритет: строгое «больше»
   сохраняет первого при равной ширине.
@@ -1650,7 +1653,7 @@ star-экспортов нет — бочки собраны аккуратно.
 
 ---
 
-## Q. Тесты — `src/**/tests/**` (156 файлов)
+## Q. Тесты — `src/**/tests/**` (157 файлов)
 
 Прочитаны полностью. Общая характеристика: это **не покрытие ради покрытия**.
 Почти каждый файл начинается с блока «что именно этот тест удерживает» —

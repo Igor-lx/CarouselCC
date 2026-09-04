@@ -526,8 +526,8 @@
 воспроизводится только на устройстве.
 
 **Рендерер и стор ресурсов ключуются одним URL.**
-Держится: `resolveRenderedImageSrc` (`slides.ts:91-99`), комментарий
-`slides.ts:94-95` `The one rule the renderer` называет это правилом обоих.
+Держится: `resolveRenderedImageSrc` (`slides.ts:94-102` `export const resolveRenderedImageSrc`), комментарий
+`slides.ts:92-93` `The one rule the renderer` называет это правилом обоих.
 Сломается: предзагрузка греет один файл, `<img>` показывает другой — двойная
 загрузка и пустой слайд там, где он должен быть готов.
 

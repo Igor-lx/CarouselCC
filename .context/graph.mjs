@@ -47,6 +47,11 @@ const CONFIG = {
    * совпадать байт в байт: разошедшийся инструмент проверяет не тот проект.
    * `null` — копии в проекте нет. */
   toolCopy: "../src/shared/context/tools/graph.mjs",
+  /** Справочник режимов уезжает вместе с инструментом: без него новый проект
+   * получает набор команд и ни слова о том, чего каждая НЕ делает. Пары
+   * «рабочий файл → копия на полке», сверяются побайтово, как и сам инструмент.
+   * Пустой список — сопровождающих файлов нет. */
+  toolDocs: [["graph.md", "../src/shared/context/tools/graph.md"]],
   /** Список разрешений среды: проектный и шаблон на полке. Правила и инструмент
    * переносятся копированием, а среда — нет, и её расхождение платится не
    * красным прогоном, а часом простоя: длинная задача встаёт на запросе
@@ -62,12 +67,16 @@ const CONFIG = {
    * Список короткий не случайно: разрастётся — значит проверка ловит не то, и
    * чинить надо её, а не пополнять список. */
   docPathExceptions: [
+    // --- проектные: при посадке в новый проект удаляются -------------------
     // Иллюстрация того, во что нормализуются ссылки при сравнении форков.
     "00-map.md|../README.md",
     // Обе записи говорят, что бочка УДАЛЕНА, и называют её по имени.
     "01-facts.md|client/modules/index.ts",
     "03-graph.md|modules/index.ts",
-    // Образец формы якоря в объяснении, а не ссылка на файл.
+    // --- полочные: едут вместе с полкой и удалять их нельзя ---------------
+    // Образец формы якоря в объяснении, а не ссылка на файл. Строки описывают
+    // файлы САМОЙ полки, поэтому в новом проекте они остаются нужны: без них
+    // первый же verify краснеет на тексте, который приехал вместе с правилами.
     "README.md|docs/architecture/x.md",
     "shared/context/knowledge-base.md|docs/architecture/x.md",
   ],
@@ -462,6 +471,19 @@ const transitiveUsers = (start) => {
 
 const mode = process.argv[2];
 
+/** Путь-аргумент принимается в обеих ходовых формах: как его печатает база
+ * (`components/…`) и как его печатает всё остальное — git, редактор, отчёт
+ * (`src/components/…`). Вторая форма раньше отвечала «Ничего не нашлось», то
+ * есть говорила «файла нет» про существующий файл; при этом соседний режим
+ * (`mutated`) её принимал. Найдено пробой, и это тот же класс, что записан в
+ * базе отдельно: отсутствие и «я не понял адрес» звучали одинаково. */
+const SRC_PREFIX = path.basename(CONFIG.src) + "/";
+const argPath = (a) => {
+  if (a === undefined) return a;
+  const s = a.split("\\").join("/").replace(/^\.\//, "");
+  return s.startsWith(SRC_PREFIX) ? s.slice(SRC_PREFIX.length) : s;
+};
+
 if (mode === "dead") {
   console.log(
     "=== Экспорты, которые нигде не импортируют (тесты включены) ===\n",
@@ -487,7 +509,7 @@ if (mode === "blast") {
   // аргумента — весь список по убыванию. Раньше аргумент молча игнорировался,
   // и документированная команда `blast <путь>` печатала общий список: ответ на
   // не тот вопрос, поданный как ответ на заданный.
-  const arg = process.argv[3];
+  const arg = argPath(process.argv[3]);
   const rows = [];
   for (const f of files) {
     if (isTest(f)) continue;
@@ -531,7 +553,7 @@ if (mode === "plan") {
   // спрашивают первым: **что придётся тронуть**. Собрать этот ответ можно и
   // четырьмя вызовами, но каждый стоит контекста, а склеивать их приходится
   // руками и по памяти — то есть ровно там, где память и подводит.
-  const arg = process.argv[3];
+  const arg = argPath(process.argv[3]);
   const matched = arg
     ? [...files, ...styleFiles].filter((f) => rel(f).includes(arg))
     : [];
@@ -769,10 +791,10 @@ if (mode === "open") {
 }
 
 // --- verify: сверка базы с кодом ---------------------------------------------
-// Восемь проверок, и все механические: покрытие карты, покрытие тестов, пометки
-// CONSTRAINT и пометки решений, правила направления импортов, живость якорей
-// с их цитатами, объявленный состав папок и радиусы поражения. Ненулевой код
-// возврата означает, что база отстала от кода.
+// Все проверки механические, и перечень их — не здесь: он живёт таблицей в
+// `01-facts.md` и её двойником на полке, и пересказ здесь ровно это и сделал —
+// разошёлся, оставшись на числе «восемь» при вдвое большем наборе. Ненулевой
+// код возврата означает, что база отстала от кода.
 // Правка в одной копии из пары — единственный настоящий риск форков, и он
 // виден только в диффе, а не в дереве: файлы законно расходятся там, где
 /** Пути, тронутые текущей правкой: изменённые И новые, ещё не добавленные.
@@ -1417,7 +1439,7 @@ if (mode === "mutated") {
 if (mode === "brief") {
   const NEWLINE = String.fromCharCode(10);
   const TICK = String.fromCharCode(96);
-  const arg = process.argv[3];
+  const arg = argPath(process.argv[3]);
   if (!arg) {
     console.log(
       "Укажи путь: node .context/graph.mjs brief <путь или его хвост>",
@@ -2123,6 +2145,43 @@ if (mode === "verify") {
     else if (flat(copy) !== flat(fileURLToPath(import.meta.url)))
       toolDrift.push(`копия разошлась: ${CONFIG.toolCopy}`);
   }
+  for (const [own, shelf] of CONFIG.toolDocs) {
+    const flat = (f) => readFileSync(f, "utf8").split(CR_LF).join(NEWLINE);
+    const mine = path.join(HERE, own);
+    const there = path.join(HERE, shelf);
+    if (!existsSync(mine)) toolDrift.push(`нет файла: ${own}`);
+    else if (!existsSync(there)) toolDrift.push(`копии нет: ${shelf}`);
+    else if (flat(mine) !== flat(there))
+      toolDrift.push(`копия разошлась: ${shelf}`);
+  }
+  // 9a. каждый режим инструмента описан в справочнике и назван в правилах.
+  // Заведено после пробы: справочник объявляет себя полным («оговорки и ловушки
+  // КАЖДОГО режима»), а держать это обещание было нечему — новый режим мог
+  // остаться неописанным, и заметить это стало бы некому.
+  const undocumented = [];
+  {
+    const own = readFileSync(fileURLToPath(import.meta.url), "utf8");
+    const modes = [...own.matchAll(/mode === "([a-z]+)"/g)].map((m) => m[1]);
+    const named = (text, m) => new RegExp("`" + m + "\\b").test(text);
+    const manual = CONFIG.toolDocs.length
+      ? readFileSync(path.join(HERE, CONFIG.toolDocs[0][0]), "utf8")
+      : null;
+    const rulesText = CONFIG.rulesManifest.rules
+      .map((r) => {
+        const at = path.join(HERE, r);
+        return existsSync(at) ? readFileSync(at, "utf8") : "";
+      })
+      .join("\n");
+    for (const m of [...new Set(modes)].sort()) {
+      if (
+        manual !== null &&
+        !new RegExp("^### `" + m + "\\b", "m").test(manual)
+      )
+        undocumented.push(`нет раздела в справочнике: ${m}`);
+      if (!named(rulesText, m)) undocumented.push(`не назван в правилах: ${m}`);
+    }
+  }
+
   console.log("=== Копия инструмента ===");
   console.log(
     CONFIG.toolCopy === null
@@ -2130,6 +2189,10 @@ if (mode === "verify") {
       : `  расхождений: ${toolDrift.length}`,
   );
   for (const t of toolDrift) console.log("    " + t);
+
+  console.log("=== Режимы инструмента описаны ===");
+  console.log(`  без описания: ${undocumented.length}`);
+  for (const u of undocumented) console.log("    " + u);
 
   // 9b. список разрешений среды не потерял того, что обещает полка
   const settingsDrift = [];
@@ -2239,11 +2302,17 @@ if (mode === "verify") {
         ...files.map((f) => [rel(f), f]),
         ...docFiles.map((f) => [rel(f), f]),
       ];
+      // Сам файл отложенного сканируется по тем же правилам, но без требования
+      // назвать себя по имени: внутри списка «пункт 4» и так значит его
+      // собственный пункт. Пропуск найден пробой — а именно здесь ссылки друг
+      // на друга и живут, и именно здесь их ломает удаление закрытого пункта.
+      scan.push([CONFIG.todo, todoPath]);
       for (const [name, full] of scan) {
+        const selfRef = full === todoPath;
         readFileSync(full, "utf8")
           .split(NEWLINE)
           .forEach((line, i) => {
-            if (!NAMES.test(line)) return;
+            if (!selfRef && !NAMES.test(line)) return;
             REF.lastIndex = 0;
             let m;
             while ((m = REF.exec(line)) !== null)
@@ -2352,6 +2421,28 @@ if (mode === "verify") {
     const baseDocs = readdirSync(BASE).filter(
       (n) => n.endsWith(".md") && n !== "README.md",
     );
+
+    // Тот же маркер, но в прозе базы и правил. Сеть выше читает только код, и
+    // `TODO`, вписанный в запись базы, проходил мимо неё молча — поймано
+    // пробой. Описания самих маркеров всегда стоят в обратных кавычках,
+    // поэтому код в кавычках вырезается перед поиском: иначе сверка доложила
+    // бы о строке, которая её же и описывает. Файл отложенного не сканируется
+    // намеренно: он и есть список согласованных отсрочек.
+    for (const rp of [
+      ...baseDocs.map((n) => path.join(BASE, n)),
+      ...CONFIG.rulesManifest.rules.map((r) => path.join(HERE, r)),
+    ]) {
+      if (!existsSync(rp) || path.basename(rp) === CONFIG.todo) continue;
+      const lines = readFileSync(rp, "utf8").split(NEWLINE);
+      lines.forEach((line, i) => {
+        const bare = line.replace(/`[^`]*`/g, " ");
+        if (CODE_MARK.test(bare))
+          parked.push(
+            `${path.relative(HERE, rp).split(path.sep).join("/")}:${i + 1} — маркер отложенной работы в тексте`,
+          );
+      });
+    }
+
     for (const name of baseDocs) {
       const p = path.join(BASE, name);
       if (!existsSync(p)) continue;
@@ -2653,6 +2744,14 @@ if (mode === "verify") {
       .filter((n) => n.endsWith(".md"))
       .map((n) => [n, norm(path.join(HERE, n))]),
     ...docFiles.map((d) => [rel(d), d]),
+    // Файлы правил сюда не входили, и это ловилось только вниманием: битая
+    // ссылка на вложенный `CLAUDE.md` прошла пробу молча. Читают их чаще всего
+    // остального, а проверяли — реже: адреса в них живут ровно так же и
+    // устаревают ровно так же.
+    ...CONFIG.rulesManifest.rules
+      .map((r) => norm(path.join(HERE, r)))
+      .filter((p) => existsSync(p))
+      .map((p) => [path.relative(REPO, p).split(path.sep).join("/"), p]),
   ];
 
   // 14. путь в обратных кавычках указывает на существующий файл.
@@ -2783,6 +2882,7 @@ if (mode === "verify") {
     broken.length ||
     wrong.length ||
     toolDrift.length ||
+    undocumented.length ||
     deadAnchors.length ||
     closedTodos.length ||
     danglingTodo.length ||

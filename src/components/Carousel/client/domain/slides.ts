@@ -2,7 +2,7 @@
 import type { Slide } from "../public-api/types";
 import type { CarouselSlideRecord } from "./types";
 
-const clampedVisibleSlidesCount = (
+export const clampedVisibleSlidesCount = (
   length: number,
   visibleSlidesCount: number,
 ) => Math.min(visibleSlidesCount, length);
@@ -53,8 +53,6 @@ export const padDeckToFullPage = (
   });
   return [...records, ...appended];
 };
-
-export { clampedVisibleSlidesCount };
 
 export const resolveLargestSrcSetCandidate = (
   srcSet: string | undefined,
