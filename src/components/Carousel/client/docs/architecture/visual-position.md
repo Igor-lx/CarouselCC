@@ -46,9 +46,12 @@ pure function of the frame (below).
 `isDroppedFallbackFrame` is the ONE frame-skip rule shared by every per-frame
 paint consumer when running without WAAPI. It is a pure function of the frame:
 since the source stamps `runningFrameIndex`, every subscriber evaluating the
-predicate on the same frame reaches the same verdict, so the track and the widget
-drop exactly the same frames and stay visually locked regardless of when each
-subscribed.
+predicate on the same frame reaches the same verdict, so all THREE per-frame
+consumers — the track, the fixed dots and the widget strip — drop exactly the
+same frames and stay visually locked regardless of when each subscribed. The two
+pagination strips reach the predicate through the follow machine they share
+(`modules/Pagination/useOffsetFollow`), which is why only two call sites appear
+in the graph while three things are being paced.
 
 Only `"running"` frames are ever dropped. Resting frames (settle, idle) and
 finger-drag frames (published with a non-running phase) always paint. The first
