@@ -92,9 +92,27 @@ const CONFIG = {
    * строки в таблице роняет прогон — и это единственный момент, когда вопрос
    * «а на полку это едет?» ещё дёшево задать. `null` — таблицы нет. */
   rulesManifest: {
-    rules: "../CLAUDE.md",
+    /** Правила живут не в одном файле: доктрина в корне, локальное — вложенными
+     * `CLAUDE.md` в своих папках, где оно грузится само и пропустить его нельзя.
+     * Список заявлен здесь, потому что «сколько у нас файлов правил» — тот же
+     * вопрос, что «сколько сверок»: пока он не записан, ответа нет. */
+    rules: [
+      "../CLAUDE.md",
+      "../src/shared/CLAUDE.md",
+      "../src/app/CLAUDE.md",
+      "../src/components/Carousel/client/config/CLAUDE.md",
+      "../e2e/CLAUDE.md",
+    ],
     table: "01-facts.md",
     heading: "| Раздел правил проекта | Где на полке |",
+    /** Ссылка на раздел по названию переживает переезд файла, а позиционная
+     * («правило выше») — нет. Поэтому именные сверяются, а остальные при
+     * переносе переписываются в именные. Ищется оборот `раздел «X»` и `§ «X»`;
+     * `см. «X»` тоже, но только когда X — заголовок, а не ярлык вывода. */
+    refExceptions: [
+      // Ярлыки секций вывода `brief`, а не заголовки документов.
+      "упомянут по имени",
+    ],
   },
   /** Область, чью поломку видно ТОЛЬКО в браузере: кадры, посадка, ввод. Задета
    * правкой — смоук обязателен, и напоминает об этом `tested`, а не память:
@@ -2461,18 +2479,24 @@ if (mode === "verify") {
   // не решил, едет он на полку или нет» — ровно тот дрейф, из-за которого полка
   // однажды увезла в следующий проект не все правила.
   const unclassified = [];
+  const danglingRefs = [];
   if (CONFIG.rulesManifest !== null) {
-    const rulesAt = path.join(HERE, CONFIG.rulesManifest.rules);
     const tableAt = path.join(BASE, CONFIG.rulesManifest.table);
-    if (!existsSync(rulesAt))
-      unclassified.push(`нет файла правил: ${CONFIG.rulesManifest.rules}`);
-    else if (!existsSync(tableAt))
+    // Заголовки собираются со ВСЕХ заявленных файлов правил: разложенные по
+    // папкам, они остаются одним корпусом, и сверять их надо как один.
+    const heads = [];
+    for (const one of CONFIG.rulesManifest.rules) {
+      const at = path.join(HERE, one);
+      if (!existsSync(at)) {
+        unclassified.push(`нет файла правил: ${one}`);
+        continue;
+      }
+      for (const line of readFileSync(at, "utf8").split(NEWLINE))
+        if (line.startsWith("## ")) heads.push(line.slice(3).trim());
+    }
+    if (!existsSync(tableAt))
       unclassified.push(`нет файла таблицы: ${CONFIG.rulesManifest.table}`);
     else {
-      const heads = readFileSync(rulesAt, "utf8")
-        .split(NEWLINE)
-        .filter((l) => l.startsWith("## "))
-        .map((l) => l.slice(3).trim());
       const lines = readFileSync(tableAt, "utf8").split(NEWLINE);
       const at = lines.findIndex(
         (l) => l.trim() === CONFIG.rulesManifest.heading.trim(),
@@ -2489,7 +2513,66 @@ if (mode === "verify") {
       for (const l of listed)
         if (!heads.includes(l)) unclassified.push(`раздела больше нет: ${l}`);
     }
+
+    // 13b-2. Ссылка на раздел по названию обязана разрешаться.
+    // Позиционная ссылка («правило выше») переезда файла не переживает и
+    // проверке не поддаётся — поэтому при выносе раздела такие переписывают в
+    // именные, а именные держит эта сверка. Заголовки берутся и из правил, и
+    // из базы: база ссылается на разделы правил, правила — на разделы базы.
+    // Корпус — это правила проекта, база И полка: правила ссылаются на разделы
+    // базы, база на разделы правил, а шаблон полки — на разделы `quality.md`,
+    // который в новом проекте станет соседом скопированного `CLAUDE.md`.
+    const allHeads = new Set(heads);
+    const shelfAt = path.join(HERE, CONFIG.rulesShelf);
+    const headSources = [
+      ...readdirSync(BASE)
+        .filter((n) => n.endsWith(".md"))
+        .map((n) => path.join(BASE, n)),
+      ...(existsSync(shelfAt)
+        ? readdirSync(shelfAt)
+            .filter((n) => n.endsWith(".md"))
+            .map((n) => path.join(shelfAt, n))
+        : []),
+    ];
+    for (const at of headSources)
+      for (const line of readFileSync(at, "utf8").split(NEWLINE))
+        if (/^#{2,}\s/.test(line))
+          allHeads.add(line.replace(/^#+\s*/, "").trim());
+    const skip = new Set(CONFIG.rulesManifest.refExceptions);
+    const REF_RE = /(?:раздел[ае]?|§)\s+«([^»]+)»/g;
+    const sources = [
+      ...CONFIG.rulesManifest.rules
+        .map((one) => [one, path.join(HERE, one)])
+        .filter(([, at]) => existsSync(at)),
+      ...readdirSync(BASE)
+        .filter((n) => n.endsWith(".md"))
+        .map((n) => [n, path.join(BASE, n)]),
+    ];
+    for (const [name, at] of sources) {
+      const body = readFileSync(at, "utf8");
+      REF_RE.lastIndex = 0;
+      let m;
+      while ((m = REF_RE.exec(body)) !== null) {
+        // Ссылка нередко разорвана переносом строки: сравнивать надо смысл, а
+        // не вёрстку, иначе живой заголовок читается как висячий.
+        const title = m[1].replace(/\s+/g, " ").trim();
+        if (skip.has(title)) continue;
+        // Заголовок могли назвать началом: «раздел «Планка качества»» против
+        // «## Планка качества — сверяется, а не подразумевается».
+        const found = [...allHeads].some(
+          (h) => h === title || h.startsWith(title),
+        );
+        if (!found) danglingRefs.push(`${name}: «${title}»`);
+      }
+    }
   }
+  console.log("=== Ссылки на разделы ===");
+  console.log(
+    CONFIG.rulesManifest === null
+      ? "  реестр правил не заявлен"
+      : `  именных ссылок ведут в никуда: ${danglingRefs.length}`,
+  );
+  for (const d of danglingRefs) console.log("    " + d);
   // 13c. Скиллы проекта: объявлены, лежат на месте, совпадают с полкой.
   const skillDrift = [];
   if (CONFIG.skills !== null) {
@@ -2712,6 +2795,7 @@ if (mode === "verify") {
     settingsDrift.length ||
     skillDrift.length ||
     unclassified.length ||
+    danglingRefs.length ||
     danglingPaths.length ||
     goneNames.length ||
     strayTests.length ||
