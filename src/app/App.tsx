@@ -29,6 +29,9 @@ import { useTheme } from "../shared/theme";
  * portrait — orientation only changes the crop, never the photo. Swap the
  * constant by hand, or override per visit with `?slides=1|2` in the URL
  * (handy on a deployed build).
+ *
+ * See ../components/Carousel/data-gen/README.md — the generator documents this
+ * constant from its own side, and the two must not drift apart.
  */
 const DEFAULT_SLIDES_SET: 1 | 2 = 2;
 
