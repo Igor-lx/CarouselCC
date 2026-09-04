@@ -1761,6 +1761,7 @@ if (mode === "verify") {
   const wrong = [];
   const unresolved = [];
   const goneTests = [];
+  const goneMapped = [];
 
   const claimDir = (name, q, prefix, filesClaim) => {
     const hits = under(q, prefix);
@@ -1937,6 +1938,18 @@ if (mode === "verify") {
             );
             if (name === TESTS && /\.test\.tsx?$/.test(one) && !existsSomewhere)
               goneTests.push(`${name}: ${one}`);
+            // Шаблоны со звёздочкой и перечисления расширений (`.ts/.tsx`)
+            // адресами не являются: они описывают форму, а не файл. Замер на
+            // здоровом дереве дал ровно три таких и ноль настоящих.
+            if (
+              name === MAP &&
+              /\.(tsx?|scss)$/.test(one) &&
+              !/\.test\.tsx?$/.test(one) &&
+              !one.includes("*") &&
+              one.split("/").every((s) => !s.startsWith(".")) &&
+              !existsSomewhere
+            )
+              goneMapped.push(`${name}: ${one}`);
             continue;
           }
           if (name === MAP) mapMentions.add(hit);
@@ -2014,9 +2027,13 @@ if (mode === "verify") {
   const missing = code.filter((f) => !mapMentions.has(f));
   console.log("=== Покрытие карты ===");
   console.log(
-    `  файлов кода и стилей (без тестов): ${code.length}, не упомянуто: ${missing.length}`,
+    `  файлов кода и стилей (без тестов): ${code.length}, не упомянуто: ${missing.length}` +
+      (goneMapped.length
+        ? `, названо и не существует: ${goneMapped.length}`
+        : ""),
   );
   for (const f of missing) console.log("    " + rel(f));
+  for (const m of goneMapped) console.log("    " + m);
 
   // 2. каждый тестовый файл назван в 08-tests.md — поимённо, папкой не зачесть
   const testFiles = files.filter(isTest);
@@ -2676,6 +2693,7 @@ if (mode === "verify") {
     missing.length ||
     unnamed.length ||
     goneTests.length ||
+    goneMapped.length ||
     uncovered.length ||
     undecided.length ||
     broken7.length ||
