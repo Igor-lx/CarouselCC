@@ -85,6 +85,17 @@ const CONFIG = {
   rulesShelf: "../src/shared/context",
   /** Заголовок таблицы машинных сверок — один и тот же в обоих файлах. */
   checkTableHeading: "| Что сверяется | Как |",
+  /** Разделы правил проекта против полки. Сверяется не текст и не совпадение
+   * заголовков с шаблоном — шаблон обобщённый, и у проекта законно есть свои
+   * разделы. Сверяется, что про КАЖДЫЙ раздел решение принято и записано: либо
+   * назван его адрес на полке, либо он помечен проектным. Новый раздел без
+   * строки в таблице роняет прогон — и это единственный момент, когда вопрос
+   * «а на полку это едет?» ещё дёшево задать. `null` — таблицы нет. */
+  rulesManifest: {
+    rules: "../CLAUDE.md",
+    table: "01-facts.md",
+    heading: "| Раздел правил проекта | Где на полке |",
+  },
   /** Отчёт последнего мутационного прогона. HTML-репортер держит внутри тот
    * же объект, что отдал бы JSON, поэтому второй репортер не нужен. */
   mutationReport: "../reports/mutation/mutation.html",
@@ -2106,6 +2117,50 @@ if (mode === "verify") {
   console.log(`  таблицы сверок разошлись: ${shelfDrift.length}`);
   for (const d of shelfDrift) console.log("    " + d);
 
+  // 13b. Каждый раздел правил проекта КЛАССИФИЦИРОВАН: либо назван его адрес
+  // на полке, либо он помечен проектным. Сверять заголовки проекта с
+  // заголовками шаблона напрямую нельзя — шаблон обобщённый, у проекта законно
+  // есть свои разделы, и прямой диф шумел бы. А вот «раздел появился и никто
+  // не решил, едет он на полку или нет» — ровно тот дрейф, из-за которого полка
+  // однажды увезла в следующий проект не все правила.
+  const unclassified = [];
+  if (CONFIG.rulesManifest !== null) {
+    const rulesAt = path.join(HERE, CONFIG.rulesManifest.rules);
+    const tableAt = path.join(BASE, CONFIG.rulesManifest.table);
+    if (!existsSync(rulesAt))
+      unclassified.push(`нет файла правил: ${CONFIG.rulesManifest.rules}`);
+    else if (!existsSync(tableAt))
+      unclassified.push(`нет файла таблицы: ${CONFIG.rulesManifest.table}`);
+    else {
+      const heads = readFileSync(rulesAt, "utf8")
+        .split(NEWLINE)
+        .filter((l) => l.startsWith("## "))
+        .map((l) => l.slice(3).trim());
+      const lines = readFileSync(tableAt, "utf8").split(NEWLINE);
+      const at = lines.findIndex(
+        (l) => l.trim() === CONFIG.rulesManifest.heading.trim(),
+      );
+      const listed = [];
+      if (at < 0) unclassified.push("таблицу разделов не нашли");
+      else
+        for (let i = at + 2; i < lines.length; i += 1) {
+          if (!lines[i].trimStart().startsWith("|")) break;
+          listed.push(lines[i].split("|")[1].trim().replace(/`/g, ""));
+        }
+      for (const h of heads)
+        if (!listed.includes(h)) unclassified.push(`не классифицирован: ${h}`);
+      for (const l of listed)
+        if (!heads.includes(l)) unclassified.push(`раздела больше нет: ${l}`);
+    }
+  }
+  console.log("=== Разделы правил классифицированы ===");
+  console.log(
+    CONFIG.rulesManifest === null
+      ? "  таблица разделов не заявлена"
+      : `  без решения «на полку или проектное»: ${unclassified.length}`,
+  );
+  for (const u of unclassified) console.log("    " + u);
+
   console.log("=== Отложенное без закрытых пунктов ===");
   console.log(
     CONFIG.todo === null
@@ -2262,6 +2317,7 @@ if (mode === "verify") {
     // такое уже случилось однажды: сверка разрешений среды была добавлена
     // мимо этого списка и молча не роняла прогон.
     settingsDrift.length ||
+    unclassified.length ||
     danglingPaths.length ||
     goneNames.length ||
     strayTests.length ||
