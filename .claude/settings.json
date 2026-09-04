@@ -11,7 +11,23 @@
       "Bash(npx eslint *)",
       "Bash(npx tsc *)",
       "Bash(npx prettier --check *)",
-      "Bash(npx stryker run *)"
+      "Bash(npx stryker run *)",
+      "Bash(cd *)",
+      "Bash(grep *)",
+      "Bash(sed -n *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(diff *)",
+      "Bash(od *)",
+      "Bash(ls *)",
+      "Bash(find *)",
+      "Bash(git status *)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(git branch *)",
+      "Bash(git show *)"
     ]
   }
 }
