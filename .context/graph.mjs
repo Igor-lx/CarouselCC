@@ -1193,6 +1193,18 @@ if (mode === "mutated") {
       }
     }
   }
+  // Запись об удалённом файле не снимается слиянием: оно только добавляет и
+  // обновляет ключи. Оставленная, она навсегда завышает размер реестра и
+  // описывает долг по коду, которого нет, — а рецепт удаления узла обещает
+  // обратное. Дешевле снимать её здесь, чем требовать это руками.
+  let dropped = 0;
+  for (const k of Object.keys(ledger))
+    if (!existsSync(path.join(repoRoot, k))) {
+      delete ledger[k];
+      dropped += 1;
+      merged += 1;
+    }
+
   if (merged) {
     const ordered = {};
     for (const k of Object.keys(ledger).sort()) ordered[k] = ledger[k];
@@ -1213,7 +1225,8 @@ if (mode === "mutated") {
   console.log("=== Мутационный прогон против правки ===");
   console.log(
     `  в реестре файлов: ${Object.keys(ledger).length}` +
-      (merged ? `, добавлено этим прогоном: ${merged}` : ""),
+      (merged ? `, обновлено этим прогоном: ${merged}` : "") +
+      (dropped ? `, снято об удалённых файлах: ${dropped}` : ""),
   );
 
   let changed = process.argv.slice(3);
