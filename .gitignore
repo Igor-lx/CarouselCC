@@ -3,6 +3,9 @@ dist/
 coverage/
 reports/
 .stryker-tmp/
+# Артефакты смоука в браузере: трассы и отчёт пишутся на каждый прогон.
+test-results/
+playwright-report/
 .DS_Store
 *.local
 

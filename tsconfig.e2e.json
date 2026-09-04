@@ -1,0 +1,30 @@
+// Четвёртый проект — только смоук в настоящем браузере.
+//
+// Заведён отдельным, а не подшит к `tsconfig.node.json`, ради одной строки:
+// колбэки `page.evaluate` исполняются В БРАУЗЕРЕ и требуют библиотеки `DOM`.
+// Добавить `DOM` в node-проект значило бы открыть её и генератору данных, чья
+// изоляция от браузера — записанное свойство проекта, а не случайность.
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.e2e.tsbuildinfo",
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    "moduleResolution": "bundler",
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["e2e"]
+}

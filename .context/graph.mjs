@@ -249,6 +249,149 @@ for (const [f, deps] of importsOf) {
   }
 }
 
+// --- общие части досье ------------------------------------------------------
+// Их спрашивают два режима: `brief` («что это такое») и `plan` («что придётся
+// тронуть»). Второй экземпляр этой логики был бы ровно тем дефектом, который
+// мы ловим у форков: сверка строк базы тут тонкая — уникальность голого имени,
+// сосед по папке, строка про ДРУГОЙ файл, — и разойдясь, две копии начали бы
+// отвечать по-разному на один вопрос.
+const LF = String.fromCharCode(10);
+const BACKTICK = String.fromCharCode(96);
+
+let LINES_CACHE = null;
+const dossierLines = () => {
+  if (LINES_CACHE !== null) return LINES_CACHE;
+  const base = [];
+  const docs = [];
+  for (const d of docFiles)
+    readFileSync(d, "utf8")
+      .split(LF)
+      .forEach((line, i) => docs.push([rel(d), i + 1, line]));
+  for (const name of readdirSync(HERE).filter((n) => n.endsWith(".md")))
+    readFileSync(path.join(HERE, name), "utf8")
+      .split(LF)
+      .forEach((line, i) => base.push([name, i + 1, line]));
+  LINES_CACHE = { base, docs };
+  return LINES_CACHE;
+};
+
+// Обратная достижимость: какой тест дотягивается до файла ПО ГРАФУ, а не по
+// совпадению имён. Имена врут — `useTrackBinding` закрыт `trackBinding.test.tsx`.
+let REACH_CACHE = null;
+const testReach = () => {
+  if (REACH_CACHE !== null) return REACH_CACHE;
+  const reach = new Map();
+  for (const t of files.filter(isTest)) {
+    const seen = new Set();
+    const stack = [t];
+    while (stack.length > 0) {
+      for (const d of importsOf.get(stack.pop()) ?? []) {
+        if (seen.has(d)) continue;
+        seen.add(d);
+        stack.push(d);
+      }
+    }
+    for (const d of seen) {
+      if (!reach.has(d)) reach.set(d, []);
+      reach.get(d).push(t);
+    }
+  }
+  REACH_CACHE = reach;
+  return reach;
+};
+
+// Три РАЗНЫХ ответа, и путать их нельзя. Напрямую — тест сам назвал файл. Через
+// бочку — взял из `index.ts` имя, которое определяет этот файл: бочка реэкспорт,
+// а не потребитель, так что тест его всё-таки гоняет. Транзитивно — дотянулся
+// через обычные модули, и это почти всегда не про него.
+const testsFor = (target) => {
+  const all = testReach().get(target) ?? [];
+  const exported = exportsOf.get(target) ?? new Set();
+  const direct = all.filter((t) => (importsOf.get(t) ?? new Set()).has(target));
+  const byName = all.filter(
+    (t) =>
+      !direct.includes(t) &&
+      [...(namesPulledBy.get(t) ?? [])].some((n) => exported.has(n)),
+  );
+  return {
+    direct,
+    byName,
+    transitive: all.length - direct.length - byName.length,
+  };
+};
+
+const quotedIn = (line) =>
+  line
+    .split(BACKTICK)
+    .filter((_, i) => i % 2 === 1)
+    .flatMap((t) => t.split(",").map((x) => x.trim()));
+
+// Записи базы про адрес: точные (назван путём) и нестрогие (упомянут по имени).
+const baseHitsFor = (target) => {
+  const r = rel(target);
+  const base = r.slice(r.lastIndexOf("/") + 1);
+  const bare = base.replace(/\.(tsx?|scss)$/, "");
+  const dir = r.slice(0, r.lastIndexOf("/"));
+  // Голое имя засчитывается, только если оно в проекте одно: `index.ts` носят
+  // сорок один файл, `types.ts` — двадцать.
+  const uniqueBase =
+    [...files, ...styleFiles].filter((f) => rel(f).endsWith("/" + base))
+      .length === 1;
+  // …но если та же строка называет соседа по папке, речь именно об этой бочке:
+  // контекст строки снимает неоднозначность имени.
+  const namesSibling = (line) =>
+    quotedIn(line).some(
+      (t) =>
+        t.includes("/") &&
+        /[.](tsx?|scss)$/.test(t) &&
+        dir.endsWith(t.slice(0, t.lastIndexOf("/"))),
+    );
+  const exact = dossierLines().base.filter(([, , line]) =>
+    quotedIn(line).some(
+      (t) =>
+        t === r ||
+        (t.includes("/") && r.endsWith("/" + t)) ||
+        (t === base && (uniqueBase || namesSibling(line))),
+    ),
+  );
+  // Строка, которая в кавычках называет ДРУГОЙ существующий файл, — про него, а
+  // не про этот: иначе короткое имя собирает весь модуль и топит попадания.
+  const namesOther = (line) =>
+    quotedIn(line).some(
+      (t) =>
+        /[.](tsx?|scss)$/.test(t) &&
+        t !== base &&
+        !r.endsWith("/" + t) &&
+        files.some((f) => rel(f) === t || rel(f).endsWith("/" + t)),
+    );
+  const loose = dossierLines().base.filter(
+    ([, , line]) =>
+      line.includes(bare) &&
+      !exact.some((e) => e[2] === line) &&
+      !namesOther(line),
+  );
+  return { exact, loose };
+};
+
+// Один шаг по импортам — это соседи, а не радиус. Разница видна на нижнем
+// слое: у `domain/layout.ts` прямых импортёров двое, но один из них бочка
+// папки, и через неё правка расходится по всему клиенту. Печатать «2» и
+// называть это радиусом значит показывать дешёвую правку там, где она
+// дорогая, — а правило проекта берёт масштаб именно отсюда. Спрашивают двое:
+// `blast` и `plan`.
+const transitiveUsers = (start) => {
+  const seen = new Set();
+  const queue = [start];
+  while (queue.length) {
+    for (const u of importedBy.get(queue.pop()) ?? []) {
+      if (isTest(u) || seen.has(u)) continue;
+      seen.add(u);
+      queue.push(u);
+    }
+  }
+  return seen;
+};
+
 const mode = process.argv[2];
 
 if (mode === "dead") {
@@ -284,23 +427,6 @@ if (mode === "blast") {
     const users = [...(importedBy.get(f) ?? [])].filter((u) => !isTest(u));
     rows.push([rel(f), users.length, users.map(rel).sort(), f]);
   }
-  // Один шаг по импортам — это соседи, а не радиус. Разница видна на нижнем
-  // слое: у `domain/layout.ts` прямых импортёров двое, но один из них бочка
-  // папки, и через неё правка расходится по всему клиенту. Печатать «2» и
-  // называть это радиусом значит показывать дешёвую правку там, где она
-  // дорогая, — а правило проекта берёт масштаб именно отсюда.
-  const transitiveUsers = (start) => {
-    const seen = new Set();
-    const queue = [start];
-    while (queue.length) {
-      for (const u of importedBy.get(queue.pop()) ?? []) {
-        if (isTest(u) || seen.has(u)) continue;
-        seen.add(u);
-        queue.push(u);
-      }
-    }
-    return seen;
-  };
   const isBarrel = (f) => /[\\/]index\.tsx?$/.test(f);
   rows.sort((a, b) => b[1] - a[1]);
   if (arg && rows.length === 0) {
@@ -328,6 +454,94 @@ if (mode === "blast") {
     }
     console.log("\n--- файлы, которые не импортирует никто (кроме тестов) ---");
     for (const [f, n] of rows) if (n === 0) console.log(`     ${f}`);
+  }
+}
+
+if (mode === "plan") {
+  // `brief` отвечает «что это такое», `blast` — «кто зависит», `tested` — «что
+  // с тестами в уже сделанной правке». Перед правкой спрашивают другое, и
+  // спрашивают первым: **что придётся тронуть**. Собрать этот ответ можно и
+  // четырьмя вызовами, но каждый стоит контекста, а склеивать их приходится
+  // руками и по памяти — то есть ровно там, где память и подводит.
+  const arg = process.argv[3];
+  const hits = arg
+    ? [...files, ...styleFiles].filter(
+        (f) => rel(f).includes(arg) && !isTest(f),
+      )
+    : [];
+  if (!arg) {
+    console.log(
+      "Укажи путь: node .context/graph.mjs plan <путь или его хвост>",
+    );
+    process.exitCode = 1;
+  } else if (hits.length === 0) {
+    console.log(`Ничего не нашлось по ${BACKTICK}${arg}${BACKTICK}.`);
+    process.exitCode = 1;
+  } else {
+    for (const target of hits.slice(0, 6)) {
+      const r = rel(target);
+      console.log(`${LF}=== что придётся тронуть: ${r} ===`);
+
+      const direct = [...(importedBy.get(target) ?? [])]
+        .filter((u) => !isTest(u))
+        .map(rel)
+        .sort();
+      const all = transitiveUsers(target);
+      console.log(
+        `--- радиус: прямых ${direct.length}, транзитивно ${all.size} ---`,
+      );
+      for (const d of direct) console.log("  " + d);
+
+      // Близнец: расхождение копий законно, а вот баг, починенный в одной, —
+      // нет. Поэтому пара называется ДО правки, а не после неё.
+      const twins = [];
+      for (const { from, to } of CONFIG.forks) {
+        if (r.startsWith(from + "/")) twins.push(to + r.slice(from.length));
+        if (r.startsWith(to + "/")) twins.push(from + r.slice(to.length));
+      }
+      const live = twins.filter((t) => files.some((f) => rel(f) === t));
+      console.log("--- парная копия ---");
+      console.log(
+        live.length
+          ? "  " + live.join(LF + "  ") + LF + "  правится в той же правке"
+          : "  пары нет",
+      );
+
+      const { direct: td, byName, transitive } = testsFor(target);
+      console.log("--- тесты, которые обязаны покраснеть на сломе ---");
+      const runners = [...td, ...byName].map(rel).sort();
+      console.log(
+        runners.length
+          ? "  " + runners.join(LF + "  ")
+          : transitive === 0
+            ? "  НЕТ НИ ОДНОГО — правку проверять руками, и это пункт отчёта"
+            : "  напрямую никто; проверь тех, кто дотягивается транзитивно",
+      );
+
+      const { exact } = baseHitsFor(target);
+      console.log("--- записи базы, которые придётся обновить ---");
+      console.log(
+        exact.length
+          ? exact
+              .map(
+                ([name, n, line]) =>
+                  `  ${name}:${n}  ${line.trim().slice(0, 96)}`,
+              )
+              .join(LF)
+          : "  ни одной — значит и описывать правку негде: это само по себе находка",
+      );
+
+      // Один и тот же документ файл нередко называет дважды — в шапке и в теле;
+      // печатать его дважды значит подсказывать, что это два разных адреса.
+      const anchors = [...new Set(docRefsIn(readFileSync(target, "utf8")))];
+      console.log("--- документация, объявленная самим файлом ---");
+      console.log(
+        anchors.length ? "  " + anchors.join(LF + "  ") : "  якоря нет",
+      );
+    }
+    console.log(
+      `${LF}Долг по мутациям спрашивают отдельно: он про всю правку, а не про один файл — ${BACKTICK}graph.mjs mutated${BACKTICK}.`,
+    );
   }
 }
 
@@ -1015,46 +1229,11 @@ if (mode === "brief") {
       console.log(`Ничего не нашлось по ${TICK}${arg}${TICK}.`);
       process.exitCode = 1;
     } else {
-      // Обратная достижимость: какой тест дотягивается до файла по графу, а
-      // не по совпадению имён. Имена врут — `useTrackBinding` закрыт
-      // `trackBinding.test.tsx`.
-      const reach = new Map();
-      for (const t of files.filter(isTest)) {
-        const seen = new Set();
-        const stack = [t];
-        while (stack.length > 0) {
-          for (const d of importsOf.get(stack.pop()) ?? []) {
-            if (seen.has(d)) continue;
-            seen.add(d);
-            stack.push(d);
-          }
-        }
-        for (const d of seen) {
-          if (!reach.has(d)) reach.set(d, []);
-          reach.get(d).push(t);
-        }
-      }
-
-      // Строки базы, где адрес назван в обратных кавычках, — это её
-      // собственный формат записи, поэтому попадание точное.
-      const BASE_LINES = [];
-      // Документация отвечает на другой вопрос, чем база: не «что и где», а
-      // «почему так». Для рефактора это половина, без которой ломают
-      // концепцию, ничего не нарушив формально.
-      const DOC_LINES = [];
-      for (const d of docFiles) {
-        const body = readFileSync(d, "utf8").split(NEWLINE);
-        body.forEach((line, i) => DOC_LINES.push([rel(d), i + 1, line]));
-      }
-      for (const name of readdirSync(HERE).filter((n) => n.endsWith(".md"))) {
-        const body = readFileSync(path.join(HERE, name), "utf8").split(NEWLINE);
-        body.forEach((line, i) => BASE_LINES.push([name, i + 1, line]));
-      }
-      const quoted = (line) =>
-        line
-          .split(TICK)
-          .filter((_, i) => i % 2 === 1)
-          .flatMap((t) => t.split(",").map((x) => x.trim()));
+      // Достижимость тестов, строки базы и разбор записей — общие с `plan`,
+      // живут на уровне модуля. Документация отвечает на другой вопрос, чем
+      // база: не «что и где», а «почему так». Для рефактора это половина, без
+      // которой ломают концепцию, ничего не нарушив формально.
+      const DOC_LINES = dossierLines().docs;
 
       for (const target of hits.slice(0, 12)) {
         const r = rel(target);
@@ -1132,26 +1311,11 @@ if (mode === "brief") {
               : "  никто — ни один файл проекта его не импортирует",
           );
 
-          // Три РАЗНЫХ ответа, и путать их нельзя.
-          // Напрямую — тест сам назвал файл. Через бочку — тест взял имя из
-          // `index.ts`, а бочка это реэкспорт, а не потребитель: такой тест
-          // файл всё-таки гоняет. Транзитивно — тест дотянулся через обычные
-          // модули, и это почти всегда не про него.
-          const all = reach.get(target) ?? [];
-          // Средний уровень считается ПО ИМЕНАМ, а не по форме пути. Тест,
+          // Средний уровень считается ПО ИМЕНАМ, а не по форме пути: тест,
           // взявший `useImageResourceStore` из бочки слоя, гоняет файл, который
           // это имя определяет; тест, взявший из той же бочки соседнее имя, —
-          // нет. Ни «только прямой импорт», ни «сквозь любую бочку» этого не
-          // различают: первое врёт вниз, второе вверх.
-          const exported = exportsOf.get(target) ?? new Set();
-          const direct = all.filter((t) =>
-            (importsOf.get(t) ?? new Set()).has(target),
-          );
-          const byName = all.filter(
-            (t) =>
-              !direct.includes(t) &&
-              [...(namesPulledBy.get(t) ?? [])].some((n) => exported.has(n)),
-          );
+          // нет. Разбор общий с `plan`, см. `testsFor`.
+          const { direct, byName, transitive } = testsFor(target);
           console.log("--- тесты, называющие файл сами ---");
           console.log(
             direct.length
@@ -1178,63 +1342,21 @@ if (mode === "brief") {
           // достают транзитивно, тест на него может существовать и гонять его
           // через композицию — так закрыт BrowserChromeSync через ThemeProvider.
           // Кричать «не гоняет никто» в этом случае значит врать.
-          const rest = all.length - direct.length - byName.length;
           if (direct.length + byName.length === 0)
             console.log(
-              rest === 0
+              transitive === 0
                 ? "  ВНИМАНИЕ: файл не гоняет ни один тест — правку проверять руками"
                 : "  напрямую никто; проверь, гоняют ли его те, кто дотягивается ниже",
             );
           console.log(
-            `--- дотягиваются транзитивно, через обычные модули: ${
-              all.length - direct.length - byName.length
-            } ---`,
+            `--- дотягиваются транзитивно, через обычные модули: ${transitive} ---`,
           );
         }
 
-        // Голое имя засчитывается, только если оно в проекте одно. `index.ts`
-        // носят сорок один файл, `types.ts` — двадцать: принять такое совпадение
-        // значит залить раздел, подписанный «точно», строками про чужие бочки.
-        const uniqueBase =
-          [...files, ...styleFiles].filter((f) => rel(f).endsWith("/" + base))
-            .length === 1;
-        const dir = r.slice(0, r.lastIndexOf("/"));
-        // Голое `index.ts` носит сорок один файл, поэтому само по себе оно не
-        // точное. Но если та же строка называет соседа по папке — `### `slots/
-        // slotNames.ts` + `index.ts`` — то речь именно об этой бочке, и строка
-        // засчитывается: контекст строки снимает неоднозначность имени.
-        const namesSibling = (line) =>
-          quoted(line).some(
-            (t) =>
-              t.includes("/") &&
-              /[.](tsx?|scss)$/.test(t) &&
-              dir.endsWith(t.slice(0, t.lastIndexOf("/"))),
-          );
-        const exact = BASE_LINES.filter(([, , line]) =>
-          quoted(line).some(
-            (t) =>
-              t === r ||
-              (t.includes("/") && r.endsWith("/" + t)) ||
-              (t === base && (uniqueBase || namesSibling(line))),
-          ),
-        );
-        // Строка, которая в кавычках называет ДРУГОЙ существующий файл, — про
-        // него, а не про этот: иначе короткое имя вроде `Diagnostic` собирает
-        // весь модуль и топит настоящие попадания.
-        const namesOther = (line) =>
-          quoted(line).some(
-            (t) =>
-              /[.](tsx?|scss)$/.test(t) &&
-              t !== base &&
-              !r.endsWith("/" + t) &&
-              files.some((f) => rel(f) === t || rel(f).endsWith("/" + t)),
-          );
-        const loose = BASE_LINES.filter(
-          ([, , line]) =>
-            line.includes(bare) &&
-            !exact.some((e) => e[2] === line) &&
-            !namesOther(line),
-        );
+        // Разбор записей базы — общий с `plan`, см. `baseHitsFor`: там же
+        // объяснено, почему голое имя засчитывается не всегда и что делает
+        // строка, называющая соседа по папке.
+        const { exact, loose } = baseHitsFor(target);
         console.log("--- записи базы: назван путём (точно) ---");
         for (const [n, i, line] of exact.slice(0, 40))
           console.log(`  ${n}:${i}  ${line.trim().slice(0, 110)}`);
@@ -1262,7 +1384,7 @@ if (mode === "brief") {
         );
 
         const docHits = DOC_LINES.filter(([, , line]) =>
-          quoted(line).some(
+          quotedIn(line).some(
             (t) => t === r || r.endsWith("/" + t) || t === base || t === bare,
           ),
         );
