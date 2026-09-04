@@ -613,6 +613,8 @@ node .context/graph.mjs sizes    # непустых строк на файл (в
 | Скилл | Шаблон на полке |
 | --- | --- |
 | task | task.skill.template.md |
+| probe | probe.skill.template.md |
+| audit | audit.skill.template.md |
 
 **Агенты в эту таблицу не входят и проверены быть не могут:** это не файлы
 репозитория, а возможности окружения. Те, на которые опираются правила, названы
