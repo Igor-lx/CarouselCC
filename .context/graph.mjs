@@ -353,6 +353,23 @@ const testsFor = (target) => {
   };
 };
 
+// Стиль в графе импортов не участвует: его подключают побочным импортом
+// `import "./x.scss";` без `from`, а тесты читают его ТЕКСТОМ. Спрашивать про
+// него у `importedBy` значит получить ноль и прочитать это как «никому не
+// нужен». Оба режима, `brief` и `plan`, обязаны отвечать про стиль одинаково —
+// отсюда общий разбор.
+const styleUsers = (target) => {
+  const base = rel(target).slice(rel(target).lastIndexOf("/") + 1);
+  const needle = "/" + base;
+  const modules = files.filter(
+    (f) => !isTest(f) && readFileSync(f, "utf8").includes(needle),
+  );
+  const tests = files.filter(
+    (f) => isTest(f) && readFileSync(f, "utf8").includes(base),
+  );
+  return { modules, tests };
+};
+
 const quotedIn = (line) =>
   line
     .split(BACKTICK)
@@ -523,13 +540,22 @@ if (mode === "plan") {
       const r = rel(target);
       console.log(`${LF}=== что придётся тронуть: ${r} ===`);
 
-      const direct = [...(importedBy.get(target) ?? [])]
-        .filter((u) => !isTest(u))
+      // У стиля радиус считается по тексту, а не по графу: см. `styleUsers`.
+      // Печатать ему «прямых 0» значило бы сказать «никому не нужен» про файл,
+      // который подключён побочным импортом.
+      const isStyle = r.endsWith(".scss");
+      const direct = (
+        isStyle
+          ? styleUsers(target).modules
+          : [...(importedBy.get(target) ?? [])].filter((u) => !isTest(u))
+      )
         .map(rel)
         .sort();
-      const all = transitiveUsers(target);
+      const all = isStyle ? null : transitiveUsers(target);
       console.log(
-        `--- радиус: прямых ${direct.length}, транзитивно ${all.size} ---`,
+        isStyle
+          ? `--- подключают (по тексту, стиль не в графе): ${direct.length} ---`
+          : `--- радиус: прямых ${direct.length}, транзитивно ${all.size} ---`,
       );
       for (const d of direct) console.log("  " + d);
 
@@ -548,7 +574,13 @@ if (mode === "plan") {
           : "  пары нет",
       );
 
-      const { direct: td, byName, transitive } = testsFor(target);
+      const {
+        direct: td,
+        byName,
+        transitive,
+      } = isStyle
+        ? { direct: styleUsers(target).tests, byName: [], transitive: 0 }
+        : testsFor(target);
       console.log("--- тесты, которые обязаны покраснеть на сломе ---");
       const runners = [...td, ...byName].map(rel).sort();
       console.log(
@@ -1412,14 +1444,9 @@ if (mode === "brief") {
             "  «что накрывает его» тут не спрашивают: тест и есть проверка; что он закрепляет — записи базы ниже",
           );
         } else if (r.endsWith(".scss")) {
-          const base = r.slice(r.lastIndexOf("/") + 1);
-          // По тексту, а не по разобранным спецификаторам: стиль часто
-          // подключают побочным импортом `import "./x.scss";` без `from`, и
-          // разбор импортов такие строки не видит вовсе.
-          const needle = "/" + base;
-          const users = files.filter(
-            (f) => !isTest(f) && readFileSync(f, "utf8").includes(needle),
-          );
+          // Разбор по тексту общий с `plan`, см. `styleUsers`: стиль часто
+          // подключают побочным импортом без `from`, и граф его не видит.
+          const { modules: users, tests: named } = styleUsers(target);
           console.log("--- подключают (модули, называющие путь в импорте) ---");
           console.log(
             users.length
@@ -1429,9 +1456,6 @@ if (mode === "brief") {
                     .sort()
                     .join(NEWLINE + "  ")
               : "  никто — стиль не подключён ни из одного модуля",
-          );
-          const named = files.filter(
-            (f) => isTest(f) && readFileSync(f, "utf8").includes(base),
           );
           console.log("--- тесты, называющие файл (читают его текстом) ---");
           console.log(
