@@ -386,6 +386,18 @@ if (mode === "open") {
     .filter((d) => !d.includes("/context/"))
     .map((d) => [rel(d), readFileSync(d, "utf8")]);
   const unanchored = [];
+  // Имя файла без папки — ещё не адрес. `defaults.ts` лежит в трёх местах, и
+  // документация карусели про `config/defaults.ts` засчитывалась полке
+  // `engines/kinetic/internal/defaults.ts`: пункт, который нельзя закрыть, —
+  // якорь из полки на документы компонента как раз и есть та связь, которой в
+  // полке быть не должно. Поэтому для неуникальных имён требуем два последних
+  // сегмента пути; для уникальных прежнего имени достаточно.
+  const baseCount = new Map();
+  for (const f of files) {
+    if (isTest(f) || surface(f)) continue;
+    const b = f.slice(f.lastIndexOf("/") + 1);
+    baseCount.set(b, (baseCount.get(b) ?? 0) + 1);
+  }
   for (const f of files) {
     if (isTest(f) || surface(f)) continue;
     if (docRefsIn(readFileSync(f, "utf8")).length) continue;
@@ -396,8 +408,11 @@ if (mode === "open") {
     // прозе трёх десятков документов и топит сигнал.
     const bare = base.replace(/[.](tsx?|scss)$/, "");
     const asCode = "`" + bare + "`";
-    const named = docBodies.filter(
-      ([, body]) => body.includes(base) || body.includes(asCode),
+    const withParent = rel(f).split("/").slice(-2).join("/");
+    const named = docBodies.filter(([, body]) =>
+      (baseCount.get(base) ?? 0) > 1
+        ? body.includes(withParent)
+        : body.includes(base) || body.includes(asCode),
     );
     if (named.length) unanchored.push([rel(f), named.map(([d]) => d)]);
   }
