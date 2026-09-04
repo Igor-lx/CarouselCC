@@ -16,7 +16,8 @@ though only one is a media query.
   follow the same contract as `sharedStore/useMediaQuery` — a lazy live read on the
   first `getSnapshot` (React reads it during render, before subscribing, so a
   cached `false` would be wrong for the whole first frame) and attach/detach
-  gated on the subscriber count. See [`../../shared/README.md`](../../shared/README.md).
+  gated on the subscriber count. See
+  [`../../sharedStore/README.md`](../../sharedStore/README.md).
 - **`useDataSaver` is for SPECULATIVE work only** (e.g. image warm-up). It must
   never gate correctness-critical work — error handling, retries, or anything the
   user actually sees. Pass `enabled = false` to call it unconditionally (Rules of

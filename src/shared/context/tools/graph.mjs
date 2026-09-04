@@ -57,6 +57,20 @@ const CONFIG = {
     project: "../.claude/settings.json",
     shelf: "../src/shared/context/settings.template.json",
   },
+  /** Известные исключения к сверке путей в обратных кавычках: адрес, которого
+   * на диске нет намеренно. Формат `<файл>|<токен>`, причина — строкой рядом.
+   * Список короткий не случайно: разрастётся — значит проверка ловит не то, и
+   * чинить надо её, а не пополнять список. */
+  docPathExceptions: [
+    // Иллюстрация того, во что нормализуются ссылки при сравнении форков.
+    "00-map.md|../README.md",
+    // Обе записи говорят, что бочка УДАЛЕНА, и называют её по имени.
+    "01-facts.md|client/modules/index.ts",
+    "03-graph.md|modules/index.ts",
+    // Образец формы якоря в объяснении, а не ссылка на файл.
+    "README.md|docs/architecture/x.md",
+    "shared/context/knowledge-base.md|docs/architecture/x.md",
+  ],
   // Отложенное: закрытый пункт отсюда удаляют, а не помечают.
   todo: "02-todo.md",
   /** Полка правил: те же методы, что в `CLAUDE.md` проекта, но уезжающие в
@@ -2093,6 +2107,123 @@ if (mode === "verify") {
   console.log(`  ссылок на несуществующий пункт: ${danglingTodo.length}`);
   for (const t of danglingTodo) console.log("    " + t);
 
+  // 14-16. Три шва, которые до сих пор держались только вниманием.
+  // Общий источник для всех трёх: файлы базы (по имени) и документация рядом с
+  // кодом (путём от `src`).
+  const docSources = [
+    ...readdirSync(HERE)
+      .filter((n) => n.endsWith(".md"))
+      .map((n) => [n, norm(path.join(HERE, n))]),
+    ...docFiles.map((d) => [rel(d), d]),
+  ];
+
+  // 14. путь в обратных кавычках указывает на существующий файл.
+  // Якоря `файл:строка` закрыты пунктом 8; здесь — голые адреса без номера
+  // строки, а их втрое больше. Адресом считается токен с косой чертой и
+  // известным расширением: без косой это обычно имя из прозы («положите рядом
+  // `config.json`»), а сегмент, начинающийся с точки, — перечисление
+  // расширений (`.ts/.tsx/.scss`), а не путь.
+  const PATH_EXT = /\.(tsx?|scss|md|json|mjs)$/;
+  const looksLikePath = (tok) =>
+    tok.includes("/") &&
+    PATH_EXT.test(tok) &&
+    tok.split("/").every((s) => s === "." || s === ".." || !s.startsWith("."));
+  // `everyPath` собран под подсчёт папок и намеренно держит только
+  // `.ts/.tsx/.scss/.md`; расширять его нельзя — на его составе стоят числа
+  // заявленных папок. Поэтому у сверки путей свой инвентарь: тот же список
+  // плюс скрипты, на которые база ссылается по имени.
+  const scriptFiles = [];
+  (function walkScripts(dir) {
+    for (const e of readdirSync(dir)) {
+      const full = path.join(dir, e);
+      if (statSync(full).isDirectory()) walkScripts(full);
+      else if (e.endsWith(".mjs")) scriptFiles.push(norm(full));
+    }
+  })(norm(path.join(REPO, "src")));
+  const inventory = [...everyPath, ...scriptFiles];
+  const knownDangling = new Set(CONFIG.docPathExceptions);
+  const danglingPaths = [];
+  let pathTokens = 0;
+  for (const [name, at] of docSources) {
+    const dir = norm(path.dirname(at));
+    for (const hit of readFileSync(at, "utf8").matchAll(/`([^`\n]+)`/g)) {
+      let tok = hit[1].trim();
+      if (/[\s(){}*[\]<>|,]/.test(tok)) continue;
+      tok = tok.replace(/[:#].*$/, "");
+      if (!looksLikePath(tok)) continue;
+      pathTokens++;
+      if (knownDangling.has(`${name}|${tok}`)) continue;
+      const asRelative =
+        tok.startsWith("./") || tok.startsWith("../")
+          ? norm(path.resolve(dir, tok))
+          : null;
+      // `locate` требует ОДНОЗНАЧНОГО разрешения и молчит, когда путь есть в
+      // двух копиях, — а у парных форков так почти всё (`runtime/types.ts`
+      // живёт и в движке, и в форке). Для вопроса «существует ли файл»
+      // неоднозначность отсутствием не является, поэтому запасной шаг —
+      // совпадение по хвосту пути.
+      if (
+        (asRelative !== null && existsSync(asRelative)) ||
+        locate(tok, null) !== null ||
+        inventory.some((f) => f.endsWith("/" + tok))
+      )
+        continue;
+      danglingPaths.push(`${name}: ${tok}`);
+    }
+  }
+  console.log("=== Пути в обратных кавычках ===");
+  console.log(
+    `  проверено: ${pathTokens}, ведут в никуда: ${danglingPaths.length}`,
+  );
+  for (const d of danglingPaths) console.log("    " + d);
+
+  // 15. ALL_CAPS-имя в обратных кавычках существует в исходниках.
+  // Константы база называет поимённо, и переименование оставляет в тексте имя,
+  // которого больше нет. Маркеры отложенной работы исключены: их в коде нет
+  // намеренно — про них как раз и написано, что их быть не должно.
+  const WORK_MARKERS = new Set(["TODO", "FIXME", "HACK", "XXX"]);
+  const sourceBlob = [...files, ...styleFiles]
+    .map((f) => readFileSync(f, "utf8"))
+    .join(NEWLINE);
+  const goneNames = [];
+  let capsTokens = 0;
+  for (const [name, at] of docSources) {
+    // Имя ищется ВНУТРИ кода-спана, а не «в кавычках целиком»: база пишет и
+    // `NAME`, и `NAME = 400`, и вторая форма при сверке по целому спану
+    // молча не проверялась бы — на ней проверка и попалась при фальсификации.
+    for (const span of readFileSync(at, "utf8").matchAll(/`([^`\n]+)`/g)) {
+      // Только СОСТАВНОЕ имя, и не часть имени файла. Односложные заглавные
+      // слова в тексте — это `CLAUDE.md`, `LOCALAPPDATA`, `PIPESTATUS`: имена
+      // не из исходников, и проверять их здесь значило бы шуметь. Подчёркивание
+      // отделяет константу проекта от такого слова надёжнее любого списка.
+      for (const hit of span[1].matchAll(
+        /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g,
+      )) {
+        if (WORK_MARKERS.has(hit[0])) continue;
+        if (span[1][hit.index + hit[0].length] === ".") continue;
+        capsTokens++;
+        if (!sourceBlob.includes(hit[0])) goneNames.push(`${name}: ${hit[0]}`);
+      }
+    }
+  }
+  console.log("=== Имена констант в тексте ===");
+  console.log(
+    `  проверено: ${capsTokens}, нет в исходниках: ${goneNames.length}`,
+  );
+  for (const g of goneNames) console.log("    " + g);
+
+  // 16. тест лежит в папке `tests/` своего слоя.
+  // Соглашение несущее: база описывает каждый тест ПУТЁМ, а размер папки
+  // считается по коду, отдельно от путей со словом `tests`. Перенос теста к
+  // его файлу не уронил бы ни один прогон — `isTest` ловит и по суффиксу
+  // имени, — зато обессмыслил бы записи базы молча.
+  const strayTests = files.filter(
+    (f) => /\.test\.tsx?$/.test(f) && !f.includes("/tests/"),
+  );
+  console.log("=== Тесты лежат в `tests/` ===");
+  console.log(`  вне своей папки: ${strayTests.length}`);
+  for (const s of strayTests) console.log("    " + rel(s));
+
   console.log("=== Объявленный состав папок и радиусы ===");
   console.log(
     `  папок: ${dirs}, радиусов: ${radii}, разошлось: ${wrong.length}`,
@@ -2118,6 +2249,13 @@ if (mode === "verify") {
     uncitedNew.length ||
     parked.length ||
     shelfDrift.length ||
+    // Проверка, не влияющая на код возврата, печатает, но не держит. Здесь
+    // такое уже случилось однажды: сверка разрешений среды была добавлена
+    // мимо этого списка и молча не роняла прогон.
+    settingsDrift.length ||
+    danglingPaths.length ||
+    goneNames.length ||
+    strayTests.length ||
     unresolved.length
   )
     process.exitCode = 1;

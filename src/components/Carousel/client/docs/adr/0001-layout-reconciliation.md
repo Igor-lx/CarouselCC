@@ -39,6 +39,6 @@ else.
   exposes a new-layout / old-state pair to layout effects.
 - The reconciler must be **idempotent**: reconciling an already-reconciled state
   against an equivalent layout returns the same reference. This is a hard
-  contract, enforced by [`state/reconcile.test.ts`](../../state/reconcile.test.ts).
+  contract, enforced by [`state/tests/reconcile.test.ts`](../../state/tests/reconcile.test.ts).
 - See [`docs/architecture/state.md`](../architecture/state.md) for the state
   machine this rule sits inside.
