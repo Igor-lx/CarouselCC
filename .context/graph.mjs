@@ -920,6 +920,56 @@ if (mode === "tested") {
       );
     }
 
+    // «Не забыть ВО ВСЕХ МЕСТАХ» — это не призыв к внимательности, а список,
+    // который можно напечатать. База описывает файл в нескольких своих файлах
+    // сразу (карта, состояние, потоки, тайминг, инварианты), и держать их в
+    // голове нельзя. Плюс рябь: новый или изменившийся узел меняет то, что
+    // делают его ПОТРЕБИТЕЛИ, и их записи устаревают молча — именно так
+    // однажды и вышло с утверждением про кэш, поправленным в трёх записях из
+    // четырёх.
+    if (touchedCode.length) {
+      const at = (hits) =>
+        hits.length
+          ? hits.map(([name, line]) => `${name}:${line}`).join(", ")
+          : null;
+      console.log(NEWLINE + "=== Записи базы про тронутые файлы ===");
+      for (const f of touchedCode) {
+        const where = at(baseHitsFor(f).exact);
+        console.log("  " + rel(f));
+        console.log(
+          where === null
+            ? "    записей нет — узел базе неизвестен, запись обязательна"
+            : "    " + where,
+        );
+      }
+
+      const neighbours = new Set();
+      for (const f of touchedCode)
+        for (const u of importedBy.get(f) ?? [])
+          if (!isTest(u) && !touchedCode.includes(u)) neighbours.add(u);
+      if (neighbours.size > 0) {
+        const shown = [...neighbours].slice(0, 8);
+        console.log(
+          NEWLINE +
+            "  Соседи, чьё описание могло измениться (кто импортирует):",
+        );
+        for (const n of shown)
+          console.log(
+            `    ${rel(n)} → ${at(baseHitsFor(n).exact) ?? "записей нет"}`,
+          );
+        if (neighbours.size > shown.length)
+          console.log(`    …и ещё ${neighbours.size - shown.length}`);
+      }
+      console.log(
+        NEWLINE +
+          "  Открыть каждую и ответить: описывает ли она ещё то, что файл делает" +
+          NEWLINE +
+          "  сейчас? Какой факт в какой файл базы — таблица в knowledge-base.md:" +
+          NEWLINE +
+          "  состояние в 04, порядок в 06, сценарий в 05, связи в 03, идиома в 10.",
+      );
+    }
+
     // Документация отвечает на другой вопрос, чем база, и закрывается ОТДЕЛЬНО
     // от неё. Названные в правилах одной строкой, они сливаются в одно дело:
     // базу ведут по ходу правки, пара кажется закрытой, а `docs/**` остаются
