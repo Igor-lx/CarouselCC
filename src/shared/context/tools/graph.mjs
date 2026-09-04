@@ -1992,7 +1992,16 @@ if (mode === "verify") {
       const text = readFileSync(p, "utf8").split(NEWLINE);
       let start = 0;
       const flush = (end) => {
-        const para = text.slice(start, end).join(" ");
+        // Строки таблицы из абзаца выбрасываются. Таблица без пустых строк —
+        // формально один абзац, и словарь ловит в нём слова из РАЗНЫХ строк:
+        // «дефект» из одной, «отложено» из другой. Поймано пересадкой полки в
+        // пустой проект: скопированная туда таблица сверок роняла прогон,
+        // ничего при этом не откладывая. Парковка дефекта — это проза, а не
+        // ячейка таблицы.
+        const para = text
+          .slice(start, end)
+          .filter((l) => !l.trimStart().startsWith("|"))
+          .join(" ");
         if (DEFECT.test(para) && DEFER.test(para) && !DECIDED.test(para))
           parked.push(
             `${name}:${start + 1} — дефект отложен без записи решения`,
