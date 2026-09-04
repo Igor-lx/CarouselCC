@@ -247,17 +247,43 @@ if (mode === "blast") {
     if (isTest(f)) continue;
     if (arg && !rel(f).includes(arg)) continue;
     const users = [...(importedBy.get(f) ?? [])].filter((u) => !isTest(u));
-    rows.push([rel(f), users.length, users.map(rel).sort()]);
+    rows.push([rel(f), users.length, users.map(rel).sort(), f]);
   }
+  // Один шаг по импортам — это соседи, а не радиус. Разница видна на нижнем
+  // слое: у `domain/layout.ts` прямых импортёров двое, но один из них бочка
+  // папки, и через неё правка расходится по всему клиенту. Печатать «2» и
+  // называть это радиусом значит показывать дешёвую правку там, где она
+  // дорогая, — а правило проекта берёт масштаб именно отсюда.
+  const transitiveUsers = (start) => {
+    const seen = new Set();
+    const queue = [start];
+    while (queue.length) {
+      for (const u of importedBy.get(queue.pop()) ?? []) {
+        if (isTest(u) || seen.has(u)) continue;
+        seen.add(u);
+        queue.push(u);
+      }
+    }
+    return seen;
+  };
+  const isBarrel = (f) => /[\\/]index\.tsx?$/.test(f);
   rows.sort((a, b) => b[1] - a[1]);
   if (arg && rows.length === 0) {
     console.log(`Ничего не нашлось по ${arg}.`);
     process.exitCode = 1;
   } else if (arg) {
     console.log(`=== Радиус поражения: ${arg} ===\n`);
-    for (const [f, n, users] of rows) {
-      console.log(`${String(n).padStart(3)}  ${f}`);
+    for (const [f, n, users, abs] of rows) {
+      const all = transitiveUsers(abs);
+      const bridges = [...(importedBy.get(abs) ?? [])]
+        .filter((u) => !isTest(u) && isBarrel(u))
+        .map(rel)
+        .sort();
+      console.log(`${String(n).padStart(3)}  ${f}  (прямых)`);
       if (n > 0) console.log(`      ${users.join("\n      ")}`);
+      console.log(`      всего транзитивно: ${all.size}`);
+      if (bridges.length > 0)
+        console.log(`      наружу ведёт бочка: ${bridges.join(", ")}`);
     }
   } else {
     console.log("=== Радиус поражения: не-тестовых импортёров на файл ===\n");
