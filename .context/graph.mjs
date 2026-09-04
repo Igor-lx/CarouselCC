@@ -116,6 +116,19 @@ const CONFIG = {
   ],
   /** Команда смоука — печатается в напоминании, чтобы её не искали. */
   smokeCommand: "npm run test:e2e",
+  /** Скиллы проекта: папка, где они лежат, и таблица, объявляющая их состав.
+   * Проверяется трижды: объявленный существует, существующий объявлен, и его
+   * шаблон на полке совпадает с рабочим файлом байт в байт. Последнее — то же
+   * правило, что у инструмента: скилл, разошедшийся с полкой, увезёт в новый
+   * проект не тот порядок работы. Агенты сюда не входят: они не файлы
+   * репозитория, и проверить их наличие скриптом нельзя — они названы прозой в
+   * `environment.md`. `null` — скиллов у проекта нет. */
+  skills: {
+    dir: "../.claude/skills",
+    shelf: "../src/shared/context",
+    table: "01-facts.md",
+    heading: "| Скилл | Шаблон на полке |",
+  },
   /** Отчёт последнего мутационного прогона. HTML-репортер держит внутри тот
    * же объект, что отдал бы JSON, поэтому второй репортер не нужен. */
   mutationReport: "../reports/mutation/mutation.html",
@@ -2313,6 +2326,60 @@ if (mode === "verify") {
         if (!heads.includes(l)) unclassified.push(`раздела больше нет: ${l}`);
     }
   }
+  // 13c. Скиллы проекта: объявлены, лежат на месте, совпадают с полкой.
+  const skillDrift = [];
+  if (CONFIG.skills !== null) {
+    const dir = path.join(HERE, CONFIG.skills.dir);
+    const onDisk = existsSync(dir)
+      ? readdirSync(dir).filter((n) =>
+          existsSync(path.join(dir, n, "SKILL.md")),
+        )
+      : [];
+    const tableAt = path.join(BASE, CONFIG.skills.table);
+    const listed = new Map();
+    if (!existsSync(tableAt))
+      skillDrift.push(`нет файла таблицы: ${CONFIG.skills.table}`);
+    else {
+      const lines = readFileSync(tableAt, "utf8").split(NEWLINE);
+      const at = lines.findIndex(
+        (l) => l.trim() === CONFIG.skills.heading.trim(),
+      );
+      if (at < 0) skillDrift.push("таблицу скиллов не нашли");
+      else
+        for (let i = at + 2; i < lines.length; i += 1) {
+          if (!lines[i].trimStart().startsWith("|")) break;
+          const cells = lines[i].split("|");
+          listed.set(
+            cells[1].trim().replace(/`/g, ""),
+            cells[2].trim().replace(/`/g, ""),
+          );
+        }
+    }
+    for (const name of onDisk)
+      if (!listed.has(name)) skillDrift.push(`не объявлен в таблице: ${name}`);
+    for (const [name, template] of listed) {
+      if (!onDisk.includes(name)) {
+        skillDrift.push(`объявлен, но файла нет: ${name}`);
+        continue;
+      }
+      const shelfAt = path.join(HERE, CONFIG.skills.shelf, template);
+      if (!existsSync(shelfAt)) {
+        skillDrift.push(`нет шаблона на полке: ${template}`);
+        continue;
+      }
+      const flat = (f) => readFileSync(f, "utf8").split(CR_LF).join(NEWLINE);
+      if (flat(shelfAt) !== flat(path.join(dir, name, "SKILL.md")))
+        skillDrift.push(`шаблон разошёлся с рабочим файлом: ${template}`);
+    }
+  }
+  console.log("=== Скиллы проекта ===");
+  console.log(
+    CONFIG.skills === null
+      ? "  скиллы не заявлены"
+      : `  расхождений: ${skillDrift.length}`,
+  );
+  for (const s of skillDrift) console.log("    " + s);
+
   console.log("=== Разделы правил классифицированы ===");
   console.log(
     CONFIG.rulesManifest === null
@@ -2477,6 +2544,7 @@ if (mode === "verify") {
     // такое уже случилось однажды: сверка разрешений среды была добавлена
     // мимо этого списка и молча не роняла прогон.
     settingsDrift.length ||
+    skillDrift.length ||
     unclassified.length ||
     danglingPaths.length ||
     goneNames.length ||
