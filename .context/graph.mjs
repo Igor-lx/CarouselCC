@@ -47,6 +47,16 @@ const CONFIG = {
    * совпадать байт в байт: разошедшийся инструмент проверяет не тот проект.
    * `null` — копии в проекте нет. */
   toolCopy: "../src/shared/context/tools/graph.mjs",
+  /** Список разрешений среды: проектный и шаблон на полке. Правила и инструмент
+   * переносятся копированием, а среда — нет, и её расхождение платится не
+   * красным прогоном, а часом простоя: длинная задача встаёт на запросе
+   * подтверждения и ждёт человека, который отошёл. Сверяется **включение**, а
+   * не равенство: проект вправе добавить своё, но не вправе потерять то, что
+   * полка обещает следующему проекту. `null` — пары нет. */
+  settingsPair: {
+    project: "../.claude/settings.json",
+    shelf: "../src/shared/context/settings.template.json",
+  },
   // Отложенное: закрытый пункт отсюда удаляют, а не помечают.
   todo: "02-todo.md",
   /** Полка правил: те же методы, что в `CLAUDE.md` проекта, но уезжающие в
@@ -1740,6 +1750,33 @@ if (mode === "verify") {
       : `  расхождений: ${toolDrift.length}`,
   );
   for (const t of toolDrift) console.log("    " + t);
+
+  // 9b. список разрешений среды не потерял того, что обещает полка
+  const settingsDrift = [];
+  if (CONFIG.settingsPair !== null) {
+    const readList = (relPath) => {
+      const at = path.join(HERE, relPath);
+      if (!existsSync(at)) return null;
+      const parsed = JSON.parse(readFileSync(at, "utf8"));
+      return parsed?.permissions?.allow ?? [];
+    };
+    const mine = readList(CONFIG.settingsPair.project);
+    const shelf = readList(CONFIG.settingsPair.shelf);
+    if (mine === null)
+      settingsDrift.push(`нет файла: ${CONFIG.settingsPair.project}`);
+    else if (shelf === null)
+      settingsDrift.push(`нет файла: ${CONFIG.settingsPair.shelf}`);
+    else
+      for (const entry of shelf)
+        if (!mine.includes(entry)) settingsDrift.push(`потеряно: ${entry}`);
+  }
+  console.log("=== Разрешения среды ===");
+  console.log(
+    CONFIG.settingsPair === null
+      ? "  пара не заявлена"
+      : `  из шаблона полки потеряно: ${settingsDrift.length}`,
+  );
+  for (const s of settingsDrift) console.log("    " + s);
 
   // 10. якорь на документацию в коде указывает на существующий файл
   // Ссылки собирает общий помощник docRefsIn (см. его шапку).
