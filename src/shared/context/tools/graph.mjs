@@ -42,6 +42,18 @@ const CONFIG = {
       from: "shared/engines/gesture",
       to: "shared/engines/kinetic/internal/gesture",
     },
+    // Правила полок (`src/shared/CLAUDE.md`) называют парными и эти две, а
+    // инструмент их не знал: `twins` отвечал «правка форков не касается» на
+    // файл, у которого близнец лежит рядом на диске. Найдено пробой — ровно тот
+    // случай, про который правило говорит «баг, починенный в одной копии».
+    {
+      from: "shared/clientState/environment/library",
+      to: "shared/clientState/environment/useUserEnvironment/internal",
+    },
+    {
+      from: "shared/clientState/media/library",
+      to: "shared/clientState/media/useMedia/internal",
+    },
   ],
   /** Копия этого файла, уезжающая с полкой правил в новый проект. Обязана
    * совпадать байт в байт: разошедшийся инструмент проверяет не тот проект.
@@ -155,6 +167,16 @@ const CONFIG = {
     shelf: "../src/shared/context",
     table: "01-facts.md",
     heading: "| Скилл | Шаблон на полке |",
+  },
+  /** Точечные `eslint-disable` в коде против таблицы, которая их объясняет.
+   * Сверяется СОСТАВ ФАЙЛОВ в обе стороны, а не количество: в таблице одна
+   * строка может покрывать две директивы («×2»), и счёт по ней был бы разбором
+   * прозы. Заведено после пробы: правила говорили «сейчас их восемь», база —
+   * «все пять», на диске было семь, и две директивы не объяснял никто. `null` —
+   * таблицы нет. */
+  lintExceptions: {
+    table: "01-facts.md",
+    heading: "| Файл | Правило | Почему |",
   },
   /** Отчёт последнего мутационного прогона. HTML-репортер держит внутри тот
    * же объект, что отдал бы JSON, поэтому второй репортер не нужен. */
@@ -857,6 +879,12 @@ if (mode === "twins") {
             ? a + f.slice(b.length)
             : null;
         if (twin === null) continue;
+        // Близнец засчитывается, только если он есть на диске. Полки парные не
+        // файл в файл: у библиотеки бывает своё (`useShortLandscape`), у сборки
+        // своё (`canonicalMedia`), и без этой проверки режим требовал бы править
+        // файл, которого не существует, — то есть врал бы. Сверка, способная
+        // соврать, хуже отсутствующей: ей верят.
+        if (!existsSync(path.join(ROOT, twin))) continue;
         inPairs++;
         if (!touched.has(twin)) lonely.push([f, twin]);
       }
@@ -954,12 +982,44 @@ if (mode === "tested") {
       .map(abs)
       .filter((f) => /\.(tsx?|scss)$/.test(f) && !isTest(f) && !existsSync(f));
 
+    // Стиль в граф импортов не входит — его подключает сборщик, — поэтому в
+    // `touchedCode` он не попадает, и раньше правка стилей получала ответ
+    // «правка кода не касается». Между тем держат стили как раз тесты, читающие
+    // их ТЕКСТОМ: соответствие переменных, слои, фолбэки. Найдено пробой:
+    // тронутый `Carousel.module.scss` не назвал ни одного из пяти своих тестов.
+    const touchedStyles = [...touched].filter(
+      (f) => styleFiles.includes(f) && existsSync(f),
+    );
+
     console.log("=== Код и тесты в одной правке ===");
     console.log(
       `  тронуто файлов кода: ${touchedCode.length}, из них с тестами в этой же правке: ${covered}`,
     );
-    if (touchedCode.length === 0 && deletedCode.length === 0)
+    if (
+      touchedCode.length === 0 &&
+      deletedCode.length === 0 &&
+      touchedStyles.length === 0
+    )
       console.log("  правка кода не касается");
+
+    if (touchedStyles.length) {
+      console.log(
+        NEWLINE +
+          "  Тронуты стили. Их держат тесты, читающие файл текстом —" +
+          NEWLINE +
+          "  открыть и ответить, держат ли они его и после правки:",
+      );
+      for (const s of touchedStyles) {
+        const { tests } = styleUsers(s);
+        const inEdit = tests.filter((t) => touched.has(t)).length;
+        console.log(
+          `    ${rel(s)} — читают ${tests.length}, из них в этой же правке ${inEdit}`,
+        );
+        for (const t of tests.map(rel).sort()) console.log(`      ${t}`);
+        if (tests.length === 0)
+          console.log("      ни одного — правку проверять глазом и смоуком");
+      }
+    }
 
     if (stale.length) {
       console.log(NEWLINE + "  Тесты есть, но в правку не попали:");
@@ -2190,6 +2250,55 @@ if (mode === "verify") {
   );
   for (const t of toolDrift) console.log("    " + t);
 
+  // 9c. каждое точечное исключение линта объяснено, и каждое объяснение живо.
+  const lintDrift = [];
+  if (CONFIG.lintExceptions !== null) {
+    const DIRECTIVE = /^\s*(?:\/\/|\/\*)\s*eslint-disable/;
+    const withDirective = new Set();
+    for (const f of files) {
+      const hit = readFileSync(f, "utf8")
+        .split(NEWLINE)
+        .some((line) => DIRECTIVE.test(line));
+      if (hit) withDirective.add(rel(f));
+    }
+    const at = path.join(HERE, CONFIG.lintExceptions.table);
+    const text = existsSync(at) ? readFileSync(at, "utf8").split(NEWLINE) : [];
+    const start = text.findIndex((l) =>
+      l.startsWith(CONFIG.lintExceptions.heading),
+    );
+    // Нет таблицы и нет ни одной директивы — нет и предмета: у нового проекта
+    // так и будет, а таблица заводится вместе с первым исключением. Требовать
+    // её раньше значит ронять посадку на пустом месте — поймано пересадкой,
+    // сразу после того, как сверку завели.
+    if (start < 0 && withDirective.size === 0) {
+      // предмета нет — расхождений тоже
+    } else if (start < 0)
+      lintDrift.push(
+        `исключения в коде есть (${withDirective.size} файлов), а таблицы, которая их объясняет, нет`,
+      );
+    else {
+      const named = new Set();
+      for (let i = start + 2; i < text.length && text[i].startsWith("|"); i++) {
+        const cell = text[i].split("|")[1] ?? "";
+        for (const tok of quotedIn(cell)) {
+          const found = [...withDirective].find(
+            (f) => f === tok || f.endsWith("/" + tok),
+          );
+          named.add(found ?? tok);
+        }
+      }
+      for (const f of withDirective)
+        if (!named.has(f)) lintDrift.push(`исключение без объяснения: ${f}`);
+      for (const n of named)
+        if (!withDirective.has(n))
+          lintDrift.push(`объяснение без исключения: ${n}`);
+    }
+  }
+
+  console.log("=== Точечные исключения линта ===");
+  console.log(`  расхождений: ${lintDrift.length}`);
+  for (const l of lintDrift) console.log("    " + l);
+
   console.log("=== Режимы инструмента описаны ===");
   console.log(`  без описания: ${undocumented.length}`);
   for (const u of undocumented) console.log("    " + u);
@@ -2737,8 +2846,34 @@ if (mode === "verify") {
   for (const t of danglingTodo) console.log("    " + t);
 
   // 14-16. Три шва, которые до сих пор держались только вниманием.
-  // Общий источник для всех трёх: файлы базы (по имени) и документация рядом с
-  // кодом (путём от `src`).
+  // Общий источник для всех трёх: файлы базы (по имени), документация рядом с
+  // кодом (путём от `src`), файлы правил и скиллы.
+  const skillDocs = () => {
+    const root = norm(path.join(HERE, CONFIG.skills.dir));
+    if (!existsSync(root)) return [];
+    const found = [];
+    (function walk(dir) {
+      for (const entry of readdirSync(dir)) {
+        const full = norm(path.join(dir, entry));
+        if (statSync(full).isDirectory()) walk(full);
+        else if (entry.endsWith(".md"))
+          found.push([
+            path.relative(REPO, full).split(path.sep).join("/"),
+            full,
+          ]);
+      }
+    })(root);
+    return found;
+  };
+  // Полка из сверки адресов исключена, и это не послабление, а точность.
+  // Её файлы описывают проект, которого ЕЩЁ НЕТ: инструкция посадки называет
+  // `.claude/skills/task/SKILL.md`, который заводят на седьмом шаге, а шаблон
+  // скилла — файлы базы, заводимые «когда появится содержимое». В этом проекте
+  // такие адреса случайно живые, в новом — нет, и первый же `verify` после
+  // посадки краснел бы на тексте, приехавшем вместе с правилами. Поймано
+  // пересадкой в пустой проект. Полку держит другое: побайтовые копии
+  // инструмента, справочника и скилла плюс равенство таблиц сверок.
+  const SHELF_ROOT = norm(path.join(HERE, CONFIG.rulesShelf));
   const docSources = [
     ...readdirSync(HERE)
       .filter((n) => n.endsWith(".md"))
@@ -2752,19 +2887,29 @@ if (mode === "verify") {
       .map((r) => norm(path.join(HERE, r)))
       .filter((p) => existsSync(p))
       .map((p) => [path.relative(REPO, p).split(path.sep).join("/"), p]),
-  ];
+    // Скиллы — те же документы с адресами: скилл начала задачи целиком состоит
+    // из «прочитай вот это». Умерший адрес в нём отправляет туда каждую сессию,
+    // и молча — сверка его не читала.
+    ...(CONFIG.skills === null ? [] : skillDocs()),
+  ].filter(([, at]) => !at.startsWith(SHELF_ROOT));
 
   // 14. путь в обратных кавычках указывает на существующий файл.
   // Якоря `файл:строка` закрыты пунктом 8; здесь — голые адреса без номера
   // строки, а их втрое больше. Адресом считается токен с косой чертой и
   // известным расширением: без косой это обычно имя из прозы («положите рядом
-  // `config.json`»), а сегмент, начинающийся с точки, — перечисление
-  // расширений (`.ts/.tsx/.scss`), а не путь.
+  // `config.json`»).
+  //
+  // Отбрасывается ровно одно — перечисление расширений (`.ts/.tsx/.scss`), у
+  // которого КАЖДЫЙ сегмент имеет вид «точка и буквы». Прежнее правило
+  // отбрасывало любой токен, где хоть один сегмент начинается с точки, и вместе
+  // с перечислениями вырезало все адреса в скрытых папках — то есть всю
+  // `.context/**`, самый называемый адрес проекта. Найдено пробой: `.context/
+  // graph2.mjs` (файла нет) прошёл молча.
   const PATH_EXT = /\.(tsx?|scss|md|json|mjs)$/;
+  const isExtensionList = (tok) =>
+    tok.split("/").every((s) => /^\.[A-Za-z0-9]+$/.test(s));
   const looksLikePath = (tok) =>
-    tok.includes("/") &&
-    PATH_EXT.test(tok) &&
-    tok.split("/").every((s) => s === "." || s === ".." || !s.startsWith("."));
+    tok.includes("/") && PATH_EXT.test(tok) && !isExtensionList(tok);
   // `everyPath` собран под подсчёт папок и намеренно держит только
   // `.ts/.tsx/.scss/.md`; расширять его нельзя — на его составе стоят числа
   // заявленных папок. Поэтому у сверки путей свой инвентарь: тот же список
@@ -2882,6 +3027,7 @@ if (mode === "verify") {
     broken.length ||
     wrong.length ||
     toolDrift.length ||
+    lintDrift.length ||
     undocumented.length ||
     deadAnchors.length ||
     closedTodos.length ||
