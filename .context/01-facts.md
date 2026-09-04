@@ -88,7 +88,7 @@
 
 **Демо-данные (`public/carousel-slides1.json`):** 12 слайдов, `id` — UUID,
 `content` уникальны, у каждого `image.srcSet` (480/720) + `defaultSrc` (720) +
-один art-directed `<source>` на compact-landscape (480/720/1080/1600).
+один art-directed `<source>` на `short-landscape` (480/720/1080/1600).
 ⚠️ **`alt` пуст у всех 12** — генератор скаффолдит `""` и ждёт ручного
 заполнения (`data-gen/README.md:52`). Следствие в рантайме: каждая картинка
 декоративна для AT, а при ошибке загрузки слайд показывает
