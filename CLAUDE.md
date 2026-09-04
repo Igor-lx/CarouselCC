@@ -1020,6 +1020,7 @@ node .context/graph.mjs mutated <путь> … # по явному списку
 | Мутации по файлам правки | `npx stryker run --mutate "<пути>"` |
 | Смоук в браузере (по требованию и перед деплоем) | `npm run test:e2e` |
 | Мутации по всей области (периодически) | `npm run test:mutation` |
+| Правка против её тестов, базы и доков | `node .context/graph.mjs tested` |
 | Долг по мутациям | `node .context/graph.mjs mutated` |
 | База знаний | `node .context/graph.mjs verify` |
 | Данные стенда | `npm run gen:carousel` |
