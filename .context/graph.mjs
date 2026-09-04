@@ -96,6 +96,26 @@ const CONFIG = {
     table: "01-facts.md",
     heading: "| Раздел правил проекта | Где на полке |",
   },
+  /** Область, чью поломку видно ТОЛЬКО в браузере: кадры, посадка, ввод. Задета
+   * правкой — смоук обязателен, и напоминает об этом `tested`, а не память:
+   * прогон «по требованию» без machinery, которая это требование предъявляет,
+   * превращается в инструмент, о котором никто не вспомнит.
+   *
+   * Список намеренно узкий — ровно то, про что смоук делает утверждения. Шире
+   * значило бы требовать прогон, который про эту правку ничего не докажет, а
+   * канал, кричащий не по делу, перестают читать. */
+  smokeScope: [
+    "src/components/Carousel/client/visual-position",
+    "src/components/Carousel/client/motion",
+    "src/components/Carousel/client/geometry",
+    "src/components/Carousel/client/gesture",
+    "src/components/Carousel/client/Carousel.module.scss",
+    "src/shared/engines/motion",
+    "src/shared/engines/gesture",
+    "src/shared/engines/kinetic/internal",
+  ],
+  /** Команда смоука — печатается в напоминании, чтобы её не искали. */
+  smokeCommand: "npm run test:e2e",
   /** Отчёт последнего мутационного прогона. HTML-репортер держит внутри тот
    * же объект, что отдал бы JSON, поэтому второй репортер не нужен. */
   mutationReport: "../reports/mutation/mutation.html",
@@ -868,6 +888,24 @@ if (mode === "tested") {
     }
     if (touchedCode.length && !stale.length && !naked.length)
       console.log("  каждый тронутый файл правился вместе со своими тестами");
+
+    // Смоук в браузере закрывает то, чего юнит-сеть не видит В ПРИНЦИПЕ. Он
+    // «по требованию», а требование предъявляет не память: сравнение идёт по
+    // сырым путям правки, поэтому в область попадают и стили, которых нет в
+    // графе импортов.
+    const smokeHits = changed.filter((f) =>
+      CONFIG.smokeScope.some((p) => norm(f).startsWith(p)),
+    );
+    console.log(String.fromCharCode(10) + "=== Смоук в браузере ===");
+    if (smokeHits.length === 0)
+      console.log("  правка область смоука не задела — прогон не нужен");
+    else {
+      console.log("  задета область, чью поломку видно только в браузере:");
+      for (const f of smokeHits) console.log("    " + f);
+      console.log(
+        `  прогнать ${CONFIG.smokeCommand} и назвать результат в отчёте`,
+      );
+    }
 
     // Документация отвечает на другой вопрос, чем база, и закрывается ОТДЕЛЬНО
     // от неё. Названные в правилах одной строкой, они сливаются в одно дело:
