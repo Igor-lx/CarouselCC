@@ -2923,14 +2923,22 @@ if (mode === "verify") {
           allHeads.add(line.replace(/^#+\s*/, "").trim());
     const skip = new Set(CONFIG.rulesManifest.refExceptions);
     const REF_RE = /(?:раздел[ае]?|§)\s+«([^»]+)»/g;
+    // Корпус ссылок — правила, вся база вглубь и **документация**. Последняя
+    // сюда не входила, и ссылка на несуществующий раздел из документа проходила
+    // молча: у документов таких ссылок как раз больше всего — они отсылают друг
+    // к другу и к разделам правил. Найдено пробой; заголовки для сверки берутся
+    // из того же корпуса, поэтому ссылка «документ → документ» тоже разрешается.
     const sources = [
       ...CONFIG.rulesManifest.rules
         .map((one) => [one, path.join(HERE, one)])
         .filter(([, at]) => existsSync(at)),
-      ...readdirSync(BASE)
-        .filter((n) => n.endsWith(".md"))
-        .map((n) => [n, path.join(BASE, n)]),
+      ...mdUnder(BASE).map((at) => [path.basename(at), at]),
+      ...docFiles.map((at) => [rel(at), at]),
     ];
+    for (const at of docFiles)
+      for (const line of readFileSync(at, "utf8").split(NEWLINE))
+        if (/^#{2,}\s/.test(line))
+          allHeads.add(line.replace(/^#+\s*/, "").trim());
     for (const [name, at] of sources) {
       const body = readFileSync(at, "utf8");
       REF_RE.lastIndex = 0;
