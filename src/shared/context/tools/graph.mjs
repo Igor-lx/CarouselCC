@@ -215,9 +215,14 @@ const CHECK_TABLES =
     ? [CONFIG.checkTableProject]
     : [CONFIG.checkTableProject, shelfAt("knowledge-base.md")];
 const SHELF_RULES = SHELF === null ? null : SHELF.split(path.sep).join("/");
-/** Путь для сообщений: от папки базы, чтобы читалось как в `CONFIG`. */
-const rel0 = (abs) =>
-  abs === null ? "—" : path.relative(HERE, abs).split(path.sep).join("/");
+/** Путь для сообщений: от папки базы, чтобы читалось как в `CONFIG`. Принимает
+ * и относительный — тогда возвращает его как есть. */
+const rel0 = (p) =>
+  p == null
+    ? "—"
+    : path.isAbsolute(p)
+      ? path.relative(HERE, p).split(path.sep).join("/")
+      : p;
 
 const norm = (f) => f.split(path.sep).join("/").replace(/[/]+$/, "");
 
@@ -2807,8 +2812,12 @@ if (mode === "verify") {
   // счёт: обе таблицы машинных сверок описывают одинаковое их число.
   const shelfDrift = [];
   {
+    // Путь бывает и относительным (файл базы), и абсолютным (полка, лежащая
+    // вне проекта). Склеивать абсолютный с базой нельзя — получится мусор, и
+    // сверка доложит «таблицу не нашли» про существующий файл. Найдено пробой
+    // посадки, где полка лежала своей папкой снаружи.
     const rows = (file) => {
-      const p = path.join(BASE, file);
+      const p = path.isAbsolute(file) ? file : path.join(BASE, file);
       if (!existsSync(p)) return null;
       const lines = readFileSync(p, "utf8").split(NEWLINE);
       const at = lines.findIndex(
@@ -2823,7 +2832,7 @@ if (mode === "verify") {
       }
       return n;
     };
-    const counts = CHECK_TABLES.map((f) => [f, rows(f)]);
+    const counts = CHECK_TABLES.map((f) => [rel0(f), rows(f)]);
     for (const [f, n] of counts)
       if (n === null) shelfDrift.push(`${f}: таблицу сверок не нашли`);
     const numbers = counts.map(([, n]) => n).filter((n) => n !== null);
