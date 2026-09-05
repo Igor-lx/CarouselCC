@@ -55,25 +55,26 @@ const CONFIG = {
       to: "shared/clientState/media/useMedia/internal",
     },
   ],
-  /** Копия этого файла, уезжающая с полкой правил в новый проект. Обязана
-   * совпадать байт в байт: разошедшийся инструмент проверяет не тот проект.
-   * `null` — копии в проекте нет. */
-  toolCopy: "../src/shared/context/tools/graph.mjs",
-  /** Справочник режимов уезжает вместе с инструментом: без него новый проект
-   * получает набор команд и ни слова о том, чего каждая НЕ делает. Пары
-   * «рабочий файл → копия на полке», сверяются побайтово, как и сам инструмент.
-   * Пустой список — сопровождающих файлов нет. */
-  toolDocs: [["graph.md", "../src/shared/context/tools/graph.md"]],
+  /** **Полка этого места — одним переключателем.**
+   *
+   * У полки две фазы, и обе у одной папки. Сперва **донор**: из неё копируют,
+   * когда ставят обвязку, и посадка в неё не пишет ничего. Дальше —
+   * **принимающая сторона**: правила и находки этого места дописываются в неё
+   * той же правкой, что и в проект, и вот тут её нельзя дать отстать — отсюда
+   * побайтовые сверки ниже и вопрос режима `twins`.
+   *
+   * `null` ставят в одном случае: проект сознательно не раздаёт обвязку дальше.
+   * Тогда всё, что зависит от полки, выключается разом. Раньше это были семь
+   * разных полей, и посадка без полки требовала погасить каждое: инструкция
+   * называла одно, а падало на шести. Найдено пробой. */
+  shelf: "../src/shared/context",
   /** Список разрешений среды: проектный и шаблон на полке. Правила и инструмент
    * переносятся копированием, а среда — нет, и её расхождение платится не
    * красным прогоном, а часом простоя: длинная задача встаёт на запросе
    * подтверждения и ждёт человека, который отошёл. Сверяется **включение**, а
    * не равенство: проект вправе добавить своё, но не вправе потерять то, что
    * полка обещает следующему проекту. `null` — пары нет. */
-  settingsPair: {
-    project: "../.claude/settings.json",
-    shelf: "../src/shared/context/settings.template.json",
-  },
+  settingsProject: "../.claude/settings.json",
   /** Известные исключения к сверке путей в обратных кавычках: адрес, которого
    * на диске нет намеренно. Формат `<файл>|<токен>`, причина — строкой рядом.
    * Список короткий не случайно: разрастётся — значит проверка ловит не то, и
@@ -101,9 +102,7 @@ const CONFIG = {
    * то, что **обе таблицы машинных сверок описывают одинаковое их число**:
    * завёл сверку — опиши в обеих, иначе следующий проект увезёт инструмент с
    * проверками, которых его база не знает. */
-  checkTables: ["01-facts.md", "../src/shared/context/knowledge-base.md"],
-  /** Корень полки правил: её трогают в той же правке, что и правила проекта. */
-  rulesShelf: "../src/shared/context",
+  checkTableProject: "01-facts.md",
   /** Заголовок таблицы машинных сверок — один и тот же в обоих файлах. */
   checkTableHeading: "| Что сверяется | Как |",
   /** Разделы правил проекта против полки. Сверяется не текст и не совпадение
@@ -164,7 +163,6 @@ const CONFIG = {
    * `environment.md`. `null` — скиллов у проекта нет. */
   skills: {
     dir: "../.claude/skills",
-    shelf: "../src/shared/context",
     table: "01-facts.md",
     heading: "| Скилл | Шаблон на полке |",
   },
@@ -199,10 +197,27 @@ const CONFIG = {
 };
 
 const ROOT = path.join(HERE, CONFIG.src).split(path.sep).join("/");
-const SHELF_RULES = path
-  .join(HERE, CONFIG.rulesShelf)
-  .split(path.sep)
-  .join("/");
+
+// --- производные от одного переключателя `shelf` -----------------------------
+// Всё, что зависит от своей полки, считается здесь и нигде больше. Раньше эти
+// адреса стояли семью отдельными полями, и «полку с собой не берём» означало
+// погасить каждое: инструкция называла одно, посадка ломалась на шести.
+const SHELF = CONFIG.shelf == null ? null : path.join(HERE, CONFIG.shelf);
+const shelfAt = (tail) => (SHELF === null ? null : path.join(SHELF, tail));
+/** Побайтовые пары «рабочий файл → копия на полке». Полки нет — пар нет. */
+const TOOL_COPY = shelfAt("tools/graph.mjs");
+const TOOL_DOCS =
+  SHELF === null ? [] : [["graph.md", shelfAt("tools/graph.md")]];
+const SETTINGS_SHELF = shelfAt("settings.template.json");
+const SKILLS_SHELF = SHELF;
+const CHECK_TABLES =
+  SHELF === null
+    ? [CONFIG.checkTableProject]
+    : [CONFIG.checkTableProject, shelfAt("knowledge-base.md")];
+const SHELF_RULES = SHELF === null ? null : SHELF.split(path.sep).join("/");
+/** Путь для сообщений: от папки базы, чтобы читалось как в `CONFIG`. */
+const rel0 = (abs) =>
+  abs === null ? "—" : path.relative(HERE, abs).split(path.sep).join("/");
 
 const norm = (f) => f.split(path.sep).join("/").replace(/[/]+$/, "");
 
@@ -223,7 +238,7 @@ const files = [];
 const RULE_FILES = new Set(
   CONFIG.rulesManifest.rules.map((r) => norm(path.join(HERE, r))),
 );
-const SHELF_DIR = norm(path.join(HERE, CONFIG.rulesShelf)) + "/";
+const SHELF_DIR = SHELF === null ? "\u0000нет полки" : norm(SHELF) + "/";
 const isMachinery = (full) =>
   RULE_FILES.has(full) || full.startsWith(SHELF_DIR);
 
@@ -2319,21 +2334,20 @@ if (mode === "verify") {
   for (const b of broken) console.log("    " + b);
   // 9. копия инструмента совпадает с рабочим файлом
   const toolDrift = [];
-  if (CONFIG.toolCopy !== null) {
-    const copy = path.join(HERE, CONFIG.toolCopy);
+  if (TOOL_COPY !== null) {
+    const copy = TOOL_COPY;
     const flat = (f) => readFileSync(f, "utf8").split(CR_LF).join(NEWLINE);
-    if (!existsSync(copy)) toolDrift.push(`копии нет: ${CONFIG.toolCopy}`);
+    if (!existsSync(copy)) toolDrift.push(`копии нет: ${rel0(TOOL_COPY)}`);
     else if (flat(copy) !== flat(fileURLToPath(import.meta.url)))
-      toolDrift.push(`копия разошлась: ${CONFIG.toolCopy}`);
+      toolDrift.push(`копия разошлась: ${rel0(TOOL_COPY)}`);
   }
-  for (const [own, shelf] of CONFIG.toolDocs) {
+  for (const [own, shelf] of TOOL_DOCS) {
     const flat = (f) => readFileSync(f, "utf8").split(CR_LF).join(NEWLINE);
     const mine = path.join(HERE, own);
-    const there = path.join(HERE, shelf);
     if (!existsSync(mine)) toolDrift.push(`нет файла: ${own}`);
-    else if (!existsSync(there)) toolDrift.push(`копии нет: ${shelf}`);
-    else if (flat(mine) !== flat(there))
-      toolDrift.push(`копия разошлась: ${shelf}`);
+    else if (!existsSync(shelf)) toolDrift.push(`копии нет: ${rel0(shelf)}`);
+    else if (flat(mine) !== flat(shelf))
+      toolDrift.push(`копия разошлась: ${rel0(shelf)}`);
   }
   // 9a. каждый режим инструмента описан в справочнике и назван в правилах.
   // Заведено после пробы: справочник объявляет себя полным («оговорки и ловушки
@@ -2344,8 +2358,8 @@ if (mode === "verify") {
     const own = readFileSync(fileURLToPath(import.meta.url), "utf8");
     const modes = [...own.matchAll(/mode === "([a-z]+)"/g)].map((m) => m[1]);
     const named = (text, m) => new RegExp("`" + m + "\\b").test(text);
-    const manual = CONFIG.toolDocs.length
-      ? readFileSync(path.join(HERE, CONFIG.toolDocs[0][0]), "utf8")
+    const manual = TOOL_DOCS.length
+      ? readFileSync(path.join(HERE, TOOL_DOCS[0][0]), "utf8")
       : null;
     const rulesText = CONFIG.rulesManifest.rules
       .map((r) => {
@@ -2365,7 +2379,7 @@ if (mode === "verify") {
 
   console.log("=== Копия инструмента ===");
   console.log(
-    CONFIG.toolCopy === null
+    TOOL_COPY === null
       ? "  копия не заявлена"
       : `  расхождений: ${toolDrift.length}`,
   );
@@ -2373,7 +2387,7 @@ if (mode === "verify") {
 
   // 9c. каждое точечное исключение линта объяснено, и каждое объяснение живо.
   const lintDrift = [];
-  if (CONFIG.lintExceptions !== null) {
+  if (CONFIG.lintExceptions != null) {
     const DIRECTIVE = /^\s*(?:\/\/|\/\*)\s*eslint-disable/;
     const withDirective = new Set();
     for (const f of files) {
@@ -2418,7 +2432,7 @@ if (mode === "verify") {
 
   // 9d. каждое записанное решение адресуемо: на него ссылается код или документ.
   const orphanAdr = [];
-  if (CONFIG.adr !== null) {
+  if (CONFIG.adr != null) {
     const dir = norm(path.join(HERE, CONFIG.adr.dir));
     // Нет папки — нет предмета: у нового проекта решений ещё не было, и
     // требовать её значило бы ронять посадку на пустом месте. Поймано
@@ -2457,26 +2471,26 @@ if (mode === "verify") {
 
   // 9b. список разрешений среды не потерял того, что обещает полка
   const settingsDrift = [];
-  if (CONFIG.settingsPair !== null) {
-    const readList = (relPath) => {
-      const at = path.join(HERE, relPath);
+  if (SETTINGS_SHELF !== null) {
+    const readListAbs = (at) => {
       if (!existsSync(at)) return null;
       const parsed = JSON.parse(readFileSync(at, "utf8"));
       return parsed?.permissions?.allow ?? [];
     };
-    const mine = readList(CONFIG.settingsPair.project);
-    const shelf = readList(CONFIG.settingsPair.shelf);
+    const readList = (relPath) => readListAbs(path.join(HERE, relPath));
+    const mine = readList(CONFIG.settingsProject);
+    const shelf = readListAbs(SETTINGS_SHELF);
     if (mine === null)
-      settingsDrift.push(`нет файла: ${CONFIG.settingsPair.project}`);
+      settingsDrift.push(`нет файла: ${CONFIG.settingsProject}`);
     else if (shelf === null)
-      settingsDrift.push(`нет файла: ${CONFIG.settingsPair.shelf}`);
+      settingsDrift.push(`нет файла: ${rel0(SETTINGS_SHELF)}`);
     else
       for (const entry of shelf)
         if (!mine.includes(entry)) settingsDrift.push(`потеряно: ${entry}`);
   }
   console.log("=== Разрешения среды ===");
   console.log(
-    CONFIG.settingsPair === null
+    SETTINGS_SHELF === null
       ? "  пара не заявлена"
       : `  из шаблона полки потеряно: ${settingsDrift.length}`,
   );
@@ -2522,7 +2536,7 @@ if (mode === "verify") {
   // или в скобках. «Закрыть доступность» — законный открытый пункт, и он не
   // должен ловиться.
   const closedTodos = [];
-  if (CONFIG.todo !== null) {
+  if (CONFIG.todo != null) {
     const todoPath = path.join(BASE, CONFIG.todo);
     if (!existsSync(todoPath)) closedTodos.push(`файла нет: ${CONFIG.todo}`);
     else {
@@ -2544,7 +2558,7 @@ if (mode === "verify") {
   // сам файл отложенного или список отложенного по-английски, иначе проверка
   // ловила бы «пункт 3» любого другого перечня и врала бы.
   const danglingTodo = [];
-  if (CONFIG.todo !== null) {
+  if (CONFIG.todo != null) {
     const todoPath = path.join(BASE, CONFIG.todo);
     if (existsSync(todoPath)) {
       const numbers = new Set();
@@ -2809,7 +2823,7 @@ if (mode === "verify") {
       }
       return n;
     };
-    const counts = CONFIG.checkTables.map((f) => [f, rows(f)]);
+    const counts = CHECK_TABLES.map((f) => [f, rows(f)]);
     for (const [f, n] of counts)
       if (n === null) shelfDrift.push(`${f}: таблицу сверок не нашли`);
     const numbers = counts.map(([, n]) => n).filter((n) => n !== null);
@@ -2831,7 +2845,7 @@ if (mode === "verify") {
   // однажды увезла в следующий проект не все правила.
   const unclassified = [];
   const danglingRefs = [];
-  if (CONFIG.rulesManifest !== null) {
+  if (CONFIG.rulesManifest != null) {
     const tableAt = path.join(BASE, CONFIG.rulesManifest.table);
     // Заголовки собираются со ВСЕХ заявленных файлов правил: разложенные по
     // папкам, они остаются одним корпусом, и сверять их надо как один.
@@ -2874,16 +2888,24 @@ if (mode === "verify") {
     // базы, база на разделы правил, а шаблон полки — на разделы `quality.md`,
     // который в новом проекте станет соседом скопированного `CLAUDE.md`.
     const allHeads = new Set(heads);
-    const shelfAt = path.join(HERE, CONFIG.rulesShelf);
+    const shelfAt = SHELF;
+    // База обходится ВГЛУБЬ: доктрина, скопированная из донора, живёт её
+    // подпапкой, и на её разделы ссылается `CLAUDE.md`. Плоский обход находил
+    // только верхний уровень — и живая ссылка на «Эталонный узел» читалась как
+    // висячая у проекта, посаженного из донора. Найдено пробой.
+    const mdUnder = (dir) => {
+      if (!existsSync(dir)) return [];
+      const out = [];
+      for (const e of readdirSync(dir)) {
+        const full = path.join(dir, e);
+        if (statSync(full).isDirectory()) out.push(...mdUnder(full));
+        else if (e.endsWith(".md")) out.push(full);
+      }
+      return out;
+    };
     const headSources = [
-      ...readdirSync(BASE)
-        .filter((n) => n.endsWith(".md"))
-        .map((n) => path.join(BASE, n)),
-      ...(existsSync(shelfAt)
-        ? readdirSync(shelfAt)
-            .filter((n) => n.endsWith(".md"))
-            .map((n) => path.join(shelfAt, n))
-        : []),
+      ...mdUnder(BASE),
+      ...(shelfAt === null ? [] : mdUnder(shelfAt)),
     ];
     for (const at of headSources)
       for (const line of readFileSync(at, "utf8").split(NEWLINE))
@@ -2927,14 +2949,14 @@ if (mode === "verify") {
   }
   console.log("=== Ссылки на разделы ===");
   console.log(
-    CONFIG.rulesManifest === null
+    CONFIG.rulesManifest == null
       ? "  реестр правил не заявлен"
       : `  именных ссылок ведут в никуда: ${danglingRefs.length}`,
   );
   for (const d of danglingRefs) console.log("    " + d);
   // 13c. Скиллы проекта: объявлены, лежат на месте, совпадают с полкой.
   const skillDrift = [];
-  if (CONFIG.skills !== null) {
+  if (CONFIG.skills != null) {
     const dir = path.join(HERE, CONFIG.skills.dir);
     const onDisk = existsSync(dir)
       ? readdirSync(dir).filter((n) =>
@@ -2968,7 +2990,12 @@ if (mode === "verify") {
         skillDrift.push(`объявлен, но файла нет: ${name}`);
         continue;
       }
-      const shelfAt = path.join(HERE, CONFIG.skills.shelf, template);
+      // Побайтовая пара существует только у проекта, который держит свой
+      // комплект. Проект, посаженный из донора и полку с собой не взявший,
+      // сверять её не с чем — и требовать шаблон значило бы ронять прогон за
+      // то, чего он не обещал. Найдено пробой посадки без полки.
+      if (SKILLS_SHELF === null) continue;
+      const shelfAt = path.join(SKILLS_SHELF, template);
       if (!existsSync(shelfAt)) {
         skillDrift.push(`нет шаблона на полке: ${template}`);
         continue;
@@ -2980,7 +3007,7 @@ if (mode === "verify") {
   }
   console.log("=== Скиллы проекта ===");
   console.log(
-    CONFIG.skills === null
+    CONFIG.skills == null
       ? "  скиллы не заявлены"
       : `  расхождений: ${skillDrift.length}`,
   );
@@ -2988,7 +3015,7 @@ if (mode === "verify") {
 
   console.log("=== Разделы правил классифицированы ===");
   console.log(
-    CONFIG.rulesManifest === null
+    CONFIG.rulesManifest == null
       ? "  таблица разделов не заявлена"
       : `  без решения «на полку или проектное»: ${unclassified.length}`,
   );
@@ -2996,7 +3023,7 @@ if (mode === "verify") {
 
   console.log("=== Отложенное без закрытых пунктов ===");
   console.log(
-    CONFIG.todo === null
+    CONFIG.todo == null
       ? "  файл отложенного не заявлен"
       : `  помечено закрытыми: ${closedTodos.length}`,
   );
@@ -3032,7 +3059,7 @@ if (mode === "verify") {
   // посадки краснел бы на тексте, приехавшем вместе с правилами. Поймано
   // пересадкой в пустой проект. Полку держит другое: побайтовые копии
   // инструмента, справочника и скилла плюс равенство таблиц сверок.
-  const SHELF_ROOT = norm(path.join(HERE, CONFIG.rulesShelf));
+  const SHELF_ROOT = SHELF === null ? "\u0000нет полки" : norm(SHELF);
   const docSources = [
     ...readdirSync(HERE)
       .filter((n) => n.endsWith(".md"))
@@ -3049,7 +3076,7 @@ if (mode === "verify") {
     // Скиллы — те же документы с адресами: скилл начала задачи целиком состоит
     // из «прочитай вот это». Умерший адрес в нём отправляет туда каждую сессию,
     // и молча — сверка его не читала.
-    ...(CONFIG.skills === null ? [] : skillDocs()),
+    ...(CONFIG.skills == null ? [] : skillDocs()),
   ].filter(([, at]) => !at.startsWith(SHELF_ROOT));
 
   // 14. путь в обратных кавычках указывает на существующий файл.
