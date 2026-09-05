@@ -307,7 +307,7 @@ shared/** ─ полки: импортируются откуда угодно, 
 ### `client/domain/slides.ts` — pure
 Записи колоды, доклад до целых страниц и **общее правило выбора URL картинки**.
 - `resolveRenderedImageSrc` (`:94-102` `export const resolveRenderedImageSrc`) — контракт, а не удобство: комментарий
-  `:94-95` `The one rule the renderer` «The one rule the renderer and the resource store share — they must
+  `:92-93` `The one rule the renderer` «The one rule the renderer and the resource store share — they must
   key on the same URL». Расходятся `SlideItem` и `imageResource/*` — предзагрузка
   греет не тот файл, который потом покажут.
 - `buildKey` (`:10-17`) — ключ не-клона = `slide:${id}` без индекса, поэтому
@@ -1770,7 +1770,7 @@ rider-defaults и собственный `useMotionPaint`. Помечено ко
    проде. Некорректный вход обязан ломаться видимо на границе интеграции; за
    гигиену данных отвечает хост (экспортированные Zod-схемы), за наблюдаемость —
    dev-слот `<Diagnostic />`. Это же покрывает и «перерасход долей профиля»
-   (`timing.ts:102,117`, `segmentFactory.ts:217` `accelerationDistanceShare =`):
+   (`timing.ts:102,117`, `segmentFactory.ts:113` `accelerationDistanceShare: shares.accelerationDistanceShare`):
    не баг, а объявленный
    контракт. **Все `?` этого класса из §B и §E — не находки.**
 5. **`engines/kinetic` не имеет ни одного потребителя.** Grep по всему `src`:
