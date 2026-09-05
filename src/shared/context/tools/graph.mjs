@@ -168,6 +168,12 @@ const CONFIG = {
     table: "01-facts.md",
     heading: "| Скилл | Шаблон на полке |",
   },
+  /** Реестр решений в документации: папка ADR и то, чем на них ссылаются.
+   * Решение, на которое не ссылается ни код, ни документ, читают только те, кто
+   * уже знает о его существовании, — а таких через месяц нет. Проверяется
+   * адресуемость, а не содержание: ссылкой считается номер (`ADR-004`) или имя
+   * файла. `null` — папки решений у проекта нет. */
+  adr: { dir: "../src/components/Carousel/client/docs/adr" },
   /** Точечные `eslint-disable` в коде против таблицы, которая их объясняет.
    * Сверяется СОСТАВ ФАЙЛОВ в обе стороны, а не количество: в таблице одна
    * строка может покрывать две директивы («×2»), и счёт по ней был бы разбором
@@ -1108,6 +1114,22 @@ if (mode === "tested") {
       // которую машина не видит вовсе, — молчание: находку, которую не записали,
       // не поймает ни одна сверка. Поэтому вопрос задаётся здесь, в момент
       // закрытия работы, а не остаётся разделом правил, куда надо заглянуть.
+      // Третий вопрос того же момента: БД отвечает «что и где» следующей
+      // сессии, документация — «почему» человеку, и закрываются они порознь.
+      // Базу ведут по ходу правки, от этого пара кажется закрытой — а
+      // документация остаётся описывать код, которого больше нет.
+      console.log(NEWLINE + "=== БД и документация — порознь ===");
+      console.log(
+        "  БД: описывает ли она новое состояние кода — включая тесты и стили?",
+      );
+      console.log(
+        "  Документация: изменилось ли «почему», а не только «что»? Прибавилась",
+      );
+      console.log(
+        "  возможность — прибавляется строка в витрине. Правила — docs/CONVENTIONS.md.",
+      );
+      console.log("  В отчёте это две строки, а не одна.");
+
       console.log(NEWLINE + "=== Попутные находки ===");
       console.log(
         "  Что попалось по дороге — в коде, в тестах, в базе, в правилах, в",
@@ -1171,26 +1193,45 @@ if (mode === "tested") {
     // делают его ПОТРЕБИТЕЛИ, и их записи устаревают молча — именно так
     // однажды и вышло с утверждением про кэш, поправленным в трёх записях из
     // четырёх.
-    if (touchedCode.length) {
+    // Кодом здесь считается ВСЁ, что база описывает: модули, стили и тесты.
+    // Раньше секция строилась только по `.ts/.tsx` без тестов — и правка стиля
+    // или теста проходила молча, хотя стиль назван в карте наравне с модулем, а
+    // тест — поимённо в реестре. Найдено пробой; лечится составом списка, а не
+    // приписками про частные случаи.
+    const touchedDescribed = [...touched].filter(
+      (f) =>
+        existsSync(f) &&
+        (files.includes(f) || styleFiles.includes(f)) &&
+        !f.endsWith(".d.ts"),
+    );
+    if (touchedDescribed.length) {
       const at = (hits) =>
         hits.length
           ? hits.map(([name, line]) => `${name}:${line}`).join(", ")
           : null;
       console.log(NEWLINE + "=== Записи базы про тронутые файлы ===");
-      for (const f of touchedCode) {
-        const where = at(baseHitsFor(f).exact);
+      for (const f of touchedDescribed) {
+        const hits = baseHitsFor(f);
+        const exact = at(hits.exact);
+        // Реестр тестов и разделы карты называют файл голым именем под
+        // заголовком, который задаёт префикс. Показывать только точные значило
+        // бы объявить «записей нет» про описанный файл — так и было с тестом,
+        // чья строка лежит в реестре.
+        const byName = at(hits.loose);
         console.log("  " + rel(f));
-        console.log(
-          where === null
-            ? "    записей нет — узел базе неизвестен, запись обязательна"
-            : "    " + where,
-        );
+        if (exact !== null) console.log("    " + exact);
+        else if (byName !== null)
+          console.log("    по имени (проверить, тот ли файл): " + byName);
+        else
+          console.log(
+            "    записей нет — узел базе неизвестен, запись обязательна",
+          );
       }
 
       const neighbours = new Set();
-      for (const f of touchedCode)
+      for (const f of touchedDescribed)
         for (const u of importedBy.get(f) ?? [])
-          if (!isTest(u) && !touchedCode.includes(u)) neighbours.add(u);
+          if (!isTest(u) && !touchedDescribed.includes(u)) neighbours.add(u);
       if (neighbours.size > 0) {
         const shown = [...neighbours].slice(0, 8);
         console.log(
@@ -2375,6 +2416,37 @@ if (mode === "verify") {
     }
   }
 
+  // 9d. каждое записанное решение адресуемо: на него ссылается код или документ.
+  const orphanAdr = [];
+  if (CONFIG.adr !== null) {
+    const dir = norm(path.join(HERE, CONFIG.adr.dir));
+    // Нет папки — нет предмета: у нового проекта решений ещё не было, и
+    // требовать её значило бы ронять посадку на пустом месте. Поймано
+    // пересадкой, ровно как со сверкой исключений линта.
+    if (!existsSync(dir)) {
+      /* решений пока нет */
+    } else {
+      const decisions = readdirSync(dir).filter((n) => /\.md$/.test(n));
+      // Ссылкой считается номер решения (`ADR-004`) или имя его файла. Сам
+      // документ себя не адресует, поэтому из корпуса исключается он один.
+      for (const file of decisions) {
+        const number = /^(\d+)/.exec(file)?.[1] ?? null;
+        const marks = [file.replace(/\.md$/, ""), file];
+        if (number !== null) marks.push(`ADR-${number}`, `ADR ${number}`);
+        const found = [...files, ...styleFiles, ...docFiles].some((f) => {
+          if (norm(f) === norm(path.join(dir, file))) return false;
+          const body = readFileSync(f, "utf8");
+          return marks.some((m) => body.includes(m));
+        });
+        if (!found) orphanAdr.push(`на решение не ссылается никто: ${file}`);
+      }
+    }
+  }
+
+  console.log("=== Решения адресуемы ===");
+  console.log(`  без единой ссылки: ${orphanAdr.length}`);
+  for (const a of orphanAdr) console.log("    " + a);
+
   console.log("=== Точечные исключения линта ===");
   console.log(`  расхождений: ${lintDrift.length}`);
   for (const l of lintDrift) console.log("    " + l);
@@ -2836,6 +2908,14 @@ if (mode === "verify") {
         // не вёрстку, иначе живой заголовок читается как висячий.
         const title = m[1].replace(/\s+/g, " ").trim();
         if (skip.has(title)) continue;
+        // Ссылка на раздел ЧУЖОГО свода — глобальных правил, живущих вне
+        // репозитория. Их инструмент не читает и потому не вправе утверждать,
+        // что раздела нет. Признак берётся из той же фразы: она сама называет,
+        // куда отсылает.
+        const around = body.slice(Math.max(0, m.index - 120), m.index);
+        // `\w` в JS — это латиница: на кириллице такой предикат молча не
+        // срабатывает, и первая версия этой проверки именно так и промолчала.
+        if (/глобальн[а-яё]*\s+правил/i.test(around)) continue;
         // Заголовок могли назвать началом: «раздел «Планка качества»» против
         // «## Планка качества — сверяется, а не подразумевается».
         const found = [...allHeads].some(
@@ -3106,6 +3186,7 @@ if (mode === "verify") {
     broken.length ||
     wrong.length ||
     toolDrift.length ||
+    orphanAdr.length ||
     lintDrift.length ||
     undocumented.length ||
     deadAnchors.length ||
