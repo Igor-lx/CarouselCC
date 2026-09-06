@@ -840,12 +840,36 @@ const outOfScope = (arg) => {
  * пробой; тот же класс уже был закрыт у `brief` для другой формы аргумента, и
  * здесь он лечится одним помощником, а не тремя. Принимаются обе ходовые формы
  * адреса — от корня репозитория и от корня исходников. */
-const unknownGiven = (given) =>
-  given.filter(
-    (one) =>
-      !existsSync(path.join(HERE, "..", one)) &&
-      !existsSync(path.join(ROOT, argPath(one))),
-  );
+const unknownGiven = (given) => given.filter((one) => canonical(one) === null);
+
+/** Один язык адресов на все режимы. Досье понимало сокращения базы
+ * (`client/…`, `engines/…`), а три режима со списками путей — нет, и вели себя
+ * при этом по-разному: `tested` отвечал «таких путей на диске нет» на живой
+ * файл, а `twins` — хуже: «правка форков не касается» на файле, у которого
+ * близнец есть. Второе не молчание, а содержательно неверный ответ уверенным
+ * тоном. Найдено пробой; лечится одним помощником, а не тремя правками.
+ *
+ * Проектных префиксов здесь нет намеренно — они сделали бы инструмент
+ * непереносимым. Адрес разрешается по единственному совпадению хвоста: путь,
+ * который на диске один, и есть искомый; неоднозначный не разрешается вовсе,
+ * и это правильный ответ, а не отказ. */
+const canonical = (one) => {
+  const s = one.split("\\").join("/").replace(/^\.\//, "");
+  if (existsSync(path.join(HERE, "..", s))) return s;
+  // Форма ответа — от корня репозитория: именно её отдаёт git, и именно с ней
+  // режимы сравнивают. `rel()` здесь не годится, он срезает корень исходников.
+  const fromRepo = (f) =>
+    path.relative(path.join(HERE, ".."), f).split(path.sep).join("/");
+  const tail = "/" + s;
+  const hits = [...files, ...styleFiles]
+    .map(fromRepo)
+    .filter((r) => r === s || r.endsWith(tail));
+  return hits.length === 1 ? hits[0] : null;
+};
+
+/** Список аргументов, приведённый к каноническому виду. Неразрешённое остаётся
+ * как есть: о нём уже сказал `reportUnknown`, и подменять его молча нельзя. */
+const canonicalList = (given) => given.map((one) => canonical(one) ?? one);
 
 const reportUnknown = (given) => {
   const unknown = unknownGiven(given);
@@ -1214,7 +1238,10 @@ const changedPaths = async (repoRoot) => {
 if (mode === "twins") {
   const NEWLINE = String.fromCharCode(10);
   let changed = process.argv.slice(3);
-  if (changed.length) reportUnknown(changed);
+  if (changed.length) {
+    reportUnknown(changed);
+    changed = canonicalList(changed);
+  }
   if (changed.length === 0) {
     changed = await changedPaths(path.join(HERE, ".."));
     if (changed === null) {
@@ -1307,7 +1334,10 @@ if (mode === "twins") {
 if (mode === "tested") {
   const NEWLINE = String.fromCharCode(10);
   let changed = process.argv.slice(3);
-  if (changed.length) reportUnknown(changed);
+  if (changed.length) {
+    reportUnknown(changed);
+    changed = canonicalList(changed);
+  }
   if (changed.length === 0) {
     changed = await changedPaths(path.join(HERE, ".."));
     if (changed === null) {
@@ -1845,7 +1875,10 @@ if (mode === "mutated") {
   );
 
   let changed = process.argv.slice(3);
-  if (changed.length) reportUnknown(changed);
+  if (changed.length) {
+    reportUnknown(changed);
+    changed = canonicalList(changed);
+  }
   if (changed.length === 0) {
     changed = await changedPaths(repoRoot);
     if (changed === null) {
@@ -3654,8 +3687,14 @@ if (mode === "verify") {
     // Без обратной проходило противоположное и худшее: вложенный `CLAUDE.md`
     // действует в своей папке, грузится сам, а обвязка о нём не знает вовсе —
     // его разделы не классифицированы, на полку он не поедет, и заметить это
-    // некому. Найдено пробой. Полка исключена: её `CLAUDE.template.md` — не
-    // действующие правила, а заготовка для будущего проекта.
+    // некому. Найдено пробой.
+    //
+    // Исключения для полки здесь НЕТ, и оно не нужно: её заготовка называется
+    // иначе (`CLAUDE.template.md`), под имя не подпадает, а настоящий
+    // `CLAUDE.md`, положенный в полку, был бы ошибкой — на нём краснеть верно.
+    // Сказано прямо, потому что первая редакция комментария объявляла
+    // исключение, которого в коде не было: запись про несуществующий механизм
+    // опаснее её отсутствия, следующий заход на неё обопрётся.
     {
       const declared = new Set(
         CONFIG.rulesManifest.rules.map((r) => norm(path.join(HERE, r))),
