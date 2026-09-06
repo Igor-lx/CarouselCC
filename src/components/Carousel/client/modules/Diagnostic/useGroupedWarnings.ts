@@ -5,7 +5,7 @@ import type { CarouselDiagnosticWarning } from "./types";
 
 /** Emit warnings to `console.warn`, deduped by signature (dev-only). */
 export function useGroupedWarnings(
-  warnings: CarouselDiagnosticWarning[],
+  warnings: readonly CarouselDiagnosticWarning[],
 ): void {
   const lastSignatureRef = useRef("");
 

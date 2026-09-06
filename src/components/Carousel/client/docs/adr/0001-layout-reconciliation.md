@@ -15,7 +15,7 @@ a layout effect, or the deck paints against a layout that no longer exists.
 
 ## Decision
 
-Keep one **physical** `committedState` from `useReducer`, and project it
+Keep one **physical** committed state from `useReducer`, and project it
 through a single pure function, `reconcileStateToLayout(committedState, layout)`
 ([`state/reconcile.ts`](../../state/reconcile.ts)), during render. The projected
 **effective** state is what every runtime consumer reads

@@ -32,7 +32,7 @@ import {
  *
  * So the tests below assert that nothing is repaired. They are meant to go red
  * on such an edit and to send the reader to
- * `docs/adr/0002-trusted-runtime-inputs.md` rather than to a diff.
+ * ADR-002 rather than to a diff.
  */
 
 describe("buildCarouselConfig — the only thing it substitutes is absence", () => {

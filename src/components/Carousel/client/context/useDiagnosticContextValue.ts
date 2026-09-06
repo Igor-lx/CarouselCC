@@ -7,7 +7,9 @@ import type { CarouselDiagnosticContextValue } from "./types";
 
 const IS_DEV = import.meta.env.DEV;
 
-/** Production stand-in: shape-complete, referentially fixed, never read. */
+/** Production stand-in: shape-complete, referentially fixed, never read — the
+ * cast is deliberate, and the reason it is safe is that nothing mounts the
+ * diagnostic slot in a production build (ADR-002 area; see the decisions file). */
 const SILENT_VALUE = Object.freeze({
   state: null,
   props: null,

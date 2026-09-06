@@ -1,4 +1,4 @@
-// See docs/adr/0002-trusted-runtime-inputs.md — inputs are caller-owned and
+// ADR-002 — inputs are caller-owned and
 // are not repaired here.
 import { CAROUSEL_DEFAULTS } from "../defaults";
 import { RENDER_WINDOW_BUFFER_MULTIPLIER } from "../layout";

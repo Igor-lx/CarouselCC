@@ -8,7 +8,8 @@ import { useGroupedWarnings } from "./useGroupedWarnings";
 // Build-time constant so the branch (and its check imports) drops in production.
 const IS_DEV = import.meta.env.DEV;
 
-const EMPTY_WARNINGS: ReturnType<typeof collectWidgetWarnings> = [];
+const EMPTY_WARNINGS: Readonly<ReturnType<typeof collectWidgetWarnings>> =
+  Object.freeze([]);
 
 /** Widget diagnostic hook — runs only in dev with a Diagnostic slot attached. */
 export function useWidgetDiagnostic(input: WidgetDiagnosticInput): void {

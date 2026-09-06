@@ -2,7 +2,7 @@
   "src/components/Carousel/client/Carousel.tsx": {
     "killed": 31,
     "alive": 44,
-    "hash": "1c76e7fedfef"
+    "hash": "a88c415ea3ca"
   },
   "src/components/Carousel/client/areCarouselPropsEqual.ts": {
     "killed": 67,
@@ -22,7 +22,7 @@
   "src/components/Carousel/client/config/resolve/buildConfig.ts": {
     "killed": 16,
     "alive": 0,
-    "hash": "13211ca2870f"
+    "hash": "fdb0f84e1d5c"
   },
   "src/components/Carousel/client/config/resolve/useCarouselConfig.ts": {
     "killed": 4,
@@ -252,7 +252,7 @@
   "src/components/Carousel/client/motion/useMotionRunner.ts": {
     "killed": 108,
     "alive": 4,
-    "hash": "4ce176f7d8c4"
+    "hash": "fc5d9872cb4c"
   },
   "src/components/Carousel/client/navigation/useCarouselNavigation.ts": {
     "killed": 21,
@@ -352,12 +352,12 @@
   "src/components/Carousel/client/state/reconcile.ts": {
     "killed": 32,
     "alive": 0,
-    "hash": "4de375da5fea"
+    "hash": "9e020523f304"
   },
   "src/components/Carousel/client/state/reducer.ts": {
     "killed": 111,
     "alive": 5,
-    "hash": "dd715d7f7c9e"
+    "hash": "a33a619e79ae"
   },
   "src/components/Carousel/client/state/transitions.ts": {
     "killed": 81,
@@ -367,7 +367,7 @@
   "src/components/Carousel/client/state/useCarouselState.ts": {
     "killed": 18,
     "alive": 0,
-    "hash": "50191b5fe333"
+    "hash": "0ad4338067ab"
   },
   "src/components/Carousel/client/state/validateState.ts": {
     "killed": 36,

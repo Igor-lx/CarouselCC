@@ -28,6 +28,12 @@ const CONFIG = {
   decisions: "09-decisions.md",
   /** Заголовок таблицы правил направления импортов, в любом файле базы. */
   rulesHeading: "Правила направления",
+  /** Заголовок таблицы изоляции — правила наоборот: слой и то, что ему
+   * РАЗРЕШЕНО импортировать, всё остальное запрещено. Нужна она потому, что
+   * запрет перечислением отстаёт от появления соседней папки и отстаёт молча:
+   * у чистого ядра в запретах стояла половина соседей, и импорт в любую из
+   * прочих проходил зелёным. Найдено пробой. */
+  isolationHeading: "Правила изоляции",
   /** Парные форки: папка и её копия. Копии НЕ обязаны совпадать байт в байт —
    * одиночной библиотеке и фасадной сборке нужны местами разные решения, и это
    * законное расхождение. Обязаны совпадать смысл, поведение и корректность:
@@ -53,6 +59,17 @@ const CONFIG = {
     {
       from: "shared/clientState/media/library",
       to: "shared/clientState/media/useMedia/internal",
+    },
+    // Третий случай того же класса, найденный пробой позже: у полки
+    // наблюдения за вьюпортом лежит СПЯЩАЯ копия общего хука — она нужна,
+    // когда папку выносят отдельно, и помечена «Do NOT delete». Копия есть,
+    // правило «правь обе» есть, а машина о паре не знала: правка канона
+    // получала «правка форков не касается». Пары папок здесь неравного
+    // размера, и это законно — близнец засчитывается только если есть на
+    // диске, поэтому лишнего режим не потребует.
+    {
+      from: "shared/hooks",
+      to: "shared/viewportObservation",
     },
   ],
   /** **Полка этого места — одним переключателем.**
@@ -87,11 +104,15 @@ const CONFIG = {
     "01-facts.md|client/modules/index.ts",
     "03-graph.md|modules/index.ts",
     // --- полочные: едут вместе с полкой и удалять их нельзя ---------------
-    // Образец формы якоря в объяснении, а не ссылка на файл. Строки описывают
-    // файлы САМОЙ полки, поэтому в новом проекте они остаются нужны: без них
-    // первый же verify краснеет на тексте, который приехал вместе с правилами.
+    // Образец формы якоря в объяснении, а не ссылка на файл. Строка описывает
+    // файл базы, который в новом проекте появится из шаблона, — без неё первый
+    // же verify краснеет на тексте, приехавшем вместе с правилами.
+    //
+    // Пары для `knowledge-base.md` здесь нет намеренно, хотя тот же образец
+    // стоит и в нём: файлы полки из сверки адресов исключены целиком, и
+    // исключение было недостижимо в принципе. Стояло оно с пометкой «удалять
+    // нельзя» — то есть выглядело обязательным ровно потому, что не работало.
     "README.md|docs/architecture/x.md",
-    "shared/context/knowledge-base.md|docs/architecture/x.md",
   ],
   // Отложенное: закрытый пункт отсюда удаляют, а не помечают.
   todo: "02-todo.md",
@@ -134,6 +155,83 @@ const CONFIG = {
       "упомянут по имени",
     ],
   },
+  /** Связи через DOM и CSS: имена, которых нет в графе импортов. Один файл
+   * пишет атрибут или переменную, другой читает — и переименование не роняет ни
+   * сборку, ни типы, ни тесты, если сделано согласованно. Ломается при этом
+   * ЗАПИСЬ: таблица связей продолжает описывать имя, которого нет, а она —
+   * единственный способ узнать радиус такой правки. Найдено пробой:
+   * переименовал `data-moving` в коде и стилях, прогон остался зелёным.
+   *
+   * Сверяется одна сторона — «названное в таблице существует». Обратная
+   * («каждое имя из кода названо в таблице») не заводится: имена приходят и от
+   * хоста, и от браузера, и список бы врал.
+   *
+   * `null` — таблиц связей у проекта нет. */
+  domTables: {
+    file: "03-graph.md",
+    headings: [
+      "| Имя | Кто пишет | Кто читает |",
+      "| Переменная | Объявляет | Читает |",
+    ],
+  },
+  /** Имена из ЧУЖИХ API, которые база вправе называть в кавычках: они выглядят
+   * как наш идентификатор, но живут в браузере или во фреймворке, и требовать их
+   * присутствия в исходниках значило бы краснеть на законном тексте.
+   *
+   * Список короткий не случайно: разрастётся — значит сверка ловит не то. Своё
+   * выдуманное имя-шаблон сюда не пишут, его убирают из кавычек: обратные
+   * кавычки в базе означают «это существует», и placeholder им не является.
+   * Мёртвую запись здесь ловит сверка «Исключения сверок используются». */
+  foreignNames: ["rAF", "setState"],
+  /** Манифест проекта: из него берётся объявленный диапазон версии среды.
+   * Прогон сверяет с ним ту версию, на которой запущен, и **говорит, а не
+   * запрещает** — решение разработчика (`09-decisions.md`, § I). Жёсткий вариант
+   * (`engine-strict` в `.npmrc`) заводили и сняли: он проверяет требования не
+   * только проекта, но и каждой зависимости, и падал на живом дереве из-за
+   * dev-инструмента — цена измерена, польза меньше.
+   *
+   * `null` — манифеста нет или диапазон не объявлен. */
+  manifest: "../package.json",
+  /** Указатель документации: папка документов и таблица «нужно понять → файл».
+   * Документ, которого нет в указателе, находит только тот, кто уже знает о его
+   * существовании, — довод тот же, что у адресуемости решений. Найдено пробой:
+   * указатель знал 17 документов из 22 и молчал об этом.
+   *
+   * `null` — указателя у проекта нет. */
+  docsIndex: {
+    dir: "../src/components/Carousel/client/docs/architecture",
+    table: "01-facts.md",
+    heading: "| Нужно понять | Файл |",
+  },
+  /** Список критериев планки: правила проекта и его двойник на полке. Правило
+   * «дефект, прошедший сверку, — дефект списка: допиши симптом» держалось
+   * вниманием, а список обязан ещё и уехать в следующий проект. Сверяется
+   * СОСТАВ ПУНКТОВ в обе стороны, а не текст: формулировки на полке обобщённые,
+   * и совпадение слов было бы ложной целью — ровно как у таблиц сверок.
+   *
+   * `null` — списка у проекта нет. */
+  qualityList: { rules: "../CLAUDE.md", shelf: "quality.md" },
+  /** Разделы базы, где числа законны по определению: базовая линия и состав
+   * инструментов проверки. Их получают прогоном команды и той же командой
+   * перепроверяют — устаревшее число ловится прогоном, а не чтением. Сверка
+   * чисел в прозе эти разделы пропускает целиком.
+   *
+   * `null` — таких разделов нет, и тогда числа запрещены везде. */
+  baselineSections: ["Базовая линия", "A2."],
+  /** Бочки со звёздным реэкспортом. Такой файл ВЫКЛЮЧАЕТ анализ мёртвых
+   * экспортов для себя — разобрать, что именно утянули, нельзя, — поэтому их
+   * список объявлен и сверяется в обе стороны: новая звёздочка гасит проверку
+   * молча, а исчезнувшая оставляет в базе запись о том, чего нет. Найдено
+   * пробой: база говорила «ровно в пяти бочках» при четырёх на диске и называла
+   * файл, который давно перечисляет экспорты поимённо.
+   *
+   * Пустой список — звёздных бочек в проекте нет. */
+  starBarrels: [
+    "shared/index.ts",
+    "shared/clientState/index.ts",
+    "shared/clientState/media/index.ts",
+    "shared/clientState/environment/index.ts",
+  ],
   /** Область, чью поломку видно ТОЛЬКО в браузере: кадры, посадка, ввод. Задета
    * правкой — смоук обязателен, и напоминает об этом `tested`, а не память:
    * прогон «по требованию» без machinery, которая это требование предъявляет,
@@ -172,6 +270,23 @@ const CONFIG = {
    * адресуемость, а не содержание: ссылкой считается номер (`ADR-004`) или имя
    * файла. `null` — папки решений у проекта нет. */
   adr: { dir: "../src/components/Carousel/client/docs/adr" },
+  /** Таблицы настроек против документов, которые обещают объяснять **каждую**
+   * константу. Обещание стояло словами и не проверялось ничем: новая константа
+   * уезжала в конфиг без строки в документе и проходила зелёной — поймано
+   * пробой, посаженной константой. Обратная сторона уже закрыта общей сверкой
+   * имён в тексте, поэтому здесь только прямая.
+   *
+   * Документ вправе называть парные константы сокращённо — полное имя одной и
+   * `…СЕРЕДИНА…` второй, — и это не поблажка, а форма записи: разворачивается
+   * она строго, по соседу в той же строке, у которого совпадают все сегменты
+   * имени, кроме одного. Без разворота сверка объявила бы недокументированными
+   * пять законных записей, то есть соврала бы (F4).
+   *
+   * `null` — таблиц настроек у проекта нет. */
+  configDocs: {
+    dir: "../src/components/Carousel/client/config",
+    docs: "../src/components/Carousel/client/docs/config",
+  },
   /** Точечные `eslint-disable` в коде против таблицы, которая их объясняет.
    * Сверяется СОСТАВ ФАЙЛОВ в обе стороны, а не количество: в таблице одна
    * строка может покрывать две директивы («×2»), и счёт по ней был бы разбором
@@ -181,6 +296,31 @@ const CONFIG = {
   lintExceptions: {
     table: "01-facts.md",
     heading: "| Файл | Правило | Почему |",
+  },
+  /** Выключения правил на уровне САМОГО конфига линта — не те, что точечными
+   * директивами в коде. Правило проекта запрещает гасить правила файлами и
+   * ослаблять их; держалось оно вниманием, и проба это показала: правило
+   * `react-hooks`, выключенное на весь репозиторий, прошло зелёным.
+   *
+   * Сверяется пара «область → правило» **в обе стороны**: выключение, которого
+   * здесь нет, роняет прогон, и запись, которой в конфиге больше нет, — тоже.
+   * Расширение области ловится тем же: область тестов и область всего
+   * репозитория — разные пары, и подмена одной другою краснеет.
+   * Список здесь, а не в прозе, потому что прозу нельзя сверить; почему каждое
+   * выключение законно — в таблице `lintExceptions.table`, раздел A2.
+   *
+   * `null` — конфига линта у проекта нет. */
+  lintConfigOff: {
+    file: "../eslint.config.js",
+    allowed: [
+      ["**/tests/**/*.{ts,tsx}", "@typescript-eslint/require-await"],
+      [
+        "src/components/Carousel/client/modules/**/*.tsx",
+        "react-refresh/only-export-components",
+      ],
+      ["**/tests/**/*.{ts,tsx}", "react-hooks/globals"],
+      ["**/tests/**/*.{ts,tsx}", "react-hooks/refs"],
+    ],
   },
   /** Отчёт последнего мутационного прогона. HTML-репортер держит внутри тот
    * же объект, что отдал бы JSON, поэтому второй репортер не нужен. */
@@ -272,12 +412,40 @@ const isTest = (f) => /\/tests\//.test(f) || /\.test\.tsx?$/.test(f);
 // Голое имя без слэша — продолжение фразы, а не путь: одноимённых документов
 // в проекте бывает несколько, и разрешать такое имя значило бы гадать.
 // Проверяются пути; проза остаётся прозой.
+// Ссылка на РЕШЕНИЕ — вторая законная форма, и она не путь: соглашение проекта
+// требует называть решение номером и ничем больше. Инструмент знал одну форму и
+// нагонял бы на код, написанный по правилам: файл, сославшийся номером, читался
+// как файл без ссылки вовсе. Найдено пробой — после того, как шесть ссылок
+// привели к соглашению, режим `open` объявил один из них документом без якоря.
+const ADR_REF = /\bADR[-\s](\d+)/g;
+// Номер → тот же относительный вид, каким решения адресуют якоря в коде.
+// Разрешаются они подъёмом по папкам, поэтому достаточно хвоста пути: он
+// однозначен, а полный путь пришлось бы вычислять от каждого файла заново.
+const adrByNumber = new Map();
+if (CONFIG.adr != null) {
+  const adrDir = norm(path.join(HERE, CONFIG.adr.dir));
+  if (existsSync(adrDir)) {
+    const tail = adrDir.split("/").slice(-2).join("/");
+    for (const name of readdirSync(adrDir)) {
+      const number = /^(\d+)/.exec(name);
+      if (number !== null && name.endsWith(".md"))
+        adrByNumber.set(Number(number[1]), `${tail}/${name}`);
+    }
+  }
+}
+
 const docRefsIn = (body) => {
   const out = [];
   for (const line of body.split(String.fromCharCode(10))) {
     if (!/^\s*(\/\/|\*|\/\*)/.test(line)) continue;
     for (const t of line.match(/[\w./-]+\.md/g) ?? [])
       if (t.includes("/")) out.push(t);
+    ADR_REF.lastIndex = 0;
+    let hit;
+    while ((hit = ADR_REF.exec(line)) !== null) {
+      const file = adrByNumber.get(Number(hit[1]));
+      if (file !== undefined) out.push(file);
+    }
   }
   return out;
 };
@@ -313,8 +481,15 @@ for (const f of files) {
   importsOf.set(f, new Set());
 
   // разбираемые формы: import { a, b as c } from "x" | import x from "y" | export {...} from "z"
+  // Клаузе запрещено содержать кавычку и точку с запятой. Это не косметика:
+  // с `[\s\S]*?` разбор перешагивал через импорт-побочный-эффект и склеивал
+  // его со СЛЕДУЮЩЕЙ строкой — имя оттуда терялось, и `dead` показывал живой
+  // экспорт мёртвым. Ограничение было записано в базе как свойство инструмента;
+  // на деле оно чинится сужением класса, потому что настоящая клауза
+  // (`x`, `* as ns`, `{ a as b }`, `type { T }`) ни кавычек, ни точек с запятой
+  // не содержит никогда.
   const re =
-    /(?:^|\n)\s*(?:import|export)\s+([\s\S]*?)\s*from\s*["']([^"']+)["']/g;
+    /(?:^|\n)\s*(?:import|export)\s+([^;"']*?)\s*from\s*["']([^"']+)["']/g;
   let m;
   while ((m = re.exec(src))) {
     const clause = m[1];
@@ -348,6 +523,18 @@ for (const f of files) {
     if (def && NAME_RE.test(def)) (set.add("default"), mine.add("default"));
   }
 
+  // Импорт-побочный-эффект (`import "x";`) — ребро графа без имён: он ничего
+  // не тянет наружу, но модуль исполняет и в бандл затаскивает. В графе его не
+  // было вовсе, поэтому правила направления и изоляции на нём проходили
+  // зелёными, а `blast` недосчитывал импортёров. Найдено пробой: импорт такой
+  // формы из изолированного слоя в запрещённый прогон не уронил.
+  for (const mm of src.matchAll(/(?:^|\n)\s*import\s*["']([^"']+)["']/g)) {
+    if (!specsOf.has(f)) specsOf.set(f, new Set());
+    specsOf.get(f).add(mm[1]);
+    const target = resolve(f, mm[1]);
+    if (target) importsOf.get(f).add(target);
+  }
+
   // экспорты, объявленные в самом файле
   const ex = new Set();
   for (const mm of src.matchAll(
@@ -355,7 +542,11 @@ for (const f of files) {
   ))
     ex.add(mm[1]);
   if (/export\s+default\s/.test(src)) ex.add("default");
-  for (const mm of src.matchAll(/export\s*\{([^}]*)\}/g)) {
+  // `export type { … }` — тоже экспорт, и раньше он не считался вовсе: разбор
+  // требовал скобку сразу за словом `export`. Тип, ушедший наружу только так,
+  // был для инструмента невидим — то есть `dead` его не показывал даже без
+  // потребителей, а запись базы о нём нечем было проверить. Найдено пробой.
+  for (const mm of src.matchAll(/export\s*(?:type\s*)?\{([^}]*)\}/g)) {
     for (let part of mm[1].split(",")) {
       part = part.trim().replace(/^type\s+/, "");
       if (!part) continue;
@@ -384,6 +575,20 @@ for (const [f, deps] of importsOf) {
 // сосед по папке, строка про ДРУГОЙ файл, — и разойдясь, две копии начали бы
 // отвечать по-разному на один вопрос.
 const LF = String.fromCharCode(10);
+
+// Парная копия — часть ответа на «что это такое», а не только на «что придётся
+// тронуть». Форк ловит именно при рассуждении: одинаковая форма читается как
+// одинаковый смысл, и близнец надо знать ДО того, как объяснять файл, а не
+// только перед правкой. Найдено пробой: `brief` о близнеце молчал, и режим для
+// объяснения узла был как раз тем местом, где ловушка срабатывает.
+const twinsOf = (r) => {
+  const twins = [];
+  for (const { from, to } of CONFIG.forks) {
+    if (r.startsWith(from + "/")) twins.push(to + r.slice(from.length));
+    if (r.startsWith(to + "/")) twins.push(from + r.slice(to.length));
+  }
+  return twins.filter((t) => files.some((f) => rel(f) === t));
+};
 const BACKTICK = String.fromCharCode(96);
 
 let LINES_CACHE = null;
@@ -465,11 +670,26 @@ const styleUsers = (target) => {
   return { modules, tests };
 };
 
+// Номер строки с адреса снимается ЗДЕСЬ, а не у каждого читателя. Якорь
+// `путь:120-130` — самая точная форма ссылки в базе, и именно она проваливалась
+// мимо строгого сравнения: `plan` печатает только точные попадания, а записи
+// каталогов ограничений и решений адресуют файл исключительно якорем — то есть
+// правку хука планировали, не видя ни одной его пометки. Два сканера одного и
+// того же с разными правилами однажды расходятся; здесь они сведены в один.
+// Хвост снимается только с адреса, у которого есть расширение, — по тому же
+// признаку, по которому якорь разбирает `verify`. Относительный якорь, у
+// которого перед двоеточием пусто, остаётся как есть: без имени файла он и не
+// адрес. Образец такой формы здесь намеренно не приведён — сверка новых якорей
+// прочла бы его как настоящий, и ровно это и случилось при первой записи.
+const LINE_SUFFIX = /(\.(?:tsx?|scss|md|json|html)):\d+(?:-\d+)?$/;
+
 const quotedIn = (line) =>
   line
     .split(BACKTICK)
     .filter((_, i) => i % 2 === 1)
-    .flatMap((t) => t.split(",").map((x) => x.trim()));
+    .flatMap((t) =>
+      t.split(",").map((x) => x.trim().replace(LINE_SUFFIX, "$1")),
+    );
 
 // Записи базы про адрес: точные (назван путём) и нестрогие (упомянут по имени).
 const baseHitsFor = (target) => {
@@ -550,6 +770,43 @@ const argPath = (a) => {
   if (a === undefined) return a;
   const s = a.split("\\").join("/").replace(/^\.\//, "");
   return s.startsWith(SRC_PREFIX) ? s.slice(SRC_PREFIX.length) : s;
+};
+
+/** «Ничего не нашлось» про файл, который на диске ЕСТЬ, — это ответ не на тот
+ * вопрос: читатель идёт искать опечатку в живом адресе. Разбор смотрит код и
+ * стили внутри исходников, а обвязка — правила, полка, инструмент — лежит вне
+ * его области, и сказать об этом надо прямо. Найдено пробой: досье на файл
+ * полки правил отвечало ровно тем же, чем на выдуманный путь. */
+const outOfScope = (arg) => {
+  const tick = String.fromCharCode(96);
+  const here = [path.join(HERE, "..", arg), path.join(ROOT, argPath(arg))];
+  return here.some((one) => existsSync(one))
+    ? `${tick}${arg}${tick} — файл есть, но он вне области разбора:` +
+        ` инструмент смотрит код и стили внутри исходников, а своды правил,` +
+        ` полка и он сам туда не входят.`
+    : `Ничего не нашлось по ${tick}${arg}${tick}.`;
+};
+
+/** Явно названный путь, которого на диске нет, — это «я не понял адрес», а не
+ * «показывать нечего». Три режима принимают списки путей, и все три отвечали на
+ * выдуманный путь ровно тем же, чем на пустую правку: «тронуто 0». Найдено
+ * пробой; тот же класс уже был закрыт у `brief` для другой формы аргумента, и
+ * здесь он лечится одним помощником, а не тремя. Принимаются обе ходовые формы
+ * адреса — от корня репозитория и от корня исходников. */
+const unknownGiven = (given) =>
+  given.filter(
+    (one) =>
+      !existsSync(path.join(HERE, "..", one)) &&
+      !existsSync(path.join(ROOT, argPath(one))),
+  );
+
+const reportUnknown = (given) => {
+  const unknown = unknownGiven(given);
+  if (unknown.length === 0) return false;
+  console.log("  таких путей на диске нет — проверь адрес:");
+  for (const one of unknown) console.log("    " + one);
+  process.exitCode = 1;
+  return true;
 };
 
 if (mode === "dead") {
@@ -652,7 +909,7 @@ if (mode === "plan") {
     );
     process.exitCode = 1;
   } else if (hits.length === 0) {
-    console.log(`Ничего не нашлось по ${BACKTICK}${arg}${BACKTICK}.`);
+    console.log(outOfScope(arg));
     process.exitCode = 1;
   } else {
     for (const target of hits.slice(0, 6)) {
@@ -680,12 +937,7 @@ if (mode === "plan") {
 
       // Близнец: расхождение копий законно, а вот баг, починенный в одной, —
       // нет. Поэтому пара называется ДО правки, а не после неё.
-      const twins = [];
-      for (const { from, to } of CONFIG.forks) {
-        if (r.startsWith(from + "/")) twins.push(to + r.slice(from.length));
-        if (r.startsWith(to + "/")) twins.push(from + r.slice(to.length));
-      }
-      const live = twins.filter((t) => files.some((f) => rel(f) === t));
+      const live = twinsOf(r);
       console.log("--- парная копия ---");
       console.log(
         live.length
@@ -803,6 +1055,14 @@ if (mode === "open") {
       line,
     ),
   );
+  // Ограничение, у которого в графе «держится» стоит «ничем», — записанная дыра
+  // сильнее любой другой: соглашение, живущее только в голове. Формулировка
+  // взята из самого формата каталога, поэтому соврать сканеру нечем. Найдено
+  // пробой: такая запись есть, и в сводку открытого она не попадала — фраза не
+  // совпала ни с одним из прежних образцов.
+  scan("Держится ничем — соглашение без опоры", (line) =>
+    /Держится:\s*(ничем|ничто)|held by nothing/i.test(line),
+  );
 
   // Файлы, до которых не дотягивается ни один тест — даже транзитивно. Это не
   // «нет своего теста»: `useTrackBinding` покрыт `trackBinding.test.tsx`, имена
@@ -907,6 +1167,7 @@ const changedPaths = async (repoRoot) => {
 if (mode === "twins") {
   const NEWLINE = String.fromCharCode(10);
   let changed = process.argv.slice(3);
+  if (changed.length) reportUnknown(changed);
   if (changed.length === 0) {
     changed = await changedPaths(path.join(HERE, ".."));
     if (changed === null) {
@@ -999,6 +1260,7 @@ if (mode === "twins") {
 if (mode === "tested") {
   const NEWLINE = String.fromCharCode(10);
   let changed = process.argv.slice(3);
+  if (changed.length) reportUnknown(changed);
   if (changed.length === 0) {
     changed = await changedPaths(path.join(HERE, ".."));
     if (changed === null) {
@@ -1536,6 +1798,7 @@ if (mode === "mutated") {
   );
 
   let changed = process.argv.slice(3);
+  if (changed.length) reportUnknown(changed);
   if (changed.length === 0) {
     changed = await changedPaths(repoRoot);
     if (changed === null) {
@@ -1632,7 +1895,6 @@ if (mode === "mutated") {
 
 if (mode === "brief") {
   const NEWLINE = String.fromCharCode(10);
-  const TICK = String.fromCharCode(96);
   const arg = argPath(process.argv[3]);
   if (!arg) {
     console.log(
@@ -1646,7 +1908,7 @@ if (mode === "brief") {
       .filter((f) => rel(f).includes(arg))
       .sort((x, y) => Number(isTest(x)) - Number(isTest(y)));
     if (hits.length === 0) {
-      console.log(`Ничего не нашлось по ${TICK}${arg}${TICK}.`);
+      console.log(outOfScope(arg));
       process.exitCode = 1;
     } else {
       // Достижимость тестов, строки базы и разбор записей — общие с `plan`,
@@ -1722,6 +1984,20 @@ if (mode === "brief") {
               ? "  " + upCode.join(NEWLINE + "  ")
               : "  никто — ни один файл проекта его не импортирует",
           );
+
+          // Близнец нужен и здесь, и раньше его тут не было: объясняя файл
+          // форка, легко перенести на него смысл копии — одинаковая форма
+          // читается как одинаковый смысл. Пара называется до объяснения.
+          const twin = twinsOf(rel(target));
+          if (twin.length) {
+            console.log("--- парная копия ---");
+            console.log(
+              "  " +
+                twin.join(NEWLINE + "  ") +
+                NEWLINE +
+                "  смысл берётся из ЭТОГО файла: одинаковая форма не значит одинакового смысла",
+            );
+          }
 
           // Средний уровень считается ПО ИМЕНАМ, а не по форме пути: тест,
           // взявший `useImageResourceStore` из бочки слоя, гоняет файл, который
@@ -1993,7 +2269,11 @@ if (mode === "verify") {
   // указывает, обязана быть содержательной. Якорь ставят на объявление, а не
   // на закрывающую скобку и не на пустоту — если он туда попал, он съехал.
   // Только для кода: в прозе пустая строка внутри диапазона законна.
-  const JUNK_ANCHOR = /^\s*(?:[)\]}]+[;,]?|\{|,|)\s*$/;
+  // Хвост комментария — та же пустота, что и закрывающая скобка: строка `*/`,
+  // одинокая `*` и голый `//` содержания не несут, и якорь, попавший туда,
+  // съехал ровно так же. Найдено пробой: запись про стенд указывала на строку,
+  // закрывающую блок комментария, а описывала конструкцию двумя строками ниже.
+  const JUNK_ANCHOR = /^\s*(?:[)\]}]+[;,]?|\{|,|\*+\/|\*|\/\/|)\s*$/;
   // Цитата принадлежит якорю тем, что стоит сразу за ним; круглые скобки вокруг
   // — вёрстка, а не форма. Требование закрывающей скобки вплотную к цитате
   // выбрасывало из проверки всё, где дальше шла точка с запятой, продолжение
@@ -2072,9 +2352,12 @@ if (mode === "verify") {
 
   // Строки таблицы «Правила направления»: слой, запреты, разрешённые исключения.
   const RULES_HEAD = new RegExp("^#+.*" + CONFIG.rulesHeading);
+  const ISOLATION_HEAD = new RegExp("^#+.*" + CONFIG.isolationHeading);
   const ROW_RE = /^\|(.+)\|(.+)\|(.*)\|\s*$/;
+  const ISO_ROW_RE = /^\|([^|]+)\|([^|]+)\|\s*$/;
   const cellPaths = (cell) => [...cell.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
   const rules = [];
+  const isolation = [];
 
   for (const name of readdirSync(BASE)) {
     // README базы описывает ФОРМЫ записи и приводит примеры: якорь с номером,
@@ -2087,9 +2370,22 @@ if (mode === "verify") {
     let prefix = null;
     let current = null;
     let inRules = false;
-    for (const line of readFileSync(path.join(BASE, name), "utf8").split(
-      NEWLINE,
-    )) {
+    let inIsolation = false;
+    const lines = readFileSync(path.join(BASE, name), "utf8").split(NEWLINE);
+    // Единица каталога — АБЗАЦ, а не строка. Адрес стоит в одной строке
+    // («**что нельзя** (`файл:строка`)»), а пометка названа словами в соседней
+    // («Решено: комментарий «…»»), и так написаны почти все записи. Обратная
+    // сверка, судящая по строке, спросила бы с двух записей из тридцати —
+    // то есть выглядела бы работающей, ничего не проверяя.
+    const record = [];
+    for (let i = 0; i < lines.length;) {
+      let j = i;
+      while (j < lines.length && lines[j].trim() !== "") j++;
+      const text = lines.slice(i, j).join("\n");
+      for (let k = i; k < j; k++) record[k] = text;
+      i = j + 1;
+    }
+    for (const [lineAt, line] of lines.entries()) {
       const head = HEAD_RE.exec(line);
       if (head !== null) {
         const token = head[1];
@@ -2104,7 +2400,10 @@ if (mode === "verify") {
             ? locate(named[0].split(String.fromCharCode(96)).join(""), prefix)
             : null;
       }
-      if (line.startsWith("#")) inRules = RULES_HEAD.test(line);
+      if (line.startsWith("#")) {
+        inRules = RULES_HEAD.test(line);
+        inIsolation = ISOLATION_HEAD.test(line);
+      }
 
       const row = inRules ? ROW_RE.exec(line) : null;
       if (row !== null) {
@@ -2115,6 +2414,17 @@ if (mode === "verify") {
             banned: cellPaths(row[2]),
             allowed: cellPaths(row[3]),
           });
+      }
+
+      // Изоляция — правило наоборот: не список запретов, а список разрешённого.
+      // Запрет перечислением отстаёт от появления соседней папки, и отстаёт
+      // молча: у `domain` в запретах стояло восемь папок из двадцати, и импорт
+      // в любую из прочих проходил зелёным. Найдено пробой.
+      const iso = inIsolation ? ISO_ROW_RE.exec(line) : null;
+      if (iso !== null) {
+        const layer = cellPaths(iso[1]);
+        if (layer.length === 1)
+          isolation.push({ layer: layer[0], only: cellPaths(iso[2]) });
       }
 
       for (const span of line
@@ -2142,10 +2452,16 @@ if (mode === "verify") {
           JUNK_ANCHOR.test(body[Number(numbers[0]) - 1] ?? "")
         )
           broken.push(`${name}: ${span} — там скобка или пусто, якорь съехал`);
-        if (name === CONFIG.invariants)
-          invariantAnchors.push({ file, from: Number(numbers[0]), to: last });
-        if (name === CONFIG.decisions)
-          decisionAnchors.push({ file, from: Number(numbers[0]), to: last });
+        // Текст записи едет вместе с якорем: обратная сверка пометок судит по
+        // тому, что запись САМА о себе говорит, а не по догадке о её замысле.
+        const anchor = {
+          file,
+          from: Number(numbers[0]),
+          to: last,
+          text: record[lineAt] ?? line,
+        };
+        if (name === CONFIG.invariants) invariantAnchors.push(anchor);
+        if (name === CONFIG.decisions) decisionAnchors.push(anchor);
       }
 
       let m;
@@ -2212,64 +2528,134 @@ if (mode === "verify") {
     }
   }
 
-  // 6. каждая пометка CONSTRAINT в коде описана в каталоге ограничений
-  // Соответствие — по якорю, указывающему в тот же файл рядом с пометкой:
-  // формулировка ограничения живёт в каталоге ограничений, а не в комментарии.
+  // 6 и 8. пометки кода и записи каталогов сверяются В ОБЕ СТОРОНЫ
+  //
+  // Сверка была односторонней — «пометка → запись» — и на снятой пометке
+  // молчала: каталог продолжал описывать ограничение, которого в коде уже нет,
+  // и читался как действующее, то есть врал достовернее пустого места. Обе
+  // стороны и оба каталога считаются одним кодом намеренно: половинчатая
+  // починка тем и опасна, что выглядит целой.
+  //
+  // ПРЯМАЯ сторона: пометка обязана быть описана. Соответствие — по якорю,
+  // указывающему в тот же файл рядом с пометкой: формулировка живёт в каталоге,
+  // а не в комментарии.
+  //
+  // ОБРАТНАЯ сторона спрашивает не с каждого якоря, а только с того, чья запись
+  // САМА называет пометку. Каталог адресует и код, который держит ограничение
+  // без всякого комментария («держится: вот эта функция»), — сверка «любой
+  // якорь → пометка» краснела бы на законном, то есть врала бы (F4). Запись,
+  // назвавшая пометку, — это утверждение, и проверяется именно оно.
   const CONSTRAINT_SLACK = 8;
-  const uncovered = [];
-  let constraints = 0;
-  for (const f of files) {
-    if (isTest(f)) continue;
-    const body = readFileSync(f, "utf8").split(NEWLINE);
-    body.forEach((line, index) => {
-      // Тот же принцип, что у пометок решений: маркер узнаётся на обоих
-      // языках, чтобы перевод проекта не выключил проверку молча.
-      if (!/(CONSTRAINT|ОГРАНИЧЕНИЕ)\s+—/.test(line)) return;
-      constraints++;
-      const at = index + 1;
-      const covered = invariantAnchors.some(
-        (a) =>
-          a.file === f &&
-          at >= a.from - CONSTRAINT_SLACK &&
-          at <= a.to + CONSTRAINT_SLACK,
-      );
-      if (!covered) uncovered.push(`${rel(f)}:${at}`);
-    });
-  }
+  const near = (at, a) =>
+    at >= a.from - CONSTRAINT_SLACK && at <= a.to + CONSTRAINT_SLACK;
 
-  // 8. каждая пометка решения в коде описана в реестре степеней свободы
-  // Ищется только в комментарии: те же слова встречаются внутри строк, которые
-  // диагностика печатает пользователю, и решением проекта не являются.
-  // Пометка решения узнаётся НА ОБОИХ ЯЗЫКАХ. Проект сегодня двуязычен по
+  // Корпус у обеих пометок один: код и стили, без тестов. Стили входят наравне
+  // с модулями — правило проекта между ними разницы не делает, а раньше её
+  // делал сканер: ограничения он в них не искал, решения искал.
+  const marked = [
+    ...files.filter((f) => !isTest(f)),
+    ...everyFile.filter((f) => f.endsWith(".scss")),
+  ];
+  // Названной пометка считается тогда, когда запись её ПРОЦИТИРОВАЛА — в
+  // обратных апострофах или в кавычках, как и написан весь каталог («Решено:
+  // комментарий «flat by design»»). Голое слово в прозе именем пометки не
+  // является: «это и есть намеренное поведение» — вывод о поведении, и сверка
+  // по нему покраснела бы на законной записи, то есть соврала бы (F4).
+  const quoted = (text) =>
+    [...text.matchAll(/`([^`]+)`|«([^»]+)»/g)].map((m) => m[1] ?? m[2]);
+
+  // Цитата сравнивается по словам, а не побайтно: в коде она переносится по
+  // строкам и несёт на себе `//` и `*` продолжения комментария. Побайтная
+  // сверка краснела бы на семи законных записях из восьми — то есть врала бы.
+  const flat = (text) =>
+    text
+      .split(NEWLINE)
+      .map((l) => l.replace(/^\s*(\/\/+|\/?\*+\/?)\s*/, " "))
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+
+  const markerCheck = ({ inCode, names, anchors }) => {
+    const bodies = new Map();
+    const marks = new Map();
+    let total = 0;
+    for (const f of marked) {
+      const body = readFileSync(f, "utf8").split(NEWLINE);
+      bodies.set(f, body);
+      const found = [];
+      body.forEach((line, index) => {
+        if (inCode(line)) found.push(index + 1);
+      });
+      if (found.length !== 0) marks.set(f, found);
+      total += found.length;
+    }
+    const unlisted = [];
+    for (const [f, found] of marks)
+      for (const at of found)
+        if (!anchors.some((a) => a.file === f && near(at, a)))
+          unlisted.push(`${rel(f)}:${at}`);
+    // Ищется ИМЕННО ТА пометка, которую запись процитировала, а не любая
+    // поблизости. Разница не теоретическая: в шапке одного файла два решения
+    // стоят в семи строках друг от друга, и сверка «есть хоть какая-то пометка
+    // в окне» на снятии одного из них промолчала — второе закрывало окно собой.
+    const gone = new Set();
+    for (const a of anchors) {
+      const body = bodies.get(a.file);
+      if (body === undefined) continue;
+      const span = flat(
+        body
+          .slice(
+            Math.max(0, a.from - 1 - CONSTRAINT_SLACK),
+            a.to + CONSTRAINT_SLACK,
+          )
+          .join("\n"),
+      );
+      for (const q of quoted(a.text)) {
+        if (!names.test(q)) continue;
+        if (!span.includes(flat(q)))
+          gone.add(`${rel(a.file)}:${a.from} «${q}»`);
+      }
+    }
+    return { total, unlisted, gone: [...gone] };
+  };
+
+  // Слова решения ищутся только в комментарии: те же слова встречаются внутри
+  // строк, которые диагностика печатает пользователю, и решением проекта не
+  // являются.
+  // Обе пометки узнаются НА ОБОИХ ЯЗЫКАХ. Проект сегодня двуязычен по
   // расположению (код английский, база русская), а завтра может переехать
-  // целиком в одну сторону. Сканер, знающий одну сторону, в этот день
-  // замолчит и пройдёт зелёным — то есть соврёт ровно там, где его читают
-  // как гарантию.
+  // целиком в одну сторону. Сканер, знающий одну сторону, в этот день замолчит
+  // и пройдёт зелёным — то есть соврёт ровно там, где его читают как гарантию.
   const DECISION_RE =
     /do not remove|by design|deliberat|intentional|on purpose|не удалять|намеренно|осознанно|по замыслу|нарочно/i;
   const inComment = (line, at) => {
     const before = line.slice(0, at);
     return before.includes("//") || /^\s*(\*|\/\*)/.test(line);
   };
-  const undecided = [];
-  let decisions = 0;
-  for (const f of [...files, ...everyFile.filter((x) => x.endsWith(".scss"))]) {
-    if (isTest(f)) continue;
-    const body = readFileSync(f, "utf8").split(NEWLINE);
-    body.forEach((line, index) => {
-      const hit = DECISION_RE.exec(line);
-      if (hit === null || !inComment(line, hit.index)) return;
-      decisions++;
-      const at = index + 1;
-      const covered = decisionAnchors.some(
-        (a) =>
-          a.file === f &&
-          at >= a.from - CONSTRAINT_SLACK &&
-          at <= a.to + CONSTRAINT_SLACK,
-      );
-      if (!covered) undecided.push(`${rel(f)}:${at}`);
-    });
-  }
+
+  const markerKinds = [
+    {
+      title: "Пометки CONSTRAINT",
+      base: CONFIG.invariants,
+      // В коде пометка пишется с тире: `CONSTRAINT — что нельзя`. Запись тире
+      // не повторяет — она называет пометку одним словом.
+      inCode: (line) => /(CONSTRAINT|ОГРАНИЧЕНИЕ)\s+—/.test(line),
+      names: /CONSTRAINT|ОГРАНИЧЕНИЕ/,
+      anchors: invariantAnchors,
+    },
+    {
+      title: "Пометки решений",
+      base: CONFIG.decisions,
+      inCode: (line) => {
+        const hit = DECISION_RE.exec(line);
+        return hit !== null && inComment(line, hit.index);
+      },
+      // Своего слова у пометки решения нет: запись называет её цитатой самого
+      // комментария.
+      names: DECISION_RE,
+      anchors: decisionAnchors,
+    },
+  ].map((kind) => ({ ...kind, ...markerCheck(kind) }));
 
   // 1. каждый файл кода и каждый стиль упомянуты в карте
   // Ambient-объявления описывать нечем: в них нет ни поведения, ни связей.
@@ -2306,13 +2692,18 @@ if (mode === "verify") {
   // пакета (сверяется по спецификатору как написан). Исключения перечислены
   // рядом с правилом: дыра, о которой известно, — это не то же, что дыра.
   const broken7 = [];
+  // Графа «исключение» — третий список того же рода, что исключения адресов и
+  // ссылок: запись, которая ничего не разрешает, читается как объявленная дыра,
+  // которой давно нет, и прикрывает собой ту, что появится завтра.
+  const allowUsed = new Set();
+  const deadRuleAllowances = [];
   for (const rule of rules) {
     const layer = (inside(rule.layer, null)?.hits ?? []).filter(
       (f) => !isTest(f),
     );
-    const allowed = new Set(
-      rule.allowed.flatMap((q) => inside(q, null)?.hits ?? []),
-    );
+    const allowedBy = new Map();
+    for (const q of rule.allowed)
+      for (const hit of inside(q, null)?.hits ?? []) allowedBy.set(hit, q);
     for (const banned of rule.banned) {
       const target = banned.includes("/")
         ? new Set(inside(banned, null)?.hits ?? [])
@@ -2323,26 +2714,177 @@ if (mode === "verify") {
             broken7.push(`${rel(f)} → ${banned}`);
           continue;
         }
-        for (const dep of importsOf.get(f) ?? [])
-          if (target.has(dep) && !allowed.has(dep))
-            broken7.push(`${rel(f)} → ${rel(dep)}`);
+        for (const dep of importsOf.get(f) ?? []) {
+          if (!target.has(dep)) continue;
+          const by = allowedBy.get(dep);
+          if (by === undefined) broken7.push(`${rel(f)} → ${rel(dep)}`);
+          else allowUsed.add(`${rule.layer}|${by}`);
+        }
       }
     }
   }
+  for (const rule of rules)
+    for (const q of rule.allowed)
+      if (!allowUsed.has(`${rule.layer}|${q}`))
+        deadRuleAllowances.push(
+          `правила направления: ${rule.layer} → ${q} — ничего не разрешает`,
+        );
   console.log("=== Правила направления ===");
   console.log(`  правил: ${rules.length}, нарушено: ${broken7.length}`);
   for (const b of broken7) console.log("    " + b);
 
-  console.log("=== Пометки CONSTRAINT ===");
+  // 7a. изоляция слоя: импортировать можно только объявленное.
+  const brokenIso = [];
+  for (const rule of isolation) {
+    const own = new Set(inside(rule.layer, null)?.hits ?? []);
+    const allowed = new Set(
+      rule.only.flatMap((q) => inside(q, null)?.hits ?? []),
+    );
+    for (const f of own) {
+      if (isTest(f)) continue;
+      for (const dep of importsOf.get(f) ?? [])
+        if (!own.has(dep) && !allowed.has(dep))
+          brokenIso.push(`${rel(f)} → ${rel(dep)}`);
+    }
+  }
+  // 7b. звёздные бочки — только объявленные.
+  const starDrift = [];
+  if (CONFIG.starBarrels != null) {
+    const declared = new Set(CONFIG.starBarrels);
+    const onDisk = new Set(
+      files
+        .filter(
+          (f) => !isTest(f) && /^\s*export\s+\*/m.test(readFileSync(f, "utf8")),
+        )
+        .map(rel),
+    );
+    for (const f of onDisk)
+      if (!declared.has(f))
+        starDrift.push(
+          `звёздная бочка не объявлена: ${f} — здесь выключен анализ мёртвых экспортов`,
+        );
+    for (const f of declared)
+      if (!onDisk.has(f)) starDrift.push(`объявлена, но звёздочки нет: ${f}`);
+  }
+  console.log("=== Звёздные бочки ===");
   console.log(
-    `  в коде: ${constraints}, без записи в ${CONFIG.invariants}: ${uncovered.length}`,
+    CONFIG.starBarrels == null
+      ? "  список не заявлен"
+      : `  расхождений: ${starDrift.length}`,
   );
-  for (const u of uncovered) console.log("    " + u);
-  console.log("=== Пометки решений ===");
+  for (const s of starDrift) console.log("    " + s);
+
+  // 7c. состав бочки в записи карты. У бочки нет своей логики — она только
+  // отдаёт наружу, поэтому каждое имя, названное её записью, есть утверждение
+  // о публичной поверхности файла. Стареет оно молча: сверка имён в тексте
+  // спрашивает лишь, есть ли имя в исходниках, а не эта ли бочка его отдаёт.
+  // Найдено пробой — запись называла пять функций полки при трёх на диске, и
+  // обе лишние в исходниках существовали, то есть та сверка была зелёной.
+  // Обратной стороны нет намеренно: запись называет ВЫБОРКУ, а не полный
+  // состав — перечислить его целиком запретило бы само правило о счётах, —
+  // и сверка «каждый экспорт назван» краснела бы на законном.
+  const barrelDrift = [];
+  {
+    const CAMEL = /^(?=.*[a-z])(?=.*[A-Z])[A-Za-z][A-Za-z0-9]*$/;
+    const mapLines = readFileSync(path.join(HERE, CONFIG.map), "utf8").split(
+      NEWLINE,
+    );
+    let barrel = null;
+    const close = () => {
+      if (barrel === null) return;
+      const own = exportsOf.get(barrel.file) ?? new Set();
+      for (const [name, line] of barrel.named)
+        if (!own.has(name))
+          barrelDrift.push(
+            `${CONFIG.map}:${line} — ${rel(barrel.file)} не отдаёт ${name}`,
+          );
+      barrel = null;
+    };
+    for (const [i, line] of mapLines.entries()) {
+      const head = /^###\s+`([^`]+)`\s+—\s+.*бочк/i.exec(line);
+      if (head !== null || /^###\s/.test(line)) close();
+      if (head === null) {
+        if (barrel !== null)
+          for (const m of line.matchAll(/`([^`]+)`/g))
+            if (CAMEL.test(m[1])) barrel.named.push([m[1], i + 1]);
+        continue;
+      }
+      const hits = files.filter(
+        (f) => rel(f) === head[1] || rel(f).endsWith("/" + head[1]),
+      );
+      // Звёздная бочка пропускается: что именно она отдаёт, разобрать нельзя —
+      // то же ограничение, из-за которого у неё выключен анализ мёртвых
+      // экспортов. Спрашивать с записи о таком файле значило бы краснеть на
+      // законном: имена, пришедшие через `export *`, инструменту не видны.
+      barrel =
+        hits.length === 1 &&
+        !/^\s*export\s+\*/m.test(readFileSync(hits[0], "utf8"))
+          ? { file: hits[0], named: [] }
+          : null;
+    }
+    close();
+  }
+  console.log("=== Состав бочки в записи карты ===");
+  console.log(`  имён названо неверно: ${barrelDrift.length}`);
+  for (const b of barrelDrift) console.log("    " + b);
+
+  console.log("=== Правила изоляции ===");
+  console.log(`  слоёв: ${isolation.length}, нарушено: ${brokenIso.length}`);
+  for (const b of brokenIso) console.log("    " + b);
+
+  // 7c. правило про несуществующий предмет.
+  // Обе таблицы слоёв судят «сверху вниз»: берут слой и смотрят его импорты.
+  // Слой, которого на диске нет, даёт пустой список — и строка проходит
+  // зелёной, продолжая читаться как действующее правило. Найдено пробой на
+  // свежей таблице изоляции; у таблицы направлений дыра та же. Имена пакетов
+  // (без косой черты) сюда не идут: они и не пути.
+  const emptyRules = [];
+  const resolves = (q) =>
+    !q.includes("/") || (inside(q, null)?.hits ?? []).length > 0;
+  for (const [what, rule] of [
+    ...rules.map((r) => ["правила направления", r]),
+    ...isolation.map((r) => ["правила изоляции", r]),
+  ]) {
+    if (!resolves(rule.layer))
+      emptyRules.push(`${what}: слоя нет на диске — ${rule.layer}`);
+    for (const q of [...(rule.banned ?? []), ...(rule.only ?? [])])
+      if (!resolves(q))
+        emptyRules.push(`${what}: ${rule.layer} → адреса нет на диске — ${q}`);
+  }
+  // 7d. заявленная таблица найдена и не пуста.
+  // Инструмент ищет таблицы ПО ЗАГОЛОВКУ. Заголовок переименовали — разбор даёт
+  // ноль строк, а ноль строк печатается как «нарушено: 0», то есть выключение
+  // читается как здоровье. Проверено пробой: переименование заголовка разом
+  // погасило все правила направления, и прогон остался зелёным. Для нового
+  // проекта это главный способ получить базу, «верную по смыслу и немую для
+  // инструмента»: заголовок написан своими словами — и сверки нет.
+  // Таблицы нет вовсе — ставят `null` в `CONFIG`, как у решений и линта.
+  const missingTables = [];
+  if (CONFIG.rulesHeading != null && rules.length === 0)
+    missingTables.push(
+      `таблица не найдена или пуста: «${CONFIG.rulesHeading}» — сверка направлений выключена`,
+    );
+  if (CONFIG.isolationHeading != null && isolation.length === 0)
+    missingTables.push(
+      `таблица не найдена или пуста: «${CONFIG.isolationHeading}» — сверка изоляции выключена`,
+    );
+
+  console.log("=== Правила про существующее ===");
   console.log(
-    `  в коде: ${decisions}, без записи в ${CONFIG.decisions}: ${undecided.length}`,
+    `  правил ни о чём: ${emptyRules.length}, заявленных таблиц не найдено: ${missingTables.length}`,
   );
-  for (const u of undecided) console.log("    " + u);
+  for (const e of emptyRules) console.log("    " + e);
+  for (const m of missingTables) console.log("    " + m);
+
+  for (const kind of markerKinds) {
+    console.log(`=== ${kind.title} ===`);
+    console.log(
+      `  в коде: ${kind.total}, без записи в ${kind.base}: ${kind.unlisted.length}` +
+        `, названо записью и снято из кода: ${kind.gone.length}`,
+    );
+    for (const u of kind.unlisted) console.log("    " + u);
+    for (const g of kind.gone) console.log(`    ${kind.base} → ${g}`);
+  }
 
   console.log("=== Якоря ===");
   console.log(
@@ -2384,7 +2926,8 @@ if (mode === "verify") {
         return existsSync(at) ? readFileSync(at, "utf8") : "";
       })
       .join("\n");
-    for (const m of [...new Set(modes)].sort()) {
+    const implemented = new Set(modes);
+    for (const m of [...implemented].sort()) {
       if (
         manual !== null &&
         !new RegExp("^### `" + m + "\\b", "m").test(manual)
@@ -2392,6 +2935,14 @@ if (mode === "verify") {
         undocumented.push(`нет раздела в справочнике: ${m}`);
       if (!named(rulesText, m)) undocumented.push(`не назван в правилах: ${m}`);
     }
+    // Обратная сторона: раздел справочника про режим, которого нет. Справочник
+    // объявляет себя полным, и такой раздел отправляет читателя вызывать
+    // команду, которой не существует, — это хуже отсутствия раздела, потому что
+    // ему верят. Найдено пробой: раздел про выдуманный режим прошёл зелёным.
+    if (manual !== null)
+      for (const hit of manual.matchAll(/^### `([a-z]+)\b/gm))
+        if (!implemented.has(hit[1]))
+          undocumented.push(`раздел есть, режима нет: ${hit[1]}`);
   }
 
   console.log("=== Копия инструмента ===");
@@ -2447,8 +2998,14 @@ if (mode === "verify") {
     }
   }
 
-  // 9d. каждое записанное решение адресуемо: на него ссылается код или документ.
+  // 9d. решения и ссылки на них сверяются В ОБЕ СТОРОНЫ.
+  // Прямая: решение, на которое не ссылается никто, читают только те, кто уже
+  // знает о его существовании. Обратная (ниже по файлу, там, где собран корпус
+  // текстов): ссылка на решение, которого нет, — указатель в пустоту, и она
+  // достовернее пустого места, потому что обещает записанное решение. Сверка
+  // была односторонней и на выдуманном номере молчала — найдено пробой.
   const orphanAdr = [];
+  const danglingAdr = [];
   if (CONFIG.adr != null) {
     const dir = norm(path.join(HERE, CONFIG.adr.dir));
     // Нет папки — нет предмета: у нового проекта решений ещё не было, и
@@ -2474,13 +3031,167 @@ if (mode === "verify") {
     }
   }
 
-  console.log("=== Решения адресуемы ===");
-  console.log(`  без единой ссылки: ${orphanAdr.length}`);
-  for (const a of orphanAdr) console.log("    " + a);
+  // 9e. каждая константа таблицы настроек названа в её документе.
+  const undocumentedConst = [];
+  let constantsChecked = 0;
+  if (CONFIG.configDocs != null) {
+    const dir = norm(path.join(HERE, CONFIG.configDocs.dir));
+    const docsDir = norm(path.join(HERE, CONFIG.configDocs.docs));
+    // Как и у решений: нет предмета — нет сверки. Новый проект садится на
+    // пустое место, и требовать с него таблиц значило бы ронять первый прогон.
+    if (existsSync(dir) && existsSync(docsDir)) {
+      // Сегменты имени разбирают обе стороны: сокращение в документе значит
+      // «то же имя, кроме одного сегмента», и разворачивается только по
+      // соседу из ТОЙ ЖЕ строки. Совпадение по одному лишь куску имени
+      // засчитывало бы `…SHARE…` за любую константу с таким сегментом.
+      const parts = (n) => n.split("_");
+      const pairs = (line) => {
+        const tokens = [...line.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]);
+        const full = tokens.filter((t) => /^[A-Z][A-Z0-9_]*$/.test(t));
+        const short = tokens
+          .filter((t) => t.includes("…"))
+          .map((t) => t.replace(/…/g, ""))
+          .filter((t) => /^[A-Z][A-Z0-9_]*$/.test(t));
+        return { full, short };
+      };
+      for (const file of readdirSync(dir).filter((n) => /\.ts$/.test(n))) {
+        const code = readFileSync(path.join(dir, file), "utf8");
+        const names = [
+          ...code.matchAll(/^export const ([A-Z][A-Z0-9_]*)/gm),
+        ].map((m) => m[1]);
+        if (names.length === 0) continue; // бочка и типы констант не объявляют
+        const doc = path.join(docsDir, file.replace(/\.ts$/, ".md"));
+        if (!existsSync(doc)) {
+          undocumentedConst.push(`таблица без документа: ${file}`);
+          continue;
+        }
+        const lines = readFileSync(doc, "utf8").split(NEWLINE);
+        const forms = lines.map(pairs);
+        for (const name of names) {
+          constantsChecked++;
+          if (lines.some((l) => l.includes(name))) continue;
+          const own = parts(name);
+          const spelled = forms.some(({ full, short }) =>
+            short.some((s) =>
+              full.some((f) => {
+                const other = parts(f);
+                if (other.length !== own.length) return false;
+                const differ = own.filter((_, i) => own[i] !== other[i]);
+                return differ.length === 1 && differ[0] === s;
+              }),
+            ),
+          );
+          if (!spelled) undocumentedConst.push(`${file} → ${name}`);
+        }
+      }
+      // Обратная сторона: документ, чья таблица настроек исчезла. Он продолжает
+      // описывать константы, которых нет, и читается как действующий — при
+      // удалении файла сверка иначе просто замолкает, потому что перебирать
+      // становится нечего. Найдено пробой.
+      for (const doc of readdirSync(docsDir).filter((n) => /\.md$/.test(n))) {
+        const table = path.join(dir, doc.replace(/\.md$/, ".ts"));
+        if (!existsSync(table))
+          undocumentedConst.push(`документ без таблицы: ${doc}`);
+      }
+      // Вторая обратная сторона, и она про имя, а не про файл: константа
+      // перестала быть настройкой — сняли `export`, переименовали, убрали, — а
+      // документ продолжает объяснять её как ручку, которую хост может крутить.
+      // Общая сверка имён в тексте это пропускает: она спрашивает, есть ли имя
+      // в исполняемом тексте, и `const` без `export` ей подходит. Найдено
+      // пробой. Спрашивается принадлежность НАБОРУ настроек, а не своей паре:
+      // документ законно ссылается на константу соседнего файла, и требование
+      // «имя из своей пары» краснело бы на этом — замерено, такая ссылка есть.
+      const settingNames = new Set();
+      for (const file of readdirSync(dir).filter((n) => /\.ts$/.test(n)))
+        for (const mm of readFileSync(path.join(dir, file), "utf8").matchAll(
+          /^export const ([A-Z][A-Z0-9_]*)/gm,
+        ))
+          settingNames.add(mm[1]);
+      for (const doc of readdirSync(docsDir).filter((n) => /\.md$/.test(n))) {
+        const lines = readFileSync(path.join(docsDir, doc), "utf8").split(
+          NEWLINE,
+        );
+        for (const [i, line] of lines.entries())
+          for (const mm of line.matchAll(/`([^`\n]+)`/g)) {
+            const tok = mm[1];
+            // Одно слово заглавными — это не имя настройки, а слово в тексте
+            // (`DEV`, `CSS`): у настроек имя составное.
+            if (!/^[A-Z][A-Z0-9_]*$/.test(tok) || !tok.includes("_")) continue;
+            constantsChecked++;
+            if (!settingNames.has(tok))
+              undocumentedConst.push(
+                `${doc}:${i + 1} — ${tok}: документ описывает настройку, которой среди настроек нет`,
+              );
+          }
+      }
+    }
+  }
+  console.log("=== Константы настроек описаны ===");
+  console.log(
+    `  проверено: ${constantsChecked}, разошлось: ${undocumentedConst.length}`,
+  );
+  for (const c of undocumentedConst) console.log("    " + c);
 
   console.log("=== Точечные исключения линта ===");
   console.log(`  расхождений: ${lintDrift.length}`);
   for (const l of lintDrift) console.log("    " + l);
+
+  // 9f. выключения правил в самом конфиге линта — против объявленного списка.
+  const offDrift = [];
+  if (CONFIG.lintConfigOff != null) {
+    const at = path.join(HERE, CONFIG.lintConfigOff.file);
+    if (!existsSync(at)) offDrift.push(`конфига линта нет: ${rel0(at)}`);
+    else {
+      // Конфиг разбирается ТЕКСТОМ, а не импортом: импорт потянул бы за собой
+      // все плагины линта — секунды к прогону и падение там, где их ещё не
+      // ставили. Блок узнаётся по балансу скобок, область — по строке `files`
+      // внутри него; блок без `files` действует на весь репозиторий, и пустая
+      // область здесь именно это и означает.
+      const found = [];
+      let depth = 0;
+      let block = null;
+      for (const line of readFileSync(at, "utf8").split(NEWLINE)) {
+        const opens = (line.match(/\{/g) ?? []).length;
+        const closes = (line.match(/\}/g) ?? []).length;
+        if (depth === 0 && opens > 0) block = { files: [], off: [] };
+        if (block !== null) {
+          const f = /files:\s*\[([^\]]*)\]/.exec(line);
+          if (f !== null)
+            block.files.push(
+              ...[...f[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]),
+            );
+          for (const m of line.matchAll(/"([^"]+)"\s*:\s*"off"/g))
+            block.off.push(m[1]);
+        }
+        depth += opens - closes;
+        if (depth <= 0 && block !== null) {
+          for (const rule of block.off)
+            for (const scope of block.files.length ? block.files : ["**"])
+              found.push(`${scope} → ${rule}`);
+          block = null;
+          depth = 0;
+        }
+      }
+      const declared = new Set(
+        CONFIG.lintConfigOff.allowed.map(
+          ([scope, rule]) => `${scope} → ${rule}`,
+        ),
+      );
+      for (const one of found)
+        if (!declared.has(one))
+          offDrift.push(`выключено, но не объявлено: ${one}`);
+      for (const one of declared)
+        if (!found.includes(one))
+          offDrift.push(`объявлено, но не выключено: ${one}`);
+    }
+  }
+  console.log("=== Выключения правил линта ===");
+  console.log(
+    CONFIG.lintConfigOff == null
+      ? "  конфиг линта не заявлен"
+      : `  расхождений: ${offDrift.length}`,
+  );
+  for (const o of offDrift) console.log("    " + o);
 
   console.log("=== Режимы инструмента описаны ===");
   console.log(`  без описания: ${undocumented.length}`);
@@ -2583,7 +3294,12 @@ if (mode === "verify") {
         const head = /^#{2,}\s+(\d+)\./.exec(line);
         if (head !== null) numbers.add(head[1]);
       }
-      const REF = /(?:пункт[ае]?|item)\s+(\d+)/gi;
+      // Падежи считаются все, а не три. «Сверься с пунктом 4», «закрыто
+      // пунктом 3», «из пунктов 2 и 3» — самые естественные формы ссылки, и
+      // именно творительный сверка не знала: найдено пробой, ссылка на
+      // несуществующий пункт прошла зелёной. Замерено на всей базе и на
+      // исходниках: новых попаданий ноль, то есть шума расширение не даёт.
+      const REF = /(?:пункт[а-яё]{0,3}|item)\s+(\d+)/gi;
       const NAMES = new RegExp(
         CONFIG.todo.replace(".", "\\.") + "|deferred-work list",
       );
@@ -2866,6 +3582,14 @@ if (mode === "verify") {
   // однажды увезла в следующий проект не все правила.
   const unclassified = [];
   const danglingRefs = [];
+  // Исключение существует, чтобы гасить конкретное ложное срабатывание. Если
+  // оно не погасило НИЧЕГО, предмета больше нет, а запись осталась — и читается
+  // как нужная, при этом молча гася то, что однажды сломается по-настоящему.
+  // Найдено пробой: одно исключение сверки адресов было недостижимо в принципе,
+  // и стояло оно с пометкой «удалять нельзя». Списков таких три — адреса,
+  // ссылки на разделы и разрешённые связи в правилах направления, — и считаются
+  // они одной секцией: заведи четвёртый, и вопрос «а он живой?» задастся сам.
+  const deadExceptions = [...deadRuleAllowances];
   if (CONFIG.rulesManifest != null) {
     const tableAt = path.join(BASE, CONFIG.rulesManifest.table);
     // Заголовки собираются со ВСЕХ заявленных файлов правил: разложенные по
@@ -2933,6 +3657,7 @@ if (mode === "verify") {
         if (/^#{2,}\s/.test(line))
           allHeads.add(line.replace(/^#+\s*/, "").trim());
     const skip = new Set(CONFIG.rulesManifest.refExceptions);
+    const skipUsed = new Set();
     const REF_RE = /(?:раздел[ае]?|§)\s+«([^»]+)»/g;
     // Корпус ссылок — правила, вся база вглубь и **документация**. Последняя
     // сюда не входила, и ссылка на несуществующий раздел из документа проходила
@@ -2958,7 +3683,10 @@ if (mode === "verify") {
         // Ссылка нередко разорвана переносом строки: сравнивать надо смысл, а
         // не вёрстку, иначе живой заголовок читается как висячий.
         const title = m[1].replace(/\s+/g, " ").trim();
-        if (skip.has(title)) continue;
+        if (skip.has(title)) {
+          skipUsed.add(title);
+          continue;
+        }
         // Ссылка на раздел ЧУЖОГО свода — глобальных правил, живущих вне
         // репозитория. Их инструмент не читает и потому не вправе утверждать,
         // что раздела нет. Признак берётся из той же фразы: она сама называет,
@@ -2975,6 +3703,9 @@ if (mode === "verify") {
         if (!found) danglingRefs.push(`${name}: «${title}»`);
       }
     }
+    for (const one of skip)
+      if (!skipUsed.has(one))
+        deadExceptions.push(`ссылки на разделы: «${one}» — ничего не гасит`);
   }
   console.log("=== Ссылки на разделы ===");
   console.log(
@@ -3014,6 +3745,25 @@ if (mode === "verify") {
     }
     for (const name of onDisk)
       if (!listed.has(name)) skillDrift.push(`не объявлен в таблице: ${name}`);
+    // Шапка скилла — то, чем он объявляет себя окружению: имя, по которому его
+    // зовут, и признак, делающий его вызываемым по `/`. Сверялись папка и
+    // таблица, а шапка — нет: `name`, разошедшийся с папкой, проходил зелёным в
+    // обеих копиях сразу, и объявление становилось ложным молча. Найдено пробой.
+    for (const name of onDisk) {
+      const head = readFileSync(path.join(dir, name, "SKILL.md"), "utf8")
+        .split(NEWLINE)
+        .slice(0, 12);
+      const declared = head
+        .map((l) => /^name:\s*(\S+)\s*$/.exec(l)?.[1])
+        .find((one) => one !== undefined);
+      if (declared === undefined) skillDrift.push(`в шапке нет имени: ${name}`);
+      else if (declared !== name)
+        skillDrift.push(
+          `имя в шапке не совпадает с папкой: ${name} ≠ ${declared}`,
+        );
+      if (!head.some((l) => /^user-invocable:\s*true\s*$/.test(l)))
+        skillDrift.push(`не вызываем по имени: ${name}`);
+    }
     for (const [name, template] of listed) {
       if (!onDisk.includes(name)) {
         skillDrift.push(`объявлен, но файла нет: ${name}`);
@@ -3034,6 +3784,218 @@ if (mode === "verify") {
         skillDrift.push(`шаблон разошёлся с рабочим файлом: ${template}`);
     }
   }
+  // 13d. сверка выключена, а предмет уже есть.
+  // Поля `CONFIG` необязательны намеренно: у нового проекта ещё нет ни решений,
+  // ни таблиц настроек, ни исключений линта, и требовать их значило бы ронять
+  // первый же прогон после посадки. Но включать их обратно было нечему: предмет
+  // появлялся, а поле оставалось `null` — и сверка молчала ровно там, где стала
+  // нужна. Проверено пробой: с полями «как после посадки» четыре сверки из пяти
+  // проходят зелёными на живом проекте. Здесь предмет ищется на диске без
+  // подсказки конфига, поэтому соврать нечем: он либо есть, либо нет.
+  const disarmed = [];
+  const dirsUnder = (root, name) => {
+    const found = [];
+    if (!existsSync(root)) return found;
+    (function walk(dir) {
+      for (const entry of readdirSync(dir)) {
+        const full = norm(path.join(dir, entry));
+        if (!statSync(full).isDirectory()) continue;
+        if (entry === name) found.push(full);
+        walk(full);
+      }
+    })(norm(root));
+    return found;
+  };
+  if (CONFIG.adr == null) {
+    const found = dirsUnder(ROOT, "adr").filter((d) =>
+      readdirSync(d).some((n) => /^\d+.*\.md$/.test(n)),
+    );
+    if (found.length)
+      disarmed.push(
+        "решения уже есть (" + rel(found[0]) + "), а CONFIG.adr пуст",
+      );
+  }
+  if (CONFIG.configDocs == null) {
+    const found = dirsUnder(ROOT, "config").filter((d) =>
+      readdirSync(d).some(
+        (n) =>
+          /\.md$/.test(n) ||
+          (/\.ts$/.test(n) &&
+            /^export const [A-Z][A-Z0-9_]*/m.test(
+              readFileSync(path.join(d, n), "utf8"),
+            )),
+      ),
+    );
+    if (found.length)
+      disarmed.push(
+        "таблицы настроек уже есть (" +
+          rel(found[0]) +
+          "), а CONFIG.configDocs пуст",
+      );
+  }
+  if (CONFIG.lintConfigOff == null) {
+    const at = ["eslint.config.js", "eslint.config.mjs", "eslint.config.cjs"]
+      .map((n) => path.join(HERE, "..", n))
+      .find((f) => existsSync(f) && /:\s*"off"/.test(readFileSync(f, "utf8")));
+    if (at !== undefined)
+      disarmed.push(
+        "правила линта уже выключаются в конфиге, а CONFIG.lintConfigOff пуст",
+      );
+  }
+  if (CONFIG.skills == null) {
+    const at = path.join(HERE, "../.claude/skills");
+    if (existsSync(at) && readdirSync(at).length)
+      disarmed.push("скиллы уже есть, а CONFIG.skills пуст");
+  }
+  // 13e. список критериев планки: проект против полки, в обе стороны.
+  const qualityDrift = [];
+  if (CONFIG.qualityList != null && SHELF !== null) {
+    const ids = (at) =>
+      existsSync(at)
+        ? new Set(
+            [
+              ...readFileSync(at, "utf8").matchAll(
+                /\*\*([A-F]\d+(?:-бис)?)\./g,
+              ),
+            ].map((m) => m[1]),
+          )
+        : null;
+    const mine = ids(path.join(HERE, CONFIG.qualityList.rules));
+    const theirs = ids(path.join(SHELF, CONFIG.qualityList.shelf));
+    if (mine === null) qualityDrift.push("файла правил нет");
+    else if (theirs === null) qualityDrift.push("списка на полке нет");
+    else {
+      for (const one of mine)
+        if (!theirs.has(one))
+          qualityDrift.push(`критерий не уехал на полку: ${one}`);
+      for (const one of theirs)
+        if (!mine.has(one))
+          qualityDrift.push(`критерий есть на полке, но не в правилах: ${one}`);
+    }
+  }
+  // 13f. каждый документ назван в указателе.
+  const indexDrift = [];
+  if (CONFIG.docsIndex != null) {
+    const dir = norm(path.join(HERE, CONFIG.docsIndex.dir));
+    const table = path.join(BASE, CONFIG.docsIndex.table);
+    if (existsSync(dir) && existsSync(table)) {
+      const text = readFileSync(table, "utf8");
+      if (!text.includes(CONFIG.docsIndex.heading))
+        indexDrift.push(`таблицы указателя нет: «${CONFIG.docsIndex.heading}»`);
+      else
+        for (const name of readdirSync(dir).filter((n) => n.endsWith(".md")))
+          if (!text.includes(name))
+            indexDrift.push(`документа нет в указателе: ${name}`);
+    }
+  }
+  // 13g. версия среды против объявленного диапазона — ПРЕДУПРЕЖДЕНИЕ.
+  //
+  // Три свойства, и все три решены разработчиком:
+  //
+  // 1. Прогона не роняет. Запрет стоил бы дороже пользы (см. `CONFIG.manifest`),
+  //    а поломка от неподходящей версии приходит громко — инструменты падают, а
+  //    не выдают тихо другие числа.
+  // 2. **Молчит, когда версия подходит.** Секция, печатающая «всё хорошо»
+  //    каждый прогон, — это плата за то, чего в работающем проекте не
+  //    происходит. Здесь молчание и означает «в диапазоне»; голос появляется
+  //    ровно там, где он нужен: посадка в новый проект, переезд на другую
+  //    машину, смена версии.
+  // 3. Говорит громко, когда не подходит: разработчик обязан быть предупреждён,
+  //    а решать дальше — ему.
+  //
+  // Разбирается ровно та форма диапазона, которая объявлена в манифесте:
+  // нижняя граница `>=` и верхняя `<`. Форма, которой разбор не знает, честно
+  // называется неразобранной — иначе предупреждение врало бы уверенным тоном.
+  if (CONFIG.manifest != null) {
+    const at = path.join(HERE, CONFIG.manifest);
+    const want = existsSync(at)
+      ? (JSON.parse(readFileSync(at, "utf8")).engines?.node ?? null)
+      : null;
+    const parts = (v) => v.replace(/^v/, "").split(".").map(Number);
+    const cmp = (a, b) => {
+      const x = parts(a);
+      const y = parts(b);
+      for (let i = 0; i < 3; i++)
+        if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) - (y[i] ?? 0);
+      return 0;
+    };
+    const low =
+      want === null ? null : (/(?:^|\s)>=\s*([\d.]+)/.exec(want)?.[1] ?? null);
+    const high =
+      want === null ? null : (/(?:^|\s)<\s*([\d.]+)/.exec(want)?.[1] ?? null);
+    const now = process.version;
+    const say =
+      want === null
+        ? "  диапазон версии не объявлен — переносимость держится на памяти"
+        : low === null && high === null
+          ? `  диапазон «${want}» записан формой, которой разбор не знает`
+          : low !== null && cmp(now, low) < 0
+            ? `  версия НИЖЕ объявленной: ${now} при «${want}»`
+            : high !== null && cmp(now, high) >= 0
+              ? `  версия ВЫШЕ объявленной: ${now} при «${want}»`
+              : null;
+    if (say !== null) {
+      console.log("=== Версия среды (предупреждение, прогон не роняет) ===");
+      console.log(say);
+      console.log(
+        "  Числа базовой линии снимались на объявленной версии; решение, что",
+      );
+      console.log("  с этим делать, за вами — прогон остановлен не будет.");
+    }
+  }
+
+  // 13h. имена связей через DOM и CSS существуют в коде.
+  const domDrift = [];
+  if (CONFIG.domTables != null) {
+    const at = path.join(BASE, CONFIG.domTables.file);
+    if (existsSync(at)) {
+      const text = readFileSync(at, "utf8").split(NEWLINE);
+      const code = [...files, ...styleFiles]
+        .map((f) => readFileSync(f, "utf8"))
+        .join(NEWLINE);
+      for (const heading of CONFIG.domTables.headings) {
+        const from = text.indexOf(heading);
+        if (from < 0) {
+          domDrift.push(`таблицы нет: «${heading}»`);
+          continue;
+        }
+        for (let i = from + 2; i < text.length && text[i].startsWith("|"); i++)
+          for (const hit of text[i]
+            .split("|")[1]
+            .matchAll(/`(--[a-z-]+|data-[a-z-]+)`/g))
+            if (!code.includes(hit[1]))
+              domDrift.push(`названо в таблице, нет в коде: ${hit[1]}`);
+      }
+    }
+  }
+  console.log("=== Связи через DOM и CSS ===");
+  console.log(
+    CONFIG.domTables == null
+      ? "  таблицы не заявлены"
+      : `  названо и не найдено: ${domDrift.length}`,
+  );
+  for (const d of domDrift) console.log("    " + d);
+
+  console.log("=== Документы названы в указателе ===");
+  console.log(
+    CONFIG.docsIndex == null
+      ? "  указатель не заявлен"
+      : `  не названо: ${indexDrift.length}`,
+  );
+  for (const d of indexDrift) console.log("    " + d);
+
+  console.log("=== Список критериев планки ===");
+  console.log(
+    CONFIG.qualityList == null || SHELF === null
+      ? "  пара не заявлена"
+      : `  расхождений: ${qualityDrift.length}`,
+  );
+  for (const q of qualityDrift) console.log("    " + q);
+
+  console.log("=== Сверки, выключенные при живом предмете ===");
+  console.log(`  выключено зря: ${disarmed.length}`);
+  for (const d of disarmed) console.log("    " + d);
+
   console.log("=== Скиллы проекта ===");
   console.log(
     CONFIG.skills == null
@@ -3108,6 +4070,35 @@ if (mode === "verify") {
     ...(CONFIG.skills == null ? [] : skillDocs()),
   ].filter(([, at]) => !at.startsWith(SHELF_ROOT));
 
+  // 9d, обратная сторона: номер решения, названный где угодно, разрешается в
+  // файл. Корпус тот же, что у адресов, плюс код: на решение ссылаются как раз
+  // из комментария. Номер сравнивается числом, а не строкой, — иначе `ADR-4` и
+  // `ADR-004` считались бы разными решениями, хотя решение одно.
+  if (CONFIG.adr != null) {
+    const dir = norm(path.join(HERE, CONFIG.adr.dir));
+    const known = new Set(
+      (existsSync(dir) ? readdirSync(dir) : [])
+        .filter((n) => /\.md$/.test(n))
+        .map((n) => Number(/^(\d+)/.exec(n)?.[1] ?? NaN))
+        .filter((n) => Number.isFinite(n)),
+    );
+    const gone = new Set();
+    for (const [name, at] of [
+      ...docSources,
+      ...[...files, ...styleFiles].map((f) => [rel(f), f]),
+    ])
+      for (const hit of readFileSync(at, "utf8").matchAll(/ADR[-\s](\d+)/g))
+        if (!known.has(Number(hit[1]))) gone.add(`${name}: ${hit[0]}`);
+    for (const g of gone) danglingAdr.push(g);
+  }
+
+  console.log("=== Решения адресуемы ===");
+  console.log(
+    `  без единой ссылки: ${orphanAdr.length}, ссылок на несуществующее решение: ${danglingAdr.length}`,
+  );
+  for (const a of orphanAdr) console.log("    " + a);
+  for (const a of danglingAdr) console.log("    " + a);
+
   // 14. путь в обратных кавычках указывает на существующий файл.
   // Якоря `файл:строка` закрыты пунктом 8; здесь — голые адреса без номера
   // строки, а их втрое больше. Адресом считается токен с косой чертой и
@@ -3121,10 +4112,47 @@ if (mode === "verify") {
   // `.context/**`, самый называемый адрес проекта. Найдено пробой: `.context/
   // graph2.mjs` (файла нет) прошёл молча.
   const PATH_EXT = /\.(tsx?|scss|md|json|mjs)$/;
+  // Составное расширение (`.test.ts`) — тоже расширение, а не адрес: прежний
+  // образец требовал одного куска после точки и на нём спотыкался.
   const isExtensionList = (tok) =>
-    tok.split("/").every((s) => /^\.[A-Za-z0-9]+$/.test(s));
+    tok.split("/").every((s) => /^\.[A-Za-z0-9]+(\.[A-Za-z0-9]+)*$/.test(s));
   const looksLikePath = (tok) =>
     tok.includes("/") && PATH_EXT.test(tok) && !isExtensionList(tok);
+  // Голое имя без косой черты — тоже адрес, и чаще всего именно им база
+  // называет саму себя: своих соседей она пишет `05-flows.md`, а не путём.
+  // Из сверки они выпадали целиком, и это не мелочь: ЧЕТЫРЕ файла базы
+  // адресуемы только так, — переименование одного из них проходило зелёным,
+  // проверено пробой. Засчитывается только имя, которое на диске одно:
+  // `README.md` носят полсотни файлов, и разрешать его значило бы гадать.
+  // Опись для голых имён — весь репозиторий, а не `src`: база называет саму
+  // себя, свои правила и свои скиллы, и все они лежат вне исходников.
+  // `.stryker-tmp` пропускается не для скорости: во время мутационного прогона
+  // там лежит ПОЛНАЯ копия дерева, и каждое имя становится неоднозначным — то
+  // есть сверка замолчала бы ровно тогда, когда рядом идёт долгий прогон. На
+  // этом и попался замер, которым эта дыра меряли.
+  const OUT_OF_TREE = new Set([
+    "node_modules",
+    ".git",
+    ".stryker-tmp",
+    "dist",
+    "coverage",
+    "reports",
+  ]);
+  const bareCount = new Map();
+  (function walkRepo(dir) {
+    for (const e of readdirSync(dir)) {
+      if (OUT_OF_TREE.has(e)) continue;
+      const full = norm(path.join(dir, e));
+      if (statSync(full).isDirectory()) walkRepo(full);
+      else bareCount.set(e, (bareCount.get(e) ?? 0) + 1);
+    }
+  })(norm(REPO));
+  // Только документы. У `.json` и `.ts` голое имя в этом проекте чаще всего
+  // проза — «положите рядом `config.json`», «суффикс `.test.ts`», — и сверка по
+  // ним краснела бы на законном тексте: замерено, пять таких на 1110 токенов.
+  // У документа наоборот: голое имя это ссылка, и другой формы у неё обычно нет.
+  const looksLikeBareName = (tok) =>
+    !tok.includes("/") && /\.md$/.test(tok) && !isExtensionList(tok);
   // `everyPath` собран под подсчёт папок и намеренно держит только
   // `.ts/.tsx/.scss/.md`; расширять его нельзя — на его составе стоят числа
   // заявленных папок. Поэтому у сверки путей свой инвентарь: тот же список
@@ -3139,6 +4167,7 @@ if (mode === "verify") {
   })(norm(path.join(REPO, "src")));
   const inventory = [...everyPath, ...scriptFiles];
   const knownDangling = new Set(CONFIG.docPathExceptions);
+  const knownUsed = new Set();
   const danglingPaths = [];
   let pathTokens = 0;
   for (const [name, at] of docSources) {
@@ -3147,9 +4176,21 @@ if (mode === "verify") {
       let tok = hit[1].trim();
       if (/[\s(){}*[\]<>|,]/.test(tok)) continue;
       tok = tok.replace(/[:#].*$/, "");
+      if (looksLikeBareName(tok)) {
+        // Неоднозначное имя отсутствием не является — тот же принцип, что у
+        // реестра тестов и у карты: список, наполненный живыми файлами,
+        // перестают читать.
+        const seen = bareCount.get(tok) ?? 0;
+        if (seen === 0) {
+          pathTokens++;
+          if (knownDangling.has(`${name}|${tok}`))
+            knownUsed.add(`${name}|${tok}`);
+          else danglingPaths.push(`${name}: ${tok}`);
+        } else if (seen === 1) pathTokens++;
+        continue;
+      }
       if (!looksLikePath(tok)) continue;
       pathTokens++;
-      if (knownDangling.has(`${name}|${tok}`)) continue;
       const asRelative =
         tok.startsWith("./") || tok.startsWith("../")
           ? norm(path.resolve(dir, tok))
@@ -3165,23 +4206,108 @@ if (mode === "verify") {
         inventory.some((f) => f.endsWith("/" + tok))
       )
         continue;
+      // Исключение спрашивают ПОСЛЕ разрешения, а не до: спрошенное раньше, оно
+      // считалось бы использованным и для адреса, который давно на месте, — то
+      // есть переживало бы собственный повод.
+      if (knownDangling.has(`${name}|${tok}`)) {
+        knownUsed.add(`${name}|${tok}`);
+        continue;
+      }
       danglingPaths.push(`${name}: ${tok}`);
     }
   }
+  for (const one of knownDangling)
+    if (!knownUsed.has(one))
+      deadExceptions.push(`пути в обратных кавычках: ${one} — ничего не гасит`);
+
   console.log("=== Пути в обратных кавычках ===");
   console.log(
     `  проверено: ${pathTokens}, ведут в никуда: ${danglingPaths.length}`,
   );
   for (const d of danglingPaths) console.log("    " + d);
 
+  console.log("=== Исключения сверок используются ===");
+  console.log(`  мёртвых исключений: ${deadExceptions.length}`);
+  for (const d of deadExceptions) console.log("    " + d);
+
   // 15. ALL_CAPS-имя в обратных кавычках существует в исходниках.
   // Константы база называет поимённо, и переименование оставляет в тексте имя,
   // которого больше нет. Маркеры отложенной работы исключены: их в коде нет
   // намеренно — про них как раз и написано, что их быть не должно.
+  // Имя ищется в ИСПОЛНЯЕМОМ тексте, а не в любом. Сверка по всему файлу
+  // держалась за собственное эхо: переименованная константа оставалась «живой»
+  // из-за строки `// СТАРОЕ_ИМЯ` в комментарии теста — прогон зелёный,
+  // а имени в коде уже нет. Найдено пробой. Комментарий узнаётся тем же
+  // помощником, что и пометки решений: два способа отличать комментарий от кода
+  // однажды разошлись бы.
   const WORK_MARKERS = new Set(["TODO", "FIXME", "HACK", "XXX"]);
-  const sourceBlob = [...files, ...styleFiles]
-    .map((f) => readFileSync(f, "utf8"))
-    .join(NEWLINE);
+  const liveNames = new Set();
+  for (const f of [...files, ...styleFiles])
+    for (const line of readFileSync(f, "utf8").split(NEWLINE))
+      for (const hit of line.matchAll(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g))
+        if (!inComment(line, hit.index)) liveNames.add(hit[0]);
+
+  // 15b. имя в camelCase, названное базой в кода-спане, существует.
+  //
+  // Сверка имён знала только ЗАГЛАВНЫЕ константы, а база называет в кавычках
+  // прежде всего хуки, функции и пропы — то есть camelCase. Найдено пробой:
+  // переименовал `slideLane` в домене, база продолжила его называть, прогон
+  // остался зелёным. Переименование — самое частое событие рефактора, и это
+  // ровно тот случай, когда запись переживает предмет.
+  //
+  // Обратные кавычки в базе означают «это существует в коде»: тем же правилом
+  // живут пути. Поэтому имя, которого больше нет, из кавычек убирают — так
+  // написаны обе исторические записи, где имя названо как прошлое.
+  //
+  // Корпус шире исходников намеренно: имя поля конфига инструмента живёт в
+  // `.mjs`, опция компилятора — в `.json` и `.js`, имя теста — в имени файла.
+  // Без них сверка кричала бы на законное, то есть врала бы (F4).
+  // Имя живо, только если стоит в ИСПОЛНЯЕМОМ тексте. Иначе сверка держится за
+  // собственное эхо — ровно как было у заглавных имён: объяснение этой самой
+  // проверки, где имя названо в комментарии, удерживало его «живым», и полное
+  // переименование по коду проходило зелёным. Поймано на первой же фальсификации.
+  const CAMEL_NAME = /^[a-z][A-Za-z0-9]*[A-Z][A-Za-z0-9]*$/;
+  const CAMEL_TOKEN = /\b[a-z][A-Za-z0-9]*[A-Z][A-Za-z0-9]*\b/g;
+  const liveCamel = new Set();
+  const fileStems = new Set();
+  (function walkNames(dir) {
+    for (const entry of readdirSync(dir)) {
+      if (OUT_OF_TREE.has(entry)) continue;
+      const full = norm(path.join(dir, entry));
+      if (statSync(full).isDirectory()) walkNames(full);
+      else {
+        fileStems.add(entry.replace(/\.[a-z.]+$/, ""));
+        if (!/\.(tsx?|scss|mjs|js|json)$/.test(entry)) continue;
+        for (const line of readFileSync(full, "utf8").split(NEWLINE))
+          for (const hit of line.matchAll(CAMEL_TOKEN))
+            if (!inComment(line, hit.index)) liveCamel.add(hit[0]);
+      }
+    }
+  })(norm(path.join(HERE, "..")));
+  const goneCamel = [];
+  const foreignUsed = new Set();
+  let camelTokens = 0;
+  for (const [name, at] of docSources)
+    for (const [i, line] of readFileSync(at, "utf8").split(NEWLINE).entries())
+      for (const span of line.split(BACKTICK).filter((_, k) => k % 2 === 1)) {
+        const tok = span.trim();
+        if (!CAMEL_NAME.test(tok) || fileStems.has(tok)) continue;
+        if ((CONFIG.foreignNames ?? []).includes(tok)) {
+          foreignUsed.add(tok);
+          continue;
+        }
+        camelTokens++;
+        if (!liveCamel.has(tok)) goneCamel.push(`${name}:${i + 1} — ${tok}`);
+      }
+  for (const one of CONFIG.foreignNames ?? [])
+    if (!foreignUsed.has(one))
+      deadExceptions.push(`имена из чужих API: ${one} — ничего не гасит`);
+
+  console.log("=== Имена из кода в тексте ===");
+  console.log(
+    `  проверено: ${camelTokens}, нет в исходниках: ${goneCamel.length}`,
+  );
+  for (const g of goneCamel) console.log("    " + g);
   const goneNames = [];
   let capsTokens = 0;
   for (const [name, at] of docSources) {
@@ -3199,10 +4325,81 @@ if (mode === "verify") {
         if (WORK_MARKERS.has(hit[0])) continue;
         if (span[1][hit.index + hit[0].length] === ".") continue;
         capsTokens++;
-        if (!sourceBlob.includes(hit[0])) goneNames.push(`${name}: ${hit[0]}`);
+        if (!liveNames.has(hit[0])) goneNames.push(`${name}: ${hit[0]}`);
       }
     }
   }
+  // 15a. счёт сущностей, записанный голой прозой базы.
+  //
+  // Правило простое: число, которое едет от любой правки, в базе не пишут.
+  // Держалось оно текстом — и текст протекал: за один заход нашлось восемь
+  // застывших счётов в проекте, где правило уже было записано. Машина их не
+  // отличала от законных, потому что законные писались так же — голой прозой.
+  //
+  // Поэтому у законных теперь есть ФОРМА: замер и факт о прошлом пишутся в
+  // обратных кавычках. Всё, что вне формы, запрещено по построению — судить не
+  // надо, соврать нечем. Проверено, что форма свободна: до этой правки чисел
+  // внутри кода-спанов в базе не было ни одного, так что задним числом ничего
+  // не легализовано.
+  //
+  // Не считаются числом: объявленные машинные формы (состав папки, радиус),
+  // разделы базовой линии и НУМЕРАЦИЯ — номер пункта, заголовка или строки
+  // таблицы. Последнее не поблажка: «11. Значение константы» — это адрес
+  // раздела, а не счёт.
+  // Единицы НАСТРОЙКИ — тот же класс, что счёт сущностей: `250 мс` в прозе это
+  // копия значения из конфига, и она едет от каждой правки настройки. Найдено
+  // пробой: значение стояло в двух файлах базы, а сверка ловила только счёт.
+  //
+  // Проценты сюда НЕ входят, и это не послабление: в этом проекте процент — это
+  // всегда результат замера (доля убитых мутантов, покрытие), а не значение
+  // константы. Включить их значило бы потребовать пометки у трёх десятков
+  // записей о прошлых прогонах — то есть шуметь там, где формой уже сказано всё.
+  const NUM_NOUN =
+    "файл|бочк|сверк|режим|провер|тест|правил|экспорт|строк|исключен|папк|модул|пункт|запис|констант|слайд|мутант|раздел|команд|хук|слоёв|секунд|минут|мс(?![а-яё])|px";
+  // Стем ищется и ВНУТРИ слова, а не только в начале: «14 реэкспортов» — тот же
+  // счёт, что «14 экспортов», и привязка к началу слова пропускала его молча.
+  // Найдено пробой. Расширение измерено на всей базе: новых попаданий ровно
+  // одно, и оно настоящее — ложных ноль, поэтому шума сверка не даёт.
+  const PROSE_NUM = new RegExp(
+    `\\d[\\d.,]*\\s+(?:[а-яё]+\\s+)?[а-яё]*(?:${NUM_NOUN})[а-яё]*`,
+    "gi",
+  );
+  const DECLARED_NUM = [
+    /\(\d+\s+файл[аов]*\)/,
+    /—\s+\d+\s+файл[аов]*/,
+    /\d+\s+импортёр[а-я]*\s*\(\+\d+/,
+  ];
+  // Нумерация: в начале строки, после маркера списка, после решётки заголовка
+  // или сразу за вертикальной чертой таблицы.
+  const NUMBERING = /(^|[-*|#]\s*|\*\*)[A-ZА-Я]?\d+\.\s/g;
+  const outsideTicks = (line) =>
+    line
+      .split(BACKTICK)
+      .filter((_, i) => i % 2 === 0)
+      .join(" ");
+  const frozenNumbers = [];
+  for (const name of readdirSync(BASE)) {
+    if (!name.endsWith(".md")) continue;
+    let inBaseline = false;
+    for (const [i, line] of readFileSync(path.join(BASE, name), "utf8")
+      .split(NEWLINE)
+      .entries()) {
+      if (/^##\s/.test(line))
+        inBaseline = (CONFIG.baselineSections ?? []).some((one) =>
+          line.includes(one),
+        );
+      if (inBaseline) continue;
+      if (DECLARED_NUM.some((rx) => rx.test(line))) continue;
+      const bare = outsideTicks(line).replace(NUMBERING, " ");
+      const hit = bare.match(PROSE_NUM);
+      if (hit !== null)
+        frozenNumbers.push(`${name}:${i + 1} — ${hit.join(" | ")}`);
+    }
+  }
+  console.log("=== Числа в прозе базы ===");
+  console.log(`  счётов вне формы: ${frozenNumbers.length}`);
+  for (const f of frozenNumbers) console.log("    " + f);
+
   console.log("=== Имена констант в тексте ===");
   console.log(
     `  проверено: ${capsTokens}, нет в исходниках: ${goneNames.length}`,
@@ -3236,14 +4433,21 @@ if (mode === "verify") {
     unnamed.length ||
     goneTests.length ||
     goneMapped.length ||
-    uncovered.length ||
-    undecided.length ||
+    markerKinds.some((k) => k.unlisted.length || k.gone.length) ||
     broken7.length ||
+    brokenIso.length ||
+    emptyRules.length ||
+    missingTables.length ||
+    starDrift.length ||
+    barrelDrift.length ||
     broken.length ||
     wrong.length ||
     toolDrift.length ||
     orphanAdr.length ||
+    danglingAdr.length ||
+    undocumentedConst.length ||
     lintDrift.length ||
+    offDrift.length ||
     undocumented.length ||
     deadAnchors.length ||
     closedTodos.length ||
@@ -3256,10 +4460,17 @@ if (mode === "verify") {
     // мимо этого списка и молча не роняла прогон.
     settingsDrift.length ||
     skillDrift.length ||
+    disarmed.length ||
+    qualityDrift.length ||
+    indexDrift.length ||
+    domDrift.length ||
     unclassified.length ||
     danglingRefs.length ||
+    deadExceptions.length ||
     danglingPaths.length ||
     goneNames.length ||
+    frozenNumbers.length ||
+    goneCamel.length ||
     strayTests.length ||
     unresolved.length
   )

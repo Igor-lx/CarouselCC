@@ -26,6 +26,12 @@ import { useSlideRenderModel } from "../useSlideRenderModel";
  */
 
 const BUFFER = 4;
+
+/**
+ * The rebase band is module-private in the hook, so the number is repeated here.
+ * The copy is held, not trusted: the two edge tests below probe AT the band, so
+ * moving the hook's value reddens them — measured, not assumed.
+ */
 const BAND = 512; // LAYOUT_ORIGIN_BAND_SLOTS
 
 const recordsOf = (slideCount: number): CarouselSlideRecord[] =>

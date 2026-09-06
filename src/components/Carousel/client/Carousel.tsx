@@ -50,7 +50,7 @@ import type { CarouselProps } from "./public-api/types";
 
 const IS_DEV = import.meta.env.DEV; // gates the dev-only slide media descriptors
 
-const EMPTY_SLIDE_MEDIA: CarouselSlideMediaView[] = [];
+const EMPTY_SLIDE_MEDIA: readonly CarouselSlideMediaView[] = Object.freeze([]);
 
 const Carousel = memo(function Carousel(props: CarouselProps) {
   const {
@@ -124,7 +124,7 @@ const Carousel = memo(function Carousel(props: CarouselProps) {
   );
 
   // Art-direction descriptors — dev Diagnostic slot only (never runs shipped).
-  const slideMediaViews = useMemo<CarouselSlideMediaView[]>(
+  const slideMediaViews = useMemo<readonly CarouselSlideMediaView[]>(
     () =>
       IS_DEV && isContentImg
         ? records.flatMap((record) =>

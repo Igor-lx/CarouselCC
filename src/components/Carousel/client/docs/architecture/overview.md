@@ -40,7 +40,9 @@ Five SSOTs, each owned by exactly one layer. No layer mirrors another's value.
 1. **Logical state** — `useCarouselState`. `targetPageIndex`, `fromVirtualIndex`,
    `virtualIndex`, optional `teleportVirtualIndex`, `isTeleportApproach`,
    `motionPhase`, `gesture` (velocity payload of the latest END_DRAG),
-   `isRepeatedClickAdvance`, `moveReason`. No timing. Reducer-pure.
+   `isRepeatedClickAdvance`, `moveReason` — plus the context the reducer decides
+   with, `layout`, `config` and `isInstantMode`, which are state and not
+   per-command arguments (ADR-004). No timing. Reducer-pure.
 2. **Visual sampled position** — `useVisualPosition`. The motion controller's
    `value`/`velocity`/`target` are the only authority on "where the track is
    right now". Everything per-frame subscribes here.

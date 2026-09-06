@@ -50,7 +50,7 @@ cannot disagree.
 
 The wrapper is `aria-hidden="true"` — dots are pointer targets, not exposed to
 AT; page indication reaches screen readers via `aria-current="step"` on the
-visible band. The slot renders only when `canSlide` (`shouldRenderPagination`),
+visible band. The slot renders only when `canSlide` — the gate lives in `useModuleRenderPolicy`,
 so a single-page deck shows no dots — no internal `pageCount <= 1` guard.
 
 **Transition suppression (a load-bearing trap).** The dot's CSS `transition`
@@ -75,7 +75,7 @@ rather than returning early.
 ## `<PaginationWidget />`
 
 Touch dot pagination — a fixed-width odd-count strip with exponentially
-shrinking side dots; `activeDot` overlays carry the moving highlight (dot count
+shrinking side dots; the active-dot overlays carry the moving highlight (dot count
 via internal `PAGINATION_WIDGET_DEFAULTS`).
 
 It is a **decoupled one-step indicator**: it owns its own step counter and never
@@ -118,7 +118,7 @@ two modes solve it differently, and the stylesheet switches between them on
   per-dot custom property `--dot-active-strength`. React writes it inline.
 - **bound** — that `::after` is turned off
   (`.container_PW[data-motion-bound="true"] .dot_PW::after { display: none }`)
-  and the highlight moves to the pooled `activeDot` overlays, which the binding
+  and the highlight moves to the pooled active-dot overlays, which the binding
   paints and hands to the compositor. A real element is what makes a keyframed
   opacity track possible at all.
 

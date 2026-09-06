@@ -30,7 +30,7 @@ export function carouselReducer(
   // The context boundary is the reconcile boundary: the host's layout, config
   // and mode land here before any command can act on them, so every branch
   // below reads them off the state it was given.
-  // See docs/adr/0001-layout-reconciliation.md and docs/adr/0004-reducer-owns-its-context.md.
+  // ADR-001, ADR-004.
   if (command.type === "SYNC_CONTEXT") {
     const synced = reconcileStateToLayout(state, command.layout);
     if (

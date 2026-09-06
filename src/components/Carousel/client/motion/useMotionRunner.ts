@@ -47,7 +47,15 @@ const directionOf = (delta: number): MotionPlanDirection =>
  * silently missed (or silently duplicated) re-plan: nothing throws, the deck
  * simply strands at the old target or restarts a ride from its own midpoint.
  */
-const replanInputs = (state: CarouselState, isInstantMode: boolean) =>
+/** What the dedupe key can be built from: `join(":")` turns anything else into
+ * `[object Object]`, and the key silently stops telling states apart. Stating it
+ * as a type is what keeps it from being an agreement held in someone's head. */
+type ReplanInput = string | number | boolean | null | undefined;
+
+const replanInputs = (
+  state: CarouselState,
+  isInstantMode: boolean,
+): readonly ReplanInput[] =>
   [
     state.layout.canSlide,
     state.layout.visibleSlidesCount,

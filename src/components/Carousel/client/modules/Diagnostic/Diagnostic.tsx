@@ -21,7 +21,7 @@ import { useGroupedWarnings } from "./useGroupedWarnings";
 const IS_DEV = import.meta.env.DEV;
 
 /** One frozen empty result, shared by every gated-off collection. */
-const EMPTY: CarouselDiagnosticWarning[] = [];
+const EMPTY: readonly CarouselDiagnosticWarning[] = Object.freeze([]);
 
 const BANNER =
   "[Carousel Diagnostic] enabled. Observe-mode only: diagnostics reports runtime misvalues but never repair or normalizes them.";

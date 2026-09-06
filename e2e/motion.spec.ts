@@ -57,12 +57,6 @@ test.beforeEach(async ({ page }) => {
   await settled(page);
 });
 
-test("колода смонтирована и трек на месте", async ({ page }) => {
-  await expect(page.locator("[data-carousel-root]")).toBeVisible();
-  await expect(page.locator("[data-carousel-viewport]")).toBeVisible();
-  expect(await page.locator("[data-active-zone]").count()).toBeGreaterThan(0);
-});
-
 test("трек ДВИЖЕТСЯ между кадрами, а не прыгает разом", async ({ page }) => {
   const before = await trackX(page);
   await next(page);

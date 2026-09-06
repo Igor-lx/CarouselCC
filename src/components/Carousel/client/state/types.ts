@@ -37,7 +37,7 @@ export const ZERO_GESTURE_RELEASE: GestureRelease = Object.freeze({
 });
 
 export interface CarouselState {
-  /** The context the reducer decides with — see docs/adr/0004-reducer-owns-its-context.md.
+  /** The context the reducer decides with — see ADR-004.
    * It is state, not something handed in per command: whatever reads the state
    * reads the same layout, config and mode the reducer used. */
   layout: CarouselLayout;
