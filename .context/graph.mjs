@@ -3480,13 +3480,21 @@ if (mode === "verify") {
     // `TODO`, вписанный в запись базы, проходил мимо неё молча — поймано
     // пробой. Описания самих маркеров всегда стоят в обратных кавычках,
     // поэтому код в кавычках вырезается перед поиском: иначе сверка доложила
-    // бы о строке, которая её же и описывает. Файл отложенного не сканируется
-    // намеренно: он и есть список согласованных отсрочек.
+    // бы о строке, которая её же и описывает.
+    //
+    // Файл отложенного из этой сети НЕ исключается, хотя из соседней —
+    // исключается по существу. Разница в том, что там ловятся книжные обороты
+    // («отложено до…»), и в списке согласованных отсрочек они законны, а здесь
+    // ловится МАРКЕР — форма, которой помечают работу несделанную и
+    // **неоформленную**. Файл отложенного как раз требует оформления: заголовок,
+    // риск, статус. `TODO` внутри его пункта — это работа внутри работы, мимо
+    // всей этой формы. Найдено пробой: исключение было написано по файлу, а его
+    // причина относилась только к одной из двух сетей.
     for (const rp of [
       ...baseDocs.map((n) => path.join(BASE, n)),
       ...CONFIG.rulesManifest.rules.map((r) => path.join(HERE, r)),
     ]) {
-      if (!existsSync(rp) || path.basename(rp) === CONFIG.todo) continue;
+      if (!existsSync(rp)) continue;
       const lines = readFileSync(rp, "utf8").split(NEWLINE);
       lines.forEach((line, i) => {
         const bare = line.replace(/`[^`]*`/g, " ");
@@ -3641,6 +3649,36 @@ if (mode === "verify") {
     const tableAt = path.join(BASE, CONFIG.rulesManifest.table);
     // Заголовки собираются со ВСЕХ заявленных файлов правил: разложенные по
     // папкам, они остаются одним корпусом, и сверять их надо как один.
+    // Обратная сторона: файл правил, лежащий на диске и НЕ объявленный.
+    // Прямая ловит «объявлен, а файла нет» — это значит правила потеряли.
+    // Без обратной проходило противоположное и худшее: вложенный `CLAUDE.md`
+    // действует в своей папке, грузится сам, а обвязка о нём не знает вовсе —
+    // его разделы не классифицированы, на полку он не поедет, и заметить это
+    // некому. Найдено пробой. Полка исключена: её `CLAUDE.template.md` — не
+    // действующие правила, а заготовка для будущего проекта.
+    {
+      const declared = new Set(
+        CONFIG.rulesManifest.rules.map((r) => norm(path.join(HERE, r))),
+      );
+      const skipDirs = new Set([
+        "node_modules",
+        ".stryker-tmp",
+        "dist",
+        "coverage",
+        ".git",
+      ]);
+      (function walkRules(dir) {
+        for (const e of readdirSync(dir)) {
+          if (skipDirs.has(e)) continue;
+          const full = norm(path.join(dir, e));
+          if (statSync(full).isDirectory()) walkRules(full);
+          else if (e === "CLAUDE.md" && !declared.has(full))
+            unclassified.push(
+              `файл правил не объявлен в манифесте: ${rel(full)}`,
+            );
+        }
+      })(norm(REPO));
+    }
     const heads = [];
     for (const one of CONFIG.rulesManifest.rules) {
       const at = path.join(HERE, one);
@@ -4027,6 +4065,28 @@ if (mode === "verify") {
             : `      шаблон настройки на полке: ${link.template}`),
       );
     }
+    // Обратная сторона: звено, появившееся в самой цепочке, но не объявленное.
+    // Прямая ловит «объявлено, а инструмента нет»; без этой половины список
+    // молча отстаёт от цепочки, и на следующей посадке про новое звено просто
+    // не спросят. Найдено пробой — сверка была односторонней с рождения.
+    const chain = scripts.check ?? null;
+    if (chain !== null) {
+      const inChain = [
+        ...[...chain.matchAll(/npm run ([\w:-]+)/g)].map((m) => m[1]),
+        ...(/(^|&&)\s*npm test\b/.test(chain) ? ["test"] : []),
+      ];
+      const known = new Set(
+        CONFIG.toolchain.map((l) => l.script).filter((s) => s != null),
+      );
+      for (const link of inChain)
+        if (!known.has(link))
+          gaps.push(
+            `  ${link} — цепочка проверок его зовёт, а в объявлении звеньев его нет` +
+              NEWLINE +
+              "      значит про его инструмент на посадке не спросят",
+          );
+    }
+
     if (gaps.length) {
       console.log(
         "=== Инструменты обвязки (предупреждение, прогон не роняет) ===",
@@ -4267,6 +4327,48 @@ if (mode === "verify") {
     }
   })(norm(path.join(REPO, "src")));
   const inventory = [...everyPath, ...scriptFiles];
+  // Ссылка markdown — ВТОРАЯ форма адреса, и её не читала ни одна сверка.
+  // Разница с обратными кавычками принципиальная: там адрес может оказаться
+  // прозой («положите рядом файл такой-то»), поэтому корпус там сужен, а полка
+  // исключена целиком — её текст называет файлы проекта, которого ещё нет.
+  // Здесь сужать нечего: `](./путь)` — это ссылка, а не упоминание.
+  //
+  // Найдено пробой, и дыра была ровно в полке: её таблица состава ссылается на
+  // собственные шаблоны, шаблон унесли — прогон остался зелёным. Исключение
+  // было написано ПО ИСТОЧНИКУ, а его причина — про ЦЕЛЬ ссылки.
+  //
+  // Корпус поэтому весь репозиторий, полка включительно; замер до заведения:
+  // ссылок 253, битых 0, и ни одной не относительной — то есть шума сверка не
+  // даёт по построению.
+  const danglingLinks = [];
+  {
+    const skipDirs = new Set([
+      "node_modules",
+      ".stryker-tmp",
+      "dist",
+      "coverage",
+      ".git",
+    ]);
+    const mdFiles = [];
+    (function walkMd(dir) {
+      for (const e of readdirSync(dir)) {
+        if (skipDirs.has(e)) continue;
+        const full = path.join(dir, e);
+        if (statSync(full).isDirectory()) walkMd(full);
+        else if (e.endsWith(".md")) mdFiles.push(norm(full));
+      }
+    })(norm(REPO));
+    for (const f of mdFiles)
+      for (const m of readFileSync(f, "utf8").matchAll(/\]\(([^)\s]+)\)/g)) {
+        const spec = m[1];
+        // Внешние адреса, якоря внутри страницы, плейсхолдеры и абсолютные
+        // пути к делу не относятся: первое не наше, остальное не адрес файла.
+        if (/^(https?:|#|<|mailto:|\/)/.test(spec)) continue;
+        const target = path.resolve(path.dirname(f), spec.split("#")[0]);
+        if (!existsSync(target)) danglingLinks.push(`${rel(f)} → ${spec}`);
+      }
+  }
+
   const knownDangling = new Set(CONFIG.docPathExceptions);
   const knownUsed = new Set();
   const danglingPaths = [];
@@ -4326,6 +4428,10 @@ if (mode === "verify") {
     `  проверено: ${pathTokens}, ведут в никуда: ${danglingPaths.length}`,
   );
   for (const d of danglingPaths) console.log("    " + d);
+
+  console.log("=== Ссылки markdown ===");
+  console.log(`  ведут в никуда: ${danglingLinks.length}`);
+  for (const d of danglingLinks) console.log("    " + d);
 
   console.log("=== Исключения сверок используются ===");
   console.log(`  мёртвых исключений: ${deadExceptions.length}`);
@@ -4569,6 +4675,7 @@ if (mode === "verify") {
     danglingRefs.length ||
     deadExceptions.length ||
     danglingPaths.length ||
+    danglingLinks.length ||
     goneNames.length ||
     frozenNumbers.length ||
     goneCamel.length ||
