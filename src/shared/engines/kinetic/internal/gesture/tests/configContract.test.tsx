@@ -96,6 +96,33 @@ describe("the engine's door", () => {
     }
   });
 
+  // `undefined` is not a broken value, it is an absent one — and forwarding
+  // one's own optional straight through (`resistance: props.resistance`) is the
+  // ordinary shape at a call site. A plain spread would have overwritten the
+  // default with it, and the door would then have refused a config nobody got
+  // wrong. Found by a probe against the README's own promise.
+  //
+  // The cast is the point, not a shortcut: `exactOptionalPropertyTypes` forbids
+  // writing this from TypeScript, and widening the config to `?: T | undefined`
+  // is not available — `ResolvedPointerSwipeConfig` is `Required<…>`, and under
+  // that flag the explicit `undefined` survives it, so "a resolved config is all
+  // numbers" would stop being true. Measured: 239 type errors across 9 files.
+  // The shape still arrives at runtime, from JavaScript and from spreads.
+  it("takes an explicitly absent setting as absent, and keeps its default", () => {
+    expect(() => {
+      const forwarded = { resistance: undefined, maxVelocity: undefined };
+      mount(forwarded as unknown as PointerSwipeConfig);
+    }).not.toThrow();
+  });
+
+  // A key that is not a setting is not this function's business either. The type
+  // forbids it, but a widened object at runtime does not, and refusing it would
+  // be the door judging what it does not own.
+  it("ignores a key that is not one of its settings", () => {
+    expect(() => {
+      mount({ somethingElse: "not a number" } as PointerSwipeConfig);
+    }).not.toThrow();
+  });
   // The distinction the whole decision rests on: a number outside its range is
   // still a number and stays the caller's business. Refusing it here would make
   // this blank the arbiter of taste in every project that copies it.

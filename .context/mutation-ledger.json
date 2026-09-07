@@ -510,9 +510,9 @@
     "hash": "ee1b273993b7"
   },
   "src/shared/engines/gesture/swipe/usePointerSwipe.ts": {
-    "killed": 277,
+    "killed": 281,
     "alive": 78,
-    "hash": "ac0917564ba0"
+    "hash": "555ffb5e5605"
   },
   "src/shared/engines/motion/compositor/compositedRide.ts": {
     "killed": 99,

@@ -102,19 +102,29 @@ const createIdleSample = (width = 0, timestamp = 0): InternalSample => ({
  * it is (`clampResistance`, the `Math.max(0, …)` around curvature): a number
  * outside its range is still that number.
  *
- * Iterated rather than listed: a setting added to the defaults is checked the
- * day it appears, with no second list to fall behind. See ../README.md § Inputs.
+ * Driven by the defaults rather than by a list: a setting added there is
+ * checked the day it appears, and a key that is NOT a setting is none of this
+ * function's business. See ../README.md § Inputs.
  */
 const resolveConfig = (
   config?: PointerSwipeConfig,
 ): ResolvedPointerSwipeConfig => {
-  const resolved = { ...POINTER_SWIPE_DEFAULTS, ...config };
-  for (const [field, value] of Object.entries(resolved)) {
-    if (!Number.isFinite(value)) {
+  const resolved = { ...POINTER_SWIPE_DEFAULTS };
+  for (const field of Object.keys(
+    resolved,
+  ) as (keyof ResolvedPointerSwipeConfig)[]) {
+    const given = config?.[field];
+    // `undefined` is "not provided", and the documented default stands — which
+    // matters because forwarding one's own optional straight through
+    // (`resistance: props.resistance`) is the ordinary shape at a call site. A
+    // plain spread would have overwritten the default with that `undefined`.
+    if (given === undefined) continue;
+    if (!Number.isFinite(given)) {
       throw new Error(
-        `usePointerSwipe: \`${field}\` must be a finite number, received ${String(value)}.`,
+        `usePointerSwipe: \`${field}\` must be a finite number, received ${String(given)}.`,
       );
     }
+    resolved[field] = given;
   }
   return resolved;
 };

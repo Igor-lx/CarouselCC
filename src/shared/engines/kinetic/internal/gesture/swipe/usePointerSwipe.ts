@@ -108,13 +108,22 @@ const createIdleSample = (width = 0, timestamp = 0): InternalSample => ({
 const resolveConfig = (
   config?: PointerSwipeConfig,
 ): ResolvedPointerSwipeConfig => {
-  const resolved = { ...POINTER_SWIPE_DEFAULTS, ...config };
-  for (const [field, value] of Object.entries(resolved)) {
-    if (!Number.isFinite(value)) {
+  const resolved = { ...POINTER_SWIPE_DEFAULTS };
+  for (const field of Object.keys(
+    resolved,
+  ) as (keyof ResolvedPointerSwipeConfig)[]) {
+    const given = config?.[field];
+    // `undefined` is "not provided", and the documented default stands — which
+    // matters because forwarding one's own optional straight through
+    // (`resistance: props.resistance`) is the ordinary shape at a call site. A
+    // plain spread would have overwritten the default with that `undefined`.
+    if (given === undefined) continue;
+    if (!Number.isFinite(given)) {
       throw new Error(
-        `usePointerSwipe: \`${field}\` must be a finite number, received ${String(value)}.`,
+        `usePointerSwipe: \`${field}\` must be a finite number, received ${String(given)}.`,
       );
     }
+    resolved[field] = given;
   }
   return resolved;
 };

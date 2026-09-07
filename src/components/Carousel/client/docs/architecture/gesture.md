@@ -29,6 +29,21 @@ semantics into engine units against the MEASURED slot — the carousel's one
 `useSlotSizeSource`, whose rounded `slotPx` is handed down as a prop (see
 [geometry.md](./geometry.md)):
 
+The two ends of this translation are both guarded, and the pair is the point:
+
+- **Its input.** A slot that is not a positive finite number — including
+  `Infinity`, which an earlier form of the guard let through — is treated as no
+  slot at all, and the commit distance is delivered at its floor. A real gesture
+  always outlives the first measurement, so the floor costs nothing.
+- **Its output.** The engine refuses to mount on a setting that is not a finite
+  number, naming the field. The resolver is where such a value would be MADE,
+  the door is where it would be reported, and the property that no slot can make
+  one is pinned by a test rather than by argument.
+
+The cost is named rather than discovered: there is no error boundary here, so a
+refusal takes the whole host tree, not just the carousel. That is the intended
+trade — a broken tuning that keeps the deck working without inertia is the
+failure nobody ever finds (`.context/09-decisions.md`, § I).
 - commit distance = `clamp(slot × commit.slotShare, commit.minPx, commit.maxPx)`,
   delivered via the engine's `minSwipeDistance` with `swipeThresholdRatio: 0` —
   the engine's own host-relative path is retired for the carousel. The base
