@@ -28,23 +28,55 @@ import type { PointerSwipeConfig } from "../swipe/types";
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
+let host: HTMLElement | null = null;
+let dragStarts = 0;
 
 const mount = (config: PointerSwipeConfig) => {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
+  dragStarts = 0;
 
   const Host = () => {
     const hostRef = useRef<HTMLDivElement | null>(null);
     const { hostProps } = usePointerSwipe({
       config,
       surfaceRef: hostRef,
+      onDragStart: () => {
+        dragStarts += 1;
+      },
     });
     return <div {...hostProps} ref={hostRef} />;
   };
 
   act(() => {
     root?.render(<Host />);
+  });
+  host = container.firstElementChild as HTMLElement;
+};
+
+/** A touch pointer event — the only kind this engine listens to. */
+const pointer = (type: string, x: number, t: number): Event => {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    clientX: x,
+    clientY: 40,
+    button: 0,
+  });
+  Object.defineProperty(event, "pointerId", { value: 1 });
+  Object.defineProperty(event, "pointerType", { value: "touch" });
+  Object.defineProperty(event, "isPrimary", { value: true });
+  Object.defineProperty(event, "timeStamp", { value: t });
+  return event;
+};
+
+const drag = (toX: number) => {
+  act(() => {
+    host?.dispatchEvent(pointer("pointerdown", 100, 0));
+  });
+  act(() => {
+    host?.dispatchEvent(pointer("pointermove", toX, 16));
   });
 };
 
@@ -100,10 +132,22 @@ describe("the engine's door", () => {
   // numbers" would stop being true. Measured: 239 type errors across 9 files.
   // The shape still arrives at runtime, from JavaScript and from spreads.
   it("takes an explicitly absent setting as absent, and keeps its default", () => {
-    expect(() => {
-      const forwarded = { resistance: undefined, maxVelocity: undefined };
-      mount(forwarded as unknown as PointerSwipeConfig);
-    }).not.toThrow();
+    // Asserted through behaviour, not through the absence of a throw: a test
+    // that only says "it did not blow up" stays green while the default is
+    // replaced by anything at all, and this one did — a probe swapped the
+    // default for `0` and all six tests passed.
+    //
+    // `intentThreshold` is the observable one. Its default is 8, and at exactly
+    // the threshold nothing is claimed yet; a substituted `0` would start the
+    // drag on the very first move.
+    const forwarded = { intentThreshold: undefined };
+    mount(forwarded as unknown as PointerSwipeConfig);
+
+    drag(100 + POINTER_SWIPE_DEFAULTS.intentThreshold);
+    expect(dragStarts, "at the default threshold nothing is claimed").toBe(0);
+
+    drag(100 + POINTER_SWIPE_DEFAULTS.intentThreshold + 12);
+    expect(dragStarts, "beyond it, the drag starts").toBe(1);
   });
 
   // A key that is not a setting is not this function's business either. The type
@@ -117,9 +161,18 @@ describe("the engine's door", () => {
   // The distinction the whole decision rests on: a number outside its range is
   // still a number and stays the caller's business. Refusing it here would make
   // this blank the arbiter of taste in every project that copies it.
-  it("accepts a number outside its range — that is not the door's business", () => {
+  //
+  // Asserted by USE, not by silence. "Did not throw" would stay green if the
+  // door quietly swapped an unusual value for the default — the same hole a
+  // probe found in the test above. An absurd threshold has to actually govern:
+  // at 1000, a 50px pull claims nothing, where the default 8 would have.
+  it("passes an out-of-range number through instead of judging it", () => {
     expect(() => {
       mount({ resistance: 4, maxVelocity: -1, cooldownMs: -50 });
     }).not.toThrow();
+
+    mount({ intentThreshold: 1000 });
+    drag(150);
+    expect(dragStarts, "an absurd threshold still governs").toBe(0);
   });
 });
