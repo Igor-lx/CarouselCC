@@ -4293,6 +4293,33 @@ if (mode === "verify") {
         }
     }
   }
+  // Объявленные области — существуют ли они на диске.
+  //
+  // Область смоука и пары форков заданы путями, и путь переживает переезд
+  // папки молча: список остаётся прежним, совпадать с ним перестаёт всё. Для
+  // смоука это ровно то, чего его конфиг обещал избежать — «по требованию»
+  // превращается в «никогда», и заметить это некому, потому что вопрос просто
+  // не задаётся. Для форков так же: `twins` перестаёт спрашивать про пару.
+  //
+  // Соврать сверке нечем: объявленный путь либо есть, либо нет. Это тот же
+  // приём, что у правил направления («правило про несуществующий предмет
+  // проходит зелёным и читается как действующее»), только про другой список.
+  const goneScope = [];
+  let scopePaths = 0;
+  for (const p of CONFIG.smokeScope ?? []) {
+    scopePaths++;
+    if (!existsSync(path.join(REPO, p))) goneScope.push(`область смоука: ${p}`);
+  }
+  for (const { from, to } of CONFIG.forks ?? []) {
+    scopePaths += 2;
+    if (!existsSync(path.join(ROOT, from)))
+      goneScope.push(`пара форков: ${from}`);
+    if (!existsSync(path.join(ROOT, to))) goneScope.push(`пара форков: ${to}`);
+  }
+  console.log("=== Объявленные области существуют ===");
+  console.log(`  адресов: ${scopePaths}, ведут в никуда: ${goneScope.length}`);
+  for (const g of goneScope) console.log("    " + g);
+
   console.log("=== Обещания без опоры собираются сводкой ===");
   console.log(`  записей мимо словаря: ${mutePromises.length}`);
   for (const m of mutePromises) console.log("    " + m);
@@ -4937,6 +4964,7 @@ if (mode === "verify") {
     indexDrift.length ||
     domDrift.length ||
     mutePromises.length ||
+    goneScope.length ||
     unclassified.length ||
     danglingRefs.length ||
     deadExceptions.length ||
