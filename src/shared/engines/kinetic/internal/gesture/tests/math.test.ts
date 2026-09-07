@@ -17,11 +17,11 @@ import {
   decayedVelocity,
   frameAdjustedAlpha,
   pauseDecayedVelocity,
-  safeResistance,
+  clampResistance,
 } from "../swipe/internals/math";
 import { sameDirectionSpeed } from "../inertia/speed";
 
-// `safeResistance` is asserted inside applyResistance's block rather than in
+// `clampResistance` is asserted inside applyResistance's block rather than in
 // one of its own: every caller reaches it through that function, and its ends
 // only mean something as an offset. What it does with a NON-number is a
 // decision, not arithmetic, and until it was pinned below nothing held it —
@@ -67,7 +67,7 @@ describe("applyResistance", () => {
   // they judge a MEASURED velocity and answer "no data", while this is a
   // setting, where 0 is a legitimate value someone might have meant.
   it("lets a non-number through instead of repairing it", () => {
-    expect(safeResistance(Number.NaN)).toBeNaN();
+    expect(clampResistance(Number.NaN)).toBeNaN();
     expect(applyResistance(300, Number.NaN, 0.002)).toBeNaN();
   });
 
@@ -75,10 +75,10 @@ describe("applyResistance", () => {
   // rule lives in that difference: 1.4 still means a resistance, so it lands on
   // the nearest end rather than propagating.
   it("clamps a number outside the range to the nearest end", () => {
-    expect(safeResistance(-5)).toBe(0);
-    expect(safeResistance(4)).toBe(1);
-    expect(safeResistance(Number.POSITIVE_INFINITY)).toBe(1);
-    expect(safeResistance(0.7)).toBe(0.7);
+    expect(clampResistance(-5)).toBe(0);
+    expect(clampResistance(4)).toBe(1);
+    expect(clampResistance(Number.POSITIVE_INFINITY)).toBe(1);
+    expect(clampResistance(0.7)).toBe(0.7);
   });
 });
 

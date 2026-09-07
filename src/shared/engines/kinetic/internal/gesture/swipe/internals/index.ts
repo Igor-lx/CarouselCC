@@ -6,7 +6,7 @@ export {
   dominantMagnitude,
   frameAdjustedAlpha,
   pauseDecayedVelocity,
-  safeResistance,
+  clampResistance,
 } from "./math";
 export {
   DRAG_IGNORE_ATTRIBUTE,

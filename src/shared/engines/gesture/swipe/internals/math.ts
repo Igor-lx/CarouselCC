@@ -18,7 +18,7 @@ const MIN_RESISTANCE_DENOMINATOR = 0.001;
  * track a transform it cannot use and the swipe visibly dies. That is the
  * intended signal, not a gap — see ../../README.md § Inputs.
  */
-export const safeResistance = (value: number) =>
+export const clampResistance = (value: number) =>
   Math.max(0, Math.min(1, value));
 
 /** Progressive drag resistance: UI offset lags the finger more as the pull
@@ -30,7 +30,7 @@ export const applyResistance = (
 ): number => {
   const sign = Math.sign(offset);
   const abs = Math.abs(offset);
-  const safe = safeResistance(resistance);
+  const safe = clampResistance(resistance);
   // No guard on `safe`: at 0 the ratio below is already 0, and a non-number
   // must not be stopped here either. The branch that used to stand here
   // decided nothing in both cases — two surviving mutants said exactly that.

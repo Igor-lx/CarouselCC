@@ -40,7 +40,7 @@ feeds corrected values back into the carousel.
 
   - **A number outside its declared range is still that number**, and clamping
     it to the nearest end is ordinary arithmetic, not a rescue. The engines do
-    exactly that in several places (`safeResistance`, the `Math.max(0, …)`
+    exactly that in several places (`clampResistance`, the `Math.max(0, …)`
     around curvature and magnitudes), and it is not a violation of this
     decision: a resistance of `1.4` clamped to `1` still behaves like the
     maximum the caller asked for, only bounded.

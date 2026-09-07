@@ -502,12 +502,12 @@
   "src/shared/engines/gesture/swipe/internals/math.ts": {
     "killed": 56,
     "alive": 1,
-    "hash": "dd603e492885"
+    "hash": "477d18117db4"
   },
   "src/shared/engines/gesture/swipe/internals/resolveSwipeDirection.ts": {
     "killed": 38,
     "alive": 2,
-    "hash": "a94478b3e75f"
+    "hash": "ee1b273993b7"
   },
   "src/shared/engines/gesture/swipe/usePointerSwipe.ts": {
     "killed": 271,

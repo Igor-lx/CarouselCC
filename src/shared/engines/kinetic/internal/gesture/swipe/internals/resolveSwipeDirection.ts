@@ -1,5 +1,5 @@
 import type { ResolvedPointerSwipeConfig } from "../types";
-import { dominantMagnitude, safeResistance } from "./math";
+import { dominantMagnitude, clampResistance } from "./math";
 
 // Commit decision at release (flick OR distance swipe, resistance-adapted).
 // See shared/engines/gesture/README.md § Recognition internals (Commit decision).
@@ -40,7 +40,7 @@ export const resolveSwipeDirection = ({
     config.minSwipeDistance,
     Math.max(0, width) * config.swipeThresholdRatio,
   );
-  const resistanceFactor = 1 - safeResistance(config.resistance);
+  const resistanceFactor = 1 - clampResistance(config.resistance);
   const adapted = Math.max(
     config.minSwipeDistance,
     distanceThreshold * resistanceFactor,

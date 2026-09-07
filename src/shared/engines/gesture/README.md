@@ -45,7 +45,7 @@ the mounting side already passes sane numbers.
 whole rule:
 
 - **A number outside its declared range is still that number**, and the engine
-  is free to clamp it to the nearest end (`safeResistance`, the `Math.max(0, …)`
+  is free to clamp it to the nearest end (`clampResistance`, the `Math.max(0, …)`
   around curvature and magnitudes). A resistance of `1.4` clamped to `1` still
   behaves like maximum resistance — the caller gets what they asked for, only
   bounded.
