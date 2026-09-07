@@ -34,6 +34,41 @@ import simply fails to resolve in the project the folder was copied into.
 - Physics run on `event.timeStamp`, not handler time, so velocities stay
   honest on a congested main thread.
 
+## Inputs
+
+Config values are **caller-owned**: the engine applies its documented defaults
+for `undefined` and does not otherwise check, coerce or repair what it is
+given. Guarding every setting on a hot path costs in the common case, where
+the mounting side already passes sane numbers.
+
+**The line this draws is repair, not arithmetic**, and the distinction is the
+whole rule:
+
+- **A number outside its declared range is still that number**, and the engine
+  is free to clamp it to the nearest end (`safeResistance`, the `Math.max(0, …)`
+  around curvature and magnitudes). A resistance of `1.4` clamped to `1` still
+  behaves like maximum resistance — the caller gets what they asked for, only
+  bounded.
+- **A value that is not a number is never substituted with a plausible one.**
+  It flows through, the offset comes back `NaN`, the transform is invalid and
+  the swipe visibly dies. That is the intended signal: a repaired `NaN` would
+  read as a deliberate `0` ("no resistance was asked for") and hide the mistake
+  for good, while a dead swipe gets fixed the same afternoon.
+
+**Where the mistake is caught is the consumer's business, not the engine's.**
+This blank ships no diagnostics layer — it is copied into projects that have
+their own. In this repository the carousel audits every tuning constant
+(finite plus range) in its dev-only Diagnostic module, and a test runs that
+audit against the constants actually shipped, so a typo in the config turns the
+suite red before it ever reaches a finger. A project taking this folder without
+such a layer keeps the engine's half of the contract — the failure stays
+visible — and owes itself the other half.
+
+**Two guards inside the engine cut a non-number and are not a precedent for
+settings.** `sameDirectionSpeed` and `projectMomentum` judge a MEASURED
+velocity — a value the engine itself derived from pointer samples, which can
+degenerate — and they answer "no usable speed" (`0`, `null`), not a plausible
+alternative reading. Substituting for a broken *setting* is a different act.
 ## Quick start
 
 ```tsx

@@ -6,13 +6,20 @@ const FRAME_BUDGET_MS = 1000 / 60;
 /** Keeps `applyResistance` finite as `resistance` → 1. */
 const MIN_RESISTANCE_DENOMINATOR = 0.001;
 
-// Positive form, per the guard idiom: `Math.max(0, Math.min(1, NaN))` is NaN,
-// so the clamp passed a non-number through under a name that promises it cannot.
-// `value > 0` is false for NaN and for anything below the range, and both land
-// on 1:1 tracking — the same answer this engine already gives elsewhere when a
-// number is not a number (`sameDirectionSpeed`, `projectMomentum`).
+/**
+ * Range clamp, and nothing else: a resistance outside `[0, 1]` is still a
+ * resistance and lands on the nearest end.
+ *
+ * A NON-number is passed through **deliberately** — clamping arithmetic and
+ * repairing a broken setting are different acts, and only the first one is
+ * this engine's business. `NaN` here would come from a mistake at the mounting
+ * side; substituting a plausible `0` would read as "no resistance was asked
+ * for" and hide that mistake for good, while letting it through hands the
+ * track a transform it cannot use and the swipe visibly dies. That is the
+ * intended signal, not a gap — see ../../README.md § Inputs.
+ */
 export const safeResistance = (value: number) =>
-  value > 0 ? Math.min(1, value) : 0;
+  Math.max(0, Math.min(1, value));
 
 /** Progressive drag resistance: UI offset lags the finger more as the pull
  * grows (`resistance` = how strongly, `curvature` = how fast it ramps). */
@@ -24,9 +31,9 @@ export const applyResistance = (
   const sign = Math.sign(offset);
   const abs = Math.abs(offset);
   const safe = safeResistance(resistance);
-  // No guard on `safe`: the clamp above keeps it inside [0, 1], and at 0 this
-  // ratio is already 0 — the branch that used to stand here decided nothing.
-  // Two surviving mutants said exactly that before it was removed.
+  // No guard on `safe`: at 0 the ratio below is already 0, and a non-number
+  // must not be stopped here either. The branch that used to stand here
+  // decided nothing in both cases — two surviving mutants said exactly that.
   const stiffness = safe / Math.max(1 - safe, MIN_RESISTANCE_DENOMINATOR);
   return sign * (abs / (1 + abs * Math.max(0, curvature) * stiffness));
 };

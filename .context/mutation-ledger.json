@@ -500,9 +500,9 @@
     "hash": "82fc751a8037"
   },
   "src/shared/engines/gesture/swipe/internals/math.ts": {
-    "killed": 58,
-    "alive": 2,
-    "hash": "701aa7ed56a5"
+    "killed": 56,
+    "alive": 1,
+    "hash": "dd603e492885"
   },
   "src/shared/engines/gesture/swipe/internals/resolveSwipeDirection.ts": {
     "killed": 38,
