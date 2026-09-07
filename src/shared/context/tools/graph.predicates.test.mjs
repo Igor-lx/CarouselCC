@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  PREDICATE_CASES,
-  inComment,
-  isCodePath,
-  isDocPath,
-  isStylePath,
-  isTestPath,
-  selfCheck,
-  touchesRuntime,
-} from "./graph.predicates.mjs";
+import * as vocabulary from "./graph.predicates.mjs";
+
+const { PREDICATE_CASES, inComment, selfCheck } = vocabulary;
+
+/** Предикаты области — выводятся из самого модуля, а не перечисляются здесь.
+ * Признак: экспортированная функция от ОДНОГО аргумента. `selfCheck` берёт
+ * ноль, `inComment` — два, и оба отсеиваются сами. Списком это стояло руками, и
+ * список был ложью формы «зелёное молчание»: предикат, добавленный без единого
+ * случая, проходил 33 теста из 33 — проверено подсадкой. Обещание «таблица
+ * покрывает каждый предикат» держалось вниманием ровно до первого добавления. */
+const PREDICATE_NAMES = Object.entries(vocabulary)
+  .filter(([, value]) => typeof value === "function" && value.length === 1)
+  .map(([name]) => name);
 
 /**
  * Набор на словарь области инструмента.
@@ -30,14 +33,8 @@ describe("словарь области", () => {
   // Та же таблица, что гоняет сам инструмент. Здесь она даёт читаемый отчёт:
   // самопроверка умеет только отказаться работать.
   it.each(PREDICATE_CASES)("%s(%s) === %s", (name, input, want) => {
-    const by = {
-      isTestPath,
-      isStylePath,
-      isDocPath,
-      isCodePath,
-      touchesRuntime,
-    };
-    expect(by[name](input)).toBe(want);
+    expect(PREDICATE_NAMES, `${name} — не предикат области`).toContain(name);
+    expect(vocabulary[name](input)).toBe(want);
   });
 
   it("самопроверка не находит расхождений", () => {
@@ -46,13 +43,11 @@ describe("словарь области", () => {
 
   it("таблица покрывает каждый предикат области", () => {
     const covered = new Set(PREDICATE_CASES.map(([name]) => name));
-    for (const name of [
-      "isTestPath",
-      "isStylePath",
-      "isDocPath",
-      "isCodePath",
-      "touchesRuntime",
-    ]) {
+    expect(
+      PREDICATE_NAMES.length,
+      "предикатов не найдено вовсе",
+    ).toBeGreaterThan(0);
+    for (const name of PREDICATE_NAMES) {
       expect(covered.has(name), `${name} без единого случая`).toBe(true);
     }
   });
