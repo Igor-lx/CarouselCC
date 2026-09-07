@@ -17,11 +17,15 @@ import {
   decayedVelocity,
   frameAdjustedAlpha,
   pauseDecayedVelocity,
+  safeResistance,
 } from "../swipe/internals/math";
 import { sameDirectionSpeed } from "../inertia/speed";
 
-// `safeResistance` has no block of its own: its clamp is asserted where it
-// matters, in applyResistance's "1:1 at zero, finite at one" case.
+// `safeResistance` is asserted inside applyResistance's block rather than in
+// one of its own: every caller reaches it through that function, and its ends
+// only mean something as an offset. It used to be asserted only in passing, by
+// the "1:1 at zero, finite at one" case — which said nothing about a value that
+// is not a number, and that is exactly where it was broken.
 //
 // `clampMagnitude` and `dominantMagnitude` DO have one, below. They lost it
 // once to the argument that one-line arithmetic cannot fail subtly; a mutation
@@ -52,6 +56,26 @@ describe("applyResistance", () => {
   it("is 1:1 with zero resistance and finite as resistance approaches 1", () => {
     expect(applyResistance(300, 0, 0.002)).toBe(300);
     expect(Number.isFinite(applyResistance(300, 1, 0.002))).toBe(true);
+  });
+
+  // The clamp is named `safeResistance`, and the rest of this engine cuts
+  // non-numbers rather than passing them on (`sameDirectionSpeed`,
+  // `projectMomentum`). It stayed the exception: `Math.max(0, Math.min(1, NaN))`
+  // is NaN, and the guard below it was written `safe <= 0`, which is false for
+  // NaN — so the whole offset came back NaN and the track was handed a
+  // transform it cannot use.
+  it("falls back to 1:1 tracking when resistance is not a number", () => {
+    expect(safeResistance(Number.NaN)).toBe(0);
+    expect(applyResistance(300, Number.NaN, 0.002)).toBe(300);
+  });
+
+  // The clamp keeps both ends, and pinning them here is what makes the fallback
+  // above a fix rather than a widening: out-of-range numbers still land inside.
+  it("clamps a number outside the range to the nearest end", () => {
+    expect(safeResistance(-5)).toBe(0);
+    expect(safeResistance(4)).toBe(1);
+    expect(safeResistance(Number.POSITIVE_INFINITY)).toBe(1);
+    expect(safeResistance(0.7)).toBe(0.7);
   });
 });
 

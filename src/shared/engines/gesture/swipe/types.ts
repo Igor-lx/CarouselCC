@@ -16,7 +16,9 @@ export interface PointerSwipeConfig {
   intentThreshold?: number;
   /** Progressive drag resistance in (0, 1): the UI offset lags the raw
    * finger travel more as the pull grows. Applied to the whole offset on
-   * every sample — the engine has no notion of edges. `0` = 1:1 tracking. */
+   * every sample — the engine has no notion of edges. `0` = 1:1 tracking,
+   * and so is anything outside the range or not a number: the clamp falls to
+   * the safe end rather than handing the track a NaN offset. */
   resistance?: number;
   /** How quickly the resistance lag ramps up with distance.*/
   resistanceCurvature?: number;

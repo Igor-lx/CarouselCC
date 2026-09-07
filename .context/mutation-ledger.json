@@ -42,7 +42,7 @@
   "src/components/Carousel/client/context/useDiagnosticContextValue.ts": {
     "killed": 10,
     "alive": 3,
-    "hash": "a3b00b557967"
+    "hash": "75bf8358b2a4"
   },
   "src/components/Carousel/client/context/useModuleContextValue.ts": {
     "killed": 20,
@@ -501,8 +501,8 @@
   },
   "src/shared/engines/gesture/swipe/internals/math.ts": {
     "killed": 58,
-    "alive": 3,
-    "hash": "1b2034c911d5"
+    "alive": 2,
+    "hash": "701aa7ed56a5"
   },
   "src/shared/engines/gesture/swipe/internals/resolveSwipeDirection.ts": {
     "killed": 38,

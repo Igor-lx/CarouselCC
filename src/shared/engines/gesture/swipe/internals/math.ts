@@ -6,8 +6,13 @@ const FRAME_BUDGET_MS = 1000 / 60;
 /** Keeps `applyResistance` finite as `resistance` → 1. */
 const MIN_RESISTANCE_DENOMINATOR = 0.001;
 
+// Positive form, per the guard idiom: `Math.max(0, Math.min(1, NaN))` is NaN,
+// so the clamp passed a non-number through under a name that promises it cannot.
+// `value > 0` is false for NaN and for anything below the range, and both land
+// on 1:1 tracking — the same answer this engine already gives elsewhere when a
+// number is not a number (`sameDirectionSpeed`, `projectMomentum`).
 export const safeResistance = (value: number) =>
-  Math.max(0, Math.min(1, value));
+  value > 0 ? Math.min(1, value) : 0;
 
 /** Progressive drag resistance: UI offset lags the finger more as the pull
  * grows (`resistance` = how strongly, `curvature` = how fast it ramps). */
@@ -19,8 +24,10 @@ export const applyResistance = (
   const sign = Math.sign(offset);
   const abs = Math.abs(offset);
   const safe = safeResistance(resistance);
-  const stiffness =
-    safe <= 0 ? 0 : safe / Math.max(1 - safe, MIN_RESISTANCE_DENOMINATOR);
+  // No guard on `safe`: the clamp above keeps it inside [0, 1], and at 0 this
+  // ratio is already 0 — the branch that used to stand here decided nothing.
+  // Two surviving mutants said exactly that before it was removed.
+  const stiffness = safe / Math.max(1 - safe, MIN_RESISTANCE_DENOMINATOR);
   return sign * (abs / (1 + abs * Math.max(0, curvature) * stiffness));
 };
 

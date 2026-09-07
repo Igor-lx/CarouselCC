@@ -149,8 +149,8 @@ ADR-004.
 **Опциональные поля объявлены `?: T | undefined`**
 (`shared/engines/motion/runtime/types.ts:44-46`,
 `shared/engines/kinetic/internal/motion/runtime/types.ts:44-46`,
-`shared/engines/gesture/swipe/types.ts:99-101`,
-`shared/engines/kinetic/internal/gesture/swipe/types.ts:99-101`).
+`shared/engines/gesture/swipe/types.ts:101-103` `Optionals read`,
+`shared/engines/kinetic/internal/gesture/swipe/types.ts:101-103` `Optionals read`).
 Решено: комментарий «on purpose» в каждом из четырёх файлов.
 Сломается: под `exactOptionalPropertyTypes` голое `?:` отвергает нормальную
 форму `onComplete: props.onSettle` — проброс чужого опционального насквозь.
