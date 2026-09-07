@@ -69,6 +69,23 @@ settings.** `sameDirectionSpeed` and `projectMomentum` judge a MEASURED
 velocity — a value the engine itself derived from pointer samples, which can
 degenerate — and they answer "no usable speed" (`0`, `null`), not a plausible
 alternative reading. Substituting for a broken *setting* is a different act.
+
+**One leak in that line, named rather than glossed over.** A broken setting can
+reach those two guards *through* the measurement and be absorbed there. Every
+setting on the velocity chain does it — `emaAlpha`, `maxVelocity`,
+`flickVelocityAlpha`, the pause-decay pair: a non-number flows into the EMA, the
+velocity becomes `NaN`, and `sameDirectionSpeed` answers `0` while
+`projectMomentum` answers `null`. The ride then starts from a standstill instead
+of visibly dying — measured, not supposed. `projectMomentum` is the milder of
+the two, since `null` is a refusal its return type forces the caller to handle;
+`sameDirectionSpeed`'s `0` is indistinguishable from the legitimate "velocity
+opposes the travel".
+
+This is why the constants layer is the consumer's obligation and not a nicety:
+it is the only thing that catches such a setting **before** it dissolves into a
+measurement. Closing the leak inside the engine would mean changing what those
+two guards answer — a contract change for every project holding a copy, and so
+not a decision this file makes on its own.
 ## Quick start
 
 ```tsx
