@@ -2,20 +2,19 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 /**
- * The one class of regression neither the unit suite nor the motion smoke can
- * see: what assistive technology gets. jsdom renders no layout and computes no
- * contrast, and the motion smoke asks where the track sits, never what the deck
- * announces. A missing label on a control, a role lost in a refactor, a colour
- * pair that drops below contrast — all pass every other check we have.
+ * Единственный класс регрессий, которого не видят ни юниты, ни смоук движения:
+ * то, что достаётся вспомогательной технологии. jsdom не строит раскладку и не
+ * считает контраст, а смоук движения спрашивает, где стоит трек, и никогда — что
+ * колода о себе сообщает. Пропавшее имя у кнопки, роль, потерянная в рефакторе,
+ * пара цветов, ушедшая ниже контраста, — всё это проходит остальные проверки.
  *
- * Scope is the carousel, not the page. The demo stand around it is scaffolding
- * (see `src/app/CLAUDE.md`): auditing it would report defects nobody intends to
- * fix and teach us to skim the output.
+ * Область — карусель, а не страница. Стенд вокруг неё обвязка
+ * (см. `src/app/CLAUDE.md`): аудит по нему выдал бы дефекты, которые никто не
+ * собирается чинить, и приучил бы просматривать вывод по диагонали.
  *
- * Severity gate is serious and critical. Minor and moderate findings are advice
- * whose weight depends on the product; making them fail the run would turn the
- * smoke into a channel that cries wolf, and a channel like that stops being
- * read.
+ * Порог — `serious` и `critical`. Находки уровня `minor` и `moderate` это совет,
+ * вес которого зависит от продукта; роняя ими прогон, смоук превратился бы в
+ * канал, кричащий не по делу, а такой канал перестают читать.
  */
 test("карусель проходит аудит доступности", async ({ page }) => {
   await page.goto("./");

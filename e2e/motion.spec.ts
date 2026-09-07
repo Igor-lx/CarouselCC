@@ -1,16 +1,16 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /**
- * Every assertion here is one that jsdom CANNOT make: it needs layout, real
- * pointer events or a compositor. Anything provable without a browser belongs
- * in the unit suite, where it costs milliseconds instead of seconds.
+ * Каждое утверждение здесь — то, которого jsdom сделать НЕ МОЖЕТ: нужна
+ * раскладка, настоящие события указателя или компоузитор. Всё, что доказуемо
+ * без браузера, живёт в юнитах, где стоит миллисекунды вместо секунд.
  *
- * The hooks used are the ones the component publishes for exactly this purpose
- * (`data-carousel-root` / `-viewport` / `-track`, `data-active-zone`) — see
- * `.context/03-graph.md`, the DOM-attribute table.
+ * Опоры взяты объявленные — те, что компонент публикует ровно для этого
+ * (`data-carousel-root` / `-viewport` / `-track`, `data-active-zone`), см.
+ * `.context/03-graph.md`, таблицу `data`-атрибутов.
  */
 
-/** `matrix(a, b, c, d, tx, ty)` → tx. Identity and `none` both read as 0. */
+/** `matrix(a, b, c, d, tx, ty)` → tx. И единичная матрица, и `none` дают 0. */
 const trackX = (page: Page): Promise<number> =>
   page.evaluate(() => {
     const track = document.querySelector("[data-carousel-track]");
@@ -22,10 +22,10 @@ const trackX = (page: Page): Promise<number> =>
   });
 
 /**
- * Which slides the component currently calls the actual band. Identified by the
- * image each one shows: the demo's slides carry photos, not text, so reading
- * `textContent` here would compare empty strings to empty strings and pass on a
- * deck that never moved.
+ * Какие слайды компонент сейчас считает активной полосой. Опознаются по
+ * картинке, которую каждый показывает: слайды демо несут фото, а не текст,
+ * поэтому чтение `textContent` сравнивало бы пустые строки с пустыми и прошло бы
+ * на колоде, которая никуда не поехала.
  */
 const band = (page: Page): Promise<string> =>
   page.evaluate(() =>
@@ -34,7 +34,7 @@ const band = (page: Page): Promise<string> =>
       .join("|"),
   );
 
-/** Waits until the track stops moving, then answers where it stopped. */
+/** Ждёт, пока трек остановится, и отвечает, где он встал. */
 const settled = async (page: Page): Promise<number> => {
   let last = await trackX(page);
   for (let i = 0; i < 40; i += 1) {
