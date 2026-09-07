@@ -1,5 +1,5 @@
 // See docs/architecture/gesture.md
-import type { PointerSwipeConfig } from "../../../../shared";
+import { isPositiveFinite, type PointerSwipeConfig } from "../../../../shared";
 import type { CarouselSwipeConfig } from "../config";
 
 /** Calibration RECORD (not a knob): the slot width the rubber numbers were
@@ -22,7 +22,14 @@ export const resolveSlotAdaptiveSwipeConfig = (
 
   // Pre-measure: no slot to scale to, so deliver the commit distance at its
   // floor. A real gesture always outlives the first measurement.
-  if (slotPx === null || !(slotPx > 0)) {
+  //
+  // The predicate carries finiteness, and that is not cosmetic: the previous
+  // form (`!(slotPx > 0)`) let INFINITY through as a real slot, and the four
+  // fields below then scaled to `Infinity` and `0` — a non-finite setting
+  // handed to the engine, which now refuses it at its door. Found by a probe;
+  // `offsetWidth` cannot be infinite today, but the guard claimed totality it
+  // did not have, and the claim is what the next reader trusts.
+  if (!isPositiveFinite(slotPx)) {
     return {
       ...engine,
       swipeThresholdRatio: 0,

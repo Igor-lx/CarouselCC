@@ -37,9 +37,30 @@ import simply fails to resolve in the project the folder was copied into.
 ## Inputs
 
 Config values are **caller-owned**: the engine applies its documented defaults
-for `undefined` and does not otherwise check, coerce or repair what it is
-given. Guarding every setting on a hot path costs in the common case, where
-the mounting side already passes sane numbers.
+for `undefined`, and beyond that it judges exactly one thing — **whether a
+setting is a finite number at all.** It never coerces, repairs or second-
+guesses a value it can work with. Guarding every setting on every frame would
+cost in the common case, where the mounting side already passes sane numbers;
+the one check that exists runs **once**, when the config is assembled.
+
+**The door.** A setting that is not a finite number throws on mount, naming
+the field:
+
+```
+usePointerSwipe: `emaAlpha` must be a finite number, received NaN.
+```
+
+This is not defensive programming creeping back in — it is the one place where
+such a value is still a *setting*. One line down it becomes a number inside
+arithmetic, and there every comparison with `NaN` is false, so a broken tuning
+reads as "the flick was not fast enough": the deck keeps working, quietly
+without inertia, and the mistake outlives everyone who could have fixed it.
+Loud beats silent-and-wrong.
+
+**Ranges are not judged, and that is deliberate.** What counts as a sane number
+is the consumer's product decision; a blank copied into someone else's project
+has no standing to make it. A number outside its range is still that number and
+is clamped where it always was.
 
 **The line this draws is repair, not arithmetic**, and the distinction is the
 whole rule:

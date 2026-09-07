@@ -31,6 +31,51 @@ describe("resolveSlotAdaptiveSwipeConfig", () => {
     }
   });
 
+  // The guard has to be TOTAL, not merely non-empty. Its previous form
+  // (`!(slotPx > 0)`) cut zero, negatives and NaN and let INFINITY through as a
+  // real slot — the four scaled fields then came out `Infinity` and `0`, a
+  // non-finite setting handed to the engine. Found by a probe; the eight tests
+  // standing here at the time all stayed green, because they pinned `null` and
+  // `0` only, and BOTH forms answer the same on those two.
+  it("treats every degenerate slot as no slot, infinity included", () => {
+    for (const slot of [
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      -50,
+    ]) {
+      const resolved = resolveSlotAdaptiveSwipeConfig(
+        CAROUSEL_SWIPE_CONFIG,
+        slot,
+      );
+      expect(resolved.minSwipeDistance, String(slot)).toBe(MIN_PX);
+      expect(resolved.quickFlickVelocity, String(slot)).toBe(
+        CAROUSEL_SWIPE_CONFIG.quickFlickVelocity,
+      );
+    }
+  });
+
+  // What the engine's door would refuse. Stated here as a property of the
+  // resolver rather than left to the door, because this is where such a value
+  // would be MANUFACTURED — the door only reports that one arrived, and by then
+  // the carousel is already down. Slots span a phone column to a wide desktop
+  // slot, plus the degenerate ones.
+  it("never manufactures a non-finite setting, at any slot", () => {
+    const slots = [null, 0, -1, Number.NaN, Number.POSITIVE_INFINITY];
+    for (let px = 1; px <= 4000; px += 7) slots.push(px);
+
+    for (const slot of slots) {
+      const resolved = resolveSlotAdaptiveSwipeConfig(
+        CAROUSEL_SWIPE_CONFIG,
+        slot,
+      );
+      for (const [field, value] of Object.entries(resolved)) {
+        expect(Number.isFinite(value), `slot ${String(slot)} → ${field}`).toBe(
+          true,
+        );
+      }
+    }
+  });
   it("disables the engine's host-relative threshold and delivers the commit distance resolved", () => {
     const resolved = resolveSlotAdaptiveSwipeConfig(CAROUSEL_SWIPE_CONFIG, 500);
     expect(resolved.swipeThresholdRatio).toBe(0);

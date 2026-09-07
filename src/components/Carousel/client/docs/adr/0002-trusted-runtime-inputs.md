@@ -54,6 +54,13 @@ feeds corrected values back into the carousel.
   Over-allocated acceleration/deceleration shares (accel + decel > 1) are not
   rescued either — they are reported by Diagnostic as a plain misconfiguration.
   See [`docs/architecture/diagnostics.md`](../architecture/diagnostics.md).
+- **Trust has exactly one gate, and it is at the door of a blank, not on its
+  hot path.** The gesture engine refuses to mount when a setting is not a
+  finite number, naming the field. That is not validation creeping back: one
+  line further in, such a value is indistinguishable from a deliberate one,
+  because every comparison with `NaN` is false — the component keeps working
+  and quietly stops doing what it was configured to do. Ranges stay unjudged;
+  the gate asks only whether the value can be reasoned about at all.
 - **The other half of trusting — the breach must be visible in development —
   is carried by two things, and neither of them is the code being trusted.**
   `<Diagnostic />` audits every tuning constant for finiteness and range, and

@@ -87,12 +87,37 @@ const createIdleSample = (width = 0, timestamp = 0): InternalSample => ({
   timestamp,
 });
 
+/**
+ * The door. Every setting here is a number, and a non-finite one stops being
+ * distinguishable from a value someone meant the moment it enters the arithmetic
+ * below: any comparison with `NaN` is false, so a broken tuning quietly reads
+ * as "the flick was not fast enough" — the deck keeps working, loses its
+ * inertia, and nobody ever learns. Downstream there is no place left to catch
+ * it; here it is still a setting rather than a measurement, so here it is
+ * refused, loudly, naming the field.
+ *
+ * **Ranges are deliberately NOT judged.** What counts as a sane number is the
+ * consumer's call — its constants audit, its product. This blank has an
+ * opinion only on what cannot be reasoned about at all. Clamping stays where
+ * it is (`clampResistance`, the `Math.max(0, …)` around curvature): a number
+ * outside its range is still that number.
+ *
+ * Iterated rather than listed: a setting added to the defaults is checked the
+ * day it appears, with no second list to fall behind. See ../README.md § Inputs.
+ */
 const resolveConfig = (
   config?: PointerSwipeConfig,
-): ResolvedPointerSwipeConfig => ({
-  ...POINTER_SWIPE_DEFAULTS,
-  ...config,
-});
+): ResolvedPointerSwipeConfig => {
+  const resolved = { ...POINTER_SWIPE_DEFAULTS, ...config };
+  for (const [field, value] of Object.entries(resolved)) {
+    if (!Number.isFinite(value)) {
+      throw new Error(
+        `usePointerSwipe: \`${field}\` must be a finite number, received ${String(value)}.`,
+      );
+    }
+  }
+  return resolved;
+};
 
 /** Event hardware-time, not handler time — else a congested thread deflates
  * every velocity. See shared/engines/gesture/README.md § Recognition internals. */
