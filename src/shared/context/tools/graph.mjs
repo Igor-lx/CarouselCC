@@ -4404,7 +4404,14 @@ if (mode === "verify") {
         // пути к делу не относятся: первое не наше, остальное не адрес файла.
         if (/^(https?:|#|<|mailto:|\/)/.test(spec)) continue;
         const target = path.resolve(path.dirname(f), spec.split("#")[0]);
-        if (!existsSync(target)) danglingLinks.push(`${rel(f)} → ${spec}`);
+        // Адрес печатается от корня репозитория, как во всех соседних
+        // секциях. `rel()` тут не годится: он срезает корень ИСХОДНИКОВ, и
+        // файл вне `src` оставался с абсолютным путём — читателю приходилось
+        // вычитывать корень глазами. Найдено пробой.
+        if (!existsSync(target))
+          danglingLinks.push(
+            `${path.relative(REPO, f).split(path.sep).join("/")} → ${spec}`,
+          );
       }
   }
 
