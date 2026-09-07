@@ -369,6 +369,23 @@ const CONFIG = {
       ["**/tests/**/*.{ts,tsx}", "react-hooks/refs"],
     ],
   },
+  /** Раздел, куда складывают обещания обвязки без машинной опоры. Сводка
+   * открытого собирает их ПО СЛОВУ в графе «держится», и потому обещание,
+   * записанное мимо словаря («Держится: привычкой»), исчезает из неё молча — а
+   * читают именно её. Найдено пробой: слово снято, `open` показал на одну
+   * запись меньше, `verify` остался зелёным.
+   *
+   * Раздел объявлен и перечислим, поэтому обратная сторона возможна: каждая
+   * графа «Держится» внутри него обязана нести узнаваемое слово. Краснеть на
+   * законном ей нечем — раздел по своему заголовку и есть место для обещаний,
+   * которых машина не держит; графа «держится: тестом» означала бы, что запись
+   * лежит не здесь.
+   *
+   * `null` — раздела у проекта нет. */
+  promises: {
+    file: "07-invariants.md",
+    heading: "## Обещания обвязки, которые не держит машина",
+  },
   /** Отчёт последнего мутационного прогона. HTML-репортер держит внутри тот
    * же объект, что отдал бы JSON, поэтому второй репортер не нужен. */
   mutationReport: "../reports/mutation/mutation.html",
@@ -451,6 +468,13 @@ const styleFiles = [];
 })(ROOT);
 
 const isTest = (f) => /\/tests\//.test(f) || /\.test\.tsx?$/.test(f);
+
+/** Графа «держится», означающая отсутствие машинной опоры. Один источник на два
+ * режима: `open` этой формой СОБИРАЕТ обещания, `verify` — требует её от каждой
+ * записи объявленного раздела. Разъехавшись, они дали бы худшее из возможного —
+ * сводка молчит, а прогон зелёный. */
+const HELD_BY_NOTHING =
+  /Держится:\s*(ничем|ничто|вниманием|памятью)|held by nothing/i;
 
 // Ссылка на документацию — любой путь `*.md`, названный в КОММЕНТАРИИ. Форма
 // у неё разная и это нормально: и отдельная строка `// See docs/x.md`, и
@@ -1138,7 +1162,7 @@ if (mode === "open") {
   // заведён под эту форму: до него такие места были названы прозой в разных
   // файлах и в сводку открытого не попадали ни одно.
   scan("Держится ничем или вниманием — обещание без опоры", (line) =>
-    /Держится:\s*(ничем|ничто|вниманием|памятью)|held by nothing/i.test(line),
+    HELD_BY_NOTHING.test(line),
   );
 
   // Файлы, до которых не дотягивается ни один тест — даже транзитивно. Это не
@@ -4150,15 +4174,55 @@ if (mode === "verify") {
     }
   }
 
+  // Обещания без опоры: раздел объявлен — значит собираемо всё, что в нём.
+  // Прямая сторона у этой формы уже есть (`open` собирает по слову); здесь
+  // обратная: запись, написанная мимо словаря, из сводки выпадает молча.
+  const mutePromises = [];
+  if (CONFIG.promises != null) {
+    const at = path.join(BASE, CONFIG.promises.file);
+    if (!existsSync(at))
+      mutePromises.push(`файла нет: ${CONFIG.promises.file}`);
+    else {
+      const lines = readFileSync(at, "utf8").split(NEWLINE);
+      const from = lines.findIndex((l) => l.trim() === CONFIG.promises.heading);
+      if (from < 0)
+        mutePromises.push(
+          `раздел объявлен и не найден: «${CONFIG.promises.heading}»`,
+        );
+      else
+        for (let i = from + 1; i < lines.length; i++) {
+          if (/^## /.test(lines[i])) break;
+          if (!/^\s*(\*\*)?Держится/.test(lines[i])) continue;
+          if (HELD_BY_NOTHING.test(lines[i])) continue;
+          mutePromises.push(
+            `${CONFIG.promises.file}:${i + 1}  ${lines[i].trim()}`,
+          );
+        }
+    }
+  }
+  console.log("=== Обещания без опоры собираются сводкой ===");
+  console.log(`  записей мимо словаря: ${mutePromises.length}`);
+  for (const m of mutePromises) console.log("    " + m);
+
   // 13h. имена связей через DOM и CSS существуют в коде.
   const domDrift = [];
   if (CONFIG.domTables != null) {
     const at = path.join(BASE, CONFIG.domTables.file);
     if (existsSync(at)) {
       const text = readFileSync(at, "utf8").split(NEWLINE);
-      const code = [...files, ...styleFiles]
-        .map((f) => readFileSync(f, "utf8"))
-        .join(NEWLINE);
+      // Имя живо, только если стоит в ИСПОЛНЯЕМОМ тексте. Сверка искала его во
+      // всём файле разом и потому держалась за собственное эхо: после
+      // согласованного переименования достаточно было оставить старое имя в
+      // комментарии или в шапке теста — и таблица связей, единственный способ
+      // узнать радиус такой правки, продолжала описывать имя, которого в коде
+      // нет. Найдено пробой. Тот же класс уже был починен у имён констант и у
+      // camelCase-имён, поэтому здесь не заводится третий фильтр, а берётся
+      // тот же предикат.
+      const liveDomNames = new Set();
+      for (const f of [...files, ...styleFiles])
+        for (const line of readFileSync(f, "utf8").split(NEWLINE))
+          for (const hit of line.matchAll(/--[a-z-]+|data-[a-z-]+/g))
+            if (!inComment(line, hit.index)) liveDomNames.add(hit[0]);
       for (const heading of CONFIG.domTables.headings) {
         const from = text.indexOf(heading);
         if (from < 0) {
@@ -4169,7 +4233,7 @@ if (mode === "verify") {
           for (const hit of text[i]
             .split("|")[1]
             .matchAll(/`(--[a-z-]+|data-[a-z-]+)`/g))
-            if (!code.includes(hit[1]))
+            if (!liveDomNames.has(hit[1]))
               domDrift.push(`названо в таблице, нет в коде: ${hit[1]}`);
       }
     }
@@ -4275,6 +4339,62 @@ if (mode === "verify") {
     // и молча — сверка его не читала.
     ...(CONFIG.skills == null ? [] : skillDocs()),
   ].filter(([, at]) => !at.startsWith(SHELF_ROOT));
+
+  // Скрипты манифеста против прозы — в обе стороны.
+  //
+  // Правила обещают, что про КАЖДЫЙ скрипт решение принято: он либо в таблице
+  // проверок, либо назван в списке тех, что не входят туда намеренно. Держалось
+  // обещание счётом, записанным словом («ещё четыре скрипта»), а такой счёт не
+  // ловит ничто — правило о числах прямо говорит, что словесный счёт остаётся на
+  // внимании. Найдено пробой: скриптов этого рода пять, и `format` не был назван
+  // нигде — ни в таблице, ни в исключениях, ни в разрешениях среды.
+  //
+  // Обратная сторона ловит другое: `npm run <имя>`, названное в прозе, когда
+  // такого скрипта в манифесте нет. Форма с явным `run` взята намеренно —
+  // `npm audit` и `npm test` это встроенные команды менеджера, и требовать для
+  // них скрипта значило бы краснеть на законном (F4). Списка встроенных здесь
+  // поэтому нет: он гнил бы от версии к версии.
+  //
+  // **Предупреждает, а не роняет** — та же идиома, что у двух соседних сверок,
+  // читающих манифест. Причина не в мягкости: посадка в новый проект приходит с
+  // готовым набором скриптов и с обобщённым шаблоном правил, и первый же прогон
+  // краснел бы на состоянии, которое ещё никто не успел описать.
+  if (CONFIG.manifest != null) {
+    const at = path.join(HERE, CONFIG.manifest);
+    const pkg = existsSync(at) ? JSON.parse(readFileSync(at, "utf8")) : null;
+    const scripts = Object.keys(pkg?.scripts ?? {});
+    if (scripts.length) {
+      const spans = new Set();
+      for (const [, src] of docSources)
+        for (const hit of readFileSync(src, "utf8").matchAll(/`([^`\n]+)`/g))
+          spans.add(hit[1].trim());
+      const named = (s) =>
+        spans.has(s) || spans.has(`npm ${s}`) || spans.has(`npm run ${s}`);
+      const silent = scripts.filter((s) => !named(s));
+      const declared = new Set(scripts);
+      const phantom = new Set();
+      for (const span of spans) {
+        const m = /^npm run ([\w:.-]+)$/.exec(span);
+        if (m !== null && !declared.has(m[1])) phantom.add(m[1]);
+      }
+      if (silent.length || phantom.size) {
+        console.log(
+          "=== Скрипты манифеста описаны (предупреждение, прогон не роняет) ===",
+        );
+        console.log(
+          `  скриптов: ${scripts.length}, не названы нигде: ${silent.length}, названы и не существуют: ${phantom.size}`,
+        );
+        for (const s of silent)
+          console.log(
+            `    ${s} — есть в манифесте, но ни таблица проверок, ни список` +
+              NEWLINE +
+              "      исключённых его не называет: решение о нём не принято",
+          );
+        for (const s of phantom)
+          console.log(`    npm run ${s} — названо в прозе, скрипта нет`);
+      }
+    }
+  }
 
   // 9d, обратная сторона: номер решения, названный где угодно, разрешается в
   // файл. Корпус тот же, что у адресов, плюс код: на решение ссылаются как раз
@@ -4723,6 +4843,7 @@ if (mode === "verify") {
     qualityDrift.length ||
     indexDrift.length ||
     domDrift.length ||
+    mutePromises.length ||
     unclassified.length ||
     danglingRefs.length ||
     deadExceptions.length ||
