@@ -14,7 +14,12 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: "node",
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // Второй шаблон — про инструмент базы знаний. Он держит все остальные
+    // сверки, а сам до этого не держался ничем: собирать его тесты было
+    // некому, потому что область кончалась на `src`. Тесты словаря лежат
+    // рядом с ним, в `.context/`, и попадают в `npm test` — то есть в
+    // обязательный набор — сами, без отдельной команды и без памяти о ней.
+    include: ["src/**/*.{test,spec}.{ts,tsx}", ".context/**/*.test.mjs"],
     // Coverage measures everything the component ships: the carousel AND the
     // shelves it stands on. Excluding either -- or excluding `.tsx`, which
     // silently drops every component and hook that touches JSX -- produces a

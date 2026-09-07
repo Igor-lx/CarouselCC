@@ -9,6 +9,18 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+// Словарь области — чистые функции от пути, вынесенные ради одного: решение
+// «к какому файлу относится этот вопрос» должно быть записано ОДИН раз.
+// Выводясь на месте, оно выводилось по-разному, и три дефекта подряд были
+// забытым слагаемым такой комбинации.
+import {
+  inComment,
+  isCodePath,
+  isTestPath,
+  selfCheck,
+  touchesRuntime,
+} from "./graph.predicates.mjs";
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 // --- настройка -------------------------------------------------------------
@@ -410,8 +422,25 @@ const SHELF = CONFIG.shelf == null ? null : path.join(HERE, CONFIG.shelf);
 const shelfAt = (tail) => (SHELF === null ? null : path.join(SHELF, tail));
 /** Побайтовые пары «рабочий файл → копия на полке». Полки нет — пар нет. */
 const TOOL_COPY = shelfAt("tools/graph.mjs");
-const TOOL_DOCS =
-  SHELF === null ? [] : [["graph.md", shelfAt("tools/graph.md")]];
+/** Справочник режимов — назван отдельно, потому что его читают, а не только
+ * сверяют: позиционная ссылка на «первый элемент списка» переживала бы
+ * добавление любой новой пары ровно до первого добавления. */
+const TOOL_MANUAL = "graph.md";
+/** Всё, что обязано лежать на полке байт в байт: сам инструмент сверяется
+ * отдельно (он сравнивает себя с собой), остальное — здесь. Словарь области и
+ * его набор тестов входят сюда с рождения: полка, увезённая без них, получит
+ * инструмент, чьи ответы никем не проверены. */
+const TOOL_PAIRS =
+  SHELF === null
+    ? []
+    : [
+        [TOOL_MANUAL, shelfAt(`tools/${TOOL_MANUAL}`)],
+        ["graph.predicates.mjs", shelfAt("tools/graph.predicates.mjs")],
+        [
+          "graph.predicates.test.mjs",
+          shelfAt("tools/graph.predicates.test.mjs"),
+        ],
+      ];
 const SETTINGS_SHELF = shelfAt("settings.template.json");
 const SKILLS_SHELF = SHELF;
 const CHECK_TABLES =
@@ -467,7 +496,7 @@ const styleFiles = [];
   }
 })(ROOT);
 
-const isTest = (f) => /\/tests\//.test(f) || /\.test\.tsx?$/.test(f);
+const isTest = isTestPath;
 
 /** Графа «держится», означающая отсутствие машинной опоры. Один источник на два
  * режима: `open` этой формой СОБИРАЕТ обещания, `verify` — требует её от каждой
@@ -827,6 +856,22 @@ const transitiveUsers = (start) => {
   }
   return seen;
 };
+
+// Словарь проверяет сам себя прежде, чем инструмент ответит хоть на один
+// вопрос. «Запустить тесты после правки» иначе держится памятью: набор
+// гоняют, когда о нём вспомнили, а инструмент зовут постоянно — и сломанный
+// словарь виден в тот же миг. Таблица случаев одна на оба слоя, поэтому
+// разойтись им нечем.
+const predicateFailures = selfCheck();
+if (predicateFailures.length > 0) {
+  console.log("=== Словарь области сломан — инструмент не отвечает ===");
+  for (const line of predicateFailures) console.log("    " + line);
+  console.log(
+    "  Правьте `graph.predicates.mjs` или его таблицу случаев: пока они",
+    "не сходятся, ответы всех режимов недостоверны.",
+  );
+  process.exit(1);
+}
 
 const mode = process.argv[2];
 
@@ -1549,14 +1594,13 @@ if (mode === "tested") {
     const shelfRoots = (CONFIG.forks ?? []).flatMap((p) => [p.from, p.to]);
     // Путь правки приходит от корня репозитория, а пара форка объявлена от
     // корня исходников: сравнение идёт по вхождению сегмента, а не по префиксу.
-    // Только исполняемый код и только не-тест: у README и у теста публичной
-    // поверхности нет, и вопрос там — шум. Канал, кричащий не по делу,
-    // перестают читать, а этот обязан сработать редко и быть прочитанным.
-    // Найдено пробой: первая редакция считала правку README поверхностью.
+    // Вопрос про контракт — значит про то, у чего он есть: у исполняемого
+    // модуля. README и тест сюда не входят, и это решает словарь, а не
+    // условие на месте. Найдено пробой: первая редакция считала правку README
+    // публичной поверхностью.
     const shelfHits = changed.filter(
       (c) =>
-        /\.tsx?$/.test(c) &&
-        !isTest(norm(c)) &&
+        isCodePath(norm(c)) &&
         shelfRoots.some((p) => norm(c).includes("/" + p + "/")),
     );
     if (shelfHits.length > 0) {
@@ -1584,20 +1628,16 @@ if (mode === "tested") {
     // сырым путям правки, поэтому в область попадают и стили, которых нет в
     // графе импортов.
     // Область задана путями, и по пути в неё попадает всё, что рядом лежит.
-    // Спрашивается же только с того, что браузер может сломать: README движка
-    // не может, тест — тоже, он и сам проверка. Прогон, который про правку
-    // ничего не докажет, — это канал, кричащий не по делу, а такой перестают
-    // читать; ровно этого конфиг области и обещал избежать. Стили остаются: в
-    // графе импортов их не видно, а краску они меняют.
+    // Спрашивается же только с того, чья правка меняет наблюдаемое поведение:
+    // README движка его не меняет, тест — тоже, он и сам проверка. Стиль
+    // меняет, хоть его и не видно в графе импортов. Всё это решает словарь.
     //
     // Найдено двумя пробами подряд, и вторая — про первую: сперва фильтр
     // завели по расширению и остановились, а тест `.test.tsx` расширению
-    // подходит. Тот же класс уже был закрыт у вопроса о публичной поверхности
-    // полки — предикат берётся тот же, чтобы третьего фильтра не появилось.
+    // подходит. Это и стало доводом вынести решение в одно место.
     const smokeHits = changed.filter(
       (f) =>
-        /\.(tsx?|scss)$/.test(f) &&
-        !isTest(norm(f)) &&
+        touchesRuntime(norm(f)) &&
         CONFIG.smokeScope.some((p) => norm(f).startsWith(p)),
     );
     console.log(String.fromCharCode(10) + "=== Смоук в браузере ===");
@@ -2796,10 +2836,6 @@ if (mode === "verify") {
   // и пройдёт зелёным — то есть соврёт ровно там, где его читают как гарантию.
   const DECISION_RE =
     /do not remove|by design|deliberat|intentional|on purpose|не удалять|намеренно|осознанно|по замыслу|нарочно/i;
-  const inComment = (line, at) => {
-    const before = line.slice(0, at);
-    return before.includes("//") || /^\s*(\*|\/\*)/.test(line);
-  };
 
   const markerKinds = [
     {
@@ -3068,7 +3104,7 @@ if (mode === "verify") {
     else if (flat(copy) !== flat(fileURLToPath(import.meta.url)))
       toolDrift.push(`копия разошлась: ${rel0(TOOL_COPY)}`);
   }
-  for (const [own, shelf] of TOOL_DOCS) {
+  for (const [own, shelf] of TOOL_PAIRS) {
     const flat = (f) => readFileSync(f, "utf8").split(CR_LF).join(NEWLINE);
     const mine = path.join(HERE, own);
     if (!existsSync(mine)) toolDrift.push(`нет файла: ${own}`);
@@ -3085,9 +3121,8 @@ if (mode === "verify") {
     const own = readFileSync(fileURLToPath(import.meta.url), "utf8");
     const modes = [...own.matchAll(/mode === "([a-z]+)"/g)].map((m) => m[1]);
     const named = (text, m) => new RegExp("`" + m + "\\b").test(text);
-    const manual = TOOL_DOCS.length
-      ? readFileSync(path.join(HERE, TOOL_DOCS[0][0]), "utf8")
-      : null;
+    const manualAt = path.join(HERE, TOOL_MANUAL);
+    const manual = existsSync(manualAt) ? readFileSync(manualAt, "utf8") : null;
     const rulesText = CONFIG.rulesManifest.rules
       .map((r) => {
         const at = path.join(HERE, r);
