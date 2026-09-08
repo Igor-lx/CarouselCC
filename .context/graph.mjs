@@ -4479,6 +4479,41 @@ if (mode === "verify") {
   );
   for (const d of domDrift) console.log("    " + d);
 
+  // Инструкция посадки называет каждый файл полки.
+  //
+  // Побайтовые пары держат НАЛИЧИЕ файла на полке, и только его. Объяснение
+  // держалось вниманием — и не удержало: словарь области и его набор приехали
+  // на полку парами, а инструкция про них молчала. Посадка по такой инструкции
+  // даёт инструмент без файла, который он импортирует первой строкой, то есть
+  // не стартующий вовсе; про набор — тише и хуже: он приезжает и не гоняется.
+  //
+  // Соврать нечем: файл полки либо назван текстом инструкции, либо нет. Ложных
+  // срабатываний тоже нет по построению — полка и есть то, что инструкция
+  // ставит, и файл, о котором она молчит, приезжает необъяснённым.
+  const unexplained = [];
+  {
+    const instructionAt = shelfAt("README-claude.md");
+    if (SHELF !== null && instructionAt !== null && existsSync(instructionAt)) {
+      const text = readFileSync(instructionAt, "utf8");
+      (function walkShelf(dir) {
+        for (const entry of readdirSync(dir)) {
+          const full = path.join(dir, entry);
+          if (statSync(full).isDirectory()) {
+            walkShelf(full);
+            continue;
+          }
+          const rel = path.relative(SHELF, full).split(path.sep).join("/");
+          if (rel === "README-claude.md") continue;
+          if (text.includes(rel) || text.includes(path.basename(rel))) continue;
+          unexplained.push(rel);
+        }
+      })(SHELF);
+    }
+  }
+  console.log("=== Инструкция посадки называет всё, что на полке ===");
+  console.log(`  файлов полки без объяснения: ${unexplained.length}`);
+  for (const u of unexplained) console.log("    " + u);
+
   console.log("=== Документы названы в указателе ===");
   console.log(
     CONFIG.docsIndex == null
@@ -5077,6 +5112,7 @@ if (mode === "verify") {
     indexDrift.length ||
     domDrift.length ||
     mutePromises.length ||
+    unexplained.length ||
     goneScope.length ||
     unclassified.length ||
     danglingRefs.length ||

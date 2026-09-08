@@ -71,6 +71,8 @@
 | [`CLAUDE.template.md`](./CLAUDE.template.md) | шаблон правил проекта: постоянное уже написано, проектное помечено `<...>` |
 | [`tools/graph.mjs`](./tools/graph.mjs) | счётный инструмент: **досье на адрес** (`brief`), циклы импортов, радиус поражения, мёртвые экспорты, объёмы, сводка открытого и **сверка базы с кодом** |
 | [`tools/graph.md`](./tools/graph.md) | справочник его режимов: что делает каждый и **чего не делает**. Без него инструмент приезжает набором команд без границ применимости |
+| [`tools/graph.predicates.mjs`](./tools/graph.predicates.mjs) | словарь области: чистые функции от пути, отвечающие «к какому файлу относится этот вопрос». Инструмент **импортирует** его — без этого файла он не запустится вовсе |
+| [`tools/graph.predicates.test.mjs`](./tools/graph.predicates.test.mjs) | набор на этот словарь. Без него ответы всех сверок держатся ничем: сломанный предикат меняет их разом |
 | [`environment.md`](./environment.md) | **среда**: что вызывает запрос подтверждения, что снимается списком разрешений, а что нет, и раздел труда между оболочкой и инструментами. Ставится, чтобы задачу можно было поставить и отойти |
 | [`settings.template.json`](./settings.template.json) | список разрешений, который кладут в новый проект как `.claude/settings.json` |
 | [`eslint.config.template.js`](./eslint.config.template.js) | шаблон конфига линтера: линт **с типами**, правила хуков во всём репозитории, послабления для тестов с причинами на месте и отказ линта от форматирования последней строкой. Кладётся как `eslint.config.js` |
@@ -132,6 +134,8 @@
   .context/                  ← папка базы (имя ваше, но дальше примеры с ней)
     graph.mjs                ← рабочая копия tools/graph.mjs
     graph.md                 ← его справочник, из tools/graph.md
+    graph.predicates.mjs     ← словарь области; инструмент его импортирует
+    graph.predicates.test.mjs ← набор на словарь, гоняется прогоном тестов
     rules/                   ← доктрина: quality, workflow, knowledge-base,
                                 documentation, environment — копии из полки
     00-map.md
@@ -153,6 +157,8 @@
 | --- | --- | --- |
 | `tools/graph.mjs` | `.context/graph.mjs` | поправить `CONFIG`, шаг 2 |
 | `tools/graph.md` | `.context/graph.md` | ничего: справочник режимов, едет как есть |
+| `tools/graph.predicates.mjs` | `.context/graph.predicates.mjs` | ничего: словарь едет как есть. **Забыть его нельзя** — инструмент импортирует его первой строкой и без него не стартует |
+| `tools/graph.predicates.test.mjs` | `.context/graph.predicates.test.mjs` | добавить в область сбора тестов второй шаблон (`.context/**/*.test.mjs` рядом с `src/**`), иначе набор не соберёт никто и словарь останется без проверки |
 | `CLAUDE.template.md` | `CLAUDE.md` в корне | заполнить `<...>`, шаг 3 |
 | `settings.template.json` | `.claude/settings.json` | сверить команды, шаг 5 |
 | `quality.md`, `workflow.md`, `knowledge-base.md`, `documentation.md`, `environment.md` | `.context/rules/` | **обязательно**: это доктрина, на неё ссылается `CLAUDE.md`. Без неё проект остаётся без планки, петли и правил базы |
