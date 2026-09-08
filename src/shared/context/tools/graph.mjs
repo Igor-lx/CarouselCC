@@ -878,7 +878,12 @@ const transitiveUsers = (start) => {
  * меняется, значит второй разбор возвращает ровно то же. Замерено: `286.8 кБ`
  * и `3.34 мс` на разбор; счёт проходов по исходнику 2 → 1. Считать дважды одно
  * и то же — та же лишняя работа, что лишний проход рендера, и мерится она
- * счётом, а не секундомером. */
+ * счётом, а не секундомером.
+ *
+ * Наружу уходит замороженным. Считанный один раз, список стал общим для обоих
+ * потребителей, и любой `sort()` у одного менял бы ответ другому — молча и не
+ * в том вызове, где написан. Пока не мутирует никто; держалось это тем, что
+ * никто не написал, а теперь — тем, что написать нельзя. */
 let modesCache = null;
 const toolModes = () => {
   if (modesCache !== null) return modesCache;
@@ -887,7 +892,7 @@ const toolModes = () => {
   for (const line of own.split(/\r?\n/))
     for (const hit of line.matchAll(/mode === "([a-z]+)"/g))
       if (!inComment(line, hit.index)) found.push(hit[1]);
-  modesCache = [...new Set(found)];
+  modesCache = Object.freeze([...new Set(found)]);
   return modesCache;
 };
 const predicateFailures = selfCheck();
