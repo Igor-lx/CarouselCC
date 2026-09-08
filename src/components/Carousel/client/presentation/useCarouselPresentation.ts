@@ -32,13 +32,13 @@ export interface CarouselPresentation {
   flagAttributes: Record<string, string>;
 }
 
-export const useCarouselPresentation = ({
+export function useCarouselPresentation({
   className,
   visibleSlidesCount,
   virtualSlides,
   layoutOrigin,
   flags,
-}: UseCarouselPresentationInput): CarouselPresentation => {
+}: UseCarouselPresentationInput): CarouselPresentation {
   const classNames = useMemo(
     () => (className ? mergeStyleMaps(styles, className) : styles),
     [className],
@@ -100,4 +100,4 @@ export const useCarouselPresentation = ({
     slideStyleFor,
     flagAttributes,
   };
-};
+}

@@ -272,7 +272,7 @@
   "src/components/Carousel/client/presentation/useCarouselPresentation.ts": {
     "killed": 13,
     "alive": 10,
-    "hash": "c4e60076c36b"
+    "hash": "93f0ae852af4"
   },
   "src/components/Carousel/client/public-api/schemas.ts": {
     "killed": 37,
@@ -377,7 +377,7 @@
   "src/components/Carousel/client/viewport/useSlideViewport.ts": {
     "killed": 1,
     "alive": 0,
-    "hash": "82d1c4b9efe6"
+    "hash": "b4471eb43562"
   },
   "src/components/Carousel/client/visual-position/fallbackPacing.ts": {
     "killed": 13,
@@ -637,7 +637,7 @@
   "src/shared/theme/useTheme.ts": {
     "killed": 5,
     "alive": 0,
-    "hash": "6a6c8be829a6"
+    "hash": "5e9c8e6d6e63"
   },
   "src/shared/viewportObservation/useIsomorphicLayoutEffect.ts": {
     "killed": 0,
