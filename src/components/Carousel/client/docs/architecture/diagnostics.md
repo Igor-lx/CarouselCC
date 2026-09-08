@@ -33,7 +33,10 @@ outermost to innermost:
   the module (and its strings) alive in production even behind a dead branch.
 
 This is verified against the built bundle, not just by reading gates: no check
-string from any of the five check files survives in production.
+string from any check module survives in production. The count is deliberately
+not written here — it moved once already, from five files to six, while the
+sentence around it stayed put. Re-verify it the way it was verified: pull the
+string literals out of `checks/` and grep the built bundle for them.
 
 ## What each check verifies
 
