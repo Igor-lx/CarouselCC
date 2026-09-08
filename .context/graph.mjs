@@ -3980,11 +3980,18 @@ if (mode === "verify") {
     for (const one of CONFIG.rulesManifest.rules) {
       const at = path.join(HERE, one);
       if (!existsSync(at)) continue;
-      const left = readFileSync(at, "utf8").match(
-        /<(?:[А-ЯЁ][А-ЯЁ ]*|\.\.\.)>/g,
-      );
+      const body = readFileSync(at, "utf8");
+      const left = body.match(/<(?:[А-ЯЁ][А-ЯЁ ]*|\.\.\.)>/g);
       if (left !== null)
         unfilledTemplate.push(`${one}: ${[...new Set(left)].join(", ")}`);
+      // Вторая форма, и без неё первая была слепа на самом объёмном: подсказки
+      // заготовки написаны прозой в угловых скобках на несколько строк
+      // («<Слои и их назначение…>»), и предикат «целиком заглавные» их не берёт.
+      // Признак — открывающая скобка в начале строки: замерено, что в живых
+      // файлах правил таких строк ноль, а в заготовке их семь.
+      const prose = body.split(NEWLINE).filter((l) => l.startsWith("<")).length;
+      if (prose > 0)
+        unfilledTemplate.push(`${one}: подсказок заготовки прозой: ${prose}`);
     }
 
     // 13b-2. Ссылка на раздел по названию обязана разрешаться.
