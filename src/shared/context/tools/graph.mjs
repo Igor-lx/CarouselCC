@@ -262,14 +262,25 @@ const CONFIG = {
     table: "01-facts.md",
     heading: "| Нужно понять | Файл |",
   },
-  /** Список критериев планки: правила проекта и его двойник на полке. Правило
-   * «дефект, прошедший сверку, — дефект списка: допиши симптом» держалось
-   * вниманием, а список обязан ещё и уехать в следующий проект. Сверяется
-   * СОСТАВ ПУНКТОВ в обе стороны, а не текст: формулировки на полке обобщённые,
-   * и совпадение слов было бы ложной целью — ровно как у таблиц сверок.
+  /** Разделы политики качества «по применимости»: объявление против предмета.
    *
-   * `null` — списка у проекта нет. */
-  qualityList: { rules: "../CLAUDE.md", shelf: "quality.md" },
+   * Политика делится на ядро (действует всегда) и разделы, у которых предмета
+   * может не быть вовсе — сети, локалей, прода, конвейера. Каждый такой раздел
+   * объявляется живым или неприменимым **с причиной**, и объявление обязано
+   * проверяться: иначе оно держится совестью, а раздел, объявленный
+   * неприменимым при живом предмете, выключает пункты молча.
+   *
+   * Предмет ищется на диске **сам**, без подсказки конфига, — тот же приём, что
+   * у «сверок, выключенных при живом предмете». Обратная сторона не
+   * проверяется намеренно: объявить лишнее значит прочитать больше нужного,
+   * вреда в этом нет.
+   *
+   * `null` — деления на ядро и применимые у политики нет. */
+  qualityScope: {
+    policy: "rules/quality.md",
+    table: "01-facts.md",
+    heading: "| Раздел политики | Применим | Чем подтверждается |",
+  },
   /** Разделы базы, где числа законны по определению: базовая линия и состав
    * инструментов проверки. Их получают прогоном команды и той же командой
    * перепроверяют — устаревшее число ловится прогоном, а не чтением. Сверка
@@ -440,7 +451,53 @@ const TOOL_PAIRS =
           "graph.predicates.test.mjs",
           shelfAt("tools/graph.predicates.test.mjs"),
         ],
+        // Доктрина качества — тот же побайтовый двойник, что и инструмент, и по
+        // той же причине. Раньше сверялся только СОСТАВ пунктов: перечень
+        // совпадал, а формулировки могли разъезжаться сколько угодно, и полка
+        // увозила в следующий проект другой текст под теми же именами. Байты не
+        // разъезжаются. Цена решения: критерий формулируется без адресов
+        // проекта — примеры живут в правилах проекта, а не в политике.
+        ["rules/quality.md", shelfAt("quality.md")],
       ];
+/** Объявление применимости разделов политики: карта «раздел → живой ли и почему».
+ *
+ * Разбор один на оба места — на сверку и на вопрос закрытия работы. Две копии
+ * разошлись бы при первой правке заголовка таблицы, и разошлись бы молча:
+ * сверка продолжала бы читать, а напоминание печатать пустоту. */
+const qualityScopeDeclared = () => {
+  if (CONFIG.qualityScope == null) return null;
+  const at = path.join(HERE, CONFIG.qualityScope.table);
+  if (!existsSync(at)) return null;
+  // Перевод строки берётся литералом: помощник объявлен выше по файлу, чем
+  // общая константа, и обращение к ней здесь падало бы на загрузке модуля.
+  const lines = readFileSync(at, "utf8").split(String.fromCharCode(10));
+  const head = lines.findIndex(
+    (l) => l.trim() === CONFIG.qualityScope.heading.trim(),
+  );
+  if (head < 0) return null;
+  const out = new Map();
+  for (let i = head + 2; i < lines.length; i += 1) {
+    if (!lines[i].trimStart().startsWith("|")) break;
+    const cell = lines[i].split("|");
+    const id = /^([K-U])\./.exec(cell[1].trim().replace(/`/g, ""));
+    if (id === null) continue;
+    // Сравнение словом, а не образцом с `\b`: граница слова в JS опирается на
+    // латиницу, поэтому «да» ею не заканчивается. Первая редакция читала
+    // КАЖДЫЙ раздел как неприменимый и доложила восемь расхождений на пустом
+    // месте — та же ловушка, что уже записана в ловушках окружения.
+    out.set(id[1], {
+      live: cell[2].trim().toLowerCase() === "да",
+      why: cell[3].trim(),
+    });
+  }
+  return out;
+};
+const liveQualityScopes = () => {
+  const declared = qualityScopeDeclared();
+  return declared === null
+    ? null
+    : [...declared].filter(([, v]) => v.live).map(([k]) => k);
+};
 const SETTINGS_SHELF = shelfAt("settings.template.json");
 const SKILLS_SHELF = SHELF;
 const CHECK_TABLES =
@@ -1596,11 +1653,34 @@ if (mode === "tested") {
         "  До прогона прочитать свой дифф по разделам планки поимённо, а не по",
       );
       console.log(
-        "  памяти. Сами разделы — в правилах: пересказывать их здесь значило бы",
+        "  памяти. Сами разделы — в политике: пересказывать их здесь значило бы",
       );
       console.log(
         "  завести второй источник, который соврёт при первом переименовании.",
       );
+      // Указание «сверься с планкой» без адреса бесполезно: у политики есть
+      // ядро и разделы по применимости, и какие из них живые — знает таблица, а
+      // не память. Инструмент, о котором надо вспомнить самому, не используют,
+      // поэтому живой набор печатается здесь же.
+      {
+        const live = liveQualityScopes();
+        console.log(
+          live === null
+            ? "  Читается ядро политики целиком; деления на применимые нет."
+            : "  Читается ядро целиком плюс живые разделы: " +
+                live.join(", ") +
+                ". Объявление и причины — таблица применимости в базе.",
+        );
+        // Зависимость — самый частый способ втащить в проект новый предмет и
+        // самый незаметный: признак по коду его не увидит, потому что вызовов
+        // ещё нет, а библиотека уже стоит. Поэтому вопрос задаётся по факту
+        // правки манифеста, а не ждёт, пока предикат догадается.
+        if (changed.some((c) => /(^|\/)package\.json$/.test(norm(c))))
+          console.log(
+            "  Манифест тронут: приехала зависимость — проверь таблицу" +
+              " применимости, не появился ли предмет спящего раздела.",
+          );
+      }
       console.log(
         "  Не сошлось — переделать, а не описать. В отчёте об этом отдельная строка.",
       );
@@ -4244,30 +4324,135 @@ if (mode === "verify") {
     if (existsSync(at) && readdirSync(at).length)
       disarmed.push("скиллы уже есть, а CONFIG.skills пуст");
   }
-  // 13e. список критериев планки: проект против полки, в обе стороны.
-  const qualityDrift = [];
-  if (CONFIG.qualityList != null && SHELF !== null) {
-    const ids = (at) =>
-      existsSync(at)
-        ? new Set(
-            [
-              ...readFileSync(at, "utf8").matchAll(
-                /\*\*([A-F]\d+(?:-бис)?)\./g,
-              ),
-            ].map((m) => m[1]),
-          )
-        : null;
-    const mine = ids(path.join(HERE, CONFIG.qualityList.rules));
-    const theirs = ids(path.join(SHELF, CONFIG.qualityList.shelf));
-    if (mine === null) qualityDrift.push("файла правил нет");
-    else if (theirs === null) qualityDrift.push("списка на полке нет");
+  // 13e. Сверка состава критериев снята намеренно, а не потеряна: её место
+  // занял побайтовый двойник доктрины (`rules/quality.md` в парах выше).
+  // Состав сличал перечень имён и молчал о формулировках — полка могла увезти
+  // другой текст под теми же именами. Байты этого не позволяют, и заодно
+  // отпадает нужда держать список критериев в двух редакциях.
+  // 13e-бис. Применимость разделов политики качества: объявление против
+  // предмета. Предикаты написаны для ЛЮБОГО проекта, а не под этот: замер на
+  // одном репозитории заполняет таблицу, но не сужает признак — иначе в
+  // следующем проекте предмет появится, а сверка промолчит.
+  const scopeDrift = [];
+  const liveScopes = [];
+  if (CONFIG.qualityScope != null) {
+    const policyAt = path.join(HERE, CONFIG.qualityScope.policy);
+    const tableAt = path.join(BASE, CONFIG.qualityScope.table);
+    if (!existsSync(policyAt)) scopeDrift.push("политики нет");
+    else if (!existsSync(tableAt)) scopeDrift.push("файла таблицы нет");
     else {
-      for (const one of mine)
-        if (!theirs.has(one))
-          qualityDrift.push(`критерий не уехал на полку: ${one}`);
-      for (const one of theirs)
-        if (!mine.has(one))
-          qualityDrift.push(`критерий есть на полке, но не в правилах: ${one}`);
+      const sections = new Map();
+      for (const line of readFileSync(policyAt, "utf8").split(NEWLINE)) {
+        const h = /^## ([K-U])\.\s+(.+)$/.exec(line);
+        if (h !== null) sections.set(h[1], h[2].trim());
+      }
+      // Предмет ищется в исполняемом тексте прод-кода: `fetch` в комментарии и
+      // адрес пространства имён в разметке значка предметом не являются, и на
+      // них сверка кричала бы — а крикливой проверке перестают верить (J4).
+      const code = files.filter((f) => !isMachinery(f) && !isTestPath(f));
+      const hasCode = (re) =>
+        code.some((f) =>
+          readFileSync(f, "utf8")
+            .split(NEWLINE)
+            .some((line) => {
+              const m = re.exec(line);
+              return m !== null && !inComment(line, m.index);
+            }),
+        );
+      const manifest = path.join(HERE, "..", "package.json");
+      const pkg = existsSync(manifest)
+        ? JSON.parse(readFileSync(manifest, "utf8"))
+        : {};
+      const script = (n) => (pkg.scripts ?? {})[n] !== undefined;
+      const deps = Object.keys({
+        ...(pkg.dependencies ?? {}),
+        ...(pkg.devDependencies ?? {}),
+      });
+      const dep = (re) => deps.some((d) => re.test(d));
+      // Признак ищется двумя сетями: по коду и по зависимостям. Вторая нужна
+      // потому, что предмет чаще всего приезжает библиотекой, а её имя известно
+      // заранее там, где выбор невелик: клиент запросов, обёртка хранилища,
+      // движок движения, набор локализации. Список закрытый и назван поимённо —
+      // угадывать он не пытается, а известное закрывает.
+      const hasMarkup = () => code.some((f) => /\.(tsx|jsx)$/.test(f));
+      const probe = {
+        K: () =>
+          hasCode(
+            /\bfetch\s*\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB|document\.cookie|URLSearchParams|useSearchParams|location\.(search|hash)|import\.meta\.env\.(?!DEV\b|PROD\b|MODE\b)|process\.env/,
+          ) ||
+          dep(
+            /^(axios|ky|got|superagent|node-fetch|swr|@tanstack\/|idb|dexie|localforage|js-cookie|dotenv)/i,
+          ),
+        L: () =>
+          hasCode(
+            /\basync\s|\bawait\s|new Promise|setTimeout\(|setInterval\(|queueMicrotask\(|AbortController|requestAnimationFrame\(|requestIdleCallback\(/,
+          ),
+        M: hasMarkup,
+        N: () =>
+          hasCode(
+            /requestAnimationFrame\(|\.animate\(|pointerdown|pointermove|touchstart|@keyframes|transition:/,
+          ) ||
+          dep(
+            /^(framer-motion|motion|gsap|react-spring|@react-spring|popmotion|anime|lottie)/i,
+          ),
+        O: () =>
+          styleFiles.length > 0 ||
+          dep(
+            /^(styled-components|@emotion|tailwindcss|stitches|vanilla-extract)/i,
+          ),
+        P: hasMarkup,
+        // Адрес пространства имён — не внешний адрес: он не загружается и никуда
+        // не ведёт. Исключение общее, а не про этот проект.
+        Q: () =>
+          hasCode(
+            /dangerouslySetInnerHTML|\.innerHTML|\.outerHTML|insertAdjacentHTML|\beval\(|new Function\(|document\.write|https?:\/\/(?!www\.w3\.org)/,
+          ) || dep(/^(dompurify|sanitize-html|xss|marked|markdown-it|helmet)/i),
+        R: () =>
+          script("build") ||
+          dep(/^(vite|webpack|rollup|esbuild|parcel|@rsbuild|turbopack)/i),
+        S: () =>
+          script("deploy") ||
+          script("start") ||
+          dep(
+            /^(@sentry|@opentelemetry|pino|winston|loglevel|bugsnag|rollbar|web-vitals)/i,
+          ),
+        T: () =>
+          hasCode(/\bIntl\.[A-Z]/) ||
+          dep(/(i18n|intl|locale|globalize|lingui|polyglot)/i),
+        U: () =>
+          [
+            ".github/workflows",
+            ".gitlab-ci.yml",
+            ".circleci",
+            ".drone.yml",
+            "azure-pipelines.yml",
+            "Jenkinsfile",
+            "bitbucket-pipelines.yml",
+            ".woodpecker.yml",
+          ].some((p) => existsSync(path.join(HERE, "..", p))),
+      };
+      const declared = qualityScopeDeclared();
+      if (declared === null) scopeDrift.push("таблицу применимости не нашли");
+      else {
+        for (const [id, title] of sections)
+          if (!declared.has(id))
+            scopeDrift.push(`раздел не объявлен: ${id}. ${title}`);
+        for (const id of declared.keys())
+          if (!sections.has(id))
+            scopeDrift.push(`объявлен раздел, которого нет в политике: ${id}`);
+        for (const [id, d] of declared) {
+          if (!sections.has(id)) continue;
+          if (d.live) {
+            liveScopes.push(id);
+            continue;
+          }
+          if (d.why === "") scopeDrift.push(`неприменим без причины: ${id}`);
+          if (probe[id] !== undefined && probe[id]())
+            scopeDrift.push(
+              `объявлен неприменимым, а предмет на диске есть: ${id}`,
+            );
+        }
+      }
     }
   }
   // 13f. каждый документ назван в указателе.
@@ -4604,13 +4789,16 @@ if (mode === "verify") {
   );
   for (const d of indexDrift) console.log("    " + d);
 
-  console.log("=== Список критериев планки ===");
+  console.log("=== Применимость разделов планки ===");
   console.log(
-    CONFIG.qualityList == null || SHELF === null
-      ? "  пара не заявлена"
-      : `  расхождений: ${qualityDrift.length}`,
+    CONFIG.qualityScope == null
+      ? "  деление на ядро и применимые не заявлено"
+      : `  расхождений: ${scopeDrift.length}` +
+          (liveScopes.length
+            ? `; живые разделы: ${liveScopes.join(", ")}`
+            : ""),
   );
-  for (const q of qualityDrift) console.log("    " + q);
+  for (const s of scopeDrift) console.log("    " + s);
 
   console.log("=== Сверки, выключенные при живом предмете ===");
   console.log(`  выключено зря: ${disarmed.length}`);
@@ -5198,7 +5386,6 @@ if (mode === "verify") {
     settingsDrift.length ||
     skillDrift.length ||
     disarmed.length ||
-    qualityDrift.length ||
     indexDrift.length ||
     domDrift.length ||
     mutePromises.length ||
@@ -5206,6 +5393,7 @@ if (mode === "verify") {
     goneScope.length ||
     unclassified.length ||
     unfilledTemplate.length ||
+    scopeDrift.length ||
     danglingRefs.length ||
     deadExceptions.length ||
     danglingPaths.length ||
