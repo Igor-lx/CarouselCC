@@ -107,5 +107,3 @@ export const Diagnostic: CarouselSlotComponent<
   typeof DiagnosticBase,
   "diagnostic"
 > = Object.assign(DiagnosticBase, { slot: "diagnostic" as const });
-
-export default Diagnostic;
