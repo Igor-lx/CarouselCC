@@ -3971,6 +3971,26 @@ if (mode === "verify") {
       for (const line of readFileSync(at, "utf8").split(NEWLINE))
         if (/^#{2,}\s/.test(line))
           allHeads.add(line.replace(/^#+\s*/, "").trim());
+    // Скиллы — тот же корпус, что правила: их читают и по ним действуют, а
+    // именная ссылка внутри скилла не проверялась ничем. Найдено пробой:
+    // ссылка на несуществующий раздел прошла зелёной. Класс уже записан у
+    // ссылок markdown — сверка сужена по ИСТОЧНИКУ, хотя причина её про ЦЕЛЬ.
+    // Заголовки скиллов идут в тот же набор: скилл ссылается прежде всего на
+    // собственный раздел, и без них сверка краснела бы на законном.
+    const skillFiles =
+      CONFIG.skills == null
+        ? []
+        : (() => {
+            const dir = path.join(HERE, CONFIG.skills.dir);
+            if (!existsSync(dir)) return [];
+            return readdirSync(dir)
+              .map((n) => path.join(dir, n, "SKILL.md"))
+              .filter((at) => existsSync(at));
+          })();
+    for (const at of skillFiles)
+      for (const line of readFileSync(at, "utf8").split(NEWLINE))
+        if (/^#{2,}\s/.test(line))
+          allHeads.add(line.replace(/^#+\s*/, "").trim());
     const skip = new Set(CONFIG.rulesManifest.refExceptions);
     const skipUsed = new Set();
     const REF_RE = /(?:раздел[ае]?|§)\s+«([^»]+)»/g;
@@ -3985,6 +4005,13 @@ if (mode === "verify") {
         .filter(([, at]) => existsSync(at)),
       ...mdUnder(BASE).map((at) => [path.basename(at), at]),
       ...docFiles.map((at) => [rel(at), at]),
+      // Скилл лежит вне `src`, и общий `rel` его не укорачивает — адрес печатался
+      // бы абсолютным, в отличие от соседей по списку. Считается от корня
+      // репозитория, как в остальных режимах.
+      ...skillFiles.map((at) => [
+        norm(path.relative(path.join(HERE, ".."), at)),
+        at,
+      ]),
     ];
     for (const at of docFiles)
       for (const line of readFileSync(at, "utf8").split(NEWLINE))
