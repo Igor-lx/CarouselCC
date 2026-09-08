@@ -675,6 +675,7 @@ node .context/graph.mjs sizes    # непустых строк на файл (в
 | task | task.skill.template.md |
 | probe | probe.skill.template.md |
 | audit | audit.skill.template.md |
+| purpose | purpose.skill.template.md |
 
 **Область видимости скилла задаётся тем, где он лежит** — это измерено, а не
 выведено. Скиллы этого проекта объявлены в сессии как действующие «при работе с
